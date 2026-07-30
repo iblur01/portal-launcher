@@ -45,6 +45,8 @@ import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.ui.theme.scaled
 import com.iblu01.portallauncher.ui.theme.stateColor
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 /**
  * What the side panel is currently showing. Media auto-opens when playback starts
@@ -129,7 +131,7 @@ private fun ChipActionsContent(
             ) {
                 Icon(
                     Icons.Filled.Close,
-                    contentDescription = "Fermer le panneau",
+                    contentDescription = stringResource(R.string.side_panel_close_desc),
                     tint = AppleColors.secondary,
                     modifier = Modifier.size(18.dp.scaled()),
                 )

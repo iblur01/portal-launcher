@@ -17,6 +17,10 @@ import javax.inject.Inject
 class ClockThemeActivity : ComponentActivity() {
     @Inject lateinit var prefs: Prefs
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {

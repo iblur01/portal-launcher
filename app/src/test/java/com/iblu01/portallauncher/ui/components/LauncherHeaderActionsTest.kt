@@ -25,7 +25,7 @@ class LauncherHeaderActionsTest {
             LauncherHeaderActions(hiddenCount = 0, onShowHidden = {}, onSettings = { settings++ })
         }
 
-        rule.onNodeWithContentDescription("Réglages").performClick()
+        rule.onNodeWithContentDescription("Settings").performClick()
         rule.waitForIdle()
 
         assertEquals(1, settings)
@@ -39,8 +39,8 @@ class LauncherHeaderActionsTest {
         }
 
         // "Masquer" would be a one-way trip without this entry.
-        rule.onNodeWithContentDescription("Applications masquées (2)").assertIsDisplayed()
-        rule.onNodeWithContentDescription("Applications masquées (2)").performClick()
+        rule.onNodeWithContentDescription("Hidden apps (2)").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Hidden apps (2)").performClick()
         rule.waitForIdle()
 
         assertEquals(1, shown)
@@ -52,6 +52,6 @@ class LauncherHeaderActionsTest {
             LauncherHeaderActions(hiddenCount = 0, onShowHidden = {}, onSettings = {})
         }
 
-        rule.onNodeWithContentDescription("Applications masquées (0)").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Hidden apps (0)").assertDoesNotExist()
     }
 }

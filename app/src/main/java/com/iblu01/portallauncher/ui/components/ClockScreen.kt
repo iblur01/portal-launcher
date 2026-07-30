@@ -32,11 +32,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -197,8 +199,8 @@ fun ClockHeader(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Appartement ${temperatures.indoorMin}–${temperatures.indoorMax}", style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
-                Text("Ext. ${temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp}", style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
+                Text(stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
+                Text(stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
             }
             if (!connected && lastUpdateAt > 0L) {
                 Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
@@ -237,13 +239,13 @@ fun ClockTray(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    if (pillsExpanded) "Masquer les informations" else "Voir plus d’informations",
+                    if (pillsExpanded) stringResource(R.string.clock_collapse_pills) else stringResource(R.string.clock_expand_pills),
                     style = AppleTypography.bodySmall.copy(fontSize = 13.sp.scaled()),
                     color = AppleColors.secondary.copy(alpha = 0.62f),
                 )
                 Icon(
                     if (pillsExpanded) Icons.Outlined.KeyboardArrowDown else Icons.Outlined.KeyboardArrowUp,
-                    contentDescription = if (pillsExpanded) "Replier" else "Déplier",
+                    contentDescription = if (pillsExpanded) stringResource(R.string.clock_collapse_content_desc) else stringResource(R.string.clock_expand_content_desc),
                     tint = AppleColors.secondary.copy(alpha = 0.62f),
                 )
             }
@@ -275,7 +277,7 @@ private fun StaleBanner(lastUpdateAt: Long) {
             .padding(horizontal = 14.dp, vertical = 5.dp),
     ) {
         Text(
-            "Hors ligne — infos figées depuis $ago",
+            stringResource(R.string.clock_stale_banner_format, ago),
             style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
             color = Color(0xFFFFC062),
         )

@@ -39,8 +39,8 @@ class QuickActionsOverlayTest {
             )
         }
 
-        rule.onNodeWithText("Fond d’écran").performClick()
-        rule.onNodeWithText("Réglages").performClick()
+        rule.onNodeWithText("Wallpaper").performClick()
+        rule.onNodeWithText("Settings").performClick()
         rule.waitForIdle()
 
         assertEquals(1, wallpaper)
@@ -61,8 +61,8 @@ class QuickActionsOverlayTest {
             )
         }
 
-        rule.onNodeWithText("Définir comme launcher par défaut").assertIsDisplayed()
-        rule.onNodeWithText("Définir comme launcher par défaut").performClick()
+        rule.onNodeWithText("Set as default launcher").assertIsDisplayed()
+        rule.onNodeWithText("Set as default launcher").performClick()
         rule.waitForIdle()
 
         assertEquals(1, homeSettings)
@@ -82,7 +82,7 @@ class QuickActionsOverlayTest {
 
         // Started off-row, in the panel's own padding: a row's tap detector consumes the down, so a
         // drag begun on a row can never become a swipe. The panel's tap swallow must not do that.
-        val row = rule.onNodeWithText("Réglages").getUnclippedBoundsInRoot()
+        val row = rule.onNodeWithText("Settings").getUnclippedBoundsInRoot()
         rule.onRoot().performTouchInput {
             val x = with(rule.density) { row.left.toPx() } + 4f
             val y = with(rule.density) { row.top.toPx() } - 4f
@@ -137,6 +137,6 @@ class QuickActionsOverlayTest {
             )
         }
 
-        rule.onNodeWithText("Définir comme launcher par défaut").assertDoesNotExist()
+        rule.onNodeWithText("Set as default launcher").assertDoesNotExist()
     }
 }

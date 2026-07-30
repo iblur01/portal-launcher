@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 import kotlin.math.roundToInt
 
 /** iOS lock-screen letter groups shown under each digit. */
@@ -203,7 +205,7 @@ fun PinKeypad(
         if (!fixed && onCancel != null) {
             Spacer(Modifier.height(14.dp))
             Text(
-                "Annuler",
+                stringResource(R.string.keypad_cancel),
                 style = AppleTypography.bodyLarge,
                 color = AppleColors.secondary,
                 modifier = Modifier
@@ -237,7 +239,7 @@ private fun KeypadKey(
     if (key == "cancel") {
         Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
             Text(
-                "Annuler",
+                stringResource(R.string.keypad_cancel),
                 style = AppleTypography.bodyLarge,
                 color = AppleColors.secondary,
                 modifier = Modifier
@@ -255,6 +257,9 @@ private fun KeypadKey(
 
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val backDesc = stringResource(R.string.keypad_back_desc)
+    val okDesc = stringResource(R.string.keypad_confirm_desc)
+    val keyDescFormat = stringResource(R.string.keypad_key_desc_format)
     val background by animateColorAsState(
         if (pressed && enabled) Color.White.copy(alpha = 0.24f) else AppleColors.frostedFill,
         tween(if (pressed) 40 else 260), label = "keyPress",
@@ -272,7 +277,11 @@ private fun KeypadKey(
                 enabled = enabled,
                 onClick = onClick,
             )
-            .semantics { contentDescription = keyDescription(key) },
+            .semantics { contentDescription = when (key) {
+                "back" -> backDesc
+                "ok" -> okDesc
+                else -> java.lang.String.format(keyDescFormat, key)
+            } },
         contentAlignment = Alignment.Center,
     ) {
         when (key) {
@@ -291,10 +300,4 @@ private fun KeypadKey(
             }
         }
     }
-}
-
-private fun keyDescription(key: String): String = when (key) {
-    "back" -> "Effacer"
-    "ok" -> "Valider"
-    else -> "Touche $key"
 }

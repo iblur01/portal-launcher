@@ -22,9 +22,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.HaInstance
 import com.iblu01.portallauncher.HaMdnsDiscovery
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.components.ConnStatus
 import com.iblu01.portallauncher.ui.components.PillButton
 import com.iblu01.portallauncher.ui.components.SettingsDivider
@@ -76,7 +78,7 @@ fun SetupWizard(
 
     if (showKeyHelp) {
         SettingsInfoDialog(
-            title = "Où trouver ma clé ?",
+            title = stringResource(R.string.setup_label_where_to_find_key),
             lines = accessKeyHelpLines,
             onDismiss = { showKeyHelp = false },
         )
@@ -90,9 +92,9 @@ fun SetupWizard(
 
         when (step) {
             0 -> {
-                Text("Bienvenue", style = AppleTypography.headlineLarge, color = AppleColors.primary)
+                Text(stringResource(R.string.setup_welcome_title), style = AppleTypography.headlineLarge, color = AppleColors.primary)
                 Text(
-                    "Commençons par trouver ta maison. Assure-toi que Home Assistant est allumé sur le même réseau.",
+                    stringResource(R.string.setup_welcome_subtitle),
                     style = AppleTypography.bodyLarge,
                     color = AppleColors.secondary
                 )
@@ -110,57 +112,57 @@ fun SetupWizard(
                 }
                 if (discovered.isEmpty()) {
                     Text(
-                        "Recherche sur le réseau…",
+                        stringResource(R.string.setup_scanning_network),
                         style = AppleTypography.bodyMedium,
                         color = AppleColors.tertiary
                     )
                 }
 
-                SettingsSection(title = "OU SAISIS L'ADRESSE") {
+                SettingsSection(title = stringResource(R.string.setup_section_manual_address)) {
                     SettingsTextField(
-                        label = "Adresse",
+                        label = stringResource(R.string.setup_label_address),
                         value = haUrl,
                         onValueChange = onUrlChange,
-                        placeholder = "http://homeassistant.local:8123"
+                        placeholder = stringResource(R.string.setup_placeholder_address)
                     )
                 }
 
-                PillButton(label = "Continuer", primary = true, onClick = { step = 1 })
-                PillButton(label = "Configurer plus tard", onClick = onSkip)
+                PillButton(label = stringResource(R.string.setup_button_continue), primary = true, onClick = { step = 1 })
+                PillButton(label = stringResource(R.string.setup_button_configure_later), onClick = onSkip)
             }
 
             1 -> {
-                Text("Ta clé d'accès", style = AppleTypography.headlineLarge, color = AppleColors.primary)
+                Text(stringResource(R.string.setup_access_key_title), style = AppleTypography.headlineLarge, color = AppleColors.primary)
                 Text(
-                    "Pour laisser Portal lire l'état de ta maison, colle une clé d'accès créée dans Home Assistant.",
+                    stringResource(R.string.setup_access_key_subtitle),
                     style = AppleTypography.bodyLarge,
                     color = AppleColors.secondary
                 )
 
-                SettingsSection(title = "CLÉ D'ACCÈS") {
+                SettingsSection(title = stringResource(R.string.setup_section_access_key)) {
                     SettingsTextField(
-                        label = "Clé d'accès",
+                        label = stringResource(R.string.setup_label_access_key),
                         value = haToken,
                         onValueChange = onTokenChange,
-                        placeholder = "Colle ta clé ici",
+                        placeholder = stringResource(R.string.setup_placeholder_paste_key),
                         isPassword = true
                     )
                     SettingsDivider()
                     SettingsRow(
-                        label = "Où trouver ma clé ?",
+                        label = stringResource(R.string.setup_label_where_to_find_key),
                         onClick = { showKeyHelp = true }
                     )
                     SettingsDivider()
                     SettingsStatusRow(
-                        label = "Connexion",
+                        label = stringResource(R.string.setup_label_connection),
                         status = uiState.haTest,
                         detail = uiState.haTestMessage,
                         onClick = onTest,
                     )
                 }
 
-                PillButton(label = "Vérifier la connexion", primary = true, onClick = onTest)
-                PillButton(label = "Retour", onClick = { step = 0 })
+                PillButton(label = stringResource(R.string.setup_button_test_connection), primary = true, onClick = onTest)
+                PillButton(label = stringResource(R.string.setup_button_back), onClick = { step = 0 })
             }
 
             else -> {
@@ -170,13 +172,13 @@ fun SetupWizard(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text("Tout est prêt !", style = AppleTypography.headlineLarge, color = AppleColors.primary)
+                    Text(stringResource(R.string.setup_done_title), style = AppleTypography.headlineLarge, color = AppleColors.primary)
                     Text(
-                        "Portal va maintenant afficher l'état de ta maison.",
+                        stringResource(R.string.setup_done_subtitle),
                         style = AppleTypography.bodyLarge,
                         color = AppleColors.secondary
                     )
-                    PillButton(label = "Commencer", primary = true, onClick = onFinish)
+                    PillButton(label = stringResource(R.string.setup_button_start), primary = true, onClick = onFinish)
                 }
             }
         }

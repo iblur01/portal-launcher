@@ -21,13 +21,15 @@ import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.components.controls.VerticalSegmentedSelector
 import com.iblu01.portallauncher.ui.theme.AppleColors
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
-private enum class PurifierMode(val preset: String?, val label: String, val icon: ImageVector) {
-    AUTO("auto", "Auto", Icons.Outlined.AutoMode),
-    SLEEP("sleep", "Nuit", Icons.Outlined.Bedtime),
-    MANUAL("manual", "Manuel", Icons.Outlined.Tune),
-    PET("pet", "Animaux", Icons.Outlined.Pets),
-    OFF(null, "Arrêt", Icons.Outlined.PowerSettingsNew),
+private enum class PurifierMode(val preset: String?, val labelRes: Int, val icon: ImageVector) {
+    AUTO("auto", R.string.purifier_mode_auto, Icons.Outlined.AutoMode),
+    SLEEP("sleep", R.string.purifier_mode_sleep, Icons.Outlined.Bedtime),
+    MANUAL("manual", R.string.purifier_mode_manual, Icons.Outlined.Tune),
+    PET("pet", R.string.purifier_mode_pet, Icons.Outlined.Pets),
+    OFF(null, R.string.purifier_mode_off, Icons.Outlined.PowerSettingsNew),
 }
 
 @Composable
@@ -44,6 +46,14 @@ fun PurifierActions(chip: LauncherChip) {
         else -> PurifierMode.MANUAL
     }
 
+    val purifierLabels = mapOf(
+        PurifierMode.AUTO to stringResource(R.string.purifier_mode_auto),
+        PurifierMode.SLEEP to stringResource(R.string.purifier_mode_sleep),
+        PurifierMode.MANUAL to stringResource(R.string.purifier_mode_manual),
+        PurifierMode.PET to stringResource(R.string.purifier_mode_pet),
+        PurifierMode.OFF to stringResource(R.string.purifier_mode_off),
+    )
+
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         VerticalSegmentedSelector(
             options = PurifierMode.entries.toList(),
@@ -55,7 +65,7 @@ fun PurifierActions(chip: LauncherChip) {
                     callService("fan", "set_preset_mode", chip.entityId, mapOf("preset_mode" to mode.preset!!))
                 }
             },
-            label = { it.label },
+            label = { purifierLabels[it]!! },
             icon = { it.icon },
             accent = AppleColors.active,
             isNeutral = { it == PurifierMode.OFF },

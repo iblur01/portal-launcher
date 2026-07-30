@@ -37,6 +37,8 @@ import com.iblu01.portallauncher.ui.components.controls.PinKeypad
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 private const val ALARM_DOMAIN = "alarm_control_panel"
 
@@ -69,7 +71,7 @@ fun AlarmControl(chip: LauncherChip) {
                     entityId = chip.entityId,
                     service = service,
                     currentState = state,
-                    prompt = if (service == "alarm_disarm") "Entrez le code pour désarmer" else "Entrez le code",
+                    prompt = if (service == "alarm_disarm") stringResource(R.string.alarm_disarm_prompt) else stringResource(R.string.alarm_arm_prompt),
                     onCancel = if (pendingArm != null) ({ pendingArm = null }) else null,
                 )
             }
@@ -89,7 +91,7 @@ fun AlarmControl(chip: LauncherChip) {
                         .map { option ->
                             AccessoryItem(
                                 id = option.service,
-                                title = option.label,
+                                title = stringResource(option.labelRes),
                                 icon = option.icon,
                                 // Disarmed here, so no option is live — the tiles read as actions.
                                 on = state == option.armedState,
@@ -107,13 +109,13 @@ private enum class ArmOption(
     val feature: Int,
     val service: String,
     val armedState: String,
-    val label: String,
+    val labelRes: Int,
     val icon: ImageVector,
 ) {
-    AWAY(AlarmFeature.ARM_AWAY, "alarm_arm_away", "armed_away", "Absence", Icons.Outlined.Luggage),
-    HOME(AlarmFeature.ARM_HOME, "alarm_arm_home", "armed_home", "Présence", Icons.Outlined.Home),
-    NIGHT(AlarmFeature.ARM_NIGHT, "alarm_arm_night", "armed_night", "Nuit", Icons.Outlined.Bedtime),
-    VACATION(AlarmFeature.ARM_VACATION, "alarm_arm_vacation", "armed_vacation", "Vacances", Icons.Outlined.NightShelter),
+    AWAY(AlarmFeature.ARM_AWAY, "alarm_arm_away", "armed_away", R.string.alarm_mode_away, Icons.Outlined.Luggage),
+    HOME(AlarmFeature.ARM_HOME, "alarm_arm_home", "armed_home", R.string.alarm_mode_home, Icons.Outlined.Home),
+    NIGHT(AlarmFeature.ARM_NIGHT, "alarm_arm_night", "armed_night", R.string.alarm_mode_night, Icons.Outlined.Bedtime),
+    VACATION(AlarmFeature.ARM_VACATION, "alarm_arm_vacation", "armed_vacation", R.string.alarm_mode_vacation, Icons.Outlined.NightShelter),
 }
 
 @Composable
@@ -129,7 +131,7 @@ private fun DisarmButton(highlight: Boolean, onClick: () -> Unit) {
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text("Désarmer", style = AppleTypography.titleMedium.copy(fontSize = 17.sp), color = color)
+        Text(stringResource(R.string.alarm_disarm_button), style = AppleTypography.titleMedium.copy(fontSize = 17.sp), color = color)
     }
 }
 

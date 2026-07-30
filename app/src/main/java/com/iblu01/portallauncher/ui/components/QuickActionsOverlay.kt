@@ -44,8 +44,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -126,18 +128,18 @@ fun QuickActionsOverlay(
                 if (!isDefaultHome) {
                     // Without the home role there are no app shortcuts and no pinned-shortcut
                     // requests, so this is the first thing to offer, not a footnote.
-                    MenuRow(Icons.Outlined.Home, "Définir comme launcher par défaut") {
+                    MenuRow(Icons.Outlined.Home, stringResource(R.string.quick_actions_set_default_home)) {
                         onDismiss(); onOpenHomeSettings()
                     }
                     MenuDivider()
                 }
-                MenuRow(Icons.Outlined.Widgets, "Ajouter un widget") { onDismiss(); onAddWidget() }
+                MenuRow(Icons.Outlined.Widgets, stringResource(R.string.quick_actions_add_widget)) { onDismiss(); onAddWidget() }
                 MenuDivider()
-                MenuRow(Icons.Outlined.Wallpaper, "Fond d’écran") { onDismiss(); onSetWallpaper() }
+                MenuRow(Icons.Outlined.Wallpaper, stringResource(R.string.quick_actions_wallpaper)) { onDismiss(); onSetWallpaper() }
                 MenuDivider()
-                MenuRow(Icons.Outlined.Settings, "Réglages") { onDismiss(); onSettings() }
+                MenuRow(Icons.Outlined.Settings, stringResource(R.string.quick_actions_settings)) { onDismiss(); onSettings() }
                 MenuDivider()
-                MenuRow(Icons.Outlined.Tune, "Composants (test)") { onDismiss(); onOpenPlayground() }
+                MenuRow(Icons.Outlined.Tune, stringResource(R.string.quick_actions_playground)) { onDismiss(); onOpenPlayground() }
             }
             }
         }

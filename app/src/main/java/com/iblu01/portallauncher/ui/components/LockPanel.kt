@@ -19,6 +19,8 @@ import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.components.controls.VerticalSwitch
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 /**
  * HomeKit-style lock as a 2-position toggle: up/green is locked, down/amber is unlocked.
@@ -34,7 +36,7 @@ fun LockControl(chip: LauncherChip) {
     val jammed = state == "jammed"
 
     val accent = if (jammed) AppleColors.error else AppleColors.active
-    val caption = when { jammed -> "Bloquée"; locked -> "Verrouillée"; else -> "Déverrouillée" }
+    val caption = when { jammed -> stringResource(R.string.lock_state_jammed); locked -> stringResource(R.string.lock_state_locked); else -> stringResource(R.string.lock_state_unlocked) }
 
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(6.dp))

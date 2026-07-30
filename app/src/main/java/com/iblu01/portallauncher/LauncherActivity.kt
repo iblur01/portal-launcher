@@ -121,6 +121,10 @@ import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class LauncherActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
     @Inject lateinit var prefs: Prefs
     @Inject lateinit var pills: PillRepository
     private var lastLaunchMs = 0L
@@ -269,7 +273,7 @@ class LauncherActivity : ComponentActivity() {
         val pkg = prefs.homeAssistantPackage
         val intent = packageManager.getLaunchIntentForPackage(pkg)
         if (intent == null) {
-            Toast.makeText(this, "Application introuvable: $pkg", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.toast_app_not_found_pkg_format, pkg), Toast.LENGTH_LONG).show()
             return
         }
         DeviceStateHub.noteLaunchingApp(pkg, this)
@@ -285,13 +289,13 @@ class LauncherActivity : ComponentActivity() {
         DeviceStateHub.noteLaunchingApp(item.packageName, this)
         val intent = LauncherAppsFacade.launchIntent(this, item.packageName, item.activityName)
         if (intent == null) {
-            Toast.makeText(this, "Application introuvable : ${item.label}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_app_not_found_label_format, item.label), Toast.LENGTH_SHORT).show()
             return
         }
         openingFromLauncher = true
         runCatching { startActivity(intent) }.onFailure {
             openingFromLauncher = false
-            Toast.makeText(this, "Impossible d’ouvrir ${item.label}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_cannot_open_app_format, item.label), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -302,7 +306,7 @@ class LauncherActivity : ComponentActivity() {
 
     private fun setWallpaper() {
         openFromLauncher(
-            Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Choisir un fond d’écran")
+            Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), getString(R.string.toast_choose_wallpaper))
         )
     }
 

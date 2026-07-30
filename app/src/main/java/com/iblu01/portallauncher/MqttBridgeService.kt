@@ -79,7 +79,7 @@ class MqttBridgeService : Service() {
         super.onCreate()
         createChannel()
         prefs = Prefs(this)
-        startForeground(NOTIF_ID, notification("Starting"))
+        startForeground(NOTIF_ID, notification(getString(R.string.app_name)))
 
         DeviceStateHub.init(this)
         ScreenControl.enableAccessibility(this)
@@ -439,7 +439,7 @@ class MqttBridgeService : Service() {
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Portal Launcher", NotificationManager.IMPORTANCE_LOW))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, getString(R.string.notification_channel_name), NotificationManager.IMPORTANCE_LOW))
         }
     }
 
@@ -452,7 +452,7 @@ class MqttBridgeService : Service() {
         }
         return builder
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Portal Launcher")
+            .setContentTitle(getString(R.string.notification_content_title))
             .setContentText(text)
             .setOngoing(true)
             .build()
@@ -469,8 +469,8 @@ class MqttBridgeService : Service() {
     }
 
     private fun powerModeLabel(mode: PowerMode) = when (mode) {
-        PowerMode.ALWAYS_ON -> "Always on"
-        PowerMode.FOLLOW_PRESENCE -> "Follow presence"
+        PowerMode.ALWAYS_ON -> getString(R.string.power_mode_always_on)
+        PowerMode.FOLLOW_PRESENCE -> getString(R.string.power_mode_follow_presence)
     }
 
     private fun localIp(): String? = try {

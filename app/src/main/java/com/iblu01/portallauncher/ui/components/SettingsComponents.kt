@@ -496,12 +496,15 @@ fun SettingsTile(
     }
 }
 
-/** Back button + title bar for settings sub-pages. */
+/** Back button + title bar for settings sub-pages.
+ *  [showBack] is false in the two-pane tablet layout, where the sidebar is the navigation
+ *  and a back chevron in the detail pane would be redundant. */
 @Composable
 fun SettingsSubPageHeader(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    showBack: Boolean = true,
 ) {
     Row(
         modifier = modifier
@@ -509,28 +512,83 @@ fun SettingsSubPageHeader(
             .padding(bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(AppleShapes.section)
-                .background(AppleColors.elevated, AppleShapes.section)
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.section)
-                .appleClickable(onBack),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Outlined.ChevronLeft,
-                contentDescription = "Retour",
-                tint = AppleColors.accent,
-                modifier = Modifier.size(22.dp)
-            )
+        if (showBack) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(AppleShapes.section)
+                    .background(AppleColors.elevated, AppleShapes.section)
+                    .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.section)
+                    .appleClickable(onBack),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Outlined.ChevronLeft,
+                    contentDescription = "Retour",
+                    tint = AppleColors.accent,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(Modifier.width(16.dp))
         }
-        Spacer(Modifier.width(16.dp))
         Text(
             title,
             style = AppleTypography.headlineLarge,
             color = AppleColors.primary
         )
+    }
+}
+
+/** Fixed-width navigation rail for the two-pane tablet settings layout (width >= 840dp).
+ *  One row per section; the selected section is highlighted, mirroring Android's own
+ *  Settings app list-detail pattern. */
+@Composable
+fun <T> SettingsSidebar(
+    items: List<Triple<T, ImageVector, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    header: String = "Portal Launcher",
+) {
+    Column(
+        modifier = modifier
+            .width(300.dp)
+            .fillMaxWidth()
+            .padding(end = 16.dp)
+    ) {
+        Text(
+            header,
+            style = AppleTypography.headlineLarge,
+            color = AppleColors.primary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 16.dp)
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            items.forEach { (value, icon, title) ->
+                val isSelected = value == selected
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(AppleShapes.section)
+                        .background(if (isSelected) AppleColors.accent.copy(alpha = 0.15f) else Color.Transparent, AppleShapes.section)
+                        .appleClickable { onSelect(value) }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = if (isSelected) AppleColors.accent else AppleColors.secondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Text(
+                        title,
+                        style = AppleTypography.titleMedium,
+                        color = if (isSelected) AppleColors.accent else AppleColors.primary
+                    )
+                }
+            }
+        }
     }
 }
 

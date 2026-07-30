@@ -35,6 +35,8 @@ import com.iblu01.portallauncher.ui.components.appleClickable
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 /** A room the robot knows about. [icon] is optional. */
 data class VacuumRoom(val id: String, val name: String, val icon: ImageVector? = null)
@@ -43,11 +45,12 @@ data class VacuumRoom(val id: String, val name: String, val icon: ImageVector? =
 enum class VacuumMode { VACUUM, VACUUM_AND_MOP, VACUUM_THEN_MOP, MOP }
 
 /** French label for a [VacuumMode], ready for a [WheelPicker]. */
+@Composable
 fun VacuumMode.frLabel(): String = when (this) {
-    VacuumMode.VACUUM -> "Aspiration"
-    VacuumMode.VACUUM_AND_MOP -> "Aspiration + lavage"
-    VacuumMode.VACUUM_THEN_MOP -> "Aspiration puis lavage"
-    VacuumMode.MOP -> "Lavage"
+    VacuumMode.VACUUM -> stringResource(R.string.vacuum_mode_vacuum)
+    VacuumMode.VACUUM_AND_MOP -> stringResource(R.string.vacuum_mode_vacuum_and_mop)
+    VacuumMode.VACUUM_THEN_MOP -> stringResource(R.string.vacuum_mode_vacuum_then_mop)
+    VacuumMode.MOP -> stringResource(R.string.vacuum_mode_mop)
 }
 
 /**
@@ -73,7 +76,7 @@ fun VacuumRunButton(
     ) {
         Icon(
             if (running) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-            contentDescription = if (running) "Mettre en pause" else "Démarrer",
+            contentDescription = if (running) stringResource(R.string.vacuum_pause_desc) else stringResource(R.string.vacuum_start_desc),
             tint = Color.Black,
             modifier = Modifier.size(size * 0.34f),
         )

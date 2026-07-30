@@ -38,10 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 import com.iblu01.portallauncher.ui.components.AmbientBackground
 import com.iblu01.portallauncher.ui.components.ClockScreen
@@ -129,7 +131,7 @@ fun ClockThemeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // Font picker.
-            ControlLabel("Police")
+            ControlLabel(stringResource(R.string.clock_theme_label_font))
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -161,7 +163,7 @@ fun ClockThemeScreen(
 
             // Weight.
             LabeledSlider(
-                label = "Graisse",
+                label = stringResource(R.string.clock_theme_label_weight),
                 value = theme.weight.toFloat(),
                 range = ClockTheme.WeightRange,
                 valueText = theme.weight.toString(),
@@ -169,7 +171,7 @@ fun ClockThemeScreen(
             )
             // Size.
             LabeledSlider(
-                label = "Taille",
+                label = stringResource(R.string.clock_theme_label_size),
                 value = theme.size,
                 range = ClockTheme.SizeRange,
                 valueText = "${theme.size.roundToInt()}",
@@ -177,7 +179,7 @@ fun ClockThemeScreen(
             )
             // Letter spacing.
             LabeledSlider(
-                label = "Espacement",
+                label = stringResource(R.string.clock_theme_label_letter_spacing),
                 value = theme.letterSpacing,
                 range = ClockTheme.LetterSpacingRange,
                 valueText = "%.1f".format(theme.letterSpacing),
@@ -185,7 +187,7 @@ fun ClockThemeScreen(
             )
             // Vertical gap between date / time / weather-temperature rows.
             LabeledSlider(
-                label = "Écart entre éléments",
+                label = stringResource(R.string.clock_theme_label_element_spacing),
                 value = theme.elementSpacing,
                 range = ClockTheme.ElementSpacingRange,
                 valueText = "%.1f×".format(theme.elementSpacing),
@@ -193,7 +195,7 @@ fun ClockThemeScreen(
             )
 
             // Tint.
-            ControlLabel("Couleur")
+            ControlLabel(stringResource(R.string.clock_theme_label_color))
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 ClockTint.entries.forEach { tint ->
                     val selected = tint == theme.tint
@@ -217,7 +219,7 @@ fun ClockThemeScreen(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ControlLabel("Format 24 h")
+                ControlLabel(stringResource(R.string.clock_theme_label_format_24h))
                 Spacer(Modifier.weight(1f))
                 Switch(
                     checked = theme.format24h,
@@ -239,7 +241,7 @@ fun ClockThemeScreen(
                 .clickable { onClose() },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Filled.Close, "Fermer", tint = AppleColors.secondary, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.Close, stringResource(R.string.clock_theme_close), tint = AppleColors.secondary, modifier = Modifier.size(20.dp))
         }
     }
 }

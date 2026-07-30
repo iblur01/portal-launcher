@@ -61,12 +61,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.PlayingMedia
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -141,7 +143,7 @@ fun MediaPlayerView(
         0 -> fallbackSourceName
         1 -> media.playerNames.first()
         2 -> "${media.playerNames[0]} + ${media.playerNames[1]}"
-        else -> "${media.playerNames.first()} + ${media.playerNames.size - 1} autres"
+        else -> stringResource(R.string.media_source_many_format, media.playerNames.first(), media.playerNames.size - 1)
     }
 
     BoxWithConstraints(
@@ -264,12 +266,12 @@ fun MediaPlayerView(
                             AsyncImage(
                                 model = imageRequest,
                                 imageLoader = imageLoader,
-                                contentDescription = "Pochette de ${media.title}",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Icon(Icons.Outlined.MusicNote, "Aucune pochette", tint = AppleColors.secondary, modifier = Modifier.size(64.dp))
+            contentDescription = stringResource(R.string.media_cover_desc_format, media.title),
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        } else {
+                                            Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(64.dp))
                         }
                     }
 
@@ -313,13 +315,13 @@ fun MediaPlayerView(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(onClick = onPrevious, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Filled.SkipPrevious, "Titre précédent", tint = AppleColors.primary, modifier = Modifier.size(22.dp))
+                                Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_previous_track_desc), tint = AppleColors.primary, modifier = Modifier.size(22.dp))
                             }
                             IconButton(onClick = onPlayPause, modifier = Modifier.size(50.dp).background(Color.White, CircleShape)) {
-                                Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) "Pause" else "Lecture", tint = Color.Black, modifier = Modifier.size(28.dp))
+                                Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) stringResource(R.string.media_pause_desc) else stringResource(R.string.media_play_desc), tint = Color.Black, modifier = Modifier.size(28.dp))
                             }
                             IconButton(onClick = onNext, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Filled.SkipNext, "Titre suivant", tint = AppleColors.primary, modifier = Modifier.size(22.dp))
+                                Icon(Icons.Filled.SkipNext, stringResource(R.string.media_next_track_desc), tint = AppleColors.primary, modifier = Modifier.size(22.dp))
                             }
                         }
 
@@ -333,8 +335,8 @@ fun MediaPlayerView(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(7.dp)
                         ) {
-                            Icon(if (media.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp, "Volume", tint = AppleColors.secondary, modifier = Modifier.size(18.dp))
-                            Text(if (media.players.size > 1) "Volumes · ${media.players.size} appareils" else "Volume · ${media.volumePercent}%", style = AppleTypography.bodySmall.copy(fontSize = 12.sp), color = AppleColors.primary)
+                            Icon(if (media.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp, stringResource(R.string.media_volume_desc), tint = AppleColors.secondary, modifier = Modifier.size(18.dp))
+                            Text(if (media.players.size > 1) stringResource(R.string.media_volume_multi_format, media.players.size) else stringResource(R.string.media_volume_single_format, media.volumePercent), style = AppleTypography.bodySmall.copy(fontSize = 12.sp), color = AppleColors.primary)
                         }
                     }
                 }
@@ -350,7 +352,7 @@ fun MediaPlayerView(
                             .clickable { onDismiss() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = "Fermer le lecteur", tint = AppleColors.secondary, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_close_player_desc), tint = AppleColors.secondary, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -376,7 +378,7 @@ fun MediaPlayerView(
                                 .clickable { onDismiss() },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(Icons.Filled.Close, contentDescription = "Fermer le lecteur", tint = AppleColors.secondary, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_close_player_desc), tint = AppleColors.secondary, modifier = Modifier.size(18.dp))
                         }
                     }
                     Row(
@@ -403,10 +405,10 @@ fun MediaPlayerView(
                         .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(28.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (imageRequest != null) {
-                        AsyncImage(model = imageRequest, imageLoader = imageLoader, contentDescription = "Pochette de ${media.title}", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else {
-                        Icon(Icons.Outlined.MusicNote, "Aucune pochette", tint = AppleColors.secondary, modifier = Modifier.size(82.dp))
+                        if (imageRequest != null) {
+                            AsyncImage(model = imageRequest, imageLoader = imageLoader, contentDescription = stringResource(R.string.media_cover_desc_format, media.title), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        } else {
+                            Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(82.dp))
                     }
                 }
 
@@ -434,13 +436,13 @@ fun MediaPlayerView(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onPrevious, modifier = Modifier.size(46.dp)) {
-                        Icon(Icons.Filled.SkipPrevious, "Titre précédent", tint = AppleColors.primary, modifier = Modifier.size(26.dp))
+                        Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_previous_track_desc), tint = AppleColors.primary, modifier = Modifier.size(26.dp))
                     }
                     IconButton(onClick = onPlayPause, modifier = Modifier.size(58.dp).background(Color.White, CircleShape)) {
-                        Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) "Pause" else "Lecture", tint = Color.Black, modifier = Modifier.size(32.dp))
+                        Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) stringResource(R.string.media_pause_desc) else stringResource(R.string.media_play_desc), tint = Color.Black, modifier = Modifier.size(32.dp))
                     }
                     IconButton(onClick = onNext, modifier = Modifier.size(46.dp)) {
-                        Icon(Icons.Filled.SkipNext, "Titre suivant", tint = AppleColors.primary, modifier = Modifier.size(26.dp))
+                        Icon(Icons.Filled.SkipNext, stringResource(R.string.media_next_track_desc), tint = AppleColors.primary, modifier = Modifier.size(26.dp))
                     }
                 }
 
@@ -454,8 +456,8 @@ fun MediaPlayerView(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
-                    Icon(if (media.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp, "Volume", tint = AppleColors.secondary, modifier = Modifier.size(20.dp))
-                    Text(if (media.players.size > 1) "Volumes · ${media.players.size} appareils" else "Volume · ${media.volumePercent}%", style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.primary)
+                    Icon(if (media.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp, stringResource(R.string.media_volume_desc), tint = AppleColors.secondary, modifier = Modifier.size(20.dp))
+                    Text(if (media.players.size > 1) stringResource(R.string.media_volume_multi_format, media.players.size) else stringResource(R.string.media_volume_single_format, media.volumePercent), style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.primary)
                 }
             }
         }
@@ -485,7 +487,7 @@ fun MediaPlayerView(
                     }
                     if (secondaryMedia.size > 2) {
                         Text(
-                            "+ ${secondaryMedia.size - 2} autres",
+                            stringResource(R.string.media_secondary_more_format, secondaryMedia.size - 2),
                             style = AppleTypography.bodySmall,
                             color = AppleColors.secondary,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -509,7 +511,7 @@ fun MediaPlayerView(
                 }
                 if (secondaryMedia.size > 2) {
                     Text(
-                        "+ ${secondaryMedia.size - 2} autres lectures actives",
+                        stringResource(R.string.media_secondary_more_active_format, secondaryMedia.size - 2),
                         style = AppleTypography.bodySmall,
                         color = AppleColors.secondary,
                     )
@@ -528,7 +530,7 @@ fun MediaPlayerView(
                         modifier = Modifier.padding(24.dp).fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
-                        Text("Volumes", style = AppleTypography.headlineLarge.copy(fontSize = 24.sp), color = AppleColors.primary)
+                        Text(stringResource(R.string.media_volume_dialog_title), style = AppleTypography.headlineLarge.copy(fontSize = 24.sp), color = AppleColors.primary)
                         (media.players.ifEmpty {
                             listOf(com.iblu01.portallauncher.domain.model.MediaPlayerVolume(media.entityId, sourceName, media.volumePercent, media.isMuted))
                         }).forEach { player ->
@@ -553,7 +555,7 @@ fun MediaPlayerView(
                             }
                         }
                         Text(
-                            "Fermer",
+                            stringResource(R.string.media_volume_dialog_close),
                             modifier = Modifier.align(Alignment.End).clip(AppleShapes.pill).clickable { volumeDialogVisible = false }
                                 .background(AppleColors.frostedFill).padding(horizontal = 18.dp, vertical = 10.dp),
                             style = AppleTypography.titleMedium,
@@ -574,8 +576,8 @@ fun MediaPlayerView(
                         modifier = Modifier.padding(24.dp).fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Text("Diffuser dans", style = AppleTypography.headlineLarge.copy(fontSize = 24.sp), color = AppleColors.primary)
-                        Text("Sélectionne les appareils à coupler avec $sourceName", style = AppleTypography.bodySmall, color = AppleColors.secondary)
+                        Text(stringResource(R.string.media_group_dialog_title), style = AppleTypography.headlineLarge.copy(fontSize = 24.sp), color = AppleColors.primary)
+                        Text(stringResource(R.string.media_group_dialog_subtitle_format, sourceName), style = AppleTypography.bodySmall, color = AppleColors.secondary)
                         media.groupablePlayers.forEach { player ->
                             val isLeader = player.entityId == media.entityId
                             val isMember = isLeader || player.entityId in selectedGroupMembers
@@ -601,11 +603,11 @@ fun MediaPlayerView(
                                         .background(if (isMember) AppleColors.active else Color.Transparent),
                                 )
                                 Text(player.name, modifier = Modifier.weight(1f), style = AppleTypography.titleMedium, color = AppleColors.primary)
-                                if (isLeader) Text("Principal", style = AppleTypography.bodySmall, color = AppleColors.secondary)
+                                if (isLeader) Text(stringResource(R.string.media_group_leader_label), style = AppleTypography.bodySmall, color = AppleColors.secondary)
                             }
                         }
                         Text(
-                            "Fermer",
+                            stringResource(R.string.media_group_dialog_close),
                             modifier = Modifier.align(Alignment.End).clip(AppleShapes.pill).clickable { groupDialogVisible = false }
                                 .background(AppleColors.frostedFill).padding(horizontal = 18.dp, vertical = 10.dp),
                             style = AppleTypography.titleMedium,
@@ -635,7 +637,7 @@ private fun SwipeIncomingCard(
         0 -> media.entityId.substringAfter('.').replace('_', ' ')
         1 -> media.playerNames.first()
         2 -> "${media.playerNames[0]} + ${media.playerNames[1]}"
-        else -> "${media.playerNames.first()} + ${media.playerNames.size - 1} autres"
+        else -> stringResource(R.string.media_source_many_format, media.playerNames.first(), media.playerNames.size - 1)
     }
     Box(
         modifier = modifier.clip(AppleShapes.panel).background(Color.Black.copy(alpha = 0.86f))
@@ -723,18 +725,18 @@ private fun MiniMediaPlayer(
             Text(media.artist, style = AppleTypography.bodySmall.copy(fontSize = 11.sp), color = AppleColors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         IconButton(onClick = onPrevious, modifier = Modifier.size(30.dp)) {
-            Icon(Icons.Filled.SkipPrevious, "Titre précédent dans $rooms", tint = AppleColors.primary, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_mini_previous_desc_format, rooms), tint = AppleColors.primary, modifier = Modifier.size(20.dp))
         }
         IconButton(onClick = onPlayPause, modifier = Modifier.size(38.dp).background(Color.White, CircleShape)) {
             Icon(
                 if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                if (playing) "Mettre en pause $rooms" else "Lire dans $rooms",
+                if (playing) stringResource(R.string.media_mini_pause_desc_format, rooms) else stringResource(R.string.media_mini_play_desc_format, rooms),
                 tint = Color.Black,
                 modifier = Modifier.size(22.dp),
             )
         }
         IconButton(onClick = onNext, modifier = Modifier.size(30.dp)) {
-            Icon(Icons.Filled.SkipNext, "Titre suivant dans $rooms", tint = AppleColors.primary, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.SkipNext, stringResource(R.string.media_mini_next_desc_format, rooms), tint = AppleColors.primary, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -804,18 +806,18 @@ private fun MiniMediaPlayerVertical(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             IconButton(onClick = onPrevious, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Filled.SkipPrevious, "Titre précédent dans $rooms", tint = AppleColors.primary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_vertical_previous_desc_format, rooms), tint = AppleColors.primary, modifier = Modifier.size(20.dp))
             }
             IconButton(onClick = onPlayPause, modifier = Modifier.size(38.dp).background(Color.White, CircleShape)) {
                 Icon(
                     if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    if (playing) "Mettre en pause $rooms" else "Lire dans $rooms",
+                    if (playing) stringResource(R.string.media_vertical_pause_desc_format, rooms) else stringResource(R.string.media_vertical_play_desc_format, rooms),
                     tint = Color.Black,
                     modifier = Modifier.size(22.dp),
                 )
             }
             IconButton(onClick = onNext, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Filled.SkipNext, "Titre suivant dans $rooms", tint = AppleColors.primary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.SkipNext, stringResource(R.string.media_vertical_next_desc_format, rooms), tint = AppleColors.primary, modifier = Modifier.size(20.dp))
             }
         }
     }

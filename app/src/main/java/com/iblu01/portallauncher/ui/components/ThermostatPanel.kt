@@ -38,6 +38,8 @@ import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -117,7 +119,7 @@ fun ThermostatControl(chip: LauncherChip) {
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(fmt(target), style = AppleTypography.displayLarge.copy(fontSize = 64.sp), color = AppleColors.primary)
-                if (current != null) Text("actuel ${fmt(current)}", style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+                if (current != null) Text(stringResource(R.string.thermostat_current_temp_format, fmt(current)), style = AppleTypography.bodyLarge, color = AppleColors.secondary)
             }
         }
         Spacer(Modifier.height(20.dp))
@@ -127,7 +129,24 @@ fun ThermostatControl(chip: LauncherChip) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 for (i in 0 until modes.length()) {
                     val m = modes.optString(i).lowercase()
-                    val (label, icon) = hvacLabel(m)
+                    val label = when (m) {
+                        "off" -> stringResource(R.string.hvac_mode_off)
+                        "heat" -> stringResource(R.string.hvac_mode_heat)
+                        "cool" -> stringResource(R.string.hvac_mode_cool)
+                        "heat_cool", "auto" -> stringResource(R.string.hvac_mode_auto)
+                        "dry" -> stringResource(R.string.hvac_mode_dry)
+                        "fan_only" -> stringResource(R.string.hvac_mode_fan_only)
+                        else -> m.replaceFirstChar { it.uppercase() }
+                    }
+                    val icon = when (m) {
+                        "off" -> Icons.Outlined.PowerSettingsNew
+                        "heat" -> Icons.Outlined.LocalFireDepartment
+                        "cool" -> Icons.Outlined.AcUnit
+                        "heat_cool", "auto" -> Icons.Outlined.AutoMode
+                        "dry" -> Icons.Outlined.WaterDrop
+                        "fan_only" -> Icons.Outlined.Air
+                        else -> Icons.Outlined.AutoMode
+                    }
                     PanelModeButton(label, icon, active = m == mode) {
                         callService("climate", "set_hvac_mode", chip.entityId, mapOf("hvac_mode" to m))
                     }
@@ -135,14 +154,4 @@ fun ThermostatControl(chip: LauncherChip) {
             }
         }
     }
-}
-
-private fun hvacLabel(mode: String): Pair<String, ImageVector> = when (mode) {
-    "off" -> "Éteint" to Icons.Outlined.PowerSettingsNew
-    "heat" -> "Chauffe" to Icons.Outlined.LocalFireDepartment
-    "cool" -> "Froid" to Icons.Outlined.AcUnit
-    "heat_cool", "auto" -> "Auto" to Icons.Outlined.AutoMode
-    "dry" -> "Sec" to Icons.Outlined.WaterDrop
-    "fan_only" -> "Ventil." to Icons.Outlined.Air
-    else -> mode.replaceFirstChar { it.uppercase() } to Icons.Outlined.AutoMode
 }

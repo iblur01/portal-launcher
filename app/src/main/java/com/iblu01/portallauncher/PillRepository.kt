@@ -1,6 +1,8 @@
 package com.iblu01.portallauncher
 
+import android.content.Context
 import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.iblu01.portallauncher.domain.MediaSessionBuilder
 import com.iblu01.portallauncher.domain.model.ForecastPoint
 import com.iblu01.portallauncher.domain.model.PillSnapshot
@@ -31,7 +33,8 @@ import javax.inject.Singleton
  * pull-consumers with a trailing debounce.
  */
 @Singleton
-class PillRepository @Inject constructor() {
+class PillRepository @Inject constructor(@ApplicationContext private val appContext: Context) {
+    private val priorityEngine = PillPriorityEngine(appContext)
     /** Lightweight change notifier for pull-consumers (the weather card). Carries no payload —
      *  consumers read the cache fields below. */
     fun interface Listener { fun onData() }
@@ -160,7 +163,7 @@ class PillRepository @Inject constructor() {
                 val rules = rulesProvider()   // read once per emission
                 val media = MediaSessionBuilder.build(s.states, haUrl, prevPrimaryIds)
                 val snapshot = PillSnapshot(
-                    chips = PillPriorityEngine.select(rules, s.states),
+                    chips = priorityEngine.select(rules, s.states),
                     media = media,
                     temperatures = temperatureSummary(rules, s.states),
                     connected = s.connected,

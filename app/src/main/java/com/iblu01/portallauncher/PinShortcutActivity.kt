@@ -22,11 +22,15 @@ import com.iblu01.portallauncher.ui.apps.toAndroidBitmap
  */
 class PinShortcutActivity : ComponentActivity() {
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val label = acceptPinRequest()
         if (label != null) {
-            Toast.makeText(this, "Raccourci ajouté : $label", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_shortcut_added_format, label), Toast.LENGTH_SHORT).show()
         }
         finish()
     }

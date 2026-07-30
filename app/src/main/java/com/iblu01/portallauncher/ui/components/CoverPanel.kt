@@ -25,6 +25,8 @@ import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 import kotlin.math.roundToInt
 
 @Composable
@@ -45,10 +47,10 @@ fun CoverControl(chip: LauncherChip) {
             when {
                 canSetPosition -> "${sliderPos.roundToInt()} %"
                 position in 0..100 -> "$position %"
-                state == "open" -> "Ouvert"
-                state == "closed" -> "Fermé"
-                state == "opening" -> "Ouverture…"
-                state == "closing" -> "Fermeture…"
+                state == "open" -> stringResource(R.string.cover_state_open)
+                state == "closed" -> stringResource(R.string.cover_state_closed)
+                state == "opening" -> stringResource(R.string.cover_state_opening)
+                state == "closing" -> stringResource(R.string.cover_state_closing)
                 else -> chip.value
             },
             style = AppleTypography.headlineLarge,
@@ -76,19 +78,19 @@ fun CoverControl(chip: LauncherChip) {
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             GlassButton(
-                label = "Ouvrir",
+                label = stringResource(R.string.cover_button_open),
                 icon = Icons.Outlined.KeyboardArrowUp,
                 active = state == "opening",
                 onClick = { callService("cover", "open_cover", chip.entityId) },
             )
             GlassButton(
-                label = "Stop",
+                label = stringResource(R.string.cover_button_stop),
                 icon = Icons.Filled.Stop,
                 active = false,
                 onClick = { callService("cover", "stop_cover", chip.entityId) },
             )
             GlassButton(
-                label = "Fermer",
+                label = stringResource(R.string.cover_button_close),
                 icon = Icons.Outlined.KeyboardArrowDown,
                 active = state == "closing",
                 onClick = { callService("cover", "close_cover", chip.entityId) },

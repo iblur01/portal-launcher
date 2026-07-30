@@ -37,6 +37,8 @@ import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun AirQualityContent(chip: LauncherChip, onBack: () -> Unit) {
@@ -84,13 +86,13 @@ private fun AirQualityHeader(onBack: () -> Unit) {
         ) {
             Icon(
                 Icons.Filled.ArrowBack,
-                contentDescription = "Retour",
+                contentDescription = stringResource(R.string.air_quality_back_desc),
                 tint = AppleColors.secondary,
                 modifier = Modifier.size(18.dp),
             )
         }
         Text(
-            "Qualité de l'air",
+            stringResource(R.string.air_quality_panel_title),
             style = AppleTypography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 1.sp),
             color = AppleColors.tertiary,
             modifier = Modifier.align(Alignment.Center),

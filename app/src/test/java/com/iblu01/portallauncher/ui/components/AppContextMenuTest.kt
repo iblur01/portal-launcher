@@ -62,9 +62,9 @@ class AppContextMenuTest {
             )
         }
 
-        rule.onNodeWithText("Masquer").assertIsDisplayed()
-        rule.onNodeWithText("Infos de l’application").assertIsDisplayed()
-        rule.onNodeWithText("Désinstaller").assertIsDisplayed()
+        rule.onNodeWithText("Hide").assertIsDisplayed()
+        rule.onNodeWithText("App info").assertIsDisplayed()
+        rule.onNodeWithText("Uninstall").assertIsDisplayed()
         rule.onNodeWithText("Titres likés").performClick()
         rule.waitForIdle()
 
@@ -90,7 +90,7 @@ class AppContextMenuTest {
             )
         }
 
-        rule.onNodeWithText("Désinstaller").assertDoesNotExist()
+        rule.onNodeWithText("Uninstall").assertDoesNotExist()
     }
 
     @Test
@@ -114,10 +114,10 @@ class AppContextMenuTest {
         // `getShortcuts()` only works for the selected home app, so an empty list here is a role
         // problem, not an app without shortcuts.
         rule.onNodeWithText(
-            "Raccourcis indisponibles — Portal n’est pas le launcher par défaut"
+            "Shortcuts unavailable — Portal is not the default launcher"
         ).assertIsDisplayed()
         // And it is actionable, not just an explanation.
-        rule.onNodeWithText("Définir Portal par défaut").assertIsDisplayed()
+        rule.onNodeWithText("Set Portal as default").assertIsDisplayed()
     }
 
     @Test
@@ -140,7 +140,7 @@ class AppContextMenuTest {
             )
         }
 
-        rule.onNodeWithText("Définir Portal par défaut").performClick()
+        rule.onNodeWithText("Set Portal as default").performClick()
         rule.waitForIdle()
 
         assertEquals(1, homeSettings)
@@ -165,9 +165,9 @@ class AppContextMenuTest {
             )
         }
 
-        rule.onNodeWithText("Masquer").assertDoesNotExist()
-        rule.onNodeWithText("Désinstaller").assertDoesNotExist()
-        rule.onNodeWithText("Retirer le raccourci").performClick()
+        rule.onNodeWithText("Hide").assertDoesNotExist()
+        rule.onNodeWithText("Uninstall").assertDoesNotExist()
+        rule.onNodeWithText("Remove shortcut").performClick()
         rule.waitForIdle()
 
         assertEquals(1, removed)
@@ -205,17 +205,17 @@ class AppContextMenuTest {
             )
         }
 
-        rule.onNodeWithText("Largeur").assertIsDisplayed()
-        rule.onNodeWithText("Renommer").assertDoesNotExist()
-        rule.onNodeWithText("Masquer").assertDoesNotExist()
-        rule.onNodeWithText("Désinstaller").assertDoesNotExist()
+        rule.onNodeWithText("Width").assertIsDisplayed()
+        rule.onNodeWithText("Rename").assertDoesNotExist()
+        rule.onNodeWithText("Hide").assertDoesNotExist()
+        rule.onNodeWithText("Uninstall").assertDoesNotExist()
 
         // Two "+" buttons (width, height): the first grows the width.
         rule.onAllNodesWithText("+")[0].performClick()
         rule.waitForIdle()
         assertEquals(listOf(GridSpan(3, 1)), resizes)
 
-        rule.onNodeWithText("Retirer le widget").performClick()
+        rule.onNodeWithText("Remove widget").performClick()
         rule.waitForIdle()
         assertEquals(1, removed)
     }
@@ -274,10 +274,10 @@ class AppContextMenuTest {
             )
         }
 
-        rule.onNodeWithText("Renommer").performClick()
+        rule.onNodeWithText("Rename").performClick()
         rule.waitForIdle()
-        rule.onNodeWithText("Nom affiché").assertIsDisplayed()
-        rule.onNodeWithText("Valider").performClick()
+        rule.onNodeWithText("Display name").assertIsDisplayed()
+        rule.onNodeWithText("Confirm").performClick()
         rule.waitForIdle()
 
         assertEquals("Spotify", renamed)

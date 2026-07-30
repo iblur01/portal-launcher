@@ -26,6 +26,8 @@ import com.iblu01.portallauncher.ui.LocalHaStates
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 /**
  * Live view of a single HA entity for a control panel. Reads [LocalHaStates] (fed by the VM),
@@ -52,7 +54,7 @@ fun HaEntity?.isUnavailable(): Boolean = this == null || state.lowercase() in se
 
 /** Shown by a control panel when its entity is missing or unavailable, instead of a blank body. */
 @Composable
-fun PanelUnavailable(message: String = "Appareil indisponible") {
+fun PanelUnavailable(message: String = stringResource(R.string.panel_device_unavailable)) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

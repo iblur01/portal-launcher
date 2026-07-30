@@ -1,6 +1,5 @@
 package com.iblu01.portallauncher.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,10 +16,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.HaInstance
 import com.iblu01.portallauncher.HaMdnsDiscovery
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.components.HaDiscoveryDialog
 import com.iblu01.portallauncher.ui.components.SettingsDivider
 import com.iblu01.portallauncher.ui.components.SettingsInfoDialog
@@ -29,6 +30,7 @@ import com.iblu01.portallauncher.ui.components.SettingsSection
 import com.iblu01.portallauncher.ui.components.SettingsStatusRow
 import com.iblu01.portallauncher.ui.components.SettingsSubPageHeader
 import com.iblu01.portallauncher.ui.components.SettingsTextField
+import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 
@@ -67,12 +69,14 @@ fun HomeConnectionPage(
     onTestHa: () -> Unit,
     onTestMqtt: () -> Unit,
     onBack: () -> Unit,
+    showBack: Boolean = true,
 ) {
     val context = LocalContext.current
     val discovered = remember { mutableStateListOf<HaInstance>() }
     var showDiscovery by remember { mutableStateOf(false) }
     var showKeyHelp by remember { mutableStateOf(false) }
-    var showAdvanced by remember { mutableStateOf(false) }
+    // Most MQTT brokers require a login; default the toggle to whatever is already saved.
+    var mqttAuthEnabled by remember { mutableStateOf(mqttUsername.isNotBlank() || mqttPassword.isNotBlank()) }
 
     // Auto-scan the LAN while this page is on screen; always stop on dispose.
     DisposableEffect(Unit) {
@@ -97,7 +101,7 @@ fun HomeConnectionPage(
 
     if (showKeyHelp) {
         SettingsInfoDialog(
-            title = "Où trouver ma clé ?",
+            title = stringResource(R.string.home_connection_label_key_help),
             lines = accessKeyHelpLines,
             onDismiss = { showKeyHelp = false },
         )
@@ -107,18 +111,18 @@ fun HomeConnectionPage(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        SettingsSubPageHeader(title = "Ma maison", onBack = onBack)
+        SettingsSubPageHeader(title = stringResource(R.string.home_connection_title), onBack = onBack, showBack = showBack)
         Text(
-            "Portal se connecte à ton serveur Home Assistant pour afficher l'état de ta maison.",
+            stringResource(R.string.home_connection_subtitle),
             style = AppleTypography.bodyLarge,
             color = AppleColors.secondary
         )
 
-        SettingsSection(title = "HOME ASSISTANT") {
+        SettingsSection(title = stringResource(R.string.home_connection_section_address)) {
             val suggestion = discovered.firstOrNull()
             if (suggestion != null) {
                 SettingsRow(
-                    label = "Home Assistant détecté",
+                    label = stringResource(R.string.home_connection_ha_detected),
                     value = suggestion.name,
                     onClick = {
                         if (discovered.size == 1) onSelectInstance(suggestion) else showDiscovery = true
@@ -127,98 +131,102 @@ fun HomeConnectionPage(
                 SettingsDivider()
             }
             SettingsTextField(
-                label = "Adresse",
+                label = stringResource(R.string.home_connection_label_address),
                 value = haUrl,
                 onValueChange = onUrlChange,
-                placeholder = "http://homeassistant.local:8123"
+                placeholder = stringResource(R.string.home_connection_placeholder_address)
             )
             SettingsDivider()
             SettingsRow(
-                label = "Chercher sur le réseau",
-                value = if (discovered.isEmpty()) "Recherche…" else "${discovered.size} trouvé(s)",
+                label = stringResource(R.string.home_connection_label_scan_network),
+                value = if (discovered.isEmpty()) stringResource(R.string.home_connection_scanning)
+                    else stringResource(R.string.home_connection_scan_found_format, discovered.size),
                 onClick = { showDiscovery = true },
             )
-            SettingsDivider()
+        }
+
+        SettingsSection(title = stringResource(R.string.home_connection_section_access_key)) {
             SettingsTextField(
-                label = "Clé d'accès",
+                label = stringResource(R.string.home_connection_label_access_key),
                 value = haToken,
                 onValueChange = onTokenChange,
-                placeholder = "Colle ta clé ici",
+                placeholder = stringResource(R.string.home_connection_placeholder_paste_key),
                 isPassword = true
             )
             SettingsDivider()
-            SettingsRow(label = "Où trouver ma clé ?", onClick = { showKeyHelp = true })
-            SettingsDivider()
+            SettingsRow(label = stringResource(R.string.home_connection_label_key_help), onClick = { showKeyHelp = true })
+        }
+
+        SettingsSection(title = stringResource(R.string.home_connection_section_status)) {
             SettingsStatusRow(
-                label = "Connexion",
+                label = stringResource(R.string.home_connection_label_connection),
                 status = uiState.haTest,
                 detail = uiState.haTestMessage,
                 onClick = onTestHa,
             )
         }
 
-        SettingsSection(title = "AVANCÉ") {
-            SettingsRow(
-                label = "Notifications entre appareils",
-                value = if (showAdvanced) "Masquer" else "Afficher",
-                onClick = { showAdvanced = !showAdvanced },
+        // MQTT is used to receive live Home Assistant notifications on this device.
+        // Always shown in full: almost every broker requires a login, so hiding it behind
+        // a disclosure toggle just hid a mandatory field.
+        SettingsSection(title = stringResource(R.string.home_connection_section_mqtt)) {
+            SettingsTextField(
+                label = stringResource(R.string.home_connection_label_mqtt_server),
+                value = mqttHost,
+                onValueChange = onMqttHostChange,
+                placeholder = stringResource(R.string.home_connection_placeholder_mqtt_server)
             )
-        }
-
-        AnimatedVisibility(visible = showAdvanced) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "Pré-rempli depuis l'adresse de ta maison. Ne touche à ces réglages que si ton broker MQTT est sur une autre machine.",
-                    style = AppleTypography.bodyMedium,
-                    color = AppleColors.secondary,
-                    modifier = Modifier.padding(horizontal = 4.dp)
+            SettingsDivider()
+            SettingsTextField(
+                label = stringResource(R.string.home_connection_label_mqtt_port),
+                value = mqttPort,
+                onValueChange = onMqttPortChange,
+                placeholder = stringResource(R.string.home_connection_placeholder_mqtt_port),
+                keyboardType = KeyboardType.Number
+            )
+            SettingsDivider()
+            SettingsToggle(
+                label = stringResource(R.string.home_connection_toggle_mqtt_auth),
+                checked = mqttAuthEnabled,
+                onCheckedChange = { enabled ->
+                    mqttAuthEnabled = enabled
+                    if (!enabled) {
+                        onMqttUsernameChange("")
+                        onMqttPasswordChange("")
+                    }
+                },
+            )
+            if (mqttAuthEnabled) {
+                SettingsDivider()
+                SettingsTextField(
+                    label = stringResource(R.string.home_connection_label_mqtt_username),
+                    value = mqttUsername,
+                    onValueChange = onMqttUsernameChange,
+                    placeholder = stringResource(R.string.home_connection_placeholder_username)
                 )
-                SettingsSection(title = "MQTT") {
-                    SettingsTextField(
-                        label = "Adresse du serveur",
-                        value = mqttHost,
-                        onValueChange = onMqttHostChange,
-                        placeholder = "homeassistant.local"
-                    )
-                    SettingsDivider()
-                    SettingsTextField(
-                        label = "Port",
-                        value = mqttPort,
-                        onValueChange = onMqttPortChange,
-                        placeholder = "1883",
-                        keyboardType = KeyboardType.Number
-                    )
-                    SettingsDivider()
-                    SettingsTextField(
-                        label = "Identifiant",
-                        value = mqttUsername,
-                        onValueChange = onMqttUsernameChange,
-                        placeholder = "optionnel"
-                    )
-                    SettingsDivider()
-                    SettingsTextField(
-                        label = "Mot de passe",
-                        value = mqttPassword,
-                        onValueChange = onMqttPasswordChange,
-                        placeholder = "optionnel",
-                        isPassword = true
-                    )
-                    SettingsDivider()
-                    SettingsTextField(
-                        label = "Nom de cet appareil",
-                        value = deviceName,
-                        onValueChange = onDeviceNameChange,
-                        placeholder = "Portal"
-                    )
-                    SettingsDivider()
-                    SettingsStatusRow(
-                        label = "Connexion MQTT",
-                        status = uiState.mqttTest,
-                        detail = uiState.mqttTestMessage,
-                        onClick = onTestMqtt,
-                    )
-                }
+                SettingsDivider()
+                SettingsTextField(
+                    label = stringResource(R.string.home_connection_label_mqtt_password),
+                    value = mqttPassword,
+                    onValueChange = onMqttPasswordChange,
+                    placeholder = stringResource(R.string.home_connection_placeholder_password),
+                    isPassword = true
+                )
             }
+            SettingsDivider()
+            SettingsTextField(
+                label = stringResource(R.string.home_connection_label_device_name),
+                value = deviceName,
+                onValueChange = onDeviceNameChange,
+                placeholder = stringResource(R.string.home_connection_placeholder_device_name)
+            )
+            SettingsDivider()
+            SettingsStatusRow(
+                label = stringResource(R.string.home_connection_label_mqtt_connection),
+                status = uiState.mqttTest,
+                detail = uiState.mqttTestMessage,
+                onClick = onTestMqtt,
+            )
         }
     }
 }

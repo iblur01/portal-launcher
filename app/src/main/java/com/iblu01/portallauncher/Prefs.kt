@@ -87,6 +87,16 @@ class Prefs(private val context: Context) {
         get() = sp.getString("background_mode", "neutral") ?: "neutral"
         set(value) = sp.edit().putString("background_mode", value).apply()
 
+    /**
+     * Language code ("en", "fr", …) or "" to follow the device's system language.
+     * Written with [SharedPreferences.Editor.commit], not `apply()`: the caller kills the
+     * process right after setting this to restart with the new locale, and `apply()`'s async
+     * disk write can lose the race against that — the setting silently reverted otherwise.
+     */
+    var appLanguage: String
+        get() = sp.getString("app_language", "") ?: ""
+        set(value) { sp.edit().putString("app_language", value).commit() }
+
     var bgOverlayOpacity: Float
         get() = sp.getFloat("bg_overlay_opacity", 0.25f)
         set(value) = sp.edit().putFloat("bg_overlay_opacity", value.coerceIn(0f, 0.6f)).apply()
@@ -343,5 +353,16 @@ enum class PowerMode {
     companion object {
         fun from(value: String?): PowerMode =
             values().firstOrNull { it.name == value } ?: FOLLOW_PRESENCE
+    }
+}
+
+/** App display language. [code] is stored in [Prefs.appLanguage]; "" means "follow the system". */
+enum class AppLanguage(val code: String, val flag: String, val nameRes: Int) {
+    SYSTEM("", "🌐", R.string.language_system),
+    ENGLISH("en", "🇬🇧", R.string.language_english),
+    FRENCH("fr", "🇫🇷", R.string.language_french);
+
+    companion object {
+        fun from(code: String): AppLanguage = values().firstOrNull { it.code == code } ?: SYSTEM
     }
 }

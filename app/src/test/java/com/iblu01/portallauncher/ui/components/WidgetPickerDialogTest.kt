@@ -53,13 +53,13 @@ class WidgetPickerDialogTest {
     fun `a device with no widgets says so instead of showing an empty panel`() {
         rule.setContent { WidgetPickerDialog(offers = emptyList(), onPick = {}, onDismiss = {}) }
 
-        rule.onNodeWithText("Aucun widget disponible").assertIsDisplayed()
+        rule.onNodeWithText("No widgets available").assertIsDisplayed()
     }
 
     @Test
     fun `no offers loaded yet means no dialog`() {
         rule.setContent { WidgetPickerDialog(offers = null, onPick = {}, onDismiss = {}) }
 
-        rule.onNodeWithText("Ajouter un widget").assertDoesNotExist()
+        rule.onNodeWithText("Add a widget").assertDoesNotExist()
     }
 }

@@ -19,9 +19,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.PillCandidate
 import com.iblu01.portallauncher.PillFamily
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.friendlyEntityState
 import com.iblu01.portallauncher.ui.components.PillButton
 import com.iblu01.portallauncher.ui.components.SettingsDivider
@@ -44,6 +46,7 @@ fun PillsSettingsPage(
     onRefresh: () -> Unit,
     onSetEnabled: (List<PillCandidate>, Boolean) -> Unit,
     onBack: () -> Unit,
+    showBack: Boolean = true,
 ) {
     LaunchedEffect(Unit) { onRefresh() }
     var search by remember { mutableStateOf("") }
@@ -70,6 +73,7 @@ fun PillsSettingsPage(
                 onRefresh = onRefresh,
                 onSetEnabled = onSetEnabled,
                 onBack = onBack,
+                showBack = showBack,
             )
         } else {
             PillFamilyPage(
@@ -93,6 +97,7 @@ private fun PillsHomePage(
     onRefresh: () -> Unit,
     onSetEnabled: (List<PillCandidate>, Boolean) -> Unit,
     onBack: () -> Unit,
+    showBack: Boolean = true,
 ) {
     val query = search.trim().lowercase()
     val searching = query.isNotEmpty()
@@ -104,27 +109,27 @@ private fun PillsHomePage(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        SettingsSubPageHeader(title = "Informations affichées", onBack = onBack)
+        SettingsSubPageHeader(title = stringResource(R.string.pills_page_title), onBack = onBack, showBack = showBack)
         Text(
-            "Active ce que Portal peut afficher en haut de l'écran. Les informations les plus importantes remontent automatiquement.",
+            stringResource(R.string.pills_page_description),
             style = AppleTypography.bodyLarge,
             color = AppleColors.secondary
         )
 
         when {
             uiState.pillLoading -> Text(
-                "Chargement depuis ta maison…",
+                stringResource(R.string.pills_loading),
                 color = AppleColors.secondary
             )
-            uiState.pillError != null -> SettingsSection(title = "CONNEXION") {
+            uiState.pillError != null -> SettingsSection(title = stringResource(R.string.pills_section_connection)) {
                 SettingsRow(
-                    label = uiState.pillError ?: "Erreur",
-                    value = "Réessayer",
+                    label = uiState.pillError ?: stringResource(R.string.pills_error_fallback),
+                    value = stringResource(R.string.pills_retry),
                     onClick = onRefresh
                 )
             }
             uiState.pillCandidates.isEmpty() -> Text(
-                "Aucun appareil compatible détecté. Vérifie la connexion dans « Ma maison ».",
+                stringResource(R.string.pills_no_devices),
                 color = AppleColors.secondary
             )
             else -> {
@@ -132,17 +137,17 @@ private fun PillsHomePage(
 
                 if (searching) {
                     if (results.isEmpty()) {
-                        Text("Aucun résultat pour « $search ».", color = AppleColors.secondary)
+                        Text(stringResource(R.string.pills_no_results_format, search), color = AppleColors.secondary)
                     } else {
                         CandidateSection(
-                            title = "RÉSULTATS",
+                            title = stringResource(R.string.pills_section_results),
                             candidates = results,
                             enabledIds = enabledIds,
                             onSetEnabled = onSetEnabled,
                         )
                     }
                 } else {
-                    SettingsSection(title = "CATÉGORIES") {
+                    SettingsSection(title = stringResource(R.string.pills_section_categories)) {
                         val families = PillFamily.values()
                             .map { f -> f to uiState.pillCandidates.filter { PillFamily.of(it.kind) == f } }
                             .filter { it.second.isNotEmpty() }
@@ -156,7 +161,7 @@ private fun PillsHomePage(
                             if (index != families.lastIndex) SettingsDivider()
                         }
                     }
-                    PillButton(label = "Actualiser la liste", onClick = onRefresh)
+                    PillButton(label = stringResource(R.string.pills_button_refresh), onClick = onRefresh)
                 }
             }
         }
@@ -180,10 +185,10 @@ private fun PillFamilyPage(
     ) {
         SettingsSubPageHeader(title = family.label, onBack = onBack)
         CandidateSection(
-            title = "ÉLÉMENTS DÉTECTÉS",
+            title = stringResource(R.string.pills_section_detected),
             candidates = candidates,
             enabledIds = enabledIds,
-            bulkLabel = if (allEnabled) "Tout masquer" else "Tout afficher",
+            bulkLabel = if (allEnabled) stringResource(R.string.pills_bulk_hide_all) else stringResource(R.string.pills_bulk_show_all),
             onBulk = { onSetEnabled(candidates, !allEnabled) },
             onSetEnabled = onSetEnabled,
         )

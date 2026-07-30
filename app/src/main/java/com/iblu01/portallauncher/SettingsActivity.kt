@@ -44,6 +44,10 @@ class SettingsActivity : ComponentActivity() {
     /** Last persisted MQTT-relevant values, to restart the bridge only when they actually change. */
     private var savedMqttSignature = ""
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         uiState.pillRules.addAll(prefs.pillRules)
@@ -313,6 +317,6 @@ class SettingsActivity : ComponentActivity() {
             }
             return
         }
-        Toast.makeText(this, "Permissions OK", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.toast_permissions_ok), Toast.LENGTH_SHORT).show()
     }
 }

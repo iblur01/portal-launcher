@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.ui.components.appleClickable
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 /**
  * HomeKit accessory-tile radius. Tuned to Apple's Home app: a rounded rectangle that is neither
@@ -118,7 +120,7 @@ fun AccessoryTile(
             if (warning) {
                 Icon(
                     Icons.Filled.Warning,
-                    contentDescription = "Attention",
+                    contentDescription = stringResource(R.string.accessory_warning_desc),
                     tint = onContent,
                     modifier = Modifier
                         .align(Alignment.TopEnd)

@@ -44,9 +44,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.apps.AppShortcut
 import com.iblu01.portallauncher.ui.apps.GridItem
 import com.iblu01.portallauncher.ui.apps.GridSpan
@@ -168,13 +170,13 @@ fun AppContextMenu(
             } else if (!isDefaultHome && !item.isShortcut) {
                 MenuSeparator()
                 Text(
-                    text = "Raccourcis indisponibles — Portal n’est pas le launcher par défaut",
+                    text = stringResource(R.string.context_menu_shortcuts_unavailable),
                     style = AppleTypography.bodySmall.copy(fontSize = 12.sp),
                     color = AppleColors.tertiary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
                 // Actionable, not just an explanation: this is where the user notices the problem.
-                ActionRow(Icons.Outlined.Home, "Définir Portal par défaut") {
+                ActionRow(Icons.Outlined.Home, stringResource(R.string.context_menu_set_default_home)) {
                     onOpenHomeSettings(); onDismiss()
                 }
             }
@@ -184,36 +186,36 @@ fun AppContextMenu(
                 // A widget has no label of its own to rename and no app-level action: what it does
                 // have is a size.
                 SizeStepper(
-                    label = "Largeur",
+                    label = stringResource(R.string.context_menu_width_stepper),
                     value = target.span.width,
                     max = maxSpan.width,
                     onChange = { onResize(target.span.copy(width = it)) },
                 )
                 SizeStepper(
-                    label = "Hauteur",
+                    label = stringResource(R.string.context_menu_height_stepper),
                     value = target.span.height,
                     max = maxSpan.height,
                     onChange = { onResize(target.span.copy(height = it)) },
                 )
                 MenuSeparator()
-                ActionRow(Icons.Outlined.Delete, "Retirer le widget", danger = true) {
+                ActionRow(Icons.Outlined.Delete, stringResource(R.string.context_menu_remove_widget), danger = true) {
                     onRemoveWidget(); onDismiss()
                 }
                 return@Column
             }
-            ActionRow(Icons.Outlined.DriveFileRenameOutline, "Renommer") {
+            ActionRow(Icons.Outlined.DriveFileRenameOutline, stringResource(R.string.context_menu_rename)) {
                 draft = item.label
                 renaming = true
             }
             if (item.isShortcut) {
-                ActionRow(Icons.Outlined.Delete, "Retirer le raccourci") {
+                ActionRow(Icons.Outlined.Delete, stringResource(R.string.context_menu_remove_shortcut)) {
                     onRemoveShortcut(); onDismiss()
                 }
             } else {
-                ActionRow(Icons.Outlined.VisibilityOff, "Masquer") { onHide(); onDismiss() }
-                ActionRow(Icons.Outlined.Info, "Infos de l’application") { onAppInfo(); onDismiss() }
+                ActionRow(Icons.Outlined.VisibilityOff, stringResource(R.string.context_menu_hide)) { onHide(); onDismiss() }
+                ActionRow(Icons.Outlined.Info, stringResource(R.string.context_menu_app_info)) { onAppInfo(); onDismiss() }
                 if (canUninstall) {
-                    ActionRow(Icons.Outlined.Delete, "Désinstaller", danger = true) {
+                    ActionRow(Icons.Outlined.Delete, stringResource(R.string.context_menu_uninstall), danger = true) {
                         onUninstall(); onDismiss()
                     }
                 }
@@ -268,10 +270,10 @@ private fun StepperButton(glyph: String, enabled: Boolean, onClick: () -> Unit) 
 private fun RenameField(value: String, onValueChange: (String) -> Unit, onConfirm: () -> Unit) {
     Column(Modifier.fillMaxWidth()) {
         SettingsTextField(
-            label = "Nom affiché",
+            label = stringResource(R.string.context_menu_rename_label),
             value = value,
             onValueChange = onValueChange,
-            placeholder = "Nom d’origine",
+            placeholder = stringResource(R.string.context_menu_rename_placeholder),
         )
         Row(
             modifier = Modifier
@@ -280,7 +282,7 @@ private fun RenameField(value: String, onValueChange: (String) -> Unit, onConfir
             horizontalArrangement = Arrangement.End,
         ) {
             Text(
-                "Valider",
+                stringResource(R.string.context_menu_confirm),
                 style = AppleTypography.titleMedium,
                 color = AppleColors.accent,
                 modifier = Modifier

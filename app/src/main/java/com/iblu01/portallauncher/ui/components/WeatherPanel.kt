@@ -33,6 +33,8 @@ import com.iblu01.portallauncher.domain.model.ForecastPoint
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 import kotlin.math.roundToInt
 
 /** Side panel opened from the clock's temperature pill: current condition + hourly & daily forecast. */
@@ -62,8 +64,8 @@ fun WeatherPanel(weather: WeatherUi, onDismiss: () -> Unit, modifier: Modifier =
                             .background(AppleColors.frostedFill).border(0.5.dp, AppleColors.frostedBorder, CircleShape)
                             .appleClickable(onDismiss),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Filled.Close, "Fermer", tint = AppleColors.secondary, modifier = Modifier.size(18.dp)) }
-                    Text("Météo", style = AppleTypography.titleMedium.copy(fontSize = 15.sp), color = AppleColors.secondary, modifier = Modifier.align(Alignment.Center))
+                    ) { Icon(Icons.Filled.Close, stringResource(R.string.weather_close_desc), tint = AppleColors.secondary, modifier = Modifier.size(18.dp)) }
+                    Text(stringResource(R.string.weather_panel_title), style = AppleTypography.titleMedium.copy(fontSize = 15.sp), color = AppleColors.secondary, modifier = Modifier.align(Alignment.Center))
                 }
 
                 Spacer(Modifier.height(18.dp))
@@ -77,7 +79,7 @@ fun WeatherPanel(weather: WeatherUi, onDismiss: () -> Unit, modifier: Modifier =
 
                 if (weather.hourly.isNotEmpty()) {
                     Spacer(Modifier.height(22.dp))
-                    Text("PROCHAINES HEURES", style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+                    Text(stringResource(R.string.weather_section_hourly), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
                     Spacer(Modifier.height(10.dp))
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                         weather.hourly.take(12).forEach { HourTile(it) }
@@ -86,7 +88,7 @@ fun WeatherPanel(weather: WeatherUi, onDismiss: () -> Unit, modifier: Modifier =
 
                 if (weather.daily.isNotEmpty()) {
                     Spacer(Modifier.height(22.dp))
-                    Text("PROCHAINS JOURS", style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+                    Text(stringResource(R.string.weather_section_daily), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
                     Spacer(Modifier.height(6.dp))
                     weather.daily.take(7).forEach { DayRow(it) }
                 }

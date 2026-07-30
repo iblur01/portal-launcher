@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import com.iblu01.portallauncher.domain.model.HaSnapshot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,7 +30,8 @@ import org.robolectric.annotation.Config
 class PillRepositoryTransformTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
-    private val repo = PillRepository()
+    private val context: Context = ApplicationProvider.getApplicationContext()
+    private val repo = PillRepository(context)
 
     private fun player(id: String, title: String, state: String = "playing"): HaEntity =
         HaEntity(id, state, JSONObject().put("media_title", title), "2026-07-23T10:00:00Z")

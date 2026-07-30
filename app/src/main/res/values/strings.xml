@@ -1,6 +1,522 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Keep existing -->
     <string name="app_name">Portal Launcher</string>
     <string name="accessibility_label">Portal Launcher Screen Control</string>
     <string name="accessibility_description">Permet a Portal Launcher d\'eteindre l\'ecran sur commande Home Assistant. Le service ne lit pas le contenu de l\'ecran.</string>
+
+    <!-- ===== SETUP WIZARD ===== -->
+    <string name="setup_welcome_title">Welcome</string>
+    <string name="setup_welcome_subtitle">Let\'s start by finding your home. Make sure Home Assistant is running on the same network.</string>
+    <string name="setup_scanning_network">Searching the network…</string>
+    <string name="setup_section_manual_address">OR ENTER THE ADDRESS</string>
+    <string name="setup_label_address">Address</string>
+    <string name="setup_placeholder_address">http://homeassistant.local:8123</string>
+    <string name="setup_button_continue">Continue</string>
+    <string name="setup_button_configure_later">Set up later</string>
+    <string name="setup_access_key_title">Your access key</string>
+    <string name="setup_access_key_subtitle">To let Portal read the state of your home, paste an access key created in Home Assistant.</string>
+    <string name="setup_section_access_key">ACCESS KEY</string>
+    <string name="setup_label_access_key">Access key</string>
+    <string name="setup_placeholder_paste_key">Paste your key here</string>
+    <string name="setup_label_where_to_find_key">Where to find my key?</string>
+    <string name="setup_label_connection">Connection</string>
+    <string name="setup_button_test_connection">Test connection</string>
+    <string name="setup_button_back">Back</string>
+    <string name="setup_done_title">All set!</string>
+    <string name="setup_done_subtitle">Portal will now display the state of your home.</string>
+    <string name="setup_button_start">Get started</string>
+    <string name="setup_access_key_help_step_1">1. Open Home Assistant → Settings → People</string>
+    <string name="setup_access_key_help_step_2">2. Select your user</string>
+    <string name="setup_access_key_help_step_3">3. Tap "Long-lived access tokens"</string>
+    <string name="setup_access_key_help_step_4">4. Create a token named "Portal"</string>
+    <string name="setup_access_key_help_step_5">5. Copy and paste it here</string>
+
+    <!-- ===== HOME CONNECTION PAGE ===== -->
+    <string name="home_connection_title">My Home</string>
+    <string name="home_connection_subtitle">Portal connects to your Home Assistant server to display the state of your home.</string>
+    <string name="home_connection_section_address">ADDRESS</string>
+    <string name="home_connection_ha_detected">Home Assistant detected</string>
+    <string name="home_connection_label_address">Address</string>
+    <string name="home_connection_placeholder_address">http://homeassistant.local:8123</string>
+    <string name="home_connection_label_scan_network">Search the network</string>
+    <string name="home_connection_scanning">Searching…</string>
+    <string name="home_connection_scan_found_format">%1$d found</string>
+    <string name="home_connection_section_access_key">ACCESS KEY</string>
+    <string name="home_connection_label_access_key">Access key</string>
+    <string name="home_connection_placeholder_paste_key">Paste your key here</string>
+    <string name="home_connection_label_key_help">Where to find my key?</string>
+    <string name="home_connection_section_status">CONNECTION STATUS</string>
+    <string name="home_connection_label_connection">Connection</string>
+    <string name="home_connection_section_mqtt">MQTT</string>
+    <string name="home_connection_label_mqtt_server">Server address</string>
+    <string name="home_connection_placeholder_mqtt_server">homeassistant.local</string>
+    <string name="home_connection_label_mqtt_port">Port</string>
+    <string name="home_connection_placeholder_mqtt_port">1883</string>
+    <string name="home_connection_toggle_mqtt_auth">Server requires a login</string>
+    <string name="home_connection_label_mqtt_username">Username</string>
+    <string name="home_connection_placeholder_username">Username</string>
+    <string name="home_connection_label_mqtt_password">Password</string>
+    <string name="home_connection_placeholder_password">Password</string>
+    <string name="home_connection_label_device_name">Name of this device</string>
+    <string name="home_connection_placeholder_device_name">Portal</string>
+    <string name="home_connection_label_mqtt_connection">MQTT connection</string>
+
+    <!-- ===== MAIN SETTINGS SCREEN ===== -->
+    <string name="settings_home_subtitle_not_configured">Not configured</string>
+    <string name="settings_home_subtitle_testing">Checking…</string>
+    <string name="settings_home_subtitle_connected">Connected</string>
+    <string name="settings_home_subtitle_error">Check connection</string>
+    <string name="settings_home_subtitle_default">Address, access key</string>
+    <string name="settings_tile_home_title">My Home</string>
+    <string name="settings_tile_pills_title">Displayed info</string>
+    <string name="settings_tile_pills_subtitle">What Portal shows at the top of the screen</string>
+    <string name="settings_tile_app_title">Application</string>
+    <string name="settings_tile_app_subtitle">Wallpaper, sleep, applications</string>
+    <string name="settings_tile_dev_title">Developer</string>
+    <string name="settings_tile_dev_subtitle">Advanced options</string>
+    <string name="settings_main_title">Portal Launcher</string>
+    <string name="settings_app_page_title">Application</string>
+    <string name="settings_app_section_language">LANGUAGE</string>
+    <string name="settings_app_label_language">Language</string>
+    <string name="language_page_title">Language</string>
+    <string name="language_system">System language</string>
+    <string name="language_english">English</string>
+    <string name="language_french">Français</string>
+    <string name="settings_app_section_tap_home">HOME SCREEN TAP</string>
+    <string name="settings_app_label_app_to_open">App to open</string>
+    <string name="settings_app_section_wallpaper">WALLPAPER</string>
+    <string name="settings_app_label_overlay_opacity">Overlay opacity</string>
+    <string name="settings_app_section_clock">CLOCK</string>
+    <string name="settings_app_label_clock_theme">Clock theme</string>
+    <string name="settings_app_section_app_grid">APP GRID</string>
+    <string name="settings_app_label_icon_size">Icon size</string>
+    <string name="settings_app_section_screen_sleep">SCREEN &amp; SLEEP</string>
+    <string name="settings_app_toggle_always_on">Always-on mode</string>
+    <string name="settings_app_toggle_auto_timeout">Auto screen off</string>
+    <string name="settings_app_label_timeout_delay">Timeout</string>
+    <string name="settings_app_section_auto_return">AUTO RETURN</string>
+    <string name="settings_app_toggle_auto_return">Return to home screen</string>
+    <string name="settings_app_label_auto_return_delay">Inactivity delay</string>
+    <string name="settings_dev_page_title">Developer</string>
+    <string name="settings_dev_section_debug">DEBUGGING</string>
+    <string name="settings_dev_toggle_keep_screen_on">Keep screen on (dev)</string>
+    <string name="settings_dev_section_system">SYSTEM</string>
+    <string name="settings_dev_label_permissions">Sensor / sound / brightness permissions</string>
+    <string name="settings_dev_rebooting">Rebooting…</string>
+    <string name="settings_dev_reboot">Reboot</string>
+
+    <!-- ===== PILL SETTINGS PAGE ===== -->
+    <string name="pills_page_title">Displayed info</string>
+    <string name="pills_page_description">Choose what Portal can display at the top of the screen. Disabled items are never shown even if detected.</string>
+    <string name="pills_loading">Loading from your home…</string>
+    <string name="pills_section_connection">CONNECTION</string>
+    <string name="pills_error_fallback">Error</string>
+    <string name="pills_retry">Retry</string>
+    <string name="pills_no_devices">No compatible devices detected. Check the connection in "My Home".</string>
+    <string name="pills_no_results_format">No results for \"%1$s\".</string>
+    <string name="pills_section_results">RESULTS</string>
+    <string name="pills_section_categories">CATEGORIES</string>
+    <string name="pills_category_count_format">%1$d of %2$d</string>
+    <string name="pills_button_refresh">Refresh list</string>
+    <string name="pills_section_detected">DETECTED ITEMS</string>
+    <string name="pills_bulk_hide_all">Hide all</string>
+    <string name="pills_bulk_show_all">Show all</string>
+    <string name="pills_extra_battery">battery</string>
+    <string name="pills_extra_cycle">cycle</string>
+    <string name="pills_extra_completion">est. finish</string>
+
+    <!-- ===== CLOCK THEME EDITOR ===== -->
+    <string name="clock_theme_label_font">Font</string>
+    <string name="clock_theme_label_weight">Weight</string>
+    <string name="clock_theme_label_size">Size</string>
+    <string name="clock_theme_label_letter_spacing">Spacing</string>
+    <string name="clock_theme_label_element_spacing">Element spacing</string>
+    <string name="clock_theme_label_color">Color</string>
+    <string name="clock_theme_label_format_24h">24-hour format</string>
+    <string name="clock_theme_close">Close</string>
+
+    <!-- ===== LAUNCHER HOME SCREEN ===== -->
+    <string name="clock_indoor_temp_format">Indoor %1$s–%2$s</string>
+    <string name="clock_outdoor_temp_format">Outdoor %1$s</string>
+    <string name="clock_collapse_pills">Hide info</string>
+    <string name="clock_expand_pills">Show more info</string>
+    <string name="clock_collapse_content_desc">Collapse</string>
+    <string name="clock_expand_content_desc">Expand</string>
+    <string name="clock_stale_banner_format">Offline — info frozen since %1$s</string>
+    <string name="header_hidden_apps_content_desc">Hidden apps (%1$d)</string>
+    <string name="header_settings_content_desc">Settings</string>
+    <string name="auto_return_pill_label">Auto close</string>
+    <string name="auto_return_cancel_desc">Cancel</string>
+    <string name="bg_mode_neutral">Neutral</string>
+    <string name="bg_mode_nature">Nature (Unsplash)</string>
+    <string name="bg_mode_custom">Custom photo</string>
+
+    <!-- ===== QUICK ACTIONS OVERLAY (Home Screen Long-Press) ===== -->
+    <string name="quick_actions_set_default_home">Set as default launcher</string>
+    <string name="quick_actions_add_widget">Add a widget</string>
+    <string name="quick_actions_wallpaper">Wallpaper</string>
+    <string name="quick_actions_settings">Settings</string>
+    <string name="quick_actions_playground">Components (test)</string>
+
+    <!-- ===== APP CONTEXT MENU ===== -->
+    <string name="context_menu_shortcuts_unavailable">Shortcuts unavailable — Portal is not the default launcher</string>
+    <string name="context_menu_set_default_home">Set Portal as default</string>
+    <string name="context_menu_width_stepper">Width</string>
+    <string name="context_menu_height_stepper">Height</string>
+    <string name="context_menu_remove_widget">Remove widget</string>
+    <string name="context_menu_rename">Rename</string>
+    <string name="context_menu_remove_shortcut">Remove shortcut</string>
+    <string name="context_menu_hide">Hide</string>
+    <string name="context_menu_app_info">App info</string>
+    <string name="context_menu_uninstall">Uninstall</string>
+    <string name="context_menu_rename_label">Display name</string>
+    <string name="context_menu_rename_placeholder">Original name</string>
+    <string name="context_menu_confirm">Confirm</string>
+
+    <!-- ===== HIDDEN APPS DIALOG ===== -->
+    <string name="hidden_apps_title">Hidden apps</string>
+    <string name="hidden_apps_empty">None</string>
+    <string name="hidden_apps_tap_to_restore">Tap to put back on the grid</string>
+
+    <!-- ===== WIDGET PICKER DIALOG ===== -->
+    <string name="widget_picker_title">Add a widget</string>
+    <string name="widget_picker_empty">No widgets available</string>
+    <string name="widget_picker_size_hint">Size in cells indicated</string>
+
+    <!-- ===== SETTINGS SHARED COMPONENTS ===== -->
+    <string name="connection_status_idle">Test</string>
+    <string name="connection_status_testing">Testing…</string>
+    <string name="connection_status_ok">Connected</string>
+    <string name="connection_status_error">Failed</string>
+    <string name="search_placeholder">Search…</string>
+    <string name="dialog_button_ok">OK</string>
+    <string name="subpage_back_desc">Back</string>
+    <string name="app_picker_title">Choose an app</string>
+    <string name="app_picker_empty">No apps found</string>
+    <string name="dialog_button_cancel">Cancel</string>
+    <string name="ha_discovery_title">Home Assistant on the network</string>
+    <string name="ha_discovery_scanning">Searching…</string>
+    <string name="ha_discovery_cancel">Cancel</string>
+
+    <!-- ===== WEATHER PANEL ===== -->
+    <string name="weather_close_desc">Close</string>
+    <string name="weather_panel_title">Weather</string>
+    <string name="weather_section_hourly">NEXT HOURS</string>
+    <string name="weather_section_daily">NEXT DAYS</string>
+
+    <!-- ===== AIR QUALITY PANEL ===== -->
+    <string name="air_quality_back_desc">Back</string>
+    <string name="air_quality_panel_title">Air quality</string>
+    <string name="air_quality_sensor_count">%1$d sensors</string>
+
+    <!-- ===== MEDIA PLAYER VIEW ===== -->
+    <string name="media_source_many_format">%1$s + %2$d others</string>
+    <string name="media_cover_desc_format">Cover of %1$s</string>
+    <string name="media_no_cover_desc">No cover</string>
+    <string name="media_previous_track_desc">Previous track</string>
+    <string name="media_pause_desc">Pause</string>
+    <string name="media_play_desc">Play</string>
+    <string name="media_next_track_desc">Next track</string>
+    <string name="media_volume_desc">Volume</string>
+    <string name="media_volume_single_format">Volume · %1$d%%</string>
+    <string name="media_volume_multi_format">Volumes · %1$d devices</string>
+    <string name="media_close_player_desc">Close player</string>
+    <string name="media_secondary_more_format">+ %1$d others</string>
+    <string name="media_secondary_more_active_format">+ %1$d other active streams</string>
+    <string name="media_volume_dialog_title">Volumes</string>
+    <string name="media_volume_dialog_close">Close</string>
+    <string name="media_group_dialog_title">Stream to</string>
+    <string name="media_group_dialog_subtitle_format">Select the devices to pair with %1$s</string>
+    <string name="media_group_leader_label">Main</string>
+    <string name="media_group_dialog_close">Close</string>
+    <string name="media_mini_previous_desc_format">Previous track in %1$s</string>
+    <string name="media_mini_pause_desc_format">Pause %1$s</string>
+    <string name="media_mini_play_desc_format">Play in %1$s</string>
+    <string name="media_mini_next_desc_format">Next track in %1$s</string>
+    <string name="media_vertical_previous_desc_format">Previous track in %1$s</string>
+    <string name="media_vertical_pause_desc_format">Pause %1$s</string>
+    <string name="media_vertical_play_desc_format">Play in %1$s</string>
+    <string name="media_vertical_next_desc_format">Next track in %1$s</string>
+
+    <!-- ===== LIGHT DETAIL PANEL ===== -->
+    <string name="light_white_channel_label">Built-in white channel</string>
+    <string name="light_colors_section">Colors</string>
+    <string name="light_whites_w_channel_label">Whites · channel W</string>
+    <string name="light_whites_label">Whites</string>
+    <string name="light_power_off">Turn off</string>
+    <string name="light_power_on">Turn on</string>
+    <string name="light_open_color_wheel_desc">Open color wheel</string>
+    <string name="light_color_active_desc">Active color</string>
+    <string name="light_color_apply_desc">Apply this color</string>
+    <string name="light_mode_brightness">Brightness</string>
+    <string name="light_mode_temperature">Temperature</string>
+    <string name="light_color_wheel_title">Color</string>
+    <string name="light_color_wheel_close_desc">Close</string>
+    <string name="light_color_wheel_semantics_format">Color wheel, hue %1$d degrees</string>
+
+    <!-- ===== ALARM PANEL ===== -->
+    <string name="alarm_disarm_prompt">Enter code to disarm</string>
+    <string name="alarm_arm_prompt">Enter code</string>
+    <string name="alarm_mode_away">Away</string>
+    <string name="alarm_mode_home">Home</string>
+    <string name="alarm_mode_night">Night</string>
+    <string name="alarm_mode_vacation">Vacation</string>
+    <string name="alarm_disarm_button">Disarm</string>
+
+    <!-- ===== COVER PANEL (Blinds) ===== -->
+    <string name="cover_state_open">Open</string>
+    <string name="cover_state_closed">Closed</string>
+    <string name="cover_state_opening">Opening…</string>
+    <string name="cover_state_closing">Closing…</string>
+    <string name="cover_button_open">Open</string>
+    <string name="cover_button_stop">Stop</string>
+    <string name="cover_button_close">Close</string>
+
+    <!-- ===== THERMOSTAT PANEL ===== -->
+    <string name="thermostat_current_temp_format">current %1$s</string>
+    <string name="hvac_mode_off">Off</string>
+    <string name="hvac_mode_heat">Heating</string>
+    <string name="hvac_mode_cool">Cooling</string>
+    <string name="hvac_mode_auto">Auto</string>
+    <string name="hvac_mode_dry">Dry</string>
+    <string name="hvac_mode_fan_only">Fan only</string>
+
+    <!-- ===== VACUUM PANEL ===== -->
+    <string name="vacuum_button_start">Start</string>
+    <string name="vacuum_button_pause">Pause</string>
+    <string name="vacuum_button_stop">Stop</string>
+    <string name="vacuum_button_dock">Dock</string>
+    <string name="vacuum_button_locate">Locate</string>
+    <string name="vacuum_detail_status">Status</string>
+    <string name="vacuum_detail_battery">Battery</string>
+    <string name="vacuum_mode_vacuum">Vacuum</string>
+    <string name="vacuum_mode_vacuum_and_mop">Vacuum + mop</string>
+    <string name="vacuum_mode_vacuum_then_mop">Vacuum then mop</string>
+    <string name="vacuum_mode_mop">Mop</string>
+    <string name="vacuum_pause_desc">Pause</string>
+    <string name="vacuum_start_desc">Start</string>
+
+    <!-- ===== LOCK PANEL ===== -->
+    <string name="lock_state_jammed">Jammed</string>
+    <string name="lock_state_locked">Locked</string>
+    <string name="lock_state_unlocked">Unlocked</string>
+
+    <!-- ===== SWITCH / FAN / PURIFIER ===== -->
+    <string name="switch_state_on">On</string>
+    <string name="switch_state_off">Off</string>
+    <string name="fan_state_on">Running</string>
+    <string name="fan_state_off">Stopped</string>
+    <string name="fan_speed_label">Speed</string>
+    <string name="fan_oscillation_label">Oscillation</string>
+    <string name="purifier_mode_auto">Auto</string>
+    <string name="purifier_mode_sleep">Sleep</string>
+    <string name="purifier_mode_manual">Manual</string>
+    <string name="purifier_mode_pet">Pets</string>
+    <string name="purifier_mode_off">Off</string>
+
+    <!-- ===== ENERGY PANEL ===== -->
+    <string name="energy_power_label">Power</string>
+    <string name="energy_today_label">Today</string>
+    <string name="energy_gauge_max_format">max %1$d W</string>
+
+    <!-- ===== PANEL HELPERS / SHARED ===== -->
+    <string name="panel_device_unavailable">Device unavailable</string>
+    <string name="side_panel_close_desc">Close panel</string>
+
+    <!-- ===== KEYPAD ===== -->
+    <string name="keypad_cancel">Cancel</string>
+    <string name="keypad_back_desc">Delete</string>
+    <string name="keypad_confirm_desc">Confirm</string>
+    <string name="keypad_key_desc_format">Key %1$s</string>
+    <string name="slider_percent_desc_format">Slider %1$s percent</string>
+
+    <!-- ===== ACCESSORY ===== -->
+    <string name="accessory_warning_desc">Warning</string>
+
+    <!-- ===== OPACITY PREVIEW ===== -->
+    <string name="opacity_preview_close_desc">Close</string>
+
+    <!-- ===== PLAYGROUND / DEV SCREEN ===== -->
+    <string name="playground_swatch_blue">Blue</string>
+    <string name="playground_swatch_green">Green</string>
+    <string name="playground_swatch_mint">Mint</string>
+    <string name="playground_swatch_yellow">Yellow</string>
+    <string name="playground_swatch_red">Red</string>
+    <string name="playground_swatch_purple">Purple</string>
+    <string name="playground_swatch_gray">Gray</string>
+    <string name="playground_back_desc">Back</string>
+    <string name="playground_title">Components</string>
+    <string name="playground_subtitle">Control test bench</string>
+    <string name="playground_accent_color_label">Accent color</string>
+    <string name="playground_section_vertical_slider">Vertical slider</string>
+    <string name="playground_slider_from_bottom">From bottom</string>
+    <string name="playground_slider_from_top">From top</string>
+    <string name="playground_slider_disabled">Disabled</string>
+    <string name="playground_section_gradient_slider">Gradient slider</string>
+    <string name="playground_slider_temperature">Temperature</string>
+    <string name="playground_section_selector">Selector</string>
+    <string name="playground_selector_2_options">2 options</string>
+    <string name="playground_selector_auto">Auto</string>
+    <string name="playground_selector_manual">Manual</string>
+    <string name="playground_selector_icon_stacked">Stacked icon</string>
+    <string name="playground_presence_home">At home</string>
+    <string name="playground_presence_away">Away</string>
+    <string name="playground_presence_off">Disabled</string>
+    <string name="playground_selector_6_options">6 options</string>
+    <string name="playground_section_switch">Switch</string>
+    <string name="playground_switch_on">On</string>
+    <string name="playground_switch_off">Off</string>
+    <string name="playground_switch_icon_text">Icon + text</string>
+    <string name="playground_switch_disabled">Disabled</string>
+    <string name="playground_section_keypad">Keypad</string>
+    <string name="playground_keypad_active">Active keypad</string>
+    <string name="playground_keypad_unlocked">Unlocked ✓</string>
+    <string name="playground_keypad_code_hint">Code: 1234</string>
+    <string name="playground_keypad_wrong_code_hint">A wrong code makes the dots shake</string>
+    <string name="playground_section_thermostat">Thermostat</string>
+    <string name="playground_thermo_mode_off">Off</string>
+    <string name="playground_thermo_mode_cool">Cool</string>
+    <string name="playground_thermo_mode_heat">Heat</string>
+    <string name="playground_thermo_mode_auto">Auto</string>
+    <string name="playground_section_vacuum">Robot vacuum</string>
+    <string name="playground_vacuum_living_room">Living room</string>
+    <string name="playground_vacuum_kitchen">Kitchen</string>
+    <string name="playground_vacuum_bedroom">Bedroom</string>
+    <string name="playground_vacuum_bathroom">Bathroom</string>
+    <string name="playground_vacuum_name">emmy</string>
+    <string name="playground_vacuum_cleaning">Cleaning</string>
+    <string name="playground_vacuum_paused">Paused</string>
+    <string name="playground_vacuum_preparing">Preparing</string>
+    <string name="playground_vacuum_in_progress">In progress</string>
+    <string name="playground_vacuum_queued">Queued</string>
+    <string name="playground_section_accessories">Accessories (HomeKit)</string>
+    <string name="playground_accessory_desk">Desk</string>
+    <string name="playground_accessory_off">Off</string>
+    <string name="playground_accessory_blinds">Blinds</string>
+    <string name="playground_accessory_updating">Updating…</string>
+    <string name="playground_accessory_lamp">Living room lamp</string>
+    <string name="playground_accessory_on">On</string>
+    <string name="playground_accessory_plug_tv">TV plug</string>
+    <string name="playground_accessory_active">Active</string>
+    <string name="playground_accessory_inactive">Inactive</string>
+    <string name="playground_accessory_plug2">Plug 2</string>
+    <string name="playground_accessory_no_response">No response</string>
+
+    <!-- ===== TOAST MESSAGES ===== -->
+    <string name="toast_app_not_found_pkg_format">App not found: %1$s</string>
+    <string name="toast_app_not_found_label_format">App not found: %1$s</string>
+    <string name="toast_cannot_open_app_format">Could not open %1$s</string>
+    <string name="toast_choose_wallpaper">Choose wallpaper</string>
+    <string name="toast_permissions_ok">Permissions OK</string>
+    <string name="toast_shortcut_added_format">Shortcut added: %1$s</string>
+
+    <!-- ===== NOTIFICATION ===== -->
+    <string name="notification_channel_name">Portal Launcher</string>
+    <string name="notification_content_title">Portal Launcher</string>
+    <string name="power_mode_always_on">Always on</string>
+    <string name="power_mode_follow_presence">Follow presence</string>
+
+    <!-- ===== PILL PRIORITY ENGINE (Dynamic Labels) ===== -->
+    <string name="presence_home">At home</string>
+    <string name="presence_away">Away</string>
+    <string name="pill_group_presence">Presence</string>
+    <string name="pill_presence_nobody">Nobody</string>
+    <string name="pill_presence_count_format">%1$d at home</string>
+    <string name="pill_group_energy">Energy</string>
+    <string name="pill_group_scenes">Scenes</string>
+    <string name="pill_group_lights">Lights</string>
+    <string name="pill_group_media">Media</string>
+    <string name="pill_group_purifier">Purifier</string>
+    <string name="pill_group_air_quality">Air quality</string>
+    <string name="pill_group_temperatures">Temperatures</string>
+    <string name="pill_group_batteries">Low batteries</string>
+    <string name="pill_group_openings">Doors &amp; windows</string>
+    <string name="pill_individual_air_quality">Air quality</string>
+    <string name="pill_individual_security">Security</string>
+    <string name="light_state_on">On</string>
+    <string name="light_state_off">Off</string>
+    <string name="opening_state_open">Open</string>
+    <string name="opening_state_closed">Closed</string>
+    <string name="pill_safety_alert">Alert</string>
+    <string name="phase_none">None</string>
+    <string name="phase_air_wash">Air wash</string>
+    <string name="phase_ai_rinse">AI rinse</string>
+    <string name="phase_ai_spin">AI spin</string>
+    <string name="phase_ai_wash">AI wash</string>
+    <string name="phase_cooling">Cooling</string>
+    <string name="phase_delay_wash">Delay wash</string>
+    <string name="phase_drying">Drying</string>
+    <string name="phase_finish">Finish</string>
+    <string name="phase_pre_wash">Pre-wash</string>
+    <string name="phase_rinse">Rinse</string>
+    <string name="phase_spin">Spin</string>
+    <string name="phase_wash">Wash</string>
+    <string name="phase_weight_sensing">Weight sensing</string>
+    <string name="phase_wrinkle_prevent">Wrinkle prevent</string>
+    <string name="phase_freeze_protection">Freeze protection</string>
+
+    <!-- ===== PILL SCENES COUNT (plurals) ===== -->
+    <plurals name="pill_scenes_count">
+        <item quantity="one">%1$d shortcut</item>
+        <item quantity="other">%1$d shortcuts</item>
+    </plurals>
+
+    <!-- ===== PILL LIGHTS STATE (plurals) ===== -->
+    <plurals name="pill_lights_state">
+        <item quantity="zero">All off</item>
+        <item quantity="one">%1$d on</item>
+        <item quantity="other">%1$d on</item>
+    </plurals>
+
+    <!-- ===== PILL MEDIA STATE (plurals) ===== -->
+    <plurals name="pill_media_state">
+        <item quantity="zero">No media</item>
+        <item quantity="one">Paused</item>
+        <item quantity="other">%1$d playing</item>
+    </plurals>
+
+    <!-- ===== PILL PURIFIER STATE (plurals) ===== -->
+    <plurals name="pill_purifier_state">
+        <item quantity="one">Running · %1$s</item>
+        <item quantity="other">Off</item>
+    </plurals>
+
+    <!-- ===== PILL AIR QUALITY LABELS ===== -->
+    <string name="air_quality_bad">Bad</string>
+    <string name="air_quality_medium">Medium</string>
+    <string name="air_quality_good">Good</string>
+
+    <!-- ===== PILL BATTERY STATE ===== -->
+    <string name="pill_battery_state_multi_format">%1$d devices · min %2$s</string>
+
+    <!-- ===== PILL OPENINGS STATE ===== -->
+    <string name="pill_openings_all_closed">All closed</string>
+    <string name="pill_openings_one_open">1 open</string>
+    <string name="pill_openings_count_format">%1$d open</string>
+
+    <!-- ===== PILL COVER STATE ===== -->
+    <string name="pill_cover_open_format">Open · %1$s%%</string>
+    <string name="pill_cover_open">Open</string>
+    <string name="pill_cover_closed">Closed</string>
+    <string name="pill_cover_opening">Opening…</string>
+    <string name="pill_cover_closing">Closing…</string>
+
+    <!-- ===== PILL SWITCH / FAN STATE ===== -->
+    <string name="pill_switch_on">On</string>
+    <string name="pill_switch_off">Off</string>
+    <string name="pill_fan_on_format">Running · %1$s%%</string>
+    <string name="pill_fan_on">Running</string>
+    <string name="pill_fan_off">Off</string>
+
+    <!-- ===== PILL TEMPERATURE ===== -->
+    <string name="pill_temperature_range_format">Min %1$s · Max %2$s</string>
+
+    <!-- ===== PILL OPENING / LOCK STATES ===== -->
+    <string name="pill_opening_open">Open</string>
+    <string name="pill_lock_locked">Locked</string>
+    <string name="pill_lock_unlocked">Unlocked</string>
+    <string name="pill_lock_jammed">Jammed</string>
+    <string name="pill_individual_energy_power">Power</string>
+    <string name="pill_individual_energy_today">Today</string>
 </resources>

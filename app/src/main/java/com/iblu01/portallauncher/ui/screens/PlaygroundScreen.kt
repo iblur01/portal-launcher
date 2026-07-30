@@ -43,10 +43,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.components.appleClickable
 import com.iblu01.portallauncher.ui.components.controls.AccessoryGrid
 import com.iblu01.portallauncher.ui.components.controls.AccessoryItem
@@ -60,7 +62,6 @@ import com.iblu01.portallauncher.ui.components.controls.VacuumRoom
 import com.iblu01.portallauncher.ui.components.controls.VacuumRoomChips
 import com.iblu01.portallauncher.ui.components.controls.VacuumRunButton
 import com.iblu01.portallauncher.ui.components.controls.VacuumStatusChip
-import com.iblu01.portallauncher.ui.components.controls.frLabel
 import com.iblu01.portallauncher.ui.components.controls.VerticalColorTempSlider
 import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
 import com.iblu01.portallauncher.ui.components.controls.WheelPicker
@@ -71,15 +72,6 @@ import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 
 /** Named accents so adaptivity is obvious at a glance. */
-private val accentSwatches = listOf(
-    "Bleu" to AppleColors.accent,
-    "Vert" to Color(0xFF30D158),
-    "Menthe" to Color(0xFF63E6BE),
-    "Jaune" to AppleColors.warning,
-    "Rouge" to AppleColors.error,
-    "Violet" to Color(0xFFAF52DE),
-    "Gris" to Color(0xFFD8D8DA),
-)
 
 private enum class Presence { HOME, AWAY, OFF }
 
@@ -90,6 +82,15 @@ private enum class Presence { HOME, AWAY, OFF }
  */
 @Composable
 fun PlaygroundScreen(onBack: () -> Unit) {
+    val accentSwatches = listOf(
+        stringResource(R.string.playground_swatch_blue) to AppleColors.accent,
+        stringResource(R.string.playground_swatch_green) to Color(0xFF30D158),
+        stringResource(R.string.playground_swatch_mint) to Color(0xFF63E6BE),
+        stringResource(R.string.playground_swatch_yellow) to AppleColors.warning,
+        stringResource(R.string.playground_swatch_red) to AppleColors.error,
+        stringResource(R.string.playground_swatch_purple) to Color(0xFFAF52DE),
+        stringResource(R.string.playground_swatch_gray) to Color(0xFFD8D8DA),
+    )
     var accent by remember { mutableStateOf(accentSwatches.first().second) }
 
     Column(
@@ -110,19 +111,19 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                     .appleClickable(onBack),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour", tint = AppleColors.primary, modifier = Modifier.size(19.dp))
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.playground_back_desc), tint = AppleColors.primary, modifier = Modifier.size(19.dp))
             }
             Spacer(Modifier.width(14.dp))
             Column {
-                Text("Composants", style = AppleTypography.headlineLarge, color = AppleColors.primary)
-                Text("Banc d'essai des contrôles", style = AppleTypography.bodySmall, color = AppleColors.secondary)
+                Text(stringResource(R.string.playground_title), style = AppleTypography.headlineLarge, color = AppleColors.primary)
+                Text(stringResource(R.string.playground_subtitle), style = AppleTypography.bodySmall, color = AppleColors.secondary)
             }
         }
 
         Spacer(Modifier.height(20.dp))
 
         // Accent picker — the whole point: everything below re-skins instantly.
-        Text("Couleur d'accent", style = AppleTypography.bodySmall, color = AppleColors.secondary)
+        Text(stringResource(R.string.playground_accent_color_label), style = AppleTypography.bodySmall, color = AppleColors.secondary)
         Spacer(Modifier.height(10.dp))
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -152,12 +153,12 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(28.dp))
 
         // 1 · Fill sliders
-        SectionTitle("Curseur vertical")
+        SectionTitle(stringResource(R.string.playground_section_vertical_slider))
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             var bottom by remember { mutableFloatStateOf(0.45f) }
             var top by remember { mutableFloatStateOf(0.45f) }
             var disabled by remember { mutableFloatStateOf(0.7f) }
-            LabeledControl("Depuis le bas") {
+            LabeledControl(stringResource(R.string.playground_slider_from_bottom)) {
                 VerticalFillSlider(
                     value = bottom, onValueChange = { bottom = it },
                     origin = FillOrigin.BOTTOM, accent = accent,
@@ -165,14 +166,14 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                     modifier = Modifier.controlSize(),
                 )
             }
-            LabeledControl("Depuis le haut") {
+            LabeledControl(stringResource(R.string.playground_slider_from_top)) {
                 VerticalFillSlider(
                     value = top, onValueChange = { top = it },
                     origin = FillOrigin.TOP, accent = accent,
                     modifier = Modifier.controlSize(),
                 )
             }
-            LabeledControl("Désactivé") {
+            LabeledControl(stringResource(R.string.playground_slider_disabled)) {
                 VerticalFillSlider(
                     value = disabled, onValueChange = { disabled = it },
                     accent = accent, enabled = false,
@@ -184,18 +185,18 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(28.dp))
 
         // 2 · Gradient sliders
-        SectionTitle("Curseur dégradé")
+        SectionTitle(stringResource(R.string.playground_section_gradient_slider))
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             var kelvin by remember { mutableIntStateOf(4000) }
             var disabledKelvin by remember { mutableIntStateOf(3000) }
-            LabeledControl("Température") {
+            LabeledControl(stringResource(R.string.playground_slider_temperature)) {
                 VerticalColorTempSlider(
                     kelvin = kelvin, onKelvinChange = { kelvin = it },
                     minKelvin = 2200, maxKelvin = 6500,
                     modifier = Modifier.controlSize(),
                 )
             }
-            LabeledControl("Désactivé") {
+            LabeledControl(stringResource(R.string.playground_slider_disabled)) {
                 VerticalColorTempSlider(
                     kelvin = disabledKelvin, onKelvinChange = { disabledKelvin = it },
                     minKelvin = 2200, maxKelvin = 6500, enabled = false,
@@ -206,28 +207,33 @@ fun PlaygroundScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(28.dp))
 
-        // 3 · Segmented selectors (2 … 6 options — the control grows taller with the count)
-        SectionTitle("Sélecteur")
+        // 3 · Segmented selectors
+        SectionTitle(stringResource(R.string.playground_section_selector))
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
             var two by remember { mutableStateOf(true) }
             var three by remember { mutableStateOf(Presence.HOME) }
             var six by remember { mutableIntStateOf(2) }
-            LabeledControl("2 options") {
+            val selectorAutoLabel = stringResource(R.string.playground_selector_auto)
+            val selectorManualLabel = stringResource(R.string.playground_selector_manual)
+            LabeledControl(stringResource(R.string.playground_selector_2_options)) {
                 VerticalSegmentedSelector(
                     options = listOf(true, false),
                     selected = two, onSelect = { two = it },
-                    label = { if (it) "Auto" else "Manuel" },
+                    label = { if (it) selectorAutoLabel else selectorManualLabel },
                     accent = accent,
                     modifier = Modifier.width(88.dp),
                 )
             }
-            LabeledControl("Icône empilée") {
+            val presenceHomeLabel = stringResource(R.string.playground_presence_home)
+            val presenceAwayLabel = stringResource(R.string.playground_presence_away)
+            val presenceOffLabel = stringResource(R.string.playground_presence_off)
+            LabeledControl(stringResource(R.string.playground_selector_icon_stacked)) {
                 VerticalSegmentedSelector(
                     options = Presence.entries.toList(),
                     selected = three, onSelect = { three = it },
                     label = {
                         when (it) {
-                            Presence.HOME -> "Au domicile"; Presence.AWAY -> "Absent"; Presence.OFF -> "Désactivée"
+                            Presence.HOME -> presenceHomeLabel; Presence.AWAY -> presenceAwayLabel; Presence.OFF -> presenceOffLabel
                         }
                     },
                     icon = {
@@ -240,7 +246,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                     modifier = Modifier.width(88.dp),
                 )
             }
-            LabeledControl("6 options") {
+            LabeledControl(stringResource(R.string.playground_selector_6_options)) {
                 VerticalSegmentedSelector(
                     options = listOf(1, 2, 3, 4, 5, 6),
                     selected = six, onSelect = { six = it },
@@ -256,17 +262,17 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(28.dp))
 
         // 4 · Vertical switches
-        SectionTitle("Interrupteur")
+        SectionTitle(stringResource(R.string.playground_section_switch))
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             var on by remember { mutableStateOf(true) }
             var off by remember { mutableStateOf(false) }
-            LabeledControl(if (on) "Activé" else "Désactivé") {
+            LabeledControl(if (on) stringResource(R.string.playground_switch_on) else stringResource(R.string.playground_switch_off)) {
                 VerticalSwitch(
                     checked = on, onCheckedChange = { on = it }, accent = accent,
                     modifier = Modifier.controlSize(),
                 )
             }
-            LabeledControl("Icône + texte") {
+            LabeledControl(stringResource(R.string.playground_switch_icon_text)) {
                 VerticalSwitch(
                     checked = off, onCheckedChange = { off = it }, accent = accent,
                     icon = { Icons.Filled.PowerSettingsNew },
@@ -274,7 +280,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                     modifier = Modifier.controlSize(),
                 )
             }
-            LabeledControl("Désactivé") {
+            LabeledControl(stringResource(R.string.playground_switch_disabled)) {
                 VerticalSwitch(
                     checked = true, onCheckedChange = {}, accent = accent, enabled = false,
                     modifier = Modifier.controlSize(),
@@ -285,12 +291,12 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(28.dp))
 
         // 5 · Keypad
-        SectionTitle("Clavier")
+        SectionTitle(stringResource(R.string.playground_section_keypad))
         var pinError by remember { mutableStateOf(false) }
         var unlocked by remember { mutableStateOf(false) }
         var keypadEnabled by remember { mutableStateOf(true) }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Clavier actif", style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+            Text(stringResource(R.string.playground_keypad_active), style = AppleTypography.bodyLarge, color = AppleColors.secondary)
             Spacer(Modifier.width(12.dp))
             VerticalSwitch(
                 checked = keypadEnabled, onCheckedChange = { keypadEnabled = it }, accent = accent,
@@ -300,8 +306,8 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         PinKeypad(
             codeLength = 4,
-            title = if (unlocked) "Déverrouillé ✓" else "Code : 1234",
-            subtitle = "Un mauvais code fait trembler les points",
+            title = if (unlocked) stringResource(R.string.playground_keypad_unlocked) else stringResource(R.string.playground_keypad_code_hint),
+            subtitle = stringResource(R.string.playground_keypad_wrong_code_hint),
             accent = accent,
             error = pinError,
             onErrorConsumed = { pinError = false },
@@ -314,8 +320,8 @@ fun PlaygroundScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(28.dp))
 
-        // 6 · Thermostat arc + cylinder mode picker
-        SectionTitle("Thermostat")
+        // 6 · Thermostat
+        SectionTitle(stringResource(R.string.playground_section_thermostat))
         var tMode by remember { mutableStateOf(ThermostatMode.HEAT_COOL) }
         var low by remember { mutableFloatStateOf(63f) }
         var high by remember { mutableFloatStateOf(70f) }
@@ -328,6 +334,10 @@ fun PlaygroundScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxWidth().height(300.dp),
         )
         Spacer(Modifier.height(8.dp))
+        val thermoOffLabel = stringResource(R.string.playground_thermo_mode_off)
+        val thermoCoolLabel = stringResource(R.string.playground_thermo_mode_cool)
+        val thermoHeatLabel = stringResource(R.string.playground_thermo_mode_heat)
+        val thermoAutoLabel = stringResource(R.string.playground_thermo_mode_auto)
         val modes = listOf(ThermostatMode.OFF, ThermostatMode.COOL, ThermostatMode.HEAT, ThermostatMode.HEAT_COOL)
         WheelPicker(
             options = modes,
@@ -335,8 +345,8 @@ fun PlaygroundScreen(onBack: () -> Unit) {
             onSelect = { tMode = it },
             label = {
                 when (it) {
-                    ThermostatMode.OFF -> "Éteint"; ThermostatMode.COOL -> "Refroidir"
-                    ThermostatMode.HEAT -> "Chauffer"; ThermostatMode.HEAT_COOL -> "Auto"
+                    ThermostatMode.OFF -> thermoOffLabel; ThermostatMode.COOL -> thermoCoolLabel
+                    ThermostatMode.HEAT -> thermoHeatLabel; ThermostatMode.HEAT_COOL -> thermoAutoLabel
                 }
             },
             accent = accent,
@@ -345,29 +355,43 @@ fun PlaygroundScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(28.dp))
 
-        // 7 · Robot vacuum — Apple-simple layout
-        SectionTitle("Aspirateur robot")
+        // 7 · Robot vacuum
+        SectionTitle(stringResource(R.string.playground_section_vacuum))
+        val livingName = stringResource(R.string.playground_vacuum_living_room)
+        val kitchenName = stringResource(R.string.playground_vacuum_kitchen)
+        val bedroomName = stringResource(R.string.playground_vacuum_bedroom)
+        val bathName = stringResource(R.string.playground_vacuum_bathroom)
         val rooms = remember {
             listOf(
-                VacuumRoom("living", "Salon", Icons.Outlined.Weekend),
-                VacuumRoom("kitchen", "Cuisine", Icons.Outlined.Kitchen),
-                VacuumRoom("bedroom", "Chambre", Icons.Outlined.Bed),
-                VacuumRoom("bath", "Salle de bain", Icons.Outlined.Bathtub),
+                VacuumRoom("living", livingName, Icons.Outlined.Weekend),
+                VacuumRoom("kitchen", kitchenName, Icons.Outlined.Kitchen),
+                VacuumRoom("bedroom", bedroomName, Icons.Outlined.Bed),
+                VacuumRoom("bath", bathName, Icons.Outlined.Bathtub),
             )
         }
         var running by remember { mutableStateOf(true) }
         var mode by remember { mutableStateOf(VacuumMode.VACUUM) }
         var vacRooms by remember { mutableStateOf(setOf<String>()) }
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("emmy", style = AppleTypography.headlineLarge, color = AppleColors.primary)
+            Text(stringResource(R.string.playground_vacuum_name), style = AppleTypography.headlineLarge, color = AppleColors.primary)
             Text(
-                if (running) "Nettoyage" else "En pause",
+                if (running) stringResource(R.string.playground_vacuum_cleaning) else stringResource(R.string.playground_vacuum_paused),
                 style = AppleTypography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = accent,
             )
             Spacer(Modifier.height(28.dp))
             VacuumRunButton(running = running, onToggle = { running = it })
             Spacer(Modifier.height(28.dp))
+            val vacuumLabelVacuum = stringResource(R.string.vacuum_mode_vacuum)
+            val vacuumLabelVacAndMop = stringResource(R.string.vacuum_mode_vacuum_and_mop)
+            val vacuumLabelVacThenMop = stringResource(R.string.vacuum_mode_vacuum_then_mop)
+            val vacuumLabelMop = stringResource(R.string.vacuum_mode_mop)
+            val vacuumModeLabels = mapOf(
+                VacuumMode.VACUUM to vacuumLabelVacuum,
+                VacuumMode.VACUUM_AND_MOP to vacuumLabelVacAndMop,
+                VacuumMode.VACUUM_THEN_MOP to vacuumLabelVacThenMop,
+                VacuumMode.MOP to vacuumLabelMop,
+            )
             val modes = listOf(
                 VacuumMode.VACUUM, VacuumMode.VACUUM_AND_MOP,
                 VacuumMode.VACUUM_THEN_MOP, VacuumMode.MOP,
@@ -376,12 +400,14 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                 options = modes,
                 selected = mode,
                 onSelect = { mode = it },
-                label = { it.frLabel() },
+                label = { vacuumModeLabels[it]!! },
                 accent = AppleColors.primary,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(16.dp))
-            VacuumStatusChip(if (running) "Préparation" else "En pause", prominent = true)
+            val inProgressLabel = stringResource(R.string.playground_vacuum_in_progress)
+            val queuedLabel = stringResource(R.string.playground_vacuum_queued)
+            VacuumStatusChip(if (running) stringResource(R.string.playground_vacuum_preparing) else stringResource(R.string.playground_vacuum_paused), prominent = true)
             Spacer(Modifier.height(20.dp))
             VacuumRoomChips(
                 rooms = rooms,
@@ -390,7 +416,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                     vacRooms = if (id in vacRooms) vacRooms - id else vacRooms + id
                 },
                 currentRoomId = "living",
-                roomState = { if (running) "En cours" else "En file" },
+                roomState = { if (running) inProgressLabel else queuedLabel },
                 accent = accent,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -398,34 +424,34 @@ fun PlaygroundScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(28.dp))
 
-        // 8 · HomeKit accessory grid
-        SectionTitle("Accessoires (HomeKit)")
+        // 8 · Accessories
+        SectionTitle(stringResource(R.string.playground_section_accessories))
         var deskOn by remember { mutableStateOf(true) }
         var lampOn by remember { mutableStateOf(false) }
         var plugOn by remember { mutableStateOf(true) }
         val accessories = listOf(
             AccessoryItem(
-                "desk", "Bureau", Icons.Outlined.Lightbulb, deskOn,
-                subtitle = if (deskOn) "36 %" else "Éteinte",
+                "desk", stringResource(R.string.playground_accessory_desk), Icons.Outlined.Lightbulb, deskOn,
+                subtitle = if (deskOn) "36 %" else stringResource(R.string.playground_accessory_off),
                 accent = AppleColors.warning, onToggle = { deskOn = it },
             ),
             AccessoryItem(
-                "blinds", "Volet", Icons.Outlined.Blinds, false,
-                subtitle = "Mise à jour…", accent = accent, warning = true,
+                "blinds", stringResource(R.string.playground_accessory_blinds), Icons.Outlined.Blinds, false,
+                subtitle = stringResource(R.string.playground_accessory_updating), accent = accent, warning = true,
             ),
             AccessoryItem(
-                "lamp", "Lampe salon", Icons.Outlined.Lightbulb, lampOn,
-                subtitle = if (lampOn) "Allumée" else "Éteinte",
+                "lamp", stringResource(R.string.playground_accessory_lamp), Icons.Outlined.Lightbulb, lampOn,
+                subtitle = if (lampOn) stringResource(R.string.playground_accessory_on) else stringResource(R.string.playground_accessory_off),
                 accent = AppleColors.warning, onToggle = { lampOn = it },
             ),
             AccessoryItem(
-                "plug", "Prise TV", Icons.Outlined.Power, plugOn,
-                subtitle = if (plugOn) "Activée" else "Désactivée",
+                "plug", stringResource(R.string.playground_accessory_plug_tv), Icons.Outlined.Power, plugOn,
+                subtitle = if (plugOn) stringResource(R.string.playground_accessory_active) else stringResource(R.string.playground_accessory_inactive),
                 accent = accent, onToggle = { plugOn = it },
             ),
             AccessoryItem(
-                "plug2", "Prise 2", Icons.Outlined.Power, false,
-                subtitle = "Pas de réponse", warning = true,
+                "plug2", stringResource(R.string.playground_accessory_plug2), Icons.Outlined.Power, false,
+                subtitle = stringResource(R.string.playground_accessory_no_response), warning = true,
             ),
         )
         AccessoryGrid(items = accessories)

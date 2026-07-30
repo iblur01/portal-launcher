@@ -31,9 +31,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.apps.WidgetOffer
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -74,13 +76,13 @@ fun WidgetPickerDialog(
                 .padding(vertical = 12.dp),
         ) {
             Text(
-                "Ajouter un widget",
+                stringResource(R.string.widget_picker_title),
                 style = AppleTypography.titleMedium,
                 color = AppleColors.primary,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
             )
             Text(
-                if (offers.isEmpty()) "Aucun widget disponible" else "Taille en cellules indiquée",
+                if (offers.isEmpty()) stringResource(R.string.widget_picker_empty) else stringResource(R.string.widget_picker_size_hint),
                 style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
                 color = AppleColors.tertiary,
                 modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp),

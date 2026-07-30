@@ -22,6 +22,8 @@ import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 /**
  * Vacuum control: start / pause / stop / dock / locate, gated by the entity's
@@ -37,26 +39,26 @@ fun VacuumControl(chip: LauncherChip) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(2.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            PanelModeButton("Démarrer", Icons.Outlined.PlayArrow, cleaning) {
+            PanelModeButton(stringResource(R.string.vacuum_button_start), Icons.Outlined.PlayArrow, cleaning) {
                 callService("vacuum", "start", chip.entityId)
             }
             if (entity.supports(VacuumFeature.PAUSE)) {
-                PanelModeButton("Pause", Icons.Outlined.Pause, entity.state.equals("paused", true)) {
+                PanelModeButton(stringResource(R.string.vacuum_button_pause), Icons.Outlined.Pause, entity.state.equals("paused", true)) {
                     callService("vacuum", "pause", chip.entityId)
                 }
             }
             if (entity.supports(VacuumFeature.STOP)) {
-                PanelModeButton("Stop", Icons.Filled.Stop, false) {
+                PanelModeButton(stringResource(R.string.vacuum_button_stop), Icons.Filled.Stop, false) {
                     callService("vacuum", "stop", chip.entityId)
                 }
             }
             if (entity.supports(VacuumFeature.RETURN_HOME)) {
-                PanelModeButton("Base", Icons.Outlined.Home, entity.state.equals("returning", true)) {
+                PanelModeButton(stringResource(R.string.vacuum_button_dock), Icons.Outlined.Home, entity.state.equals("returning", true)) {
                     callService("vacuum", "return_to_base", chip.entityId)
                 }
             }
             if (entity.supports(VacuumFeature.LOCATE)) {
-                PanelModeButton("Localiser", Icons.Outlined.MyLocation, false) {
+                PanelModeButton(stringResource(R.string.vacuum_button_locate), Icons.Outlined.MyLocation, false) {
                     callService("vacuum", "locate", chip.entityId)
                 }
             }
@@ -65,10 +67,10 @@ fun VacuumControl(chip: LauncherChip) {
 
         val battery = entity.attributes.optInt("battery_level", -1)
         val status = entity.attributes.optString("status").ifBlank { chip.value }
-        if (status.isNotBlank()) PanelDetailRow(PillDetail("État", status))
+        if (status.isNotBlank()) PanelDetailRow(PillDetail(stringResource(R.string.vacuum_detail_status), status))
         if (battery in 0..100) {
             Spacer(Modifier.height(8.dp))
-            PanelDetailRow(PillDetail("Batterie", "$battery %"))
+            PanelDetailRow(PillDetail(stringResource(R.string.vacuum_detail_battery), "$battery %"))
         }
         chip.details.forEach {
             Spacer(Modifier.height(8.dp))

@@ -33,6 +33,8 @@ import com.iblu01.portallauncher.ui.components.WeatherGlyph
 import com.iblu01.portallauncher.ui.components.WeatherUi
 import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
 import com.iblu01.portallauncher.ui.theme.AppleColors
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 /** Frozen mock content used to judge the overlay against a real wallpaper — no HA dependency. */
 private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", city = "Appartement", condition = "Dégagé", glyph = WeatherGlyph())
@@ -131,7 +133,7 @@ fun OpacityPreviewScreen(
         ) {
             Icon(
                 Icons.Filled.Close,
-                contentDescription = "Fermer",
+                contentDescription = stringResource(R.string.opacity_preview_close_desc),
                 tint = AppleColors.secondary,
                 modifier = Modifier.size(20.dp),
             )

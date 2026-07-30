@@ -22,6 +22,7 @@ import okhttp3.OkHttpClient
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
 import androidx.compose.runtime.remember
+import com.iblu01.portallauncher.R
 
 private val unsplashUrls = listOf(
     "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80" to "Mer",
@@ -32,9 +33,9 @@ private val unsplashUrls = listOf(
 )
 
 val backgroundModes = listOf(
-    "neutral" to "Neutre",
-    "nature" to "Nature (Unsplash)",
-    "custom" to "Photo perso",
+    "neutral" to R.string.bg_mode_neutral,
+    "nature" to R.string.bg_mode_nature,
+    "custom" to R.string.bg_mode_custom,
 )
 
 @Composable

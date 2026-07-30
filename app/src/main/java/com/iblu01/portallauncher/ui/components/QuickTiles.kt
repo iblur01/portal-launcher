@@ -74,12 +74,15 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
     val target = stateColor(chip.state)
     val accent by animateColorAsState(target, AppleMotion.spring(), label = "chipAccent")
     val animatedProgress by animateFloatAsState(chip.progress, AppleMotion.spring(), label = "chipProgress")
-    // Selected chip (its panel is open) reads as active: accent-tinted fill + border.
-    val borderColor by animateColorAsState(if (selected) accent else AppleColors.frostedBorder, AppleMotion.spring(), label = "chipBorder")
+    // Selected chip: iOS-style — white fill, dark text, matching border.
+    val selectedContent = Color(0xFF1C1C1E)
+    val selectedSubtitle = Color(0xFF3C3C43).copy(alpha = 0.6f)
+    val borderColor by animateColorAsState(if (selected) Color.White else AppleColors.frostedBorder, AppleMotion.spring(), label = "chipBorder")
+    val fillColor by animateColorAsState(if (selected) Color.White else AppleColors.frostedFill, AppleMotion.spring(), label = "chipFill")
     Row(
         modifier = modifier
             .clip(AppleShapes.pill)
-            .background(if (selected) accent.copy(alpha = 0.16f) else AppleColors.frostedFill, AppleShapes.pill)
+            .background(fillColor, AppleShapes.pill)
             .border(if (selected) 1.dp else 0.5.dp, borderColor, AppleShapes.pill)
             .then(if (onClick != null) Modifier.appleClickable(onClick, onLongPress) else Modifier)
             .padding(start = 12.dp.scaled(), end = 22.dp.scaled(), top = 12.dp.scaled(), bottom = 12.dp.scaled()),
@@ -124,13 +127,13 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
             Text(
                 chip.label,
                 style = AppleTypography.bodyLarge.copy(fontSize = AppleTypography.bodyLarge.fontSize.scaled()),
-                color = AppleColors.secondary,
+                color = if (selected) selectedSubtitle else AppleColors.secondary,
                 maxLines = 1,
             )
             Text(
                 chip.value,
                 style = AppleTypography.titleLarge.copy(fontSize = AppleTypography.titleLarge.fontSize.scaled()),
-                color = AppleColors.primary,
+                color = if (selected) selectedContent else AppleColors.primary,
                 maxLines = 1,
             )
         }

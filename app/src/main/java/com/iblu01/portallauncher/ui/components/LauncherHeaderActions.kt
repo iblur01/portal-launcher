@@ -14,11 +14,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -42,14 +44,14 @@ fun LauncherHeaderActions(
             // empty list, and "Masquer" would have no visible way back.
             HeaderAction(
                 icon = Icons.Outlined.VisibilityOff,
-                contentDescription = "Applications masquées ($hiddenCount)",
+                contentDescription = stringResource(R.string.header_hidden_apps_content_desc, hiddenCount),
                 badge = hiddenCount.toString(),
                 onClick = onShowHidden,
             )
         }
         HeaderAction(
             icon = Icons.Outlined.Settings,
-            contentDescription = "Réglages",
+            contentDescription = stringResource(R.string.header_settings_content_desc),
             onClick = onSettings,
         )
     }

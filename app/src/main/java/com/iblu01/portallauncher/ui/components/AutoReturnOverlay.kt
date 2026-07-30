@@ -21,12 +21,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.AutoReturnUiState
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -87,7 +89,7 @@ private fun AutoReturnPill(
         }
 
         Text(
-            "Fermeture auto",
+            stringResource(R.string.auto_return_pill_label),
             style = AppleTypography.bodySmall,
             color = AppleColors.primary,
         )
@@ -102,7 +104,7 @@ private fun AutoReturnPill(
         ) {
             Icon(
                 Icons.Outlined.Close,
-                contentDescription = "Annuler",
+                contentDescription = stringResource(R.string.auto_return_cancel_desc),
                 tint = AppleColors.primary,
                 modifier = Modifier.size(14.dp),
             )

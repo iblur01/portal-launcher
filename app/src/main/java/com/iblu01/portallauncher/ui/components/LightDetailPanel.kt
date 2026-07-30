@@ -88,6 +88,8 @@ import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -310,7 +312,7 @@ private fun ColumnScope.LandscapeLightDetail(
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     Icon(Icons.Filled.WbSunny, null, tint = AppleColors.secondary, modifier = Modifier.size(18.dp))
-                    Text("Canal blanc intégré", style = AppleTypography.bodySmall, color = AppleColors.secondary)
+                    Text(stringResource(R.string.light_white_channel_label), style = AppleTypography.bodySmall, color = AppleColors.secondary)
                 }
             }
         }
@@ -407,7 +409,7 @@ private fun ColorPresetsBar(
             PowerButton(isOn, onPowerToggle)
         }
     } else {
-        if (supportsColor) Text("Couleurs", style = AppleTypography.bodySmall, color = AppleColors.secondary)
+        if (supportsColor) Text(stringResource(R.string.light_colors_section), style = AppleTypography.bodySmall, color = AppleColors.secondary)
         val colorRows = colorPresets.takeIf { supportsColor }?.chunked(3).orEmpty()
         colorRows.forEachIndexed { index, row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -420,7 +422,7 @@ private fun ColorPresetsBar(
         }
         if (supportsColor && colorPresets.size % 3 == 0) PaletteButton { onOpenWheel(null) }
         if (supportsWhite) {
-            Text(if (whiteChannel) "Blancs · canal W" else "Blancs", style = AppleTypography.bodySmall, color = AppleColors.secondary)
+            Text(if (whiteChannel) stringResource(R.string.light_whites_w_channel_label) else stringResource(R.string.light_whites_label), style = AppleTypography.bodySmall, color = AppleColors.secondary)
             whitePresets.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     row.forEach { (rawKelvin, swatch) ->
@@ -456,7 +458,7 @@ private fun PowerButton(isOn: Boolean, onToggle: (Boolean) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(Icons.Filled.PowerSettingsNew, null, tint = if (isOn) AppleColors.accent else AppleColors.secondary, modifier = Modifier.size(17.dp))
-        Text(if (isOn) "Éteindre" else "Allumer", style = AppleTypography.bodySmall, color = AppleColors.primary)
+        Text(if (isOn) stringResource(R.string.light_power_off) else stringResource(R.string.light_power_on), style = AppleTypography.bodySmall, color = AppleColors.primary)
     }
 }
 
@@ -464,9 +466,10 @@ private fun PowerButton(isOn: Boolean, onToggle: (Boolean) -> Unit) {
 private fun PaletteButton(onClick: () -> Unit) {
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, AppleMotion.spring(), label = "paletteScale")
+    val colorWheelDesc = stringResource(R.string.light_open_color_wheel_desc)
     Box(
         Modifier.scale(scale).size(46.dp).clip(CircleShape).background(AppleColors.frostedFill)
-            .border(1.dp, AppleColors.frostedBorder, CircleShape).semantics { contentDescription = "Ouvrir la roue chromatique" }
+            .border(1.dp, AppleColors.frostedBorder, CircleShape).semantics { contentDescription = colorWheelDesc }
             .pointerInput(onClick) { detectTapGestures(onPress = { pressed = true; tryAwaitRelease(); pressed = false }, onTap = { onClick() }) },
         contentAlignment = Alignment.Center,
     ) {
@@ -479,11 +482,13 @@ private fun PaletteButton(onClick: () -> Unit) {
 private fun ColorDot(color: Color, active: Boolean, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, AppleMotion.spring(), label = "dotScale")
+    val activeDesc = stringResource(R.string.light_color_active_desc)
+    val applyDesc = stringResource(R.string.light_color_apply_desc)
     Box(
         Modifier.scale(scale).size(46.dp)
             .then(if (active) Modifier.shadow(10.dp, CircleShape, ambientColor = color, spotColor = color) else Modifier)
             .clip(CircleShape).background(color).border(if (active) 2.dp else 1.dp, Color.White.copy(alpha = if (active) 0.95f else 0.35f), CircleShape)
-            .semantics { contentDescription = if (active) "Couleur active" else "Appliquer cette couleur" }
+            .semantics { contentDescription = if (active) activeDesc else applyDesc }
             .pointerInput(onClick, onLongClick) {
                 detectTapGestures(
                     onPress = { pressed = true; tryAwaitRelease(); pressed = false },
@@ -507,13 +512,13 @@ private fun SliderModeSwitch(
     ) {
         SliderModeButton(
             icon = Icons.Filled.WbSunny,
-            label = if (compact) null else "Luminosité",
+            label = if (compact) null else stringResource(R.string.light_mode_brightness),
             selected = mode == LightSliderMode.BRIGHTNESS,
             onClick = { onModeChange(LightSliderMode.BRIGHTNESS) },
         )
         SliderModeButton(
             icon = Icons.Filled.NightsStay,
-            label = if (compact) null else "Température",
+            label = if (compact) null else stringResource(R.string.light_mode_temperature),
             selected = mode == LightSliderMode.COLOR_TEMPERATURE,
             onClick = { onModeChange(LightSliderMode.COLOR_TEMPERATURE) },
         )
@@ -561,9 +566,9 @@ private fun ColorWheelOverlay(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Couleur", style = AppleTypography.titleLarge, color = AppleColors.primary)
+                        Text(stringResource(R.string.light_color_wheel_title), style = AppleTypography.titleLarge, color = AppleColors.primary)
                         Box(Modifier.size(40.dp).clip(CircleShape).background(AppleColors.frostedFill).pointerInput(onDismiss) { detectTapGestures { onDismiss() } }, contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Close, "Fermer", tint = AppleColors.primary, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Filled.Close, stringResource(R.string.light_color_wheel_close_desc), tint = AppleColors.primary, modifier = Modifier.size(20.dp))
                         }
                     }
                     Spacer(Modifier.height(if (landscape) 10.dp else 20.dp))

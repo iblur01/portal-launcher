@@ -39,6 +39,8 @@ import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 
 /**
  * The big round HomeKit-style accessory button used by simple on/off accessories
@@ -79,7 +81,7 @@ fun SwitchControl(chip: LauncherChip) {
     val on = entity.state.equals("on", true)
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(6.dp))
-        BigCircleButton(on, AppleColors.active, Icons.Outlined.PowerSettingsNew, if (on) "Allumé" else "Éteint") {
+        BigCircleButton(on, AppleColors.active, Icons.Outlined.PowerSettingsNew, if (on) stringResource(R.string.switch_state_on) else stringResource(R.string.switch_state_off)) {
             callService("switch", "toggle", chip.entityId)
         }
         Spacer(Modifier.height(20.dp))
@@ -95,7 +97,7 @@ fun FanControl(chip: LauncherChip) {
     val on = entity.state.equals("on", true)
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(6.dp))
-        BigCircleButton(on, AppleColors.accent, Icons.Outlined.Air, if (on) "En marche" else "Arrêté") {
+        BigCircleButton(on, AppleColors.accent, Icons.Outlined.Air, if (on) stringResource(R.string.fan_state_on) else stringResource(R.string.fan_state_off)) {
             callService("fan", "toggle", chip.entityId)
         }
         Spacer(Modifier.height(20.dp))
@@ -104,7 +106,7 @@ fun FanControl(chip: LauncherChip) {
             val committed = entity.attributes.optInt("percentage", 0)
             var slider by remember(committed) { mutableFloatStateOf(committed.toFloat()) }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Vitesse", style = AppleTypography.bodyLarge, color = AppleColors.secondary, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.fan_speed_label), style = AppleTypography.bodyLarge, color = AppleColors.secondary, modifier = Modifier.weight(1f))
                 Text("${slider.toInt()}%", style = AppleTypography.bodyLarge, color = AppleColors.primary)
             }
             Slider(
@@ -120,7 +122,7 @@ fun FanControl(chip: LauncherChip) {
             val oscillating = entity.attributes.optBoolean("oscillating", false)
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                PanelModeButton("Oscillation", Icons.Outlined.Sync, oscillating) {
+                PanelModeButton(stringResource(R.string.fan_oscillation_label), Icons.Outlined.Sync, oscillating) {
                     callService("fan", "oscillate", chip.entityId, mapOf("oscillating" to !oscillating))
                 }
             }

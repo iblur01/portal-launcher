@@ -23,10 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.apps.GridItem
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -65,13 +67,13 @@ fun HiddenAppsDialog(
                 .padding(vertical = 12.dp),
         ) {
             Text(
-                "Applications masquées",
+                stringResource(R.string.hidden_apps_title),
                 style = AppleTypography.titleMedium,
                 color = AppleColors.primary,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
             )
             Text(
-                if (items.isEmpty()) "Aucune" else "Touchez pour remettre sur la grille",
+                if (items.isEmpty()) stringResource(R.string.hidden_apps_empty) else stringResource(R.string.hidden_apps_tap_to_restore),
                 style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
                 color = AppleColors.tertiary,
                 modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp),

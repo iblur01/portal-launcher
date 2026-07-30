@@ -29,13 +29,15 @@ import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.ui.theme.AppleMotion
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 import kotlin.math.roundToInt
 
 /** Live power with an auto-scaling gauge, plus today's energy. */
 @Composable
 fun EnergyActions(chip: LauncherChip) {
-    val powerDetail = chip.details.firstOrNull { it.label == "Puissance" }
-    val energyDetail = chip.details.firstOrNull { it.label == "Aujourd'hui" }
+    val powerDetail = chip.details.firstOrNull { it.label == stringResource(R.string.energy_power_label) }
+    val energyDetail = chip.details.firstOrNull { it.label == stringResource(R.string.energy_today_label) }
     val entity = powerDetail?.entityId?.let { rememberEntity(it) }
     val watts = entity?.state?.toFloatOrNull() ?: powerDetail?.value?.filter { it.isDigit() }?.toFloatOrNull() ?: 0f
 
@@ -54,6 +56,6 @@ fun EnergyActions(chip: LauncherChip) {
         Spacer(Modifier.height(6.dp))
         Text("max ${gaugeMax.roundToInt()} W", style = AppleTypography.bodySmall.copy(fontSize = 12.sp), color = AppleColors.tertiary)
         Spacer(Modifier.height(18.dp))
-        if (energyDetail != null) PanelDetailRow(PillDetail("Aujourd'hui", energyDetail.value))
+        if (energyDetail != null) PanelDetailRow(PillDetail(stringResource(R.string.energy_today_label), energyDetail.value))
     }
 }
