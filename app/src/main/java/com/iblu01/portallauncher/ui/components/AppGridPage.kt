@@ -101,6 +101,8 @@ fun AppGridPage(
     onSpec: (GridSpec) -> Unit = {},
     /** Reports one cell's size in dp — the only way a widget's declared minimum becomes cells. */
     onCellSize: (widthDp: Float, heightDp: Float) -> Unit = { _, _ -> },
+    /** User-configurable multiplier on cell size (icon size / grid density), from Prefs.gridScale. */
+    cellScale: Float = 1f,
     /**
      * 0 on the clock page, 1 once this page is in view. A lambda, not a value: read in the draw
      * phase it costs no recomposition, whereas a parameter would recompose every page every frame
@@ -134,7 +136,7 @@ fun AppGridPage(
                 drag.registerPage(page, PageGeometry(contentRect, spec))
                 val widthDp = with(density) { contentRect.width.toDp().value }
                 val heightDp = with(density) { contentRect.height.toDp().value }
-                onSpec(gridSpecFor(widthDp = widthDp, heightDp = heightDp))
+                onSpec(gridSpecFor(widthDp = widthDp, heightDp = heightDp, cellWidthDp = 112f * cellScale, cellHeightDp = 116f * cellScale))
                 onCellSize(widthDp / spec.columns, heightDp / spec.rows)
             }
             // Outlines the footprint the dragged item would land on — a widget covers several
@@ -258,6 +260,7 @@ fun AppGridPage(
                             label = placed.item.label,
                             icon = placed.item.icon,
                             onClick = { onLaunch(placed.item) },
+                            iconSize = 56.dp * cellScale,
                         )
                     }
                 }
@@ -309,7 +312,7 @@ private fun Rect.roundToIntRect(): IntRect =
 
 /** The floating icon under the finger, drawn above every page so a drag can cross them. */
 @Composable
-fun DraggedIconOverlay(drag: GridDragState) {
+fun DraggedIconOverlay(drag: GridDragState, iconSize: Dp = 56.dp) {
     if (!drag.isDragging) return
     val icon = drag.draggedIcon
     Box(
@@ -335,7 +338,7 @@ fun DraggedIconOverlay(drag: GridDragState) {
                     bitmap = icon,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(56.dp),
+                    modifier = Modifier.size(iconSize),
                 )
             }
         }
@@ -343,7 +346,8 @@ fun DraggedIconOverlay(drag: GridDragState) {
 }
 
 @Composable
-internal fun AppTile(label: String, icon: ImageBitmap?, onClick: () -> Unit) {
+internal fun AppTile(label: String, icon: ImageBitmap?, onClick: () -> Unit, iconSize: Dp = 56.dp) {
+    val scale = iconSize / 56.dp
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -356,12 +360,12 @@ internal fun AppTile(label: String, icon: ImageBitmap?, onClick: () -> Unit) {
                 bitmap = icon,
                 contentDescription = label,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(56.dp),
+                modifier = Modifier.size(iconSize),
             )
         } else {
             Box(
                 Modifier
-                    .size(56.dp)
+                    .size(iconSize)
                     .clip(AppleShapes.panel)
                     .background(AppleColors.frostedFill)
             )
@@ -369,7 +373,7 @@ internal fun AppTile(label: String, icon: ImageBitmap?, onClick: () -> Unit) {
         Spacer(Modifier.height(6.dp))
         Text(
             text = label,
-            style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
+            style = AppleTypography.bodySmall.copy(fontSize = (13.sp.value * scale).sp),
             color = AppleColors.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

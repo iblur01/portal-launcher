@@ -124,6 +124,10 @@ class Prefs(private val context: Context) {
         get() = sp.getBoolean("clock_format_24h", true)
         set(value) = sp.edit().putBoolean("clock_format_24h", value).apply()
 
+    var clockElementSpacing: Float
+        get() = sp.getFloat("clock_element_spacing", 1f)
+        set(value) = sp.edit().putFloat("clock_element_spacing", value.coerceIn(0.4f, 2f)).apply()
+
     /** Whole clock styling as one value object, mapping to/from the individual keys above. */
     var clockTheme: ClockTheme
         get() = ClockTheme(
@@ -133,6 +137,7 @@ class Prefs(private val context: Context) {
             letterSpacing = clockLetterSpacing,
             tint = ClockTint.fromKey(clockTint),
             format24h = clockFormat24h,
+            elementSpacing = clockElementSpacing,
         )
         set(value) {
             clockFont = value.font.key
@@ -141,7 +146,13 @@ class Prefs(private val context: Context) {
             clockLetterSpacing = value.letterSpacing
             clockTint = value.tint.key
             clockFormat24h = value.format24h
+            clockElementSpacing = value.elementSpacing
         }
+
+    /** Multiplier on the app grid's cell size (icon size), so a smaller device can shrink it. */
+    var gridScale: Float
+        get() = sp.getFloat("grid_scale", 1f)
+        set(value) = sp.edit().putFloat("grid_scale", value.coerceIn(0.7f, 1.3f)).apply()
 
     var adbEnabled: Boolean
         get() = sp.getBoolean("adb_enabled", false)

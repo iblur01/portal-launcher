@@ -41,9 +41,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iblu01.portallauncher.ui.apps.gridSpecFor
+import com.iblu01.portallauncher.ui.components.AppGridInsets
+import com.iblu01.portallauncher.ui.components.ClockHeaderCollapsedHeight
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.iblu01.portallauncher.Prefs
@@ -173,6 +177,7 @@ fun SettingsScreen(
     }
     var autoReturnEnabled by remember { mutableStateOf(prefs.autoReturnEnabled) }
     var autoReturnDelay by remember { mutableStateOf(prefs.autoReturnDelaySeconds.toFloat()) }
+    var gridScale by remember { mutableStateOf(prefs.gridScale) }
 
     var showAppPicker by remember { mutableStateOf(false) }
 
@@ -292,6 +297,8 @@ fun SettingsScreen(
                         onAutoReturnEnabledChange = { autoReturnEnabled = it; prefs.autoReturnEnabled = it },
                         autoReturnDelay = autoReturnDelay,
                         onAutoReturnDelayChange = { autoReturnDelay = it; prefs.autoReturnDelaySeconds = it.toInt() },
+                        gridScale = gridScale,
+                        onGridScaleChange = { gridScale = it; prefs.gridScale = it },
                         onBack = { currentPage = SettingsPage.MAIN },
                     )
                     SettingsPage.PILLS -> PillsSettingsPage(
@@ -364,6 +371,7 @@ private fun AppPage(
     timeoutMinutes: Float, onTimeoutMinutesChange: (Float) -> Unit,
     autoReturnEnabled: Boolean, onAutoReturnEnabledChange: (Boolean) -> Unit,
     autoReturnDelay: Float, onAutoReturnDelayChange: (Float) -> Unit,
+    gridScale: Float = 1f, onGridScaleChange: (Float) -> Unit = {},
     onBack: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -396,6 +404,26 @@ private fun AppPage(
 
         SettingsSection(title = "HORLOGE") {
             SettingsRow(label = "Thème de l'horloge", value = "", onClick = onOpenClockTheme)
+        }
+
+        SettingsSection(title = "GRILLE D'APPLICATIONS") {
+            val configuration = LocalConfiguration.current
+            val spec = remember(gridScale, configuration.screenWidthDp, configuration.screenHeightDp) {
+                gridSpecFor(
+                    widthDp = configuration.screenWidthDp - AppGridInsets.horizontal.value * 2,
+                    heightDp = configuration.screenHeightDp - ClockHeaderCollapsedHeight.value - AppGridInsets.bottom.value,
+                    cellWidthDp = 112f * gridScale,
+                    cellHeightDp = 116f * gridScale,
+                )
+            }
+            SettingsSlider(
+                label = "Taille des icônes",
+                value = gridScale * 100f,
+                valueRange = 70f..130f,
+                steps = 11,
+                onValueChange = { onGridScaleChange(it / 100f) },
+                valueText = "${spec.columns} × ${spec.rows}",
+            )
         }
 
         SettingsSection(title = "ÉCRAN & VEILLE") {

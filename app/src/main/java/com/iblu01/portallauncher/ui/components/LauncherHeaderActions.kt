@@ -62,22 +62,26 @@ private fun HeaderAction(
     onClick: () -> Unit,
     badge: String? = null,
 ) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(AppleShapes.pill)
-            .background(Color.White.copy(alpha = 0.12f), AppleShapes.pill)
-            .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-            .appleClickable(onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            icon,
-            contentDescription = contentDescription,
-            tint = AppleColors.primary,
-            modifier = Modifier.size(20.dp),
-        )
+    Box(modifier = Modifier.size(40.dp)) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(AppleShapes.pill)
+                .background(Color.White.copy(alpha = 0.12f), AppleShapes.pill)
+                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
+                .appleClickable(onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = contentDescription,
+                tint = AppleColors.primary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
         if (badge != null) {
+            // Sibling of the clipped button, not a child of it — otherwise the pill's own clip cuts
+            // the badge off at the boundary instead of letting it sit proud of the corner.
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)

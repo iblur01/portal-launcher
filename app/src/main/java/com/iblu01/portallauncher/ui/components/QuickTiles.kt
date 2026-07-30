@@ -66,6 +66,7 @@ import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.ui.theme.PortalTheme
+import com.iblu01.portallauncher.ui.theme.scaled
 import com.iblu01.portallauncher.ui.theme.stateColor
 
 @Composable
@@ -81,11 +82,11 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
             .background(if (selected) accent.copy(alpha = 0.16f) else AppleColors.frostedFill, AppleShapes.pill)
             .border(if (selected) 1.dp else 0.5.dp, borderColor, AppleShapes.pill)
             .then(if (onClick != null) Modifier.appleClickable(onClick, onLongPress) else Modifier)
-            .padding(start = 12.dp, end = 22.dp, top = 12.dp, bottom = 12.dp),
+            .padding(start = 12.dp.scaled(), end = 22.dp.scaled(), top = 12.dp.scaled(), bottom = 12.dp.scaled()),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(46.dp),
+            modifier = Modifier.size(46.dp.scaled()),
             contentAlignment = Alignment.Center
         ) {
             if (chip.progress > 0f) {
@@ -118,16 +119,26 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
             }
             ChipGlyph(chip, accent)
         }
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(14.dp.scaled()))
         Column {
-            Text(chip.label, style = AppleTypography.bodyLarge, color = AppleColors.secondary, maxLines = 1)
-            Text(chip.value, style = AppleTypography.titleLarge, color = AppleColors.primary, maxLines = 1)
+            Text(
+                chip.label,
+                style = AppleTypography.bodyLarge.copy(fontSize = AppleTypography.bodyLarge.fontSize.scaled()),
+                color = AppleColors.secondary,
+                maxLines = 1,
+            )
+            Text(
+                chip.value,
+                style = AppleTypography.titleLarge.copy(fontSize = AppleTypography.titleLarge.fontSize.scaled()),
+                color = AppleColors.primary,
+                maxLines = 1,
+            )
         }
     }
 }
 
 @Composable
-private fun ChipGlyph(chip: LauncherChip, accent: Color, iconSize: Dp = 26.dp) {
+private fun ChipGlyph(chip: LauncherChip, accent: Color, iconSize: Dp = 26.dp.scaled()) {
     val modifier = Modifier.size(iconSize)
     when (chip.icon) {
         "washer" -> WasherGlyph(chip.value, accent, modifier)

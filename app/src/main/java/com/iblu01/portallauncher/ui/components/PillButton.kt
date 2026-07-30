@@ -17,6 +17,7 @@ import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.ui.theme.PortalTheme
+import com.iblu01.portallauncher.ui.theme.scaled
 
 /**
  * Reusable pill button. Primary = accent fill; secondary = frosted fill.
@@ -33,7 +34,7 @@ fun PillButton(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 50.dp)
+            .defaultMinSize(minHeight = 50.dp.scaled())
             .clip(AppleShapes.pill)
             .background(fill, AppleShapes.pill)
             .then(
@@ -41,12 +42,12 @@ fun PillButton(
                 else Modifier.border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
             )
             .appleClickable(onClick)
-            .padding(horizontal = 28.dp, vertical = 14.dp),
+            .padding(horizontal = 28.dp.scaled(), vertical = 14.dp.scaled()),
         contentAlignment = Alignment.Center
     ) {
         androidx.compose.material3.Text(
             text = label,
-            style = AppleTypography.titleMedium,
+            style = AppleTypography.titleMedium.copy(fontSize = AppleTypography.titleMedium.fontSize.scaled()),
             textAlign = TextAlign.Center,
             color = if (primary) AppleColors.primary else AppleColors.primary.copy(alpha = 0.8f)
         )

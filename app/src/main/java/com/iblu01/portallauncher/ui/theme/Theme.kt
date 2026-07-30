@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 
 private val PortalColorScheme = darkColorScheme(
     primary = AppleColors.accent,
@@ -26,9 +27,11 @@ private val PortalColorScheme = darkColorScheme(
 fun PortalTheme(content: @Composable () -> Unit) {
     @Suppress("UNUSED_EXPRESSION")
     isSystemInDarkTheme()
-    MaterialTheme(
-        colorScheme = PortalColorScheme,
-        typography = AppleTypography,
-        content = content
-    )
+    CompositionLocalProvider(LocalUiScale provides rememberUiScale()) {
+        MaterialTheme(
+            colorScheme = PortalColorScheme,
+            typography = AppleTypography,
+            content = content
+        )
+    }
 }

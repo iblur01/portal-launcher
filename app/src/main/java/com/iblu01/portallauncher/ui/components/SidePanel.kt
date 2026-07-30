@@ -43,6 +43,7 @@ import com.iblu01.portallauncher.ui.model.PanelKind
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import com.iblu01.portallauncher.ui.theme.scaled
 import com.iblu01.portallauncher.ui.theme.stateColor
 
 /**
@@ -71,7 +72,7 @@ fun ChipActionsPanel(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 14.dp, vertical = 16.dp)
+            .padding(horizontal = 14.dp.scaled(), vertical = 16.dp.scaled())
     ) {
         Box(
             modifier = Modifier
@@ -112,14 +113,14 @@ private fun ChipActionsContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 20.dp),
+            .padding(horizontal = 24.dp.scaled(), vertical = 20.dp.scaled()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.fillMaxWidth().height(36.dp)) {
+        Box(Modifier.fillMaxWidth().height(36.dp.scaled())) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .size(36.dp)
+                    .size(36.dp.scaled())
                     .clip(CircleShape)
                     .background(AppleColors.frostedFill)
                     .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
@@ -130,7 +131,7 @@ private fun ChipActionsContent(
                     Icons.Filled.Close,
                     contentDescription = "Fermer le panneau",
                     tint = AppleColors.secondary,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(18.dp.scaled()),
                 )
             }
             Row(
@@ -139,24 +140,24 @@ private fun ChipActionsContent(
                     .clip(AppleShapes.pill)
                     .background(AppleColors.frostedFill, AppleShapes.pill)
                     .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                    .padding(horizontal = 14.dp.scaled(), vertical = 7.dp.scaled()),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp.scaled()),
             ) {
-                Icon(launcherIcon(chip.icon), null, tint = accent, modifier = Modifier.size(16.dp))
-                Text(chip.label, style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.secondary)
+                Icon(launcherIcon(chip.icon), null, tint = accent, modifier = Modifier.size(16.dp.scaled()))
+                Text(chip.label, style = AppleTypography.bodySmall.copy(fontSize = 13.sp.scaled()), color = AppleColors.secondary)
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(14.dp.scaled()))
         Text(
             chip.value,
-            style = AppleTypography.titleLarge,
+            style = AppleTypography.titleLarge.copy(fontSize = AppleTypography.titleLarge.fontSize.scaled()),
             color = AppleColors.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp.scaled()))
 
         // Center the control block vertically in the remaining space; it still scrolls if a
         // panel's content is taller than the panel (keypads, long detail lists).
@@ -202,11 +203,11 @@ fun PanelModeButton(label: String, icon: ImageVector, active: Boolean, onClick: 
         modifier = Modifier
             .clip(AppleShapes.card)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp.scaled(), vertical = 6.dp.scaled()),
     ) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.height(4.dp))
-        Text(label, style = AppleTypography.bodySmall.copy(fontSize = 12.sp), color = color)
+        Icon(icon, null, tint = color, modifier = Modifier.size(24.dp.scaled()))
+        Spacer(Modifier.height(4.dp.scaled()))
+        Text(label, style = AppleTypography.bodySmall.copy(fontSize = 12.sp.scaled()), color = color)
     }
 }
 
@@ -218,18 +219,19 @@ fun PanelDetailRow(detail: PillDetail) {
             .clip(AppleShapes.card)
             .background(AppleColors.frostedFill, AppleShapes.card)
             .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.card)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp.scaled(), vertical = 12.dp.scaled()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val rowStyle = AppleTypography.bodyLarge.copy(fontSize = AppleTypography.bodyLarge.fontSize.scaled())
         Text(
             detail.label,
-            style = AppleTypography.bodyLarge,
+            style = rowStyle,
             color = AppleColors.secondary,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(detail.value, style = AppleTypography.bodyLarge, color = AppleColors.primary, maxLines = 1)
+        Text(detail.value, style = rowStyle, color = AppleColors.primary, maxLines = 1)
     }
 }
 

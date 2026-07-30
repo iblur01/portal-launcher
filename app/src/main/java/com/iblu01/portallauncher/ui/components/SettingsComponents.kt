@@ -399,6 +399,8 @@ fun SettingsSlider(
     steps: Int,
     onValueChange: (Float) -> Unit,
     valueSuffix: String = "",
+    /** Overrides the auto-formatted "{value}{valueSuffix}" label, e.g. for a "5 × 4" grid readout. */
+    valueText: String? = null,
     modifier: Modifier = Modifier,
     onValueChangeFinished: (() -> Unit)? = null,
 ) {
@@ -411,7 +413,7 @@ fun SettingsSlider(
             Text(label, style = AppleTypography.titleMedium, color = AppleColors.primary)
             Box(Modifier.weight(1f))
             Text(
-                "${value.toInt()}$valueSuffix",
+                valueText ?: "${value.toInt()}$valueSuffix",
                 style = AppleTypography.titleMedium,
                 color = AppleColors.secondary
             )

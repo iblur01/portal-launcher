@@ -47,10 +47,13 @@ data class ClockTheme(
     val letterSpacing: Float = 0f,
     val tint: ClockTint = ClockTint.WHITE,
     val format24h: Boolean = true,
+    /** Multiplier on the vertical gaps between date/time/weather-pill rows (see ClockHeader). */
+    val elementSpacing: Float = 1f,
 ) {
     companion object {
         val WeightRange = 100f..900f
         val SizeRange = 90f..180f
         val LetterSpacingRange = -2f..12f
+        val ElementSpacingRange = 0.4f..2f
     }
 }

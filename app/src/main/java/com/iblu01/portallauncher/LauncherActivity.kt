@@ -271,7 +271,6 @@ class LauncherActivity : ComponentActivity() {
         val intent = packageManager.getLaunchIntentForPackage(pkg)
         if (intent == null) {
             Toast.makeText(this, "Application introuvable: $pkg", Toast.LENGTH_LONG).show()
-            openFromLauncher(Intent(this, SettingsActivity::class.java))
             return
         }
         DeviceStateHub.noteLaunchingApp(pkg, this)
@@ -426,6 +425,7 @@ private fun PortalLauncherApp(
     var backgroundMode by remember { mutableStateOf(prefs.backgroundMode) }
     var bgOverlayOpacity by remember { mutableStateOf(prefs.bgOverlayOpacity) }
     var clockTheme by remember { mutableStateOf(prefs.clockTheme) }
+    var gridScale by remember { mutableStateOf(prefs.gridScale) }
     // Bumped on every "backgroundMode" emission (even custom->custom) so CustomWallpaper
     // re-reads the file's lastModified() and Coil busts its stale cache on replacement.
     var wallpaperVersion by remember { mutableStateOf(0) }
@@ -475,6 +475,7 @@ private fun PortalLauncherApp(
                 backgroundMode = prefs.backgroundMode
                 bgOverlayOpacity = prefs.bgOverlayOpacity
                 clockTheme = prefs.clockTheme
+                gridScale = prefs.gridScale
             }
             // Never *wake* on the app grid — but a pause caused by opening an app must keep the
             // page, or it snaps back before the app appears and coming back lands on the clock.
@@ -607,13 +608,6 @@ private fun PortalLauncherApp(
         null -> null
     }
     val isSplit = panelContent != null
-    // A panel takes a third of the screen; an app grid in the remaining two thirds is unusable, so
-    // the pager goes back to the clock page and locks while a panel is open.
-    LaunchedEffect(isSplit) {
-        // Same reason as auto-return: the panel can resolve away mid-scroll, cancelling this effect
-        // and stranding the pager between pages.
-        if (isSplit && pagerState.currentPage != PAGE_CLOCK) returnToClockPage(pagerScope, pagerState)
-    }
     // Dropping an icon back onto an earlier page removes the growth page from under our feet.
     LaunchedEffect(appPages.value) {
         val lastPage = PAGE_FIRST_APP + appPages.value - 1
@@ -814,9 +808,11 @@ private fun PortalLauncherApp(
                 LauncherPager(
                     state = pagerState,
                     // Dragging an icon must not also swipe the page out from under it.
-                    userScrollEnabled = !isSplit && !appDragActive,
+                    // A panel narrows the pager to leftWidthFraction/topHeightFraction, but the app
+                    // grid still fits and swipes there just fine — no reason to lock it.
+                    userScrollEnabled = !appDragActive,
                     onHeaderTap = onOpenHomeAssistant,
-                    onHeaderLongPress = { overlayVisible = true },
+                    onHeaderLongPress = { context.startActivity(Intent(context, ClockThemeActivity::class.java)) },
                     header = { collapse ->
                         ClockHeader(
                             weather = weather,
@@ -867,6 +863,7 @@ private fun PortalLauncherApp(
                                 if (placement != null) layout.place(key, placement.cell, placement.span)
                             },
                             widgetView = widgets::createView,
+                            cellScale = gridScale,
                             onSpec = { spec ->
                                 gridSpecState.value = spec
                                 layout.lastKnownSpec = spec
@@ -886,7 +883,7 @@ private fun PortalLauncherApp(
                             onSettings = onOpenSettings,
                         )
                     },
-                    dragOverlay = { DraggedIconOverlay(gridDrag) },
+                    dragOverlay = { DraggedIconOverlay(gridDrag, iconSize = 56.dp * gridScale) },
                     drag = gridDrag,
                 )
             }

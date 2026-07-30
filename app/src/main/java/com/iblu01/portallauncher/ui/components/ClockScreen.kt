@@ -44,6 +44,7 @@ import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.ui.theme.ClockTheme
 import com.iblu01.portallauncher.ui.theme.clockFontFamily
 import com.iblu01.portallauncher.ui.theme.PortalTheme
+import com.iblu01.portallauncher.ui.theme.scaled
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -165,7 +166,7 @@ fun ClockHeader(
             ),
             color = clockTheme.tint.color.copy(alpha = 0.7f)
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(4.dp * clockTheme.elementSpacing))
         Text(
             text = time,
             style = AppleTypography.displayLarge.copy(
@@ -184,7 +185,7 @@ fun ClockHeader(
             softWrap = false
         )
         if (secondaryAlpha > 0f) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
             Row(
                 modifier = Modifier
                     .graphicsLayer { alpha = secondaryAlpha }
@@ -200,7 +201,7 @@ fun ClockHeader(
                 Text("Ext. ${temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp}", style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
             }
             if (!connected && lastUpdateAt > 0L) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
                 Box(Modifier.graphicsLayer { alpha = secondaryAlpha }) {
                     StaleBanner(lastUpdateAt = lastUpdateAt)
                 }
@@ -223,21 +224,21 @@ fun ClockTray(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 36.dp),
+            .padding(horizontal = 12.dp.scaled())
+            .padding(bottom = 36.dp.scaled()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp.scaled()),
     ) {
         if (chips.size > 3) {
             Row(
                 modifier = Modifier.clip(AppleShapes.pill)
                     .appleClickable { onPillsExpandedChange(!pillsExpanded) }
-                    .padding(horizontal = 12.dp, vertical = 3.dp),
+                    .padding(horizontal = 12.dp.scaled(), vertical = 3.dp.scaled()),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     if (pillsExpanded) "Masquer les informations" else "Voir plus d’informations",
-                    style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
+                    style = AppleTypography.bodySmall.copy(fontSize = 13.sp.scaled()),
                     color = AppleColors.secondary.copy(alpha = 0.62f),
                 )
                 Icon(
@@ -249,7 +250,7 @@ fun ClockTray(
         }
         val visible = if (pillsExpanded) chips.take(9) else chips.take(3)
         visible.chunked(3).forEach { rowChips ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp.scaled(), Alignment.CenterHorizontally)) {
                 rowChips.forEach { chip ->
                     StatusChip(chip, selected = chip.id == selectedChipKey, onClick = { onChipClick(chip) }, onLongPress = { onChipLongPress(chip) })
                 }

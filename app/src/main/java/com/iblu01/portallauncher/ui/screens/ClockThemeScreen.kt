@@ -183,6 +183,14 @@ fun ClockThemeScreen(
                 valueText = "%.1f".format(theme.letterSpacing),
                 onChange = { update(theme.copy(letterSpacing = it)) },
             )
+            // Vertical gap between date / time / weather-temperature rows.
+            LabeledSlider(
+                label = "Écart entre éléments",
+                value = theme.elementSpacing,
+                range = ClockTheme.ElementSpacingRange,
+                valueText = "%.1f×".format(theme.elementSpacing),
+                onChange = { update(theme.copy(elementSpacing = it)) },
+            )
 
             // Tint.
             ControlLabel("Couleur")
