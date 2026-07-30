@@ -77,7 +77,7 @@ That is the experience a smart display gives you out of the box, and what a wall
 
 ![Media player panel](docs/screenshots/panel-media-player.jpg)
 
-_Still missing: thermostat panel in situ, vacuum, energy gauge, presence, camera popup, clock-theme editor, web config UI. If you run this on a device, [screenshots are a genuinely useful PR](#-good-first-issues)._
+_Still missing: thermostat panel in situ, vacuum, energy gauge, presence, clock-theme editor. If you run this on a device, [screenshots are a genuinely useful PR](#-good-first-issues)._
 
 ---
 
@@ -140,7 +140,7 @@ Installed apps that you do not want on the grid can be hidden and brought back f
 - **Real control panels**, not just read-outs — dimming and color for lights, thermostat setpoints, media transport, lock/unlock, cover open/close/stop, alarm arm/disarm, vacuum start/dock, fan speed, switches
 - **Energy** — power + daily-energy sensors auto-detected into a live auto-scaling gauge
 - **Scenes & scripts** — one tap
-- **Cameras** — snapshot popup triggered by a doorbell or motion sensor, auto-dismiss
+
 - **Presence** — who's home, as overlapping avatars, with each person's status
 - **Air quality** — full-screen panel when you have the sensors for it
 
@@ -150,7 +150,7 @@ Installed apps that you do not want on the grid can be hidden and brought back f
 - **MQTT bridge** with HA MQTT Discovery — the Portal shows up in Home Assistant on its own, as a device with sensors, switches and sliders
 - **Presence proxy** — infers room occupancy from Portal's dream/sleep lifecycle, no privileged permissions needed
 - **Power modes** — `follow presence` (lets the Portal sleep, saves the panel) or `always on` (wall clock)
-- **Web config server** — LAN-only, token-protected, off by default: manage settings and upload wallpapers from a browser instead of poking at a touchscreen
+
 
 ---
 
@@ -170,7 +170,7 @@ Installed apps that you do not want on the grid can be hidden and brought back f
 | `scene` / `script` | ✅ | ✅ one-tap activation |
 | `person` | ✅ | — home / away only, no zones |
 | `weather` | ✅ | — current + hourly/daily forecast |
-| `camera` | ✅ | — snapshot popup on trigger |
+
 | `sensor` / `binary_sensor` | ✅ | — incl. energy, air quality, battery, openings |
 | `button`, `input_*`, `number`, `select` | ❌ | ❌ — [planned](#roadmap) |
 
@@ -232,21 +232,16 @@ Open Settings from the dashboard → HA base URL + long-lived token → MQTT bro
 ./gradlew test
 ```
 
-113 tests. There is no `androidTest` source set — the two Compose tests run under Robolectric. Covered: the panel state machine (16 cases), the pill priority engine (18), chip mapping, the media session builder, the ViewModel's stream composition (Turbine), the `PillRepository` transform, the web config server, plus two targeted recomposition-regression guards. **Not** covered: the HA/MQTT connectivity layer, the presence proxy and sensor bridge, the clock/idle screen, and every rendered panel. [Help wanted.](#-good-first-issues)
+113 tests. There is no `androidTest` source set — the two Compose tests run under Robolectric. Covered: the panel state machine (16 cases), the pill priority engine (18), chip mapping, the media session builder, the ViewModel's stream composition (Turbine), the `PillRepository` transform, plus two targeted recomposition-regression guards. **Not** covered: the HA/MQTT connectivity layer, the presence proxy and sensor bridge, the clock/idle screen, and every rendered panel. [Help wanted.](#-good-first-issues)
 
 ---
 
 ## Configuration
 
-Everything is reachable from the on-device Settings screens: a first-run wizard (mDNS instance discovery + token), HA connection, MQTT broker, per-entity pill enable/disable with search and bulk toggles, background mode + scrim opacity, clock theme, power mode, screen timeout, auto-return delay, camera trigger pairs, temperature offset, and a Developer page (wireless ADB, permission grants, web config, reboot).
+Everything is reachable from the on-device Settings screens: a first-run wizard (mDNS instance discovery + token), HA connection, MQTT broker, per-entity pill enable/disable with search and bulk toggles, background mode + scrim opacity, clock theme, power mode, screen timeout, auto-return delay, temperature offset, and a Developer page (wireless ADB, permission grants, reboot).
 
-> Two settings are currently inert: the **tap-sensitivity** slider (the accelerometer is no longer registered — see the sensors note below) and the **web config port** (a callback exists, no UI row calls it, so the port is 8080 in practice).
+> The **tap-sensitivity** slider is currently inert (the accelerometer is no longer registered — see the sensors note below).
 
-### Web config server
-
-Enable it in **Developer settings**, then open `http://<device-ip>:8080/?token=<token>` from any machine on your LAN. You get settings management and wallpaper upload in a browser instead of a 10" touch keyboard. Changes to HA credentials, MQTT details and wallpapers apply **live** — no app restart.
-
-> ⚠️ Plain HTTP on your trusted LAN, token-gated, **off by default**. Do not port-forward it. The HA long-lived token is write-only: the API accepts it and never returns it.
 
 ---
 
@@ -272,12 +267,12 @@ Legend: ✅ shipped · 🔨 in progress · ⬜ open · 🙋 **good first issue /
 - [x] MQTT bridge with HA MQTT Discovery, both directions
 - [x] Priority engine — pills ranked by what actually matters right now
 - [x] Control parity for `light`, `media_player`, `lock`, `cover`, `climate`, `alarm_control_panel`, `vacuum`, `switch`, `fan`
-- [x] Scenes / scripts, presence, energy gauge, air quality, camera popup
+- [x] Scenes / scripts, presence, energy gauge, air quality
 - [x] HA `weather` entity with hourly + daily forecast
 - [x] Presence proxy + power modes + configurable screen timeout
 - [x] Secrets in `EncryptedSharedPreferences` (HA token, MQTT password)
 - [x] Offline / stale banner and per-panel unavailable states
-- [x] Browser config server with live-apply settings and wallpaper upload
+
 - [x] Clock theming — fonts, weight, size, spacing, tint, 12h/24h, live preview
 - [x] Alarm keypad — masked digits, variable-length codes, shake on a wrong code (inferred, since HA reports nothing)
 - [x] First-run setup wizard — mDNS instance discovery → token → verify (`ui/screens/SetupWizard.kt`)
@@ -291,7 +286,7 @@ Legend: ✅ shipped · 🔨 in progress · ⬜ open · 🙋 **good first issue /
 
 - [ ] Clock theme + opacity preview: land on `main`, add tests
 - [x] Screenshots + component gallery in this README
-- [ ] Remaining screenshots (thermostat, vacuum, energy, presence, camera, clock theme, web config) + a demo recording 🙋
+- [ ] Remaining screenshots (thermostat, vacuum, energy, presence, clock theme) + a demo recording 🙋
 - [ ] Unit tests for the clock theme (`fromKey` fallbacks) and the opacity mapping — the two shipped features with zero coverage
 
 ### ⬜ Next — the big three
@@ -342,7 +337,7 @@ This project exists because people refused to bin a discontinued appliance. Bug 
 
 | Task | Why it's a good start |
 |---|---|
-| The missing screenshots (thermostat, vacuum, energy, presence, camera, clock theme, web config) + a demo video | Zero setup beyond having the device running |
+| The missing screenshots (thermostat, vacuum, energy, presence, clock theme) + a demo video | Zero setup beyond having the device running |
 | Extract French strings to `strings.xml` | Mechanical, reviewable, unblocks all translations |
 | Add one `input_*` entity kind | Follow the existing pill + panel pattern end to end |
 | Test on a Portal variant and report | Compatibility matrix is empty and we need it |
@@ -407,7 +402,7 @@ Whatever you point it at — Settings → Application → "Tap sur l'écran d'ac
 | DI | Hilt + KSP |
 | HA API | OkHttp WebSocket |
 | MQTT | Paho |
-| Web config | NanoHTTPD |
+
 | Storage | `EncryptedSharedPreferences` |
 | Tests | JUnit 4 + Robolectric + Turbine + Compose UI Test (JVM only) |
 

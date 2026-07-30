@@ -193,57 +193,6 @@ class SettingsActivity : ComponentActivity() {
             uiState.pillRules.clear(); uiState.pillRules.addAll(rules)
             prefs.pillRules = rules
         }
-
-        override fun onEnableAdb(port: Int, onComplete: (Boolean) -> Unit) {
-            Thread {
-                val success = AdbControl.enableAdb(this@SettingsActivity, port)
-                runOnUiThread {
-                    if (success) {
-                        Toast.makeText(this@SettingsActivity, "ADB sans fil activé", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@SettingsActivity, "Erreur : Accès root requis pour activer ADB", Toast.LENGTH_LONG).show()
-                    }
-                    onComplete(success)
-                }
-            }.also { it.isDaemon = true }.start()
-        }
-
-        override fun onDisableAdb(onComplete: (Boolean) -> Unit) {
-            Thread {
-                val success = AdbControl.disableAdb(this@SettingsActivity)
-                runOnUiThread {
-                    if (success) {
-                        Toast.makeText(this@SettingsActivity, "ADB sans fil désactivé", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@SettingsActivity, "Erreur : Accès root requis pour désactiver ADB", Toast.LENGTH_LONG).show()
-                    }
-                    onComplete(success)
-                }
-            }.also { it.isDaemon = true }.start()
-        }
-
-        override fun onToggleWebConfig(enabled: Boolean) {
-            prefs.webConfigEnabled = enabled
-            if (enabled) ConfigServerService.start(this@SettingsActivity)
-            else ConfigServerService.stop(this@SettingsActivity)
-        }
-
-        override fun onRegenerateWebConfigToken() {
-            prefs.regenerateWebConfigToken()
-            // bounce the server so the new token takes effect immediately
-            if (prefs.webConfigEnabled) {
-                ConfigServerService.stop(this@SettingsActivity)
-                ConfigServerService.start(this@SettingsActivity)
-            }
-        }
-
-        override fun onSetWebConfigPort(port: Int) {
-            prefs.webConfigPort = port
-            if (prefs.webConfigEnabled) {
-                ConfigServerService.stop(this@SettingsActivity)
-                ConfigServerService.start(this@SettingsActivity)
-            }
-        }
     }
 
     private fun parseHaEntities(raw: String): List<HaEntity> = runCatching {

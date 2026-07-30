@@ -25,8 +25,8 @@ android {
         applicationId = "com.iblu01.portallauncher"
         minSdk = 28
         targetSdk = 28
-        versionCode = 1
-        versionName = "0.0.1-beta"
+        versionCode = 2
+        versionName = "0.0.2-beta"
     }
 
     signingConfigs {
@@ -94,7 +94,6 @@ androidComponents {
 dependencies {
     implementation(libs.paho.mqtt)
     implementation(libs.okhttp)
-    implementation(libs.nanohttpd)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

@@ -97,7 +97,6 @@ import com.iblu01.portallauncher.ui.components.WidgetPickerDialog
 import com.iblu01.portallauncher.ui.components.rememberGridDragState
 import com.iblu01.portallauncher.ui.components.returnToClockPage
 import com.iblu01.portallauncher.ui.components.AutoReturnOverlay
-import com.iblu01.portallauncher.ui.components.CameraOverlay
 import com.iblu01.portallauncher.ui.components.ChipActionsPanel
 import com.iblu01.portallauncher.ui.components.ClockHeader
 import com.iblu01.portallauncher.ui.components.HiddenAppsDialog
@@ -689,17 +688,6 @@ private fun PortalLauncherApp(
         label = "bottomGradientHeight"
     )
 
-    var cameraOverlay by remember { mutableStateOf<CameraPair?>(null) }
-    val prevCameraOn = remember { HashMap<String, Boolean>() }
-    LaunchedEffect(ui.latestStates) {
-        prefs.cameraPairs.forEach { pair ->
-            val on = ui.latestStates[pair.trigger]?.state?.equals("on", true) ?: return@forEach
-            val was = prevCameraOn[pair.trigger]
-            prevCameraOn[pair.trigger] = on
-            if (on && was == false) cameraOverlay = pair
-        }
-    }
-
     val alertMessage = AlertOverlayState.activeMessage
     val blurRadius by animateDpAsState(
         targetValue = if (alertMessage != null || overlayVisible) 16.dp else 0.dp,
@@ -994,10 +982,6 @@ private fun PortalLauncherApp(
             message = alertMessage,
             onDismiss = { AlertOverlayState.dismiss() }
         )
-
-        cameraOverlay?.let { pair ->
-            CameraOverlay(pair = pair, onDismiss = { cameraOverlay = null })
-        }
 
         AutoReturnOverlay(state = autoReturnState, onCancel = { autoReturnTimer.onInteraction() })
     }

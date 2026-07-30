@@ -23,7 +23,7 @@ Conventions used below:
 - [4. Media](#4-media)
 - [5. Device, sensors, power, presence proxy](#5-device-sensors-power-presence-proxy)
 - [6. Home Assistant + MQTT integration](#6-home-assistant--mqtt-integration)
-- [7. Settings, preferences, web config](#7-settings-preferences-web-config)
+- [7. Settings, preferences](#7-settings-preferences)
 - [8. Overlays, gestures, navigation](#8-overlays-gestures-navigation)
 - [9. Design system](#9-design-system)
 - [10. Architecture](#10-architecture)
@@ -281,7 +281,7 @@ Both triggered from MQTT and both paired with an on-screen alert overlay.
 | Permission | Without it |
 |---|---|
 | `INTERNET`, `ACCESS_NETWORK_STATE` | no HA, no MQTT |
-| `FOREGROUND_SERVICE` | bridge and config server get killed |
+| `FOREGROUND_SERVICE` | bridge gets killed |
 | `RECEIVE_BOOT_COMPLETED` | nothing auto-starts after reboot |
 | `WAKE_LOCK` | `wake()` throws |
 | `RECORD_AUDIO` | sound sensor disables itself with a log line telling you the exact `adb` command |
@@ -319,20 +319,20 @@ The presence proxy depends on Portal dream broadcasts; tap compensation is keyed
 **Consumed command topics**: screen on/off, temp offset, mic mute, volume, volume mute, sound play, notification, brightness, screen timeout on/off, timeout minutes, power mode. Each handled on a dedicated single-thread executor, each wrapped in `runCatching` so one bad payload can't kill the queue — `:246-323`.
 
 ### Live-apply bus
-`SettingsChangeBus` carries changed field names; `ConfigServer` only emits fields whose value actually changed, so a full form resubmit doesn't trigger spurious reconnects — `ConfigServer.kt:94-105`. Consumers in `LauncherActivity.kt:237-249`:
+`SettingsChangeBus` carries changed field names. Consumers in `LauncherActivity.kt:237-249`:
 - `backgroundMode` → wallpaper re-read.
 - `haUrl` / `haToken` → HA reconnect (fingerprint-compared, no-op if unchanged).
 - `brokerHost` / `brokerPort` / `username` / `password` → MQTT reconnect.
-- ⚠️ **Everything else has no consumer**: `tempOffset`, `screenTimeoutEnabled/Minutes`, `powerMode`, `tapThreshold`, `autoReturn*`, `deviceName`, `adb*` persist but are not applied live from the web UI, unlike the MQTT command path which does apply them.
+- ⚠️ **Everything else has no consumer**: `tempOffset`, `screenTimeoutEnabled/Minutes`, `powerMode`, `tapThreshold`, `autoReturn*`, `deviceName`, `adb*` persist but are not applied live, unlike the MQTT command path which does apply them.
 
 ### Credentials
-- `haToken`, MQTT `password` and `webConfigToken` live in `EncryptedSharedPreferences` (AES256-SIV keys / GCM values), with a one-time migration that scrubs the old plaintext copies — `Prefs.kt:19-32,241-257`.
+- `haToken` and MQTT `password` live in `EncryptedSharedPreferences` (AES256-SIV keys / GCM values), with a one-time migration that scrubs the old plaintext copies — `Prefs.kt:19-32,241-257`.
 - ⚠️ If the Keystore is unavailable it falls back to plain SharedPreferences with only a log line — a silent security downgrade.
-- The web API never returns secrets: they read back as `""` or `***set***`, and writes ignore the sentinel — write-only by construction (`ConfigServer.kt:65,69,99-105`).
+
 
 ---
 
-## 7. Settings, preferences, web config
+## 7. Settings, preferences
 
 ### Pages
 One flat `HorizontalPager` holds everything: `[clock, app page 0, app page 1, …]` (`LauncherPager.kt`). Not a pager nested inside the apps page — two horizontal scrollers competing for the same drag has no good answer, and stock launchers treat their home screens as one pager for the same reason. Swipe right-to-left to reach the apps, and keep going for further pages.
@@ -387,7 +387,7 @@ Back is always consumed — finishing a home activity gives a black flash while 
 - Its backdrop decides whether a tap was outside the panel (both rectangles in root coordinates) instead of relying on the panel to swallow it: overlapping siblings both receive a gesture, consuming it from the panel is dispatch-order dependent, and the `clickable` that used to do it merged the whole panel into one semantics node — hiding every row from TalkBack.
 - **Quick actions** — long-press the clock. Blurred backdrop + 40 % scrim, two entries (Réglages / Composants). Dismiss by scrim tap or a >120 px downward swipe. The app drawer that used to live here is now page 1. Launching an app notifies the presence proxy.
 - **Alert overlay** — raised from MQTT (`sound/play` or `notification`), auto-dismisses after 5 s, restartable; scrim tap dismisses, taps inside are swallowed. Also blurs the whole scene to 16 dp while visible.
-- **Camera overlay** — fires on the trigger sensor's rising edge only (once per activation), refetches the `camera_proxy` snapshot **every 2 s with all Coil caching disabled**, and auto-dismisses 10 s after the trigger clears. Only the × closes it; scrim taps don't.
+
 
 ### Gestures
 Swipe right-to-left anywhere on the home page (clock band included) → app grid; swipe back, or wait for auto-return. Long-press an app icon → its menu; long-press then drag → move it to any free cell, swap with an occupied one, or hold at a page edge to carry it to another page. Tap the clock → open HA (1 s debounce). Long-press the clock → quick actions. Tap chip → toggle or panel. Long-press chip → panel (except media). Tap the weather pill → weather panel. Swipe down on the quick-actions panel → dismiss. Swipe horizontally on the artwork → change session. Vertical drag on the custom sliders → brightness / Kelvin / cover position. Drag the thermostat ring → setpoint, committed on release. Every touch also feeds the sleep scheduler and the auto-return reset via `dispatchTouchEvent` (`LauncherActivity.kt:135-141`). No pinch or rotate anywhere.
@@ -411,7 +411,7 @@ Swipe right-to-left anywhere on the home page (clock band included) → app grid
 
 ⚠️ **`blurCompat()` is a no-op below API 31 and the Portal runs API 28**, so every "frosted blur" backdrop degrades on device to a flat translucent fill. It looks like real blur only in previews and on newer hardware.
 
-⚠️ Four places hardcode colours outside the tokens: the offline banner's amber (no amber exists in the palette at all), the side-panel background, the camera scrim, and the alert pill.
+⚠️ Three places hardcode colours outside the tokens: the offline banner's amber (no amber exists in the palette at all), the side-panel background, and the alert pill.
 
 ---
 
@@ -419,7 +419,7 @@ Swipe right-to-left anywhere on the home page (clock band included) → app grid
 
 ### Entry points
 - **Activities** — `LauncherActivity` (HOME / LAUNCHER / LEANBACK_LAUNCHER, `singleTask`, `fullSensor`, the only exported one), `SettingsActivity`, `PlaygroundActivity`, `OpacityPreviewActivity`, `ClockThemeActivity` — `AndroidManifest.xml:26-63`.
-- **Services** — `MqttBridgeService`, `ConfigServerService` (both foreground), `ScreenAccessibility` (permission-gated by the system) — `:65-81`.
+- **Services** — `MqttBridgeService` (foreground), `ScreenAccessibility` (permission-gated by the system) — `:65-81`.
 - **Receivers** — `BootReceiver` (`BOOT_COMPLETED`), `SleepReceiver` (alarm-driven, no filter) — `:83-91`.
 - **Queries** — declares visibility into the HA companion app and any `MAIN`/`LAUNCHER` activity, so the app drawer can enumerate what's installed — `:14-20`.
 
@@ -459,7 +459,7 @@ A typed `ChipVisual` enum to replace the stringly-typed `LauncherChip.state` was
 ### Coverage
 113 tests, 18 files, **all under `app/src/test`**. There is no `androidTest` source set at all — the two "Compose UI tests" run under Robolectric on the JVM (`@Config(sdk = [28])`), not on a device.
 
-**Covered**: the panel reducer (16 cases, every branch including interleaved user/auto), the priority engine (18), chip mapping (9), the media session builder (8), the VM's stream composition via Turbine (8), the `PillRepository` transform, `HaEntity` equality, panel helpers, and the web config server (4 files — auth, masking, 400-not-500 on bad input, change-emission dedup). Two Compose tests are targeted regression guards for a specific past bug (alarm-keypad jank), not general coverage.
+**Covered**: the panel reducer (16 cases, every branch including interleaved user/auto), the priority engine (18), chip mapping (9), the media session builder (8), the VM's stream composition via Turbine (8), the `PillRepository` transform, `HaEntity` equality, panel helpers. Two Compose tests are targeted regression guards for a specific past bug (alarm-keypad jank), not general coverage.
 
 **Zero coverage**:
 - the entire HA connectivity layer — `HaStateRepository`, `HaApiClient`, `HaDiscovery`, `HaMdnsDiscovery`. The reconnect and liveness-watchdog logic this README advertises is untested at the unit level.
@@ -475,7 +475,7 @@ A typed `ChipVisual` enum to replace the stringly-typed `LauncherChip.state` was
 - **minSdk 28, targetSdk 28, compileSdk 35** — targetSdk is pinned to the Portal's actual OS while compiling against a much newer SDK, with `android.suppressUnsupportedCompileSdk=35` silencing the warning. None of the behaviour changes gated on API 29+ are exercised.
 - `isMinifyEnabled = false` even in release — no R8, so release APKs are unminified. Low risk for a sideloaded kiosk app, worth knowing.
 - **Release unit tests are disabled on purpose** (`app/build.gradle.kts:36-48`): the Compose test manifest that supplies the `ComponentActivity` for `createComposeRule()` is `debugImplementation`-only by design, and Robolectric can't merge a test-only manifest into a release variant. Disabling `testReleaseUnitTest` is the correct fix rather than shipping test-only manifest content.
-- Dependencies of note: Paho MQTT 1.2.5 (from a **custom Eclipse repo**, not Maven Central), OkHttp 4.12, NanoHTTPD 2.3.1, Coil 2.7, Compose BOM 2024.09, Hilt 2.52. ⚠️ `androidx.security:security-crypto` is on **1.1.0-alpha06** and is the one dependency hardcoded outside the version catalog — an alpha for the library holding the HA token. `material-icons-extended` pulls thousands of icons for a handful of uses; `hilt-navigation-compose` is declared but there is no Compose Navigation in the app (activities are the navigation unit).
+- Dependencies of note: Paho MQTT 1.2.5 (from a **custom Eclipse repo**, not Maven Central), OkHttp 4.12, Coil 2.7, Compose BOM 2024.09, Hilt 2.52. ⚠️ `androidx.security:security-crypto` is on **1.1.0-alpha06** and is the one dependency hardcoded outside the version catalog — an alpha for the library holding the HA token. `material-icons-extended` pulls thousands of icons for a handful of uses; `hilt-navigation-compose` is declared but there is no Compose Navigation in the app (activities are the navigation unit).
 
 ### i18n footprint
 `res/values/strings.xml` holds **3 strings**: the app name and two accessibility service labels. Everything else is a Kotlin literal — roughly **590 user-facing French strings** across ~25 files.
@@ -492,7 +492,7 @@ Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59,
 | Item | Status |
 |---|---|
 | Tap-sensitivity slider | inert — the accelerometer is never registered |
-| Web config port callback | wired end to end, no UI row calls it |
+
 | `priorityBoost` on pill rules | decoded, clamped, added to scores — but no UI writes it and all 9 grouped kinds ignore it |
 | `LauncherChip.stale` | declared, never set to true |
 | `VacuumFeature.CLEAN_SPOT` / `.START` | declared, never checked |
@@ -510,7 +510,7 @@ Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59,
 - Media: mute not actionable, no seek, primary transport hits the leader only, `join` sends one member at a time.
 - Thermostat has no dual setpoint.
 - HA reconnect has no backoff; the watchdog can be fooled by a ponging-but-silent instance.
-- Half the web-config fields don't apply live.
+
 - The weather entity is whichever `weather.*` HA lists first.
 - The offline banner never rolls over to hours.
 - The `nature` background has no offline fallback and its 5 image URLs are hardcoded.

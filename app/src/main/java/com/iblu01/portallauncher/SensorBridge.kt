@@ -6,10 +6,8 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.SystemClock
 import android.util.Log
 import kotlin.math.abs
-import kotlin.math.sqrt
 
 class SensorBridge(
     private val context: android.content.Context,
@@ -19,8 +17,6 @@ class SensorBridge(
     companion object {
         private const val TAG = "PortalHA"
         private const val RGB_TYPE = 65537
-        private const val TAP_COOLDOWN_MS = 800L
-        private const val TAP_RESET_MS = 1500L
         private const val LIGHT_THROTTLE_MS = 2_000L
         private const val LIGHT_MIN_DELTA = 1.5f
         private const val ACCEL_THROTTLE_MS = 5_000L
@@ -41,19 +37,11 @@ class SensorBridge(
     private val thread = HandlerThread("portal-ha-sensors").also { it.start() }
     private val handler = Handler(thread.looper)
 
-    // The Portal+ 2nd gen ("cipher") has its accelerometer on the moving screen
-    // arm, which heavily dampens body taps — measured de-gravitied force was only
-    // ~0.4–1.5 (vs the still-floor <0.4). Scale the threshold down hard so firm
-    // taps land just above that floor. This model only.
-    private val isCipher = android.os.Build.DEVICE.equals("cipher", true)
-    private val tapScale = if (isCipher) 0.25f else 1f
-
     @Volatile private var gravX = 0f
     @Volatile private var gravY = 0f
     @Volatile private var gravZ = 0f
     private var gravInit = false
 
-    private var lastTapMs = 0L
     private var lastLightMs = 0L
     private var lastLux = Float.MIN_VALUE
     private var lastAccelMs = 0L
@@ -96,16 +84,8 @@ class SensorBridge(
         val now = System.currentTimeMillis()
         if (now - lastTempMs < TEMP_THROTTLE_MS && abs(c - lastTemp) < TEMP_MIN_DELTA) return
         lastTempMs = now
-        lastTemp = c   // raw reading; offset applied at publish time
-        onPublish(HaDiscovery.tempStateTopic(p.deviceId), "%.1f".format(c + p.tempOffset), 0)
-    }
-
-    // Re-emit the last temperature with the current offset — called when the
-    // offset changes so HA updates immediately instead of waiting for a reading.
-    fun republishTemperature() {
-        val p = prefs ?: return
-        if (lastTemp == Float.MIN_VALUE) return
-        onPublish(HaDiscovery.tempStateTopic(p.deviceId), "%.1f".format(lastTemp + p.tempOffset), 0)
+        lastTemp = c
+        onPublish(HaDiscovery.tempStateTopic(p.deviceId), "%.1f".format(c), 0)
     }
 
     private fun handleLight(event: SensorEvent, p: Prefs) {
@@ -142,11 +122,6 @@ class SensorBridge(
         gravZ = alpha * gravZ + (1 - alpha) * z
         gravInit = true
 
-        val lx = x - gravX
-        val ly = y - gravY
-        val lz = z - gravZ
-        val force = sqrt((lx * lx + ly * ly + lz * lz).toDouble()).toFloat()
-
         val now = System.currentTimeMillis()
         if (now - lastAccelMs >= ACCEL_THROTTLE_MS) {
             lastAccelMs = now
@@ -155,26 +130,6 @@ class SensorBridge(
                 """{"x":${"%.2f".format(x)},"y":${"%.2f".format(y)},"z":${"%.2f".format(z)}}""",
                 0
             )
-        }
-
-        // Threshold is read live from prefs so HA slider and app slider take effect
-        // immediately; tapScale lowers it on the less-sensitive Portal+ 2nd gen.
-        val threshold = p.tapThreshold * tapScale
-        if (force > threshold && now - lastTapMs > TAP_COOLDOWN_MS) {
-            lastTapMs = now
-            val dir = when {
-                abs(lx) >= abs(ly) && abs(lx) >= abs(lz) -> if (lx > 0) "right" else "left"
-                abs(ly) >= abs(lx) && abs(ly) >= abs(lz) -> if (ly > 0) "down" else "up"
-                // On the cipher Portal+ the gesture reads as a screen tilt, so the
-                // Z axis is more accurately up/down than front/back.
-                else -> if (isCipher) { if (lz > 0) "up" else "down" } else { if (lz > 0) "front" else "back" }
-            }
-            Log.i(TAG, "tap: $dir  force=%.1f  threshold=%.1f (scale=%.2f)".format(force, threshold, tapScale))
-            onPublish(HaDiscovery.tapStateTopic(p.deviceId), dir, 1)
-            handler.removeCallbacksAndMessages("tap_reset")
-            handler.postAtTime({
-                onPublish(HaDiscovery.tapStateTopic(p.deviceId), "none", 0)
-            }, "tap_reset", SystemClock.uptimeMillis() + TAP_RESET_MS)
         }
     }
 }

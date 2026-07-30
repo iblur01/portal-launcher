@@ -34,7 +34,7 @@ data class LauncherUiState(
     val mediaSessions: List<PlayingMedia> = emptyList(),
     val connected: Boolean = true,
     val lastUpdateAt: Long = 0L,
-    /** Raw states, for detail panels + camera-trigger diffing. */
+    /** Raw states, for detail panels. */
     val latestStates: Map<String, HaEntity> = emptyMap(),
     /** entity_id -> area name, for the light rooms grouping. */
     val areaByEntity: Map<String, String> = emptyMap(),

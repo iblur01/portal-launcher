@@ -11,8 +11,6 @@ class BootReceiver : BroadcastReceiver() {
             ScreenControl.enableAccessibility(context)
             SleepScheduler.apply(context)
             MqttBridgeService.start(context)
-            if (Prefs(context).webConfigEnabled) ConfigServerService.start(context)
-            AdbControl.restoreOnBoot(context)
         }
     }
 }

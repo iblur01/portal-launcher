@@ -204,10 +204,8 @@ class MqttBridgeService : Service() {
         pub(HaDiscovery.lightDiscoveryTopic(p.deviceId), HaDiscovery.lightConfigPayload(p.deviceId, p.deviceName))
         if (sensorBridge?.hasTemperature == true) {
             pub(HaDiscovery.tempDiscoveryTopic(p.deviceId), HaDiscovery.tempConfigPayload(p.deviceId, p.deviceName))
-            pub(HaDiscovery.tempOffsetDiscoveryTopic(p.deviceId), HaDiscovery.tempOffsetConfigPayload(p.deviceId, p.deviceName))
         } else {
             client.publish(HaDiscovery.tempDiscoveryTopic(p.deviceId), emptyRetained())
-            client.publish(HaDiscovery.tempOffsetDiscoveryTopic(p.deviceId), emptyRetained())
         }
         pub(HaDiscovery.soundDiscoveryTopic(p.deviceId), HaDiscovery.soundConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.micMuteDiscoveryTopic(p.deviceId), HaDiscovery.micMuteConfigPayload(p.deviceId, p.deviceName))
@@ -225,7 +223,6 @@ class MqttBridgeService : Service() {
         val interactive = getSystemService(PowerManager::class.java).isInteractive
         publishRaw(HaDiscovery.screenStateTopic(p.deviceId), if (interactive) "ON" else "OFF", 1, retained = true)
         publishDeviceState(DeviceStateHub.current)
-        publishRaw(HaDiscovery.tempOffsetStateTopic(p.deviceId), "%.1f".format(p.tempOffset), 1, retained = true)
         publishRaw(HaDiscovery.ipStateTopic(p.deviceId), localIp() ?: "unknown", 1, retained = true)
         publishMicState(p)
         publishVolumeState(p)
@@ -248,11 +245,6 @@ class MqttBridgeService : Service() {
             HaDiscovery.screenCommandTopic(p.deviceId) -> when (payload.uppercase()) {
                 "ON" -> ScreenControl.wake(this)
                 "OFF" -> ScreenControl.sleep(this)
-            }
-            HaDiscovery.tempOffsetCommandTopic(p.deviceId) -> {
-                p.tempOffset = payload.toFloatOrNull() ?: return
-                sensorBridge?.republishTemperature()
-                publishRaw(HaDiscovery.tempOffsetStateTopic(p.deviceId), "%.1f".format(p.tempOffset), 1, retained = true)
             }
             HaDiscovery.micMuteCommandTopic(p.deviceId) -> {
                 val muted = payload.uppercase() == "ON"

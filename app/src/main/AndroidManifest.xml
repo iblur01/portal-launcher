@@ -92,10 +92,6 @@
             android:exported="false" />
 
         <service
-            android:name=".ConfigServerService"
-            android:exported="false" />
-
-        <service
             android:name=".ScreenAccessibility"
             android:exported="true"
             android:label="@string/accessibility_label"

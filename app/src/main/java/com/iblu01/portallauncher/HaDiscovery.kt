@@ -38,14 +38,6 @@ object HaDiscovery {
         return """{"name":"Temperature","unique_id":"${deviceId}_temperature","device":${device(deviceId, name)},"state_topic":"${tempStateTopic(deviceId)}","device_class":"temperature","unit_of_measurement":"°C","state_class":"measurement"}"""
     }
 
-    fun tempOffsetDiscoveryTopic(deviceId: String) = "homeassistant/number/${deviceId}_temp_offset/config"
-    fun tempOffsetStateTopic(deviceId: String) = "portal/$deviceId/sensor/temp_offset/state"
-    fun tempOffsetCommandTopic(deviceId: String) = "portal/$deviceId/sensor/temp_offset/set"
-    fun tempOffsetConfigPayload(deviceId: String, deviceName: String): String {
-        val name = deviceName.escape()
-        return """{"name":"Temperature Offset","unique_id":"${deviceId}_temp_offset","device":${device(deviceId, name)},"state_topic":"${tempOffsetStateTopic(deviceId)}","command_topic":"${tempOffsetCommandTopic(deviceId)}","min":-20,"max":20,"step":0.5,"mode":"box","unit_of_measurement":"°C","icon":"mdi:thermometer-plus","entity_category":"config"}"""
-    }
-
     fun accelDiscoveryTopic(deviceId: String, axis: String) = "homeassistant/sensor/${deviceId}_accel_$axis/config"
     fun accelStateTopic(deviceId: String) = "portal/$deviceId/sensor/accelerometer"
     fun accelConfigPayload(deviceId: String, deviceName: String, axis: String): String {
@@ -58,26 +50,6 @@ object HaDiscovery {
     fun rgbConfigPayload(deviceId: String, deviceName: String, channel: String): String {
         val name = deviceName.escape()
         return """{"name":"Light ${channel.uppercase()}","unique_id":"${deviceId}_rgb_$channel","device":${device(deviceId, name)},"state_topic":"${rgbStateTopic(deviceId)}","value_template":"{{ value_json.$channel }}","unit_of_measurement":"lx","state_class":"measurement","icon":"mdi:palette"}"""
-    }
-
-    private val isTiltModel = android.os.Build.DEVICE.equals("cipher", true)
-    private val tapLabel = if (isTiltModel) "Tilt" else "Tap"
-    private val tapIcon = if (isTiltModel) "mdi:axis-arrow" else "mdi:gesture-tap"
-    private val tapSensIcon = if (isTiltModel) "mdi:axis-arrow" else "mdi:hand-tap"
-
-    fun tapDiscoveryTopic(deviceId: String) = "homeassistant/sensor/${deviceId}_tap/config"
-    fun tapStateTopic(deviceId: String) = "portal/$deviceId/event/tap"
-    fun tapConfigPayload(deviceId: String, deviceName: String): String {
-        val name = deviceName.escape()
-        return """{"name":"$tapLabel","unique_id":"${deviceId}_tap","device":${device(deviceId, name)},"state_topic":"${tapStateTopic(deviceId)}","icon":"$tapIcon"}"""
-    }
-
-    fun sensitivityDiscoveryTopic(deviceId: String) = "homeassistant/number/${deviceId}_tap_sensitivity/config"
-    fun sensitivityStateTopic(deviceId: String) = "portal/$deviceId/tap/sensitivity/state"
-    fun sensitivityCommandTopic(deviceId: String) = "portal/$deviceId/tap/sensitivity/set"
-    fun sensitivityConfigPayload(deviceId: String, deviceName: String): String {
-        val name = deviceName.escape()
-        return """{"name":"$tapLabel Sensitivity","unique_id":"${deviceId}_tap_sensitivity","device":${device(deviceId, name)},"state_topic":"${sensitivityStateTopic(deviceId)}","command_topic":"${sensitivityCommandTopic(deviceId)}","min":2.0,"max":15.0,"step":0.5,"mode":"slider","icon":"$tapSensIcon"}"""
     }
 
     fun soundDiscoveryTopic(deviceId: String) = "homeassistant/sensor/${deviceId}_sound/config"
@@ -173,7 +145,6 @@ object HaDiscovery {
         volumeMuteCommandTopic(deviceId),
         soundCommandTopic(deviceId),
         brightnessCommandTopic(deviceId),
-        tempOffsetCommandTopic(deviceId),
         screenTimeoutCommandTopic(deviceId),
         screenTimeoutMinutesCommandTopic(deviceId),
         powerModeCommandTopic(deviceId),
@@ -181,20 +152,12 @@ object HaDiscovery {
     )
 
     fun staleTopics(deviceId: String) = listOf(
-        "homeassistant/switch/${deviceId}_camera/config",
-        "homeassistant/switch/${deviceId}_motion_enable/config",
-        "homeassistant/switch/${deviceId}_stream_enable/config",
-        "homeassistant/binary_sensor/${deviceId}_motion/config",
-        "homeassistant/number/${deviceId}_motion_sensitivity/config",
-        "homeassistant/switch/${deviceId}_presence_enable/config",
         accelDiscoveryTopic(deviceId, "x"),
         accelDiscoveryTopic(deviceId, "y"),
         accelDiscoveryTopic(deviceId, "z"),
         rgbDiscoveryTopic(deviceId, "r"),
         rgbDiscoveryTopic(deviceId, "g"),
         rgbDiscoveryTopic(deviceId, "b"),
-        tapDiscoveryTopic(deviceId),
-        sensitivityDiscoveryTopic(deviceId)
     )
 
     private fun device(deviceId: String, escapedName: String) =
