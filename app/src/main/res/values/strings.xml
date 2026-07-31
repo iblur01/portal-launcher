@@ -448,6 +448,14 @@
     <string name="settings_app_sessions_empty">No apps allowed</string>
     <string name="settings_app_sessions_clear">Clear allowed apps</string>
     <string name="settings_app_sessions_cycle_hint">Tap an app to change its classification</string>
+    <string name="settings_app_sessions_choose_class">Choose session type for %1$s</string>
+    <string name="settings_app_sessions_class_home">Home</string>
+    <string name="settings_app_sessions_class_media">Media</string>
+    <string name="settings_app_sessions_class_utility">Utility</string>
+    <string name="settings_app_sessions_class_communication">Communication</string>
+    <string name="settings_app_sessions_classification_value">%1$s · %2$d s default · %3$d s max</string>
+    <string name="settings_app_sessions_duration_consequence">%1$d s default · %2$d s maximum</string>
+    <string name="settings_app_sessions_cancel">Cancel</string>
 
     <!-- ===== PILL PRIORITY ENGINE (Dynamic Labels) ===== -->
     <string name="presence_home">At home</string>

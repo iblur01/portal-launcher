@@ -86,7 +86,8 @@ class MqttBridgeService : Service() {
     private val sessionTick = object : Runnable {
         override fun run() {
             if (running.get()) {
-                sessionCoordinator?.onDeviceState(DeviceStateHub.current.foregroundPackage)
+                sessionCoordinator?.takeIf { it.hasActiveSession }
+                    ?.onDeviceState(DeviceStateHub.current.foregroundPackage)
                 mainHandler.postDelayed(this, 1_000L)
             }
         }
@@ -202,7 +203,7 @@ class MqttBridgeService : Service() {
             setWill(HaDiscovery.screenStateTopic(p.deviceId), "OFF".toByteArray(), 1, true)
         })
         mqtt = client
-        if (!runOnMain { refreshSessionConfiguration(p, publishEnabledState = false) }) {
+        if (!runConfigurationOnMain { refreshSessionConfiguration(p, publishEnabledState = false) }) {
             mqtt = null
             runCatching { client.disconnect(0) }
             throw IllegalStateException("session_config_apply_failed")
@@ -508,13 +509,13 @@ class MqttBridgeService : Service() {
                 if (allowlist.classificationFor(packageName) == null) return false
                 val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                return runOnMain {
+                return runCatching {
                     startActivity(intent)
                     DeviceStateHub.noteLaunchingApp(packageName, this@MqttBridgeService)
-                }
+                }.isSuccess
             }
 
-            override fun returnToLauncher(): Boolean = runOnMain {
+            override fun returnToLauncher(): Boolean = runCatching {
                 startActivity(
                     Intent(this@MqttBridgeService, LauncherActivity::class.java).addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
@@ -523,12 +524,13 @@ class MqttBridgeService : Service() {
                     )
                 )
                 SleepScheduler.apply(this@MqttBridgeService)
-            }
+            }.isSuccess
         }
         return SessionCoordinator(manager, allowlist, RealSessionTimeSource, runtime)
     }
 
-    private fun runOnMain(action: () -> Unit): Boolean {
+    /** Serialize local configuration replacement with main-thread settings callbacks. */
+    private fun runConfigurationOnMain(action: () -> Unit): Boolean {
         if (Looper.myLooper() == Looper.getMainLooper()) return runCatching(action).isSuccess
         val task = FutureTask { runCatching(action).isSuccess }
         if (!mainHandler.post(task)) return false

@@ -142,6 +142,8 @@ Only one session may be active at a time. A second `start` while a session is ac
 2. A duplicate command (same `request_id` and every field identical: `action`, `package`,
    `duration_s`, `expires_at`, `reason`) replays the recorded result **without side effects** and
    **before** the rate-limit check.
+   Optional temporal fields are compared exactly as requested. A clock-derived expiry for an omitted
+   `expires_at` is deliberately excluded, so delayed QoS 1 redelivery remains idempotent.
 3. A conflicting duplicate (same `request_id` but different command fields) is rejected with
    `request_id_conflict`.
 4. Lifecycle updates (`launching` → `active`, `ending` → `completed`, `expired`) update the replay
@@ -173,8 +175,9 @@ Only one session may be active at a time. A second `start` while a session is ac
 ## Allowlist
 
 - The allowlist defaults to empty and is stored only in Portal's local preferences.
-- The on-device Application settings page can add installed apps, cycle each app's classification,
-  clear the list, and arm/disarm the feature.
+- When an MQTT broker is configured, the on-device Application settings page can add installed apps,
+  choose a classification from a dialog that shows its default/maximum duration, clear the list,
+  and arm/disarm the feature. The section is hidden when MQTT is not configured.
 - Each entry is `package + classification`; malformed stored entries are ignored and storage is
   capped at 32 entries.
 - Each classification (`HOME`, `MEDIA`, `UTILITY`, `COMMUNICATION`) defines a default duration and a
@@ -189,7 +192,9 @@ Only one session may be active at a time. A second `start` while a session is ac
 - One coordinator is built per service process and preserved across ordinary MQTT reconnects. A local
   allowlist change ends any active session and atomically replaces the coordinator.
 - `DeviceStateHub.foregroundPackage` drives `launching → active`; a broker-independent one-second tick
-  checks expiry so a network outage cannot extend a session. No new Usage Access or location
+  checks expiry only while a session is active, so a network outage cannot extend a session without
+  waking the main loop when idle. Activity launch/return runs directly from the service command
+  executor and never blocks waiting for the main looper. No new Usage Access or location
   permission is requested.
 - The bridge republishes current session state every five seconds. Home Assistant discovery uses
   `expire_after: 15`, so the diagnostic becomes unavailable after broker/device loss instead of

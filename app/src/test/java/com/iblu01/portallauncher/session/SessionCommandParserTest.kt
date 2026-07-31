@@ -55,17 +55,21 @@ class SessionCommandParserTest {
         assertEquals("com.example.app", it.packageName)
         assertEquals(AppClassification.HOME.defaultDurationSeconds, it.durationSeconds)
         assertEquals((nowMs() / 1000 + AppClassification.HOME.defaultDurationSeconds) * 1000, it.expiresAtMs)
+        assertEquals(null, it.requestedDurationSeconds)
+        assertEquals(null, it.requestedExpiresAtSeconds)
         assertEquals(null, it.reason)
     }
 
     @Test fun `start with explicit duration`() = assertValidCommand(validStart(duration = 45)) {
         assertEquals(45, it.durationSeconds)
+        assertEquals(45, it.requestedDurationSeconds)
         assertEquals((nowMs() / 1000 + 45) * 1000, it.expiresAtMs)
     }
 
     @Test fun `start with explicit expires_at`() = assertValidCommand(validStart(expiresAt = 1100)) {
         assertEquals(AppClassification.HOME.defaultDurationSeconds, it.durationSeconds)
         assertEquals(1100L * 1000, it.expiresAtMs)
+        assertEquals(1100L, it.requestedExpiresAtSeconds)
     }
 
     @Test fun `start with reason is sanitized and bounded`() = assertValidCommand(

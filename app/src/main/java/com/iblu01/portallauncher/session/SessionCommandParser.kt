@@ -141,7 +141,7 @@ object SessionCommandParser {
         val classification = allowlist.classificationFor(packageName)
             ?: return ParseResult.Invalid(SessionRejectionCode.UNKNOWN_PACKAGE)
 
-        val requestedDuration = if (obj.has("duration_s")) {
+        val rawRequestedDuration = if (obj.has("duration_s")) {
             when (val raw = obj.opt("duration_s")) {
                 is Int, is Long -> {
                     val value = (raw as Number).toInt()
@@ -151,22 +151,24 @@ object SessionCommandParser {
                 else -> return ParseResult.Invalid(SessionRejectionCode.DURATION_OUT_OF_RANGE)
             }
         } else {
-            classification.defaultDurationSeconds
+            null
         }
+        val requestedDuration = rawRequestedDuration ?: classification.defaultDurationSeconds
 
         if (requestedDuration > classification.maxDurationSeconds) {
             return ParseResult.Invalid(SessionRejectionCode.DURATION_EXCEEDS_MAX)
         }
         val effectiveDuration = requestedDuration.coerceAtMost(classification.maxDurationSeconds)
 
-        val requestedExpiresAt = if (obj.has("expires_at")) {
+        val rawRequestedExpiresAt = if (obj.has("expires_at")) {
             when (val raw = obj.opt("expires_at")) {
                 is Int, is Long -> (raw as Number).toLong()
                 else -> return ParseResult.Invalid(SessionRejectionCode.EXPIRES_AT_INVALID)
             }
         } else {
-            nowSeconds + effectiveDuration
+            null
         }
+        val requestedExpiresAt = rawRequestedExpiresAt ?: (nowSeconds + effectiveDuration)
 
         if (requestedExpiresAt <= nowSeconds) {
             return ParseResult.Invalid(SessionRejectionCode.EXPIRES_AT_IN_THE_PAST)
@@ -185,6 +187,8 @@ object SessionCommandParser {
                 durationSeconds = effectiveDuration,
                 expiresAtMs = expiresAtMs,
                 reason = reason,
+                requestedDurationSeconds = rawRequestedDuration,
+                requestedExpiresAtSeconds = rawRequestedExpiresAt,
             )
         )
     }

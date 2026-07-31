@@ -337,8 +337,8 @@ class SessionManager(
         a.requestId == b.requestId &&
             a.action == b.action &&
             a.packageName == b.packageName &&
-            a.durationSeconds == b.durationSeconds &&
-            a.expiresAtMs == b.expiresAtMs &&
+            a.requestedDurationSeconds == b.requestedDurationSeconds &&
+            a.requestedExpiresAtSeconds == b.requestedExpiresAtSeconds &&
             a.reason == b.reason
 
     private fun isActiveLifecycle(lifecycle: SessionLifecycle): Boolean =

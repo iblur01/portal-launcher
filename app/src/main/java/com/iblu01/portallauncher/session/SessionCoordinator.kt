@@ -21,6 +21,9 @@ class SessionCoordinator(
     @Volatile
     private var latestState: SessionResult = SessionSerializer.idleState()
 
+    val hasActiveSession: Boolean
+        get() = manager.activeSession != null
+
     /** Publishes current state after MQTT connects; a fresh process naturally reports idle. */
     @Synchronized
     fun publishCurrentState() {

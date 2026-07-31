@@ -62,6 +62,9 @@ data class SessionCommand(
     val durationSeconds: Int,
     val expiresAtMs: Long,
     val reason: String?,
+    /** Raw optional client fields used for idempotency; derived clock values are not compared. */
+    val requestedDurationSeconds: Int? = if (action == SessionAction.START) durationSeconds else null,
+    val requestedExpiresAtSeconds: Long? = if (action == SessionAction.START) expiresAtMs / 1000 else null,
 )
 
 /**

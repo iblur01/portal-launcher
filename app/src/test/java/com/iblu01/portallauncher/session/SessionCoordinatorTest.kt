@@ -51,6 +51,9 @@ class SessionCoordinatorTest {
     private fun endJson(requestId: String = "req-end") =
         """{"schema_version":1,"request_id":"$requestId","action":"end","package":"com.example.app"}"""
 
+    private fun defaultStartJson(requestId: String = "req-default") =
+        """{"schema_version":1,"request_id":"$requestId","action":"start","package":"com.example.app"}"""
+
     @Test fun `empty retained clear is ignored`() {
         val f = fixture()
         assertFalse(f.coordinator.onCommand("  "))
@@ -68,6 +71,28 @@ class SessionCoordinatorTest {
 
         f.coordinator.onCommand(startJson())
         assertEquals(1, f.runtime.launchCalls)
+    }
+
+    @Test fun `qos replay with derived expiry is idempotent after clock advances`() {
+        val f = fixture()
+        f.coordinator.onCommand(defaultStartJson())
+        f.time.advance(1_500L)
+        f.coordinator.onCommand(defaultStartJson())
+
+        assertEquals(1, f.runtime.launchCalls)
+        assertEquals(SessionLifecycle.LAUNCHING, f.runtime.states.last().lifecycle)
+        assertEquals(null, f.runtime.states.last().code)
+    }
+
+    @Test fun `same request id with different requested temporal fields conflicts`() {
+        val f = fixture()
+        f.coordinator.onCommand(defaultStartJson())
+        f.coordinator.onCommand(
+            """{"schema_version":1,"request_id":"req-default","action":"start","package":"com.example.app","duration_s":60}"""
+        )
+
+        assertEquals(1, f.runtime.launchCalls)
+        assertEquals(SessionRejectionCode.REQUEST_ID_CONFLICT, f.runtime.states.last().code)
     }
 
     @Test fun `invalid command is rejected without side effects`() {
