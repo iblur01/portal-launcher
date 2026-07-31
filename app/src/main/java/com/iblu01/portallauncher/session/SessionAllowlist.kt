@@ -21,22 +21,21 @@ enum class AppClassification(
  * Local package allowlist. Each entry maps a package name to a classification that supplies the
  * default and maximum durations. The parser rejects unknown packages, so the system fails closed.
  *
- * [DEFAULT] is only an optional seed for convenience. Production configurations should build their
- * own [SessionAllowlist] from local storage or configuration so the set of launchable packages is
- * not hard-coded and can differ per device.
+ * Runtime configuration starts from [EMPTY] and is populated only through local device settings.
  */
 class SessionAllowlist(private val entries: Map<String, AppClassification>) {
 
     fun classificationFor(packageName: String): AppClassification? = entries[packageName]
 
+    /** Exposes a read-only view of the configured entries for persistence and UI editing. */
+    fun toMap(): Map<String, AppClassification> = entries
+
+    override fun equals(other: Any?): Boolean =
+        other is SessionAllowlist && other.entries == entries
+
+    override fun hashCode(): Int = entries.hashCode()
+
     companion object {
-        val DEFAULT = SessionAllowlist(
-            mapOf(
-                "io.homeassistant.companion.android" to AppClassification.HOME,
-                "com.google.android.youtube" to AppClassification.MEDIA,
-                "com.android.chrome" to AppClassification.UTILITY,
-                "com.whatsapp" to AppClassification.COMMUNICATION,
-            )
-        )
+        val EMPTY = SessionAllowlist(emptyMap())
     }
 }

@@ -6,11 +6,9 @@ import org.junit.Test
 
 class SessionAllowlistTest {
 
-    @Test fun `DEFAULT seed contains known packages`() {
-        assertEquals(AppClassification.HOME, SessionAllowlist.DEFAULT.classificationFor("io.homeassistant.companion.android"))
-        assertEquals(AppClassification.MEDIA, SessionAllowlist.DEFAULT.classificationFor("com.google.android.youtube"))
-        assertEquals(AppClassification.UTILITY, SessionAllowlist.DEFAULT.classificationFor("com.android.chrome"))
-        assertEquals(AppClassification.COMMUNICATION, SessionAllowlist.DEFAULT.classificationFor("com.whatsapp"))
+    @Test fun `EMPTY defaults fail closed`() {
+        assertNull(SessionAllowlist.EMPTY.classificationFor("io.homeassistant.companion.android"))
+        assertNull(SessionAllowlist.EMPTY.classificationFor("com.google.android.youtube"))
     }
 
     @Test fun `custom entries override default behavior`() {
@@ -37,7 +35,7 @@ class SessionAllowlistTest {
     }
 
     @Test fun `unknown package returns null`() {
-        assertNull(SessionAllowlist.DEFAULT.classificationFor("com.not.in.list"))
+        assertNull(SessionAllowlist.EMPTY.classificationFor("com.not.in.list"))
     }
 
     @Test fun `empty allowlist rejects everything`() {

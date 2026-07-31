@@ -442,6 +442,12 @@
     <string name="notification_content_title">Portal Launcher</string>
     <string name="power_mode_always_on">Always on</string>
     <string name="power_mode_follow_presence">Follow presence</string>
+    <string name="settings_app_section_sessions">External app sessions</string>
+    <string name="settings_app_sessions_enabled">Allow bounded MQTT app sessions</string>
+    <string name="settings_app_sessions_add">Add allowed app</string>
+    <string name="settings_app_sessions_empty">No apps allowed</string>
+    <string name="settings_app_sessions_clear">Clear allowed apps</string>
+    <string name="settings_app_sessions_cycle_hint">Tap an app to change its classification</string>
 
     <!-- ===== PILL PRIORITY ENGINE (Dynamic Labels) ===== -->
     <string name="presence_home">At home</string>

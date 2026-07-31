@@ -146,6 +146,23 @@ object HaDiscovery {
         return """{"name":"IP Address","unique_id":"${deviceId}_ip","device":${device(deviceId, name)},"state_topic":"${ipStateTopic(deviceId)}","icon":"mdi:ip-network","entity_category":"diagnostic"}"""
     }
 
+    // --- Bounded external-app session discovery ---------------------------------------------
+    fun sessionDiscoveryTopic(deviceId: String) = "homeassistant/sensor/${deviceId}_app_session/config"
+    fun sessionStateTopic(deviceId: String) = "portal/$deviceId/session/state"
+    fun sessionEventTopic(deviceId: String) = "portal/$deviceId/session/event"
+    fun sessionCommandTopic(deviceId: String) = "portal/$deviceId/session/command"
+    fun sessionConfigPayload(deviceId: String, deviceName: String): String {
+        val name = deviceName.escape()
+        return """{"name":"App Session","unique_id":"${deviceId}_app_session","device":${device(deviceId, name)},"state_topic":"${sessionStateTopic(deviceId)}","value_template":"{{ value_json.lifecycle }}","expire_after":15,"icon":"mdi:application-cog","entity_category":"diagnostic"}"""
+    }
+
+    fun sessionEnabledDiscoveryTopic(deviceId: String) = "homeassistant/binary_sensor/${deviceId}_app_sessions_enabled/config"
+    fun sessionEnabledStateTopic(deviceId: String) = "portal/$deviceId/session/enabled"
+    fun sessionEnabledConfigPayload(deviceId: String, deviceName: String): String {
+        val name = deviceName.escape()
+        return """{"name":"App Sessions Enabled","unique_id":"${deviceId}_app_sessions_enabled","device":${device(deviceId, name)},"state_topic":"${sessionEnabledStateTopic(deviceId)}","payload_on":"ON","payload_off":"OFF","icon":"mdi:shield-lock","entity_category":"diagnostic"}"""
+    }
+
     fun commandTopics(deviceId: String) = listOf(
         screenCommandTopic(deviceId),
         micMuteCommandTopic(deviceId),
@@ -156,7 +173,8 @@ object HaDiscovery {
         screenTimeoutCommandTopic(deviceId),
         screenTimeoutMinutesCommandTopic(deviceId),
         powerModeCommandTopic(deviceId),
-        notificationCommandTopic(deviceId)
+        notificationCommandTopic(deviceId),
+        sessionCommandTopic(deviceId),
     )
 
     fun staleTopics(deviceId: String) = listOf(

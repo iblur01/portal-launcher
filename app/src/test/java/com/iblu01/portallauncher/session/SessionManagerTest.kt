@@ -167,6 +167,18 @@ class SessionManagerTest {
         assertNull(f.manager.activeSession)
     }
 
+    @Test fun `ending is not overwritten by expiry while launcher return is pending`() {
+        val f = manager(enabled = true)
+        val expires = f.timeSource.now() + 5_000L
+        f.manager.process(f.start(requestId = "req-1", expiresAtMs = expires))
+        f.manager.onDeviceState("com.example.app")
+        f.manager.process(f.end(requestId = "req-2"))
+        f.timeSource.advance(6_000L)
+        assertTrue(f.manager.onDeviceState("com.example.app").isEmpty())
+        assertEquals(SessionLifecycle.ENDING, f.manager.activeSession?.lifecycle)
+        assertEquals(SessionLifecycle.COMPLETED, f.manager.onReturnToLauncher().single().result.lifecycle)
+    }
+
     // --- expiry ------------------------------------------------------------
 
     @Test fun `expired session emits exactly one return side effect`() {

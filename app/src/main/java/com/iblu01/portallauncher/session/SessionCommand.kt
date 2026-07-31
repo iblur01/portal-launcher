@@ -48,6 +48,8 @@ enum class SessionRejectionCode {
     PACKAGE_MISMATCH,
     SESSION_ALREADY_ENDING,
     REQUEST_ID_CONFLICT,
+    LAUNCH_FAILED,
+    RETURN_TO_LAUNCHER_FAILED,
 }
 
 /**

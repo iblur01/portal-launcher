@@ -98,7 +98,9 @@ class SessionManager(
         val transitions = mutableListOf<SessionTransition>()
         val session = currentSession ?: return transitions
 
-        if (nowMs >= session.command.expiresAtMs) {
+        // Once return has begun, completion/failure owns the terminal outcome. Do not overwrite an
+        // ENDING session with EXPIRED while Portal is coming back to the foreground.
+        if (session.lifecycle != SessionLifecycle.ENDING && nowMs >= session.command.expiresAtMs) {
             transitions += expire(session, nowMs)
             return transitions
         }
@@ -163,6 +165,28 @@ class SessionManager(
             rememberResult(it, result.copy(requestId = it.requestId, reason = it.reason), nowMs)
         }
         return listOf(SessionTransition(result, emptyList()))
+    }
+
+    /** Ends the current session after a bounded runtime-side failure. */
+    fun failActive(
+        code: SessionRejectionCode,
+        nowMs: Long = timeSource.now(),
+    ): List<SessionTransition> = synchronized(lock) {
+        val session = currentSession ?: return emptyList()
+        currentSession = null
+        val result = SessionResult(
+            lifecycle = SessionLifecycle.FAILED,
+            requestId = session.command.requestId,
+            packageName = session.command.packageName,
+            expiresAtMs = null,
+            reason = session.command.reason,
+            code = code,
+        )
+        rememberResult(session.command, result, nowMs)
+        session.endingCommand?.let {
+            rememberResult(it, result.copy(requestId = it.requestId, reason = it.reason), nowMs)
+        }
+        listOf(SessionTransition(result))
     }
 
     val isEnabled: Boolean get() = synchronized(lock) { sessionsEnabled }

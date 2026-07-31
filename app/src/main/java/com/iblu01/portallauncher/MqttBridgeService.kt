@@ -24,9 +24,19 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import com.iblu01.portallauncher.photo.PhotoStatusSerializer
+import com.iblu01.portallauncher.session.SessionCoordinator
+import com.iblu01.portallauncher.session.SessionAllowlist
+import com.iblu01.portallauncher.session.SessionManager
+import com.iblu01.portallauncher.session.SessionMqttContract
+import com.iblu01.portallauncher.session.SessionResult
+import com.iblu01.portallauncher.session.SessionRuntime
+import com.iblu01.portallauncher.session.SessionSerializer
+import com.iblu01.portallauncher.session.RealSessionTimeSource
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.concurrent.Executors
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MqttBridgeService : Service() {
@@ -69,7 +79,22 @@ class MqttBridgeService : Service() {
     private var soundMonitor: SoundMonitor? = null
     private var screenReceiver: BroadcastReceiver? = null
     private var audioReceiver: BroadcastReceiver? = null
-    private val deviceStateListener = DeviceStateHub.Listener { state -> publishDeviceState(state) }
+    @Volatile private var sessionCoordinator: SessionCoordinator? = null
+    private var sessionAllowlist: SessionAllowlist = SessionAllowlist.EMPTY
+    private var lastSessionsEnabled: Boolean? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val sessionTick = object : Runnable {
+        override fun run() {
+            if (running.get()) {
+                sessionCoordinator?.onDeviceState(DeviceStateHub.current.foregroundPackage)
+                mainHandler.postDelayed(this, 1_000L)
+            }
+        }
+    }
+    private val deviceStateListener = DeviceStateHub.Listener { state ->
+        publishDeviceState(state)
+        sessionCoordinator?.onDeviceState(state.foregroundPackage)
+    }
     @Volatile private var lastVolumePercent = -1
     @Volatile private var lastVolumeMuted = false
     @Volatile private var lastBrightnessPercent = -1
@@ -80,9 +105,13 @@ class MqttBridgeService : Service() {
         super.onCreate()
         createChannel()
         prefs = Prefs(this)
+        sessionAllowlist = prefs.appSessionAllowlist
+        sessionCoordinator = createSessionCoordinator().also { it.setEnabled(prefs.appSessionsEnabled) }
+        lastSessionsEnabled = prefs.appSessionsEnabled
         startForeground(NOTIF_ID, notification(getString(R.string.app_name)))
 
         DeviceStateHub.init(this)
+        DeviceStateHub.addListener(deviceStateListener)
         ScreenControl.enableAccessibility(this)
         sensorBridge = SensorBridge(this, ::publishRaw).also { it.start(prefs) }
         soundMonitor = SoundMonitor(this) { level ->
@@ -96,6 +125,7 @@ class MqttBridgeService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_RECONNECT) {
             Log.i(TAG, "Reconnect requested (broker config changed)")
+            refreshSessionConfiguration(prefs)
             Thread({
                 com.iblu01.portallauncher.ui.ConnectionStatus.connected = false
                 runCatching { mqtt?.disconnect(0) }
@@ -103,6 +133,7 @@ class MqttBridgeService : Service() {
             }, "portal-launcher-reconnect").also { it.isDaemon = true }.start()
         }
         if (running.compareAndSet(false, true)) {
+            mainHandler.post(sessionTick)
             Thread(::mqttLoop, "portal-launcher-mqtt").also { it.isDaemon = true }.start()
         }
         return START_STICKY
@@ -110,6 +141,8 @@ class MqttBridgeService : Service() {
 
     override fun onDestroy() {
         running.set(false)
+        mainHandler.removeCallbacks(sessionTick)
+        sessionCoordinator = null
         commands.shutdownNow()
         runCatching { mqtt?.disconnect(0) }
         sensorBridge?.stop()
@@ -169,6 +202,11 @@ class MqttBridgeService : Service() {
             setWill(HaDiscovery.screenStateTopic(p.deviceId), "OFF".toByteArray(), 1, true)
         })
         mqtt = client
+        if (!runOnMain { refreshSessionConfiguration(p, publishEnabledState = false) }) {
+            mqtt = null
+            runCatching { client.disconnect(0) }
+            throw IllegalStateException("session_config_apply_failed")
+        }
         com.iblu01.portallauncher.ui.ConnectionStatus.connected = true
         Log.i(TAG, "MQTT connected to ${p.brokerUri}")
 
@@ -178,7 +216,6 @@ class MqttBridgeService : Service() {
 
         publishDiscovery(client, p)
         publishInitialStates(p)
-        DeviceStateHub.addListener(deviceStateListener)
         updateNotification("Connected - ${p.brokerHost}")
 
         try {
@@ -189,7 +226,6 @@ class MqttBridgeService : Service() {
             }
         } finally {
             com.iblu01.portallauncher.ui.ConnectionStatus.connected = false
-            DeviceStateHub.removeListener(deviceStateListener)
             mqtt = null
             runCatching { client.disconnect(0) }
         }
@@ -219,6 +255,8 @@ class MqttBridgeService : Service() {
         pub(HaDiscovery.screenTimeoutMinutesDiscoveryTopic(p.deviceId), HaDiscovery.screenTimeoutMinutesConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.powerModeDiscoveryTopic(p.deviceId), HaDiscovery.powerModeConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.photoStatusDiscoveryTopic(p.deviceId), HaDiscovery.photoStatusConfigPayload(p.deviceId, p.deviceName))
+        pub(HaDiscovery.sessionDiscoveryTopic(p.deviceId), HaDiscovery.sessionConfigPayload(p.deviceId, p.deviceName))
+        pub(HaDiscovery.sessionEnabledDiscoveryTopic(p.deviceId), HaDiscovery.sessionEnabledConfigPayload(p.deviceId, p.deviceName))
     }
 
     private fun publishInitialStates(p: Prefs) {
@@ -232,6 +270,8 @@ class MqttBridgeService : Service() {
         publishBrightnessState(p)
         publishPowerState(p)
         publishPhotoStatus(p)
+        publishSessionsEnabledState(p)
+        sessionCoordinator?.publishCurrentState()
     }
 
     private fun pollChangedStates(p: Prefs) {
@@ -242,6 +282,8 @@ class MqttBridgeService : Service() {
         val bright = currentBrightnessPercent()
         if (bright != lastBrightnessPercent) publishBrightnessState(p)
         publishPhotoStatus(p)
+        mainHandler.post { refreshSessionConfiguration(p) }
+        sessionCoordinator?.publishCurrentState()
     }
 
     private fun publishPhotoStatus(p: Prefs) {
@@ -262,6 +304,7 @@ class MqttBridgeService : Service() {
 
     private fun handleMessage(topic: String, payload: String, p: Prefs) {
         when (topic) {
+            HaDiscovery.sessionCommandTopic(p.deviceId) -> sessionCoordinator?.onCommand(payload)
             HaDiscovery.screenCommandTopic(p.deviceId) -> when (payload.uppercase()) {
                 "ON" -> ScreenControl.wake(this)
                 "OFF" -> ScreenControl.sleep(this)
@@ -409,6 +452,91 @@ class MqttBridgeService : Service() {
             1,
             retained = true
         )
+    }
+
+    private fun publishSessionsEnabledState(p: Prefs) {
+        publishRaw(
+            HaDiscovery.sessionEnabledStateTopic(p.deviceId),
+            if (p.appSessionsEnabled) "ON" else "OFF",
+            1,
+            retained = true,
+        )
+    }
+
+    private fun refreshSessionConfiguration(p: Prefs, publishEnabledState: Boolean = true) {
+        val configuredAllowlist = p.appSessionAllowlist
+        if (configuredAllowlist != sessionAllowlist) {
+            sessionCoordinator?.setEnabled(false)
+            sessionAllowlist = configuredAllowlist
+            sessionCoordinator = createSessionCoordinator()
+            lastSessionsEnabled = null
+        }
+        if (lastSessionsEnabled != p.appSessionsEnabled) {
+            lastSessionsEnabled = p.appSessionsEnabled
+            sessionCoordinator?.setEnabled(p.appSessionsEnabled)
+            if (publishEnabledState) publishSessionsEnabledState(p)
+        }
+    }
+
+    private fun createSessionCoordinator(): SessionCoordinator {
+        val allowlist = sessionAllowlist
+        val manager = SessionManager(
+            timeSource = RealSessionTimeSource,
+            allowlist = allowlist,
+            launcherPackage = packageName,
+        )
+        val runtime = object : SessionRuntime {
+            override fun publishEvent(result: SessionResult) {
+                runCatching {
+                    mqtt?.publish(
+                        HaDiscovery.sessionEventTopic(prefs.deviceId),
+                        SessionMqttContract.eventMessage(SessionSerializer.toJson(result)),
+                    )
+                }
+            }
+
+            override fun publishState(result: SessionResult) {
+                runCatching {
+                    mqtt?.publish(
+                        HaDiscovery.sessionStateTopic(prefs.deviceId),
+                        SessionMqttContract.stateMessage(SessionSerializer.toJson(result)),
+                    )
+                }
+            }
+
+            override fun launchApp(packageName: String): Boolean {
+                if (allowlist.classificationFor(packageName) == null) return false
+                val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                return runOnMain {
+                    startActivity(intent)
+                    DeviceStateHub.noteLaunchingApp(packageName, this@MqttBridgeService)
+                }
+            }
+
+            override fun returnToLauncher(): Boolean = runOnMain {
+                startActivity(
+                    Intent(this@MqttBridgeService, LauncherActivity::class.java).addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                    )
+                )
+                SleepScheduler.apply(this@MqttBridgeService)
+            }
+        }
+        return SessionCoordinator(manager, allowlist, RealSessionTimeSource, runtime)
+    }
+
+    private fun runOnMain(action: () -> Unit): Boolean {
+        if (Looper.myLooper() == Looper.getMainLooper()) return runCatching(action).isSuccess
+        val task = FutureTask { runCatching(action).isSuccess }
+        if (!mainHandler.post(task)) return false
+        return runCatching { task.get(5, TimeUnit.SECONDS) }.getOrElse {
+            mainHandler.removeCallbacks(task)
+            task.cancel(false)
+            false
+        }
     }
 
     private fun publishDeviceState(state: DeviceState) {

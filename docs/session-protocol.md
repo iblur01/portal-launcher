@@ -1,9 +1,7 @@
 # Bounded App-Session Protocol
 
-This document defines the pure protocol, state machine, and MQTT contract for the Portal
-bounded external-app session feature. It covers only the parser, state machine, and serializer;
-runtime integration (MQTT bridge, Android launcher, settings UI) is intentionally out of scope
-for Phase A.
+This document defines the protocol, state machine, MQTT contract, Android runtime adapter, and
+local settings behavior for Portal's bounded external-app sessions.
 
 ## Design goals
 
@@ -25,10 +23,9 @@ All topics are under the device-specific prefix `portal/<deviceId>/session`.
 | Topic | Direction | QoS | Retained | Purpose |
 |-------|-----------|-----|----------|---------|
 | `portal/<deviceId>/session/command` | Incoming | 1 | No (clear-message retained) | Request to start/end/cancel a session. |
-| `portal/<deviceId>/session/event` | Outgoing | 1 | No | Transient lifecycle events (accepted, launching, active, ending, completed, expired, rejected). |
+| `portal/<deviceId>/session/event` | Outgoing | 1 | No | Transient lifecycle events (accepted, launching, active, ending, completed, expired, failed, rejected). |
 | `portal/<deviceId>/session/state` | Outgoing | 1 | Yes | Last-known lifecycle state for Home Assistant. |
-| `portal/<deviceId>/session/kill_switch/set` | Incoming | 1 | No | Toggle the local kill switch (`ON` / `OFF`). |
-| `portal/<deviceId>/session/kill_switch/state` | Outgoing | 1 | Yes | Current kill-switch state (`ON` / `OFF`). |
+| `portal/<deviceId>/session/enabled` | Outgoing | 1 | Yes | Read-only local enabled state (`ON` / `OFF`). There is no matching command topic. |
 
 The bridge publishes a zero-byte retained message to `.../command` on connect so that a stale
 retained command from a previous broker session cannot be replayed after reconnect.
@@ -136,6 +133,8 @@ Only one session may be active at a time. A second `start` while a session is ac
 | `package_mismatch` | `end`/`cancel` package does not match the active session. |
 | `session_already_ending` | `end`/`cancel` arrived while the session is already ending. |
 | `request_id_conflict` | Duplicate `request_id` with different command fields. |
+| `launch_failed` | Android could not resolve or launch the locally allowed package. |
+| `return_to_launcher_failed` | Android could not return to Portal after an ending or expiry transition. |
 
 ## Idempotency and replay rules
 
@@ -167,15 +166,40 @@ Only one session may be active at a time. A second `start` while a session is ac
 - Toggling the switch to `OFF` while a session is active immediately transitions it to `ending` and
   requests a return to the launcher.
 - There is no remote command that can force sessions to be enabled; the switch must be set on the
-  device or through the local settings surface.
+  device through the local settings surface.
+- Home Assistant discovery exposes enabled state as a read-only diagnostic binary sensor and does
+  not include a `command_topic`.
 
 ## Allowlist
 
-- Allowed packages and their classifications are supplied by the local configuration.
-- `SessionAllowlist.DEFAULT` is an optional seed for convenience, not the only source.
+- The allowlist defaults to empty and is stored only in Portal's local preferences.
+- The on-device Application settings page can add installed apps, cycle each app's classification,
+  clear the list, and arm/disarm the feature.
+- Each entry is `package + classification`; malformed stored entries are ignored and storage is
+  capped at 32 entries.
 - Each classification (`HOME`, `MEDIA`, `UTILITY`, `COMMUNICATION`) defines a default duration and a
   hard maximum duration; the parser enforces both.
+- Runtime launch uses only Android's package-manager launch intent for the exact allowed package.
+  Commands cannot supply a component, URI, deep link, extras, or arbitrary intent.
 - Unknown packages are rejected before any side effect.
+
+## Runtime behavior
+
+- The bridge clears the retained command topic before subscribing. Empty clear payloads are ignored.
+- One coordinator is built per service process and preserved across ordinary MQTT reconnects. A local
+  allowlist change ends any active session and atomically replaces the coordinator.
+- `DeviceStateHub.foregroundPackage` drives `launching → active`; a broker-independent one-second tick
+  checks expiry so a network outage cannot extend a session. No new Usage Access or location
+  permission is requested.
+- The bridge republishes current session state every five seconds. Home Assistant discovery uses
+  `expire_after: 15`, so the diagnostic becomes unavailable after broker/device loss instead of
+  displaying stale `active` state indefinitely.
+- A successful explicit return to Portal completes an `ending` session immediately; foreground
+  observation is a second idempotent confirmation path. Once return begins, expiry cannot overwrite
+  `ending` with `expired`.
+- Portal's existing `DeviceStateHub` continues to cancel/apply `SleepScheduler` around external-app
+  transitions; sessions do not add a second screen-sleep scheduler.
+- Launch/return failures publish bounded `failed` event/state payloads without exception text.
 
 ## Example flow
 
