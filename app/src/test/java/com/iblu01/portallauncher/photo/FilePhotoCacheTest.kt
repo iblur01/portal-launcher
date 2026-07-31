@@ -72,6 +72,22 @@ class FilePhotoCacheTest {
         assertTrue(recreated.entries().isEmpty())
     }
 
+    @Test fun `sweep removes orphan files temp files and stale manifest entries`() = runBlocking {
+        val cache = FilePhotoCache(context)
+        cache.put(meta("immich:valid", "valid", 1L, 1), byteArrayOf(1))
+        cache.put(meta("immich:missing", "missing", 2L, 1), byteArrayOf(2))
+        cache.fileFor("immich:missing").delete()
+        val orphan = File(cache.cacheDir(), "orphan.img").apply { writeBytes(byteArrayOf(9)) }
+        val temp = File(cache.cacheDir(), ".crashed.tmp").apply { writeText("partial") }
+
+        cache.sweepOrphans()
+
+        assertFalse(orphan.exists())
+        assertFalse(temp.exists())
+        assertEquals(setOf("immich:valid"), cache.keys())
+        assertArrayEquals(byteArrayOf(1), cache.get("immich:valid")?.first!!)
+    }
+
     private fun meta(key: String, asset: String, created: Long, size: Int) = CacheMeta(
         cacheKey = key,
         assetId = asset,

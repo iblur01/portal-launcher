@@ -11,6 +11,7 @@ object PhotoStatusSerializer {
         PhotoErrorCategories.SERVER,
         PhotoErrorCategories.CONFIG,
         PhotoErrorCategories.CACHE,
+        PhotoErrorCategories.TOO_LARGE,
         PhotoErrorCategories.UNKNOWN,
     )
 

@@ -21,11 +21,16 @@ import org.robolectric.annotation.Config
 class ImmichApiClientTest {
 
     private val secret = "immich-api-key-secret"
+    private val albumId = "123e4567-e89b-42d3-a456-426614174001"
+
+    private fun fixture(name: String): String = requireNotNull(
+        javaClass.getResource("/immich-v3.1/$name")
+    ) { "missing Immich fixture: $name" }.readText()
 
     @Test
     fun `health returns ok on ping 200`() = runBlocking {
         val transport = FakeHttpTransport()
-        transport.respond("https://photos.example.com/api/server-info/ping", "{\"res\":\"pong\"}")
+        transport.respond("https://photos.example.com/api/server/ping", "{\"res\":\"pong\"}")
         val client = ImmichApiClient(transport, "https://photos.example.com", secret)
         val health = client.health()
         assertTrue(health.ok)
@@ -35,7 +40,7 @@ class ImmichApiClientTest {
     @Test
     fun `health returns auth category on 401`() = runBlocking {
         val transport = FakeHttpTransport()
-        transport.respond("https://photos.example.com/api/server-info/ping", "", 401)
+        transport.respond("https://photos.example.com/api/server/ping", "", 401)
         val client = ImmichApiClient(transport, "https://photos.example.com", secret)
         val health = client.health()
         assertFalse(health.ok)
@@ -47,17 +52,12 @@ class ImmichApiClientTest {
         val transport = FakeHttpTransport()
         transport.respond(
             "https://photos.example.com/api/albums",
-            """
-            [
-              {"id":"album-1","albumName":"Vacation","assetCount":3},
-              {"id":"album-2","albumName":"Pets","assetCount":2}
-            ]
-            """.trimIndent(),
+            fixture("albums.json"),
         )
         val client = ImmichApiClient(transport, "https://photos.example.com", secret)
         val albums = client.listAlbums()
         assertEquals(2, albums.size)
-        assertEquals("album-1", albums[0].id)
+        assertEquals(albumId, albums[0].id)
         assertEquals("Vacation", albums[0].label)
         assertEquals(3, albums[0].assetCount)
     }
@@ -65,35 +65,31 @@ class ImmichApiClientTest {
     @Test
     fun `listAlbumAssets pages correctly`() = runBlocking {
         val transport = FakeHttpTransport()
-        transport.respond(
-            "https://photos.example.com/api/albums/album-1?withoutAssets=false",
-            """
-            {
-              "id":"album-1",
-              "albumName":"Vacation",
-              "assets":[
-                {"id":"a1","fileCreatedAt":"2024-01-01T00:00:00Z","exifInfo":{"exifImageWidth":1000}},
-                {"id":"a2","fileCreatedAt":"2024-01-02T00:00:00Z"},
-                {"id":"a3","fileCreatedAt":"2024-01-03T00:00:00Z"}
-              ]
-            }
-            """.trimIndent(),
-        )
+        transport.intercept { request ->
+            if (request.method != "POST" || !request.url.endsWith("/api/search/metadata")) return@intercept null
+            val page = org.json.JSONObject(request.body.orEmpty()).getInt("page")
+            HttpTransport.Response(
+                code = 200,
+                body = fixture(if (page == 1) "search-page-1.json" else "search-page-2.json"),
+            )
+        }
         val client = ImmichApiClient(transport, "https://photos.example.com", secret)
-        val page0 = client.listAlbumAssets("album-1", page = 0, pageSize = 2)
+        val page0 = client.listAlbumAssets(albumId, page = 0, pageSize = 2)
         assertEquals(2, page0.assets.size)
         assertTrue(page0.hasMore)
-        assertEquals("a1", page0.assets[0].id)
-        assertEquals("immich:a1", page0.assets[0].cacheKey)
+        assertEquals("123e4567-e89b-42d3-a456-426614174101", page0.assets[0].id)
+        assertEquals("immich:123e4567-e89b-42d3-a456-426614174101", page0.assets[0].cacheKey)
 
-        val page1 = client.listAlbumAssets("album-1", page = 1, pageSize = 2)
+        val page1 = client.listAlbumAssets(albumId, page = 1, pageSize = 2)
         assertEquals(1, page1.assets.size)
         assertFalse(page1.hasMore)
-        assertEquals("a3", page1.assets[0].id)
-        assertEquals(
-            1,
-            transport.requests.count { it.url.contains("/api/albums/album-1?") },
-        )
+        assertEquals("123e4567-e89b-42d3-a456-426614174103", page1.assets[0].id)
+        assertEquals(2, transport.requests.count { it.method == "POST" })
+        val firstBody = org.json.JSONObject(transport.requests.first { it.method == "POST" }.body.orEmpty())
+        assertEquals(1, firstBody.getInt("page"))
+        assertEquals(2, firstBody.getInt("size"))
+        assertEquals("IMAGE", firstBody.getString("type"))
+        assertEquals(albumId, firstBody.getJSONArray("albumIds").getString(0))
     }
 
     @Test
@@ -107,6 +103,7 @@ class ImmichApiClientTest {
         val client = ImmichApiClient(transport, "https://photos.example.com", secret)
         val bytes = client.fetchThumbnail("a1", DisplaySize(1200, 800))
         assertEquals(8, bytes.size)
+        assertEquals("image/*", transport.requests.last().headers["Accept"])
     }
 
     @Test
@@ -122,17 +119,23 @@ class ImmichApiClientTest {
         assertTrue(
             transport.requests.any { it.url.contains("size=thumbnail") },
         )
+        assertEquals("image/*", transport.requests.last().headers["Accept"])
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun `require secure policy rejects http base url`(): Unit = runBlocking {
-        ImmichApiClient(FakeHttpTransport(), "http://photos.example.com", secret, TransportPolicy.REQUIRE_SECURE)
+    @Test
+    fun `require secure policy rejects http before transport`() {
+        val transport = FakeHttpTransport()
+        val failure = runCatching {
+            ImmichApiClient(transport, "http://photos.example.com", secret, TransportPolicy.REQUIRE_SECURE)
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(transport.requests.isEmpty())
     }
 
     @Test
     fun `allow insecure policy accepts http base url`() = runBlocking {
         val transport = FakeHttpTransport()
-        transport.respond("http://photos.example.com/api/server-info/ping", "{\"res\":\"pong\"}")
+        transport.respond("http://photos.example.com/api/server/ping", "{\"res\":\"pong\"}")
         val client = ImmichApiClient(transport, "http://photos.example.com", secret, TransportPolicy.ALLOW_INSECURE)
         val health = client.health()
         assertTrue(health.ok)
@@ -153,15 +156,43 @@ class ImmichApiClientTest {
         transport.respond("https://photos.example.com/api/albums", "not-json")
         val client = ImmichApiClient(transport, "https://photos.example.com", secret)
         val failure = runCatching { client.listAlbums() }.exceptionOrNull()
-        assertTrue(failure is org.json.JSONException)
+        assertTrue(failure is com.iblu01.portallauncher.photo.PhotoSourceException)
+        assertEquals(
+            PhotoErrorCategories.SERVER,
+            (failure as com.iblu01.portallauncher.photo.PhotoSourceException).category,
+        )
+    }
+
+    @Test
+    fun `missing v3 assets envelope is rejected as server error`() = runBlocking {
+        val transport = FakeHttpTransport()
+        transport.respond("https://photos.example.com/api/search/metadata", "{}")
+        val client = ImmichApiClient(transport, "https://photos.example.com", secret)
+        val failure = runCatching { client.listAlbumAssets("album-1", 0, 10) }.exceptionOrNull()
+        assertEquals(
+            PhotoErrorCategories.SERVER,
+            (failure as com.iblu01.portallauncher.photo.PhotoSourceException).category,
+        )
+    }
+
+    @Test
+    fun `oversized search response has distinct category`() = runBlocking {
+        val transport = FakeHttpTransport()
+        transport.respond("https://photos.example.com/api/search/metadata", "", 413)
+        val client = ImmichApiClient(transport, "https://photos.example.com", secret)
+        val failure = runCatching { client.listAlbumAssets("album-1", 0, 10) }.exceptionOrNull()
+        assertEquals(
+            PhotoErrorCategories.TOO_LARGE,
+            (failure as com.iblu01.portallauncher.photo.PhotoSourceException).category,
+        )
     }
 
     @Test
     fun `video assets are excluded`() = runBlocking {
         val transport = FakeHttpTransport()
         transport.respond(
-            "https://photos.example.com/api/albums/album-1?withoutAssets=false",
-            """{"assets":[{"id":"image","type":"IMAGE"},{"id":"video","type":"VIDEO"}]}""",
+            "https://photos.example.com/api/search/metadata",
+            """{"assets":{"count":2,"facets":[],"items":[{"id":"image","type":"IMAGE"},{"id":"video","type":"VIDEO"}],"nextPage":null,"total":2},"albums":{"items":[],"total":0}}""",
         )
         val client = ImmichApiClient(transport, "https://photos.example.com", secret)
         assertEquals(listOf("image"), client.listAlbumAssets("album-1", 0, 10).assets.map { it.id })

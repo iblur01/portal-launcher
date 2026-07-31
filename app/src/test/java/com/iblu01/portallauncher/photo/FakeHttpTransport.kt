@@ -11,6 +11,7 @@ class FakeHttpTransport : HttpTransport {
         val method: String,
         val url: String,
         val headers: Map<String, String>,
+        val body: String? = null,
     )
 
     private val handlers = mutableMapOf<String, (HttpTransport.Response) -> HttpTransport.Response?>()
@@ -56,6 +57,18 @@ class FakeHttpTransport : HttpTransport {
         return HttpTransport.Response(code = 404)
     }
 
+    override suspend fun post(url: String, body: String, headers: Map<String, String>): HttpTransport.Response {
+        val request = RecordedRequest("POST", url, headers, body)
+        _requests.add(request)
+        handlers[url]?.let { handler ->
+            return handler(HttpTransport.Response(code = 404)) ?: HttpTransport.Response(code = 404)
+        }
+        for (handler in fallbackHandlers) {
+            handler(request)?.let { return it }
+        }
+        return HttpTransport.Response(code = 404)
+    }
+
     /** Assert the API key was sent but never expose it in the assertion message. */
     fun assertApiKeyHeaderPresent() {
         val sent = _requests.any { it.headers.containsKey("x-api-key") }
@@ -64,6 +77,8 @@ class FakeHttpTransport : HttpTransport {
 
     /** Assert the API key never leaked into a request URL or other publishable request metadata. */
     fun assertApiKeyNotInRequestsOrResponses(secret: String) {
-        check(_requests.none { it.url.contains(secret) }) { "Secret found in request URL" }
+        check(_requests.none { it.url.contains(secret) || it.body?.contains(secret) == true }) {
+            "Secret found in request metadata"
+        }
     }
 }

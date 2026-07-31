@@ -1,0 +1,21 @@
+{
+  "assets": {
+    "count": 1,
+    "facets": [],
+    "items": [
+      {
+        "id": "123e4567-e89b-42d3-a456-426614174103",
+        "type": "IMAGE",
+        "fileCreatedAt": "2024-01-03T00:00:00.000Z",
+        "width": 800,
+        "height": 600
+      }
+    ],
+    "nextPage": null,
+    "total": 3
+  },
+  "albums": {
+    "items": [],
+    "total": 0
+  }
+}

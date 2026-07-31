@@ -31,6 +31,7 @@ class PhotoCoordinatorTest {
                 prefetchCount = 2,
             ),
             scope = this,
+            clock = { 10_000_000L + testScheduler.currentTime },
             selection = { PhotoAlbumSelection("immich", listOf("album-1")) },
         )
 
@@ -71,6 +72,91 @@ class PhotoCoordinatorTest {
         assertEquals("offline_cached", PhotoStatusSerializer.state(coordinator.status.value))
         assertFalse(coordinator.status.value.healthy)
         assertEquals(PhotoErrorCategories.NETWORK, coordinator.status.value.errorCategory)
+        coordinator.stop()
+    }
+
+    @Test fun `retry backoff does not pause cached frame cadence`() = runTest {
+        val cache = MemoryPhotoCache()
+        cache.put(CacheMeta("immich:a", "a", "immich", 1, 1), byteArrayOf(1))
+        cache.put(CacheMeta("immich:b", "b", "immich", 2, 1), byteArrayOf(2))
+        val source = FakePhotoSource(healthy = false)
+        val coordinator = PhotoCoordinator(
+            source = source,
+            cache = cache,
+            config = PhotoCoordinatorConfig(
+                cadenceSeconds = 5,
+                retryBaseSeconds = 20,
+                retryMaxSeconds = 60,
+                shuffle = false,
+            ),
+            scope = this,
+            clock = { 10_000_000L + testScheduler.currentTime },
+            selection = { PhotoAlbumSelection("immich", listOf("album-1")) },
+        )
+
+        coordinator.start()
+        runCurrent()
+        val first = coordinator.currentFrame.value?.assetId
+        assertEquals(1, source.healthCalls)
+
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertTrue(first != coordinator.currentFrame.value?.assetId)
+        assertEquals(1, source.healthCalls)
+
+        advanceTimeBy(35_000)
+        runCurrent()
+        assertEquals(2, source.healthCalls)
+        coordinator.stop()
+    }
+
+    @Test fun `disabled selection keeps process coordinator idle`() = runTest {
+        val source = FakePhotoSource()
+        val coordinator = PhotoCoordinator(
+            source = source,
+            cache = MemoryPhotoCache(),
+            config = PhotoCoordinatorConfig(cadenceSeconds = 5),
+            scope = this,
+            selection = { null },
+        )
+
+        coordinator.start()
+        runCurrent()
+
+        assertEquals(0, source.healthCalls)
+        assertEquals("none", coordinator.status.value.provider)
+        coordinator.stop()
+    }
+
+    @Test fun `retry can wake before a longer frame cadence without advancing frame`() = runTest {
+        val cache = MemoryPhotoCache()
+        cache.put(CacheMeta("immich:a", "a", "immich", 1, 1), byteArrayOf(1))
+        cache.put(CacheMeta("immich:b", "b", "immich", 2, 1), byteArrayOf(2))
+        val source = FakePhotoSource(healthy = false)
+        val coordinator = PhotoCoordinator(
+            source = source,
+            cache = cache,
+            config = PhotoCoordinatorConfig(
+                cadenceSeconds = 60,
+                retryBaseSeconds = 10,
+                retryMaxSeconds = 60,
+                shuffle = false,
+            ),
+            scope = this,
+            clock = { 10_000_000L + testScheduler.currentTime },
+            selection = { PhotoAlbumSelection("immich", listOf("album-1")) },
+        )
+
+        coordinator.start()
+        runCurrent()
+        val first = coordinator.currentFrame.value?.assetId
+        assertEquals(1, source.healthCalls)
+
+        advanceTimeBy(20_000)
+        runCurrent()
+
+        assertEquals(2, source.healthCalls)
+        assertEquals(first, coordinator.currentFrame.value?.assetId)
         coordinator.stop()
     }
 
@@ -130,11 +216,15 @@ private class FakePhotoSource(
 ) : PhotoSource {
     override val provider = "immich"
     val requestedPages = mutableListOf<Int>()
+    var healthCalls = 0
 
-    override suspend fun health() = PhotoSourceHealth(
-        ok = healthy,
-        errorCategory = if (healthy) null else PhotoErrorCategories.NETWORK,
-    )
+    override suspend fun health(): PhotoSourceHealth {
+        healthCalls++
+        return PhotoSourceHealth(
+            ok = healthy,
+            errorCategory = if (healthy) null else PhotoErrorCategories.NETWORK,
+        )
+    }
 
     override suspend fun listAlbums() = listOf(PhotoAlbum("album-1", "Family", 3))
 

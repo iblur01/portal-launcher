@@ -31,11 +31,16 @@ Choose **Immich album** under Settings → App → Wallpaper, then configure:
 
 - Immich base URL
 - a replacement API key (write-only after saving)
-- comma-separated album IDs
+- albums selected from the server-backed picker
 - refresh interval
 - frame cadence
 - shuffle
 - optional insecure HTTP for a trusted LAN
+
+Use **Test connection** before selecting albums. Portal fetches the account's album list and only
+persists valid Immich v4 UUID album IDs. Refresh and slideshow cadence use bounded presets rather
+than arbitrary slider values. The HTTP opt-in displays an explicit warning because the API key and
+requests are unencrypted on that path.
 
 HTTPS is required by default. HTTP requires the explicit local opt-in. Redirects are disabled in the default HTTP transport, including HTTPS-to-HTTP redirects, so an API key is never forwarded to a redirect target.
 JSON responses are capped at 10 MiB and image responses at 25 MiB before they are buffered.
@@ -44,22 +49,30 @@ The API key uses Portal's encrypted preference store. The UI reports only whethe
 
 ## Immich API behavior
 
-The adapter uses:
+The adapter is pinned to the Immich **3.1** API contract and uses:
 
-- `GET /api/server-info/ping`
+- `GET /api/server/ping`
 - `GET /api/albums`
-- `GET /api/albums/{id}?withoutAssets=false`
+- `POST /api/search/metadata` with `albumIds`, `type: IMAGE`, and real page/size fields
 - `GET /api/assets/{id}/thumbnail?size=preview|thumbnail`
 
-The current Immich album-detail endpoint returns all album assets rather than a server-paged response. Portal caches that response briefly and exposes logical pages to the coordinator, avoiding repeated full downloads during one refresh. Video assets are excluded in v1. Portal fetches thumbnails/previews, never originals.
+Immich v3 removed album assets from the album-detail response. Portal therefore performs paged
+metadata searches for each selected album, follows the bounded `nextPage` signal, and asks Immich
+to filter to still images server-side. Portal fetches thumbnails/previews, never originals.
 
 ## Cache and offline behavior
 
 The cache lives under the app-private `files/photos` directory. Filenames are SHA-256-derived opaque names; provider URLs and credentials never appear in filenames or metadata. Image and manifest replacements are atomic and all manifest/file transactions share one lock.
 
-The cache is bounded by entry count and total bytes. Oldest entries are evicted first. Album refresh removes cached assets no longer present in the selected albums. Empty album selection or explicit provider removal removes that provider's cached entries.
+The cache is bounded by entry count and total bytes. Oldest entries are evicted first. Startup
+sweeps crash-orphaned image/temp files and stale manifest entries. Album refresh removes cached
+assets no longer present in the selected albums. Empty album selection or explicit provider removal
+removes that provider's cached entries.
 
-At coordinator startup, valid cached metadata reconstructs the playlist before network access. If Immich is unavailable, cached frames continue rotating. With no usable cached frame, the UI falls back to Portal's neutral gradient.
+The app process owns coordinator lifetime; Compose backgrounds only observe it and cannot stop the
+launcher from a preview. At coordinator startup, valid cached metadata reconstructs the playlist
+before network access. If Immich is unavailable, cached frames continue rotating independently of
+network retry backoff. With no usable cached frame, the UI falls back to Portal's neutral gradient.
 
 ## Home Assistant and MQTT
 

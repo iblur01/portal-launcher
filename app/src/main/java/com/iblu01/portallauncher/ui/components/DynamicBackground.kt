@@ -22,7 +22,7 @@ import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
-import androidx.compose.runtime.DisposableEffect
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.R
@@ -134,11 +134,6 @@ private fun ImmichBackground(modifier: Modifier = Modifier) {
         (context.applicationContext as PortalApp).photoCoordinator
     }
     val frame by coordinator.currentFrame.collectAsStateWithLifecycle()
-
-    DisposableEffect(coordinator) {
-        coordinator.start()
-        onDispose { coordinator.stop() }
-    }
 
     Crossfade(targetState = frame, animationSpec = tween(2000), label = "immich-bg") { currentFrame ->
         if (currentFrame == null) {

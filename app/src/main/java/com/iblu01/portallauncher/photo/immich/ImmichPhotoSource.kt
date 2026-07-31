@@ -17,7 +17,7 @@ import java.net.URLEncoder
 import java.net.URI
 
 /**
- * Immich v1 HTTP adapter. All provider-specific JSON parsing and URL construction lives here.
+ * Immich v3.1 HTTP adapter. All provider-specific JSON parsing and URL construction lives here.
  *
  * The adapter is given an [HttpTransport] so tests can run it against a fake server without a network.
  * It never logs or exposes the API key, and it never treats a provider URL as durable: the only
@@ -30,7 +30,6 @@ class ImmichApiClient(
     private val policy: TransportPolicy = TransportPolicy.REQUIRE_SECURE,
 ) {
     private val cleanBaseUrl = baseUrl.trim().trimEnd('/')
-    private val albumCache = mutableMapOf<String, CachedAlbum>()
 
     init {
         val uri = runCatching { URI(cleanBaseUrl) }.getOrNull()
@@ -44,7 +43,7 @@ class ImmichApiClient(
 
     suspend fun health(): PhotoSourceHealth {
         val response = transport.get(
-            url = "$cleanBaseUrl/api/server-info/ping",
+            url = "$cleanBaseUrl/api/server/ping",
             headers = authHeaders(),
         )
         return if (response.code == 200) {
@@ -62,58 +61,51 @@ class ImmichApiClient(
         if (response.code != 200 || response.body == null) {
             throw ImmichApiException(response.toErrorCategory())
         }
-        val array = JSONArray(response.body)
-        return (0 until array.length()).mapNotNull { i ->
-            val o = array.optJSONObject(i) ?: return@mapNotNull null
-            val id = o.getString("id")
-            PhotoAlbum(
-                id = id,
-                label = o.optString("albumName").takeIf { it.isNotBlank() } ?: id,
-                assetCount = o.optInt("assetCount", 0),
-            )
-        }
+        return runCatching {
+            val array = JSONArray(response.body)
+            (0 until array.length()).mapNotNull { i ->
+                val o = array.optJSONObject(i) ?: return@mapNotNull null
+                val id = o.getString("id")
+                PhotoAlbum(
+                    id = id,
+                    label = o.optString("albumName").takeIf { it.isNotBlank() } ?: id,
+                    assetCount = o.optInt("assetCount", 0),
+                )
+            }
+        }.getOrElse { throw ImmichApiException(PhotoErrorCategories.SERVER) }
     }
 
-    /**
-     * Fetches one album with its assets. Immich v1 returns the full album on `GET /api/albums/{id}`;
-     * this method turns that into a paged window starting at [page] * [pageSize].
-     */
+    /** Fetches one real server-side page through Immich v3 metadata search. */
     suspend fun listAlbumAssets(albumId: String, page: Int, pageSize: Int): ImmichAlbumPage {
-        require(page in 0..MAX_LOGICAL_PAGE && pageSize in 1..MAX_PAGE_SIZE) { "invalid_page" }
-        val now = System.currentTimeMillis()
-        val cached = albumCache[albumId]?.takeIf { now - it.loadedAtMs <= ALBUM_CACHE_TTL_MS }
-        val album = if (cached != null) {
-            cached
-        } else {
-            val encoded = URLEncoder.encode(albumId, "UTF-8")
-            val response = transport.get(
-                url = "$cleanBaseUrl/api/albums/$encoded?withoutAssets=false",
-                headers = authHeaders(),
-            )
-            if (response.code != 200 || response.body == null) {
-                throw ImmichApiException(response.toErrorCategory())
-            }
-            val json = JSONObject(response.body)
-            CachedAlbum(
-                label = json.optString("albumName", albumId),
-                assets = parseAssets(json.optJSONArray("assets") ?: JSONArray()),
-                loadedAtMs = now,
-            ).also { albumCache[albumId] = it }
+        require(page in 0..MAX_PAGE && pageSize in 1..MAX_PAGE_SIZE) { "invalid_page" }
+        val request = JSONObject().apply {
+            put("albumIds", JSONArray().put(albumId))
+            put("page", page + 1)
+            put("size", pageSize)
+            put("type", "IMAGE")
+            put("order", "asc")
         }
-        val start = page * pageSize
-        if (start >= album.assets.size) {
-            return ImmichAlbumPage(
-                label = album.label,
-                assets = emptyList(),
-                hasMore = false,
-            )
-        }
-        val end = minOf(start + pageSize, album.assets.size)
-        return ImmichAlbumPage(
-            label = album.label,
-            assets = album.assets.subList(start, end),
-            hasMore = end < album.assets.size,
+        val response = transport.post(
+            url = "$cleanBaseUrl/api/search/metadata",
+            body = request.toString(),
+            headers = authHeaders(),
         )
+        if (response.code != 200 || response.body == null) {
+            throw ImmichApiException(response.toErrorCategory())
+        }
+        return runCatching {
+            val assets = JSONObject(response.body).getJSONObject("assets")
+            val items = assets.getJSONArray("items")
+            val nextPage = assets.opt("nextPage")
+                ?.takeUnless { it == JSONObject.NULL }
+                ?.toString()
+                ?.takeIf { it.isNotBlank() }
+            ImmichAlbumPage(
+                label = albumId,
+                assets = parseAssets(items),
+                hasMore = nextPage != null,
+            )
+        }.getOrElse { throw ImmichApiException(PhotoErrorCategories.SERVER) }
     }
 
     suspend fun fetchThumbnail(assetId: String, size: DisplaySize): ByteArray {
@@ -123,7 +115,7 @@ class ImmichApiClient(
         val sizeParam = if (size.maxDim >= 720) "preview" else "thumbnail"
         val response = transport.getBytes(
             url = "$cleanBaseUrl/api/assets/$encoded/thumbnail?size=$sizeParam",
-            headers = authHeaders(),
+            headers = authHeaders(accept = "image/*"),
         )
         val bytes = response.bytes
         if (response.code != 200 || bytes == null) {
@@ -158,9 +150,9 @@ class ImmichApiClient(
     private fun parseImmichTime(value: String?): Long =
         value?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() } ?: 0L
 
-    private fun authHeaders(): Map<String, String> = mapOf(
+    private fun authHeaders(accept: String = "application/json"): Map<String, String> = mapOf(
         "x-api-key" to apiKey,
-        "Accept" to "application/json",
+        "Accept" to accept,
     )
 
     data class ImmichAlbumPage(
@@ -171,16 +163,9 @@ class ImmichApiClient(
 
     class ImmichApiException(category: String) : PhotoSourceException(category)
 
-    private data class CachedAlbum(
-        val label: String,
-        val assets: List<PhotoAsset>,
-        val loadedAtMs: Long,
-    )
-
     private companion object {
         const val MAX_IMAGE_BYTES = 25 * 1024 * 1024
-        const val ALBUM_CACHE_TTL_MS = 60_000L
-        const val MAX_LOGICAL_PAGE = 10_000
+        const val MAX_PAGE = 10_000
         const val MAX_PAGE_SIZE = 500
     }
 }
@@ -208,7 +193,7 @@ class ImmichPhotoSource(
 }
 
 /**
- * Convenience factory that builds the v1 source from plain settings. The API key is not stored or
+ * Convenience factory that builds the v3 source from plain settings. The API key is not stored or
  * logged inside this factory; it is passed straight into the client.
  */
 fun ImmichPhotoSource(

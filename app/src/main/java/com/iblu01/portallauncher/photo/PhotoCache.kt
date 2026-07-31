@@ -48,6 +48,9 @@ interface PhotoCache {
     /** Total cached bytes currently on disk. */
     suspend fun totalBytes(): Long
 
+    /** Remove crash-orphaned image/temp files and stale manifest entries. */
+    suspend fun sweepOrphans() = Unit
+
     /** The on-disk file that stores [cacheKey], whether it exists yet or not. */
     fun fileFor(cacheKey: String): File
 }
@@ -122,6 +125,20 @@ class FilePhotoCache(context: Context) : PhotoCache {
 
     override suspend fun totalBytes(): Long = withContext(Dispatchers.IO) {
         synchronized(lock) { readManifest().values.sumOf { it.size } }
+    }
+
+    override suspend fun sweepOrphans() = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val manifest = readManifest().toMutableMap()
+            val validNames = manifest.keys.map(::cacheKeyToFileName).toSet()
+            dir.listFiles().orEmpty().forEach { file ->
+                if ((file.extension == "img" && file.name !in validNames) || file.name.endsWith(".tmp")) {
+                    file.delete()
+                }
+            }
+            val existing = manifest.filterValues { entryFile(it.cacheKey).exists() }
+            if (existing.size != manifest.size) writeManifest(existing)
+        }
     }
 
     /** Exposed for tests and reconciliation. */

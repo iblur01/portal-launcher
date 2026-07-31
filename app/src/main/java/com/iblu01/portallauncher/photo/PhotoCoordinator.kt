@@ -11,6 +11,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 import java.io.File
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
 
@@ -30,6 +31,7 @@ class PhotoCoordinator(
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val selection: () -> PhotoAlbumSelection? = { null },
     private val random: Random = Random.Default,
+    private val log: (event: String, category: String?) -> Unit = { _, _ -> },
 ) {
     private val _status = MutableStateFlow(
         PhotoCoordinatorStatus(provider = source.provider, healthy = false)
@@ -42,23 +44,37 @@ class PhotoCoordinator(
     private var job: Job? = null
     @Volatile private var orderedAssets: List<PhotoAsset> = emptyList()
     @Volatile private var currentIndex: Int = 0
+    @Volatile private var lastRefreshAt: Long = 0L
 
     /** Start the refresh-and-cadence loop. Idempotent: multiple calls are no-ops. */
     fun start() {
         if (job?.isActive == true) return
         job = scope.launch {
+            cache.sweepOrphans()
             restoreCachedAssets()
             var refreshAttempt = 0
-            var lastRefreshAt = 0L
+            var nextRetryAt = 0L
+            var nextFrameAt = clock()
             while (isActive) {
+                if (selection() == null) {
+                    orderedAssets = emptyList()
+                    currentIndex = 0
+                    _currentFrame.value = null
+                    _status.value = PhotoCoordinatorStatus(provider = "none", healthy = false)
+                    delay(config.cadenceSeconds * 1000L)
+                    continue
+                }
                 val now = clock()
                 val nextRefreshDue = lastRefreshAt + config.refreshIntervalMinutes * 60_000L
-                val shouldRefresh = orderedAssets.isEmpty() || now >= nextRefreshDue
+                val shouldRefresh = (orderedAssets.isEmpty() || now >= nextRefreshDue) && now >= nextRetryAt
                 if (shouldRefresh) {
+                    log("refresh_start", null)
                     when (val result = refreshAssets()) {
                         is RefreshResult.Success -> {
                             refreshAttempt = 0
+                            nextRetryAt = 0L
                             lastRefreshAt = clock()
+                            log("refresh_success", null)
                         }
                         is RefreshResult.Error -> {
                             refreshAttempt++
@@ -66,25 +82,34 @@ class PhotoCoordinator(
                                 config.retryBaseSeconds * (1 shl min(refreshAttempt, 10)),
                                 config.retryMaxSeconds,
                             ).toLong()
+                            nextRetryAt = now + backoff * 1000L
                             _status.value = _status.value.copy(
                                 healthy = false,
                                 cachedAssets = cache.keys().size,
                                 cachedBytes = cache.totalBytes(),
                                 errorCategory = result.category,
                             )
-                            showNextFrame()
-                            delay(min(backoff, config.cadenceSeconds.toLong()) * 1000L)
-                            continue
+                            log("refresh_error", result.category)
                         }
                     }
                 }
 
-                // Ensure at least the current and next images are cached (prefetch).
-                prefetchAround()
+                val afterRefresh = clock()
+                if (afterRefresh >= nextFrameAt) {
+                    // Frame cadence remains independent from network refresh/retry wake-ups.
+                    prefetchAround()
+                    showNextFrame()
+                    nextFrameAt = afterRefresh + config.cadenceSeconds * 1000L
+                }
 
-                // Advance the frame on the configured cadence.
-                showNextFrame()
-                delay(config.cadenceSeconds * 1000L)
+                val periodicRefreshAt = if (lastRefreshAt > 0L) {
+                    lastRefreshAt + config.refreshIntervalMinutes * 60_000L
+                } else {
+                    Long.MAX_VALUE
+                }
+                val retryAt = nextRetryAt.takeIf { it > afterRefresh } ?: Long.MAX_VALUE
+                val nextWakeAt = minOf(nextFrameAt, periodicRefreshAt, retryAt)
+                delay(max(1L, nextWakeAt - afterRefresh))
             }
         }
     }
@@ -102,6 +127,7 @@ class PhotoCoordinator(
 
     fun reconfigure(newConfig: PhotoCoordinatorConfig) {
         config = newConfig
+        requestRefresh()
         restart()
     }
 
@@ -120,6 +146,7 @@ class PhotoCoordinator(
     /** Force a refresh of the asset list on the next loop iteration. */
     fun requestRefresh() {
         orderedAssets = emptyList()
+        lastRefreshAt = 0L
     }
 
     private suspend fun refreshAssets(): RefreshResult {
@@ -291,11 +318,6 @@ class PhotoCoordinator(
     private fun categorize(t: Throwable): String = when {
         t is PhotoSourceException -> t.category
         t is java.net.UnknownHostException || t is java.net.SocketTimeoutException || t is java.io.IOException -> PhotoErrorCategories.NETWORK
-        t.message?.contains("401", ignoreCase = true) == true ||
-            t.message?.contains("unauthorized", ignoreCase = true) == true ||
-            t.message?.contains("forbidden", ignoreCase = true) == true -> PhotoErrorCategories.AUTH
-        t.message?.contains("5", ignoreCase = true) == true ||
-            t.message?.contains("server", ignoreCase = true) == true -> PhotoErrorCategories.SERVER
         else -> PhotoErrorCategories.UNKNOWN
     }
 

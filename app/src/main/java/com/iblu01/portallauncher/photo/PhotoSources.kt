@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher.photo
 
+import android.util.Log
 import com.iblu01.portallauncher.Prefs
 
 /**
@@ -83,7 +84,7 @@ class ProxyPhotoSource(private val sourceProvider: PhotoSourceProvider) : PhotoS
     override fun clearCachedConfiguration() = sourceProvider.clearCachedSource()
 }
 
-/** Convenience builder for the v1 Immich-only photo coordinator. */
+/** Convenience builder for the v3 Immich-only photo coordinator. */
 fun createDefaultPhotoCoordinator(
     provider: PhotoSourceProvider,
     cache: PhotoCache,
@@ -101,5 +102,9 @@ fun createDefaultPhotoCoordinator(
     selection = {
         if (prefs.backgroundMode != "immich") null
         else PhotoAlbumSelection(provider = "immich", albumIds = prefs.immichAlbumIds)
+    },
+    log = { event, category ->
+        if (category == null) Log.i("PortalPhotos", event)
+        else Log.w("PortalPhotos", "$event category=$category")
     },
 )

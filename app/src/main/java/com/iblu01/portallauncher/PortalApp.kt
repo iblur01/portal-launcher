@@ -32,10 +32,6 @@ class PortalApp : Application() {
             scope = scope,
             prefs = prefs,
         )
-    }
-
-    override fun onTerminate() {
-        photoCoordinator.stop()
-        super.onTerminate()
+        photoCoordinator.start()
     }
 }

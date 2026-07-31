@@ -7,6 +7,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
@@ -28,13 +30,17 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,7 +63,12 @@ import com.iblu01.portallauncher.AppLanguage
 import com.iblu01.portallauncher.Prefs
 import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.R
+import com.iblu01.portallauncher.photo.OkHttpTransport
+import com.iblu01.portallauncher.photo.PhotoAlbum
 import com.iblu01.portallauncher.photo.PhotoCoordinatorConfig
+import com.iblu01.portallauncher.photo.PhotoSourceException
+import com.iblu01.portallauncher.photo.TransportPolicy
+import com.iblu01.portallauncher.photo.immich.ImmichPhotoSource
 import com.iblu01.portallauncher.HaInstance
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.PillRule
@@ -81,6 +92,21 @@ import com.iblu01.portallauncher.ui.components.backgroundModes
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import java.net.URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private val IMMICH_ALBUM_ID = Regex(
+    "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+)
+
+internal fun isValidImmichAlbumId(value: String): Boolean = IMMICH_ALBUM_ID.matches(value)
+
+internal fun canApplyImmichConfig(
+    url: String,
+    hasApiKey: Boolean,
+    albumIds: List<String>,
+): Boolean = url.isNotBlank() && hasApiKey && albumIds.isNotEmpty() && albumIds.all(::isValidImmichAlbumId)
 
 data class SettingsForm(
     val haPackage: String,
@@ -422,15 +448,93 @@ private fun AppPage(
     var showLanguagePage by remember { mutableStateOf(false) }
     var immichUrl by remember { mutableStateOf(prefs.immichUrl) }
     var immichKeyDraft by remember { mutableStateOf("") }
-    var immichAlbums by remember { mutableStateOf(prefs.immichAlbumIds.joinToString(", ")) }
+    var immichAlbumIds by remember { mutableStateOf(prefs.immichAlbumIds) }
     var immichAllowInsecure by remember { mutableStateOf(prefs.immichAllowInsecure) }
     var immichShuffle by remember { mutableStateOf(prefs.immichShuffle) }
-    var immichRefresh by remember { mutableStateOf(prefs.immichRefreshMinutes.toFloat()) }
-    var immichCadence by remember { mutableStateOf(prefs.immichCadenceSeconds.toFloat()) }
+    var immichRefresh by remember { mutableStateOf(prefs.immichRefreshMinutes) }
+    var immichCadence by remember { mutableStateOf(prefs.immichCadenceSeconds) }
+    var immichAlbums by remember { mutableStateOf<List<PhotoAlbum>>(emptyList()) }
+    var showImmichAlbumPicker by remember { mutableStateOf(false) }
+    var showImmichRefreshPresets by remember { mutableStateOf(false) }
+    var showImmichCadencePresets by remember { mutableStateOf(false) }
+    var immichBusy by remember { mutableStateOf(false) }
+    var immichErrorCategory by remember { mutableStateOf<String?>(null) }
+    var immichConnectedAlbumCount by remember { mutableStateOf<Int?>(null) }
+    val scope = rememberCoroutineScope()
     val app = LocalContext.current.applicationContext as PortalApp
+
+    fun loadImmichAlbums(openPicker: Boolean) {
+        if (immichBusy) return
+        immichBusy = true
+        immichErrorCategory = null
+        immichConnectedAlbumCount = null
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val apiKey = immichKeyDraft.ifBlank { prefs.immichApiKey }
+                    val source = ImmichPhotoSource(
+                        transport = OkHttpTransport(),
+                        baseUrl = immichUrl,
+                        apiKey = apiKey,
+                        policy = if (immichAllowInsecure) {
+                            TransportPolicy.ALLOW_INSECURE
+                        } else {
+                            TransportPolicy.REQUIRE_SECURE
+                        },
+                    )
+                    val health = source.health()
+                    if (!health.ok) throw PhotoSourceException(health.errorCategory ?: "unknown")
+                    source.listAlbums()
+                }
+            }
+            result.onSuccess { albums ->
+                immichAlbums = albums
+                immichConnectedAlbumCount = albums.size
+                if (openPicker) showImmichAlbumPicker = true
+            }.onFailure { failure ->
+                immichErrorCategory = (failure as? PhotoSourceException)?.category ?: "config"
+            }
+            immichBusy = false
+        }
+    }
     if (showLanguagePage) {
         LanguagePage(prefs = prefs, onBack = { showLanguagePage = false })
         return
+    }
+    if (showImmichAlbumPicker) {
+        ImmichAlbumPickerDialog(
+            albums = immichAlbums,
+            selected = immichAlbumIds.toSet(),
+            onDismiss = { showImmichAlbumPicker = false },
+            onApply = {
+                immichAlbumIds = it.toList()
+                showImmichAlbumPicker = false
+            },
+        )
+    }
+    if (showImmichRefreshPresets) {
+        IntPresetDialog(
+            title = stringResource(R.string.settings_immich_refresh),
+            values = listOf(5, 15, 30, 60, 180, 360, 720, 1440),
+            suffix = stringResource(R.string.settings_minutes_short),
+            onDismiss = { showImmichRefreshPresets = false },
+            onSelect = {
+                immichRefresh = it
+                showImmichRefreshPresets = false
+            },
+        )
+    }
+    if (showImmichCadencePresets) {
+        IntPresetDialog(
+            title = stringResource(R.string.settings_immich_cadence),
+            values = listOf(5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600),
+            suffix = stringResource(R.string.settings_seconds_short),
+            onDismiss = { showImmichCadencePresets = false },
+            onSelect = {
+                immichCadence = it
+                showImmichCadencePresets = false
+            },
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -491,11 +595,27 @@ private fun AppPage(
                     isPassword = true,
                 )
                 SettingsDivider()
-                SettingsTextField(
-                    label = stringResource(R.string.settings_immich_album_ids),
-                    value = immichAlbums,
-                    onValueChange = { immichAlbums = it },
-                    placeholder = stringResource(R.string.settings_immich_album_ids_hint),
+                SettingsRow(
+                    label = stringResource(R.string.settings_immich_test_connection),
+                    value = when {
+                        immichBusy -> stringResource(R.string.settings_immich_testing)
+                        immichErrorCategory != null -> stringResource(
+                            R.string.settings_immich_test_failed,
+                            immichErrorCategory.orEmpty(),
+                        )
+                        immichConnectedAlbumCount != null -> stringResource(
+                            R.string.settings_immich_test_success,
+                            immichConnectedAlbumCount ?: 0,
+                        )
+                        else -> null
+                    },
+                    onClick = { loadImmichAlbums(openPicker = false) },
+                )
+                SettingsDivider()
+                SettingsRow(
+                    label = stringResource(R.string.settings_immich_albums),
+                    value = stringResource(R.string.settings_immich_albums_selected, immichAlbumIds.size),
+                    onClick = { loadImmichAlbums(openPicker = true) },
                 )
                 SettingsDivider()
                 SettingsToggle(
@@ -503,6 +623,14 @@ private fun AppPage(
                     checked = immichAllowInsecure,
                     onCheckedChange = { immichAllowInsecure = it },
                 )
+                if (immichAllowInsecure) {
+                    Text(
+                        text = stringResource(R.string.settings_immich_insecure_warning),
+                        style = AppleTypography.bodySmall,
+                        color = AppleColors.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
                 SettingsDivider()
                 SettingsToggle(
                     label = stringResource(R.string.settings_immich_shuffle),
@@ -510,35 +638,38 @@ private fun AppPage(
                     onCheckedChange = { immichShuffle = it },
                 )
                 SettingsDivider()
-                SettingsSlider(
+                SettingsRow(
                     label = stringResource(R.string.settings_immich_refresh),
-                    value = immichRefresh,
-                    valueRange = 5f..1440f,
-                    steps = 286,
-                    onValueChange = { immichRefresh = it },
-                    valueSuffix = " min",
+                    value = "$immichRefresh ${stringResource(R.string.settings_minutes_short)}",
+                    onClick = { showImmichRefreshPresets = true },
                 )
                 SettingsDivider()
-                SettingsSlider(
+                SettingsRow(
                     label = stringResource(R.string.settings_immich_cadence),
-                    value = immichCadence,
-                    valueRange = 5f..3600f,
-                    steps = 718,
-                    onValueChange = { immichCadence = it },
-                    valueSuffix = " s",
+                    value = "$immichCadence ${stringResource(R.string.settings_seconds_short)}",
+                    onClick = { showImmichCadencePresets = true },
                 )
                 SettingsDivider()
                 SettingsRow(
                     label = stringResource(R.string.settings_immich_apply),
                     value = if (prefs.hasImmichApiKey) stringResource(R.string.settings_immich_key_configured) else null,
-                    onClick = {
+                    onClick = applyImmich@{
+                        if (!canApplyImmichConfig(
+                                url = immichUrl,
+                                hasApiKey = immichKeyDraft.isNotBlank() || prefs.hasImmichApiKey,
+                                albumIds = immichAlbumIds,
+                            )
+                        ) {
+                            immichErrorCategory = "config"
+                            return@applyImmich
+                        }
                         prefs.immichUrl = immichUrl
                         if (immichKeyDraft.isNotBlank()) prefs.immichApiKey = immichKeyDraft
-                        prefs.immichAlbumIds = immichAlbums.split(',')
+                        prefs.immichAlbumIds = immichAlbumIds
                         prefs.immichAllowInsecure = immichAllowInsecure
                         prefs.immichShuffle = immichShuffle
-                        prefs.immichRefreshMinutes = immichRefresh.toInt()
-                        prefs.immichCadenceSeconds = immichCadence.toInt()
+                        prefs.immichRefreshMinutes = immichRefresh
+                        prefs.immichCadenceSeconds = immichCadence
                         immichKeyDraft = ""
                         app.photoCoordinator.reconfigure(
                             PhotoCoordinatorConfig(
@@ -557,7 +688,14 @@ private fun AppPage(
                         prefs.clearImmichConfiguration()
                         immichUrl = ""
                         immichKeyDraft = ""
-                        immichAlbums = ""
+                        immichAlbumIds = emptyList()
+                        immichAlbums = emptyList()
+                        immichAllowInsecure = prefs.immichAllowInsecure
+                        immichShuffle = prefs.immichShuffle
+                        immichRefresh = prefs.immichRefreshMinutes
+                        immichCadence = prefs.immichCadenceSeconds
+                        immichErrorCategory = null
+                        immichConnectedAlbumCount = null
                         onBgModeChange("neutral")
                     },
                 )
@@ -607,6 +745,98 @@ private fun AppPage(
         }
 
     }
+}
+
+@Composable
+private fun ImmichAlbumPickerDialog(
+    albums: List<PhotoAlbum>,
+    selected: Set<String>,
+    onDismiss: () -> Unit,
+    onApply: (Set<String>) -> Unit,
+) {
+    var draft by remember(albums, selected) { mutableStateOf(selected) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_immich_albums)) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+            ) {
+                if (albums.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.settings_immich_no_albums),
+                        style = AppleTypography.bodySmall,
+                        color = AppleColors.secondary,
+                    )
+                }
+                albums.forEach { album ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                draft = if (album.id in draft) draft - album.id else draft + album.id
+                            }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = album.id in draft,
+                            onCheckedChange = { checked ->
+                                draft = if (checked) draft + album.id else draft - album.id
+                            },
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(album.label, style = AppleTypography.bodyLarge)
+                            Text(
+                                text = stringResource(R.string.settings_immich_album_asset_count, album.assetCount),
+                                style = AppleTypography.bodySmall,
+                                color = AppleColors.secondary,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = draft.isNotEmpty() && draft.all(::isValidImmichAlbumId),
+                onClick = { onApply(draft) },
+            ) { Text(stringResource(R.string.settings_immich_select_albums)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun IntPresetDialog(
+    title: String,
+    values: List<Int>,
+    suffix: String,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                values.forEach { value ->
+                    TextButton(
+                        onClick = { onSelect(value) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("$value $suffix", modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+        },
+    )
 }
 
 @Composable

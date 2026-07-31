@@ -110,6 +110,7 @@ object PhotoErrorCategories {
     const val SERVER = "server"
     const val CONFIG = "config"
     const val CACHE = "cache"
+    const val TOO_LARGE = "too_large"
     const val UNKNOWN = "unknown"
 }
 
