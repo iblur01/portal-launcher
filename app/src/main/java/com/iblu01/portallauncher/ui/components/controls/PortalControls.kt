@@ -100,6 +100,9 @@ private val ControlCornerRadius: Dp = 26.dp
 /** Continuous-corner squircle used by the pill-shaped controls. */
 private val ControlSquircle: Shape = RoundedCornerShape(ControlCornerRadius)
 
+/** Slider-only corners scale with the control width instead of staying frozen at 26 dp. */
+private val VerticalSliderSquircle: Shape = RoundedCornerShape(percent = 30)
+
 /**
  * Concentric-corner rule (Apple HIG): a shape nested inside another, [inset] away from its
  * edge, must round by `outer − inset` so the curves stay parallel. Never reuse the outer radius.
@@ -205,7 +208,7 @@ fun VerticalFillSlider(
     icon: ImageVector? = null,
     label: ((Float) -> String)? = { percentLabel(it, valueRange) },
     contentLayout: ControlContentLayout = ControlContentLayout.Vertical,
-    shape: Shape = ControlSquircle,
+    shape: Shape = VerticalSliderSquircle,
     onValueChangeFinished: ((Float) -> Unit)? = null,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -290,18 +293,35 @@ fun VerticalFillSlider(
                 .background(fillColor.copy(alpha = if (enabled) 0.95f else 0.5f)),
         )
 
-        // Grip line, parked on the fill edge.
+        // Keep the grip slightly inside the coloured fill, like Apple's vertical controls,
+        // instead of letting it straddle the hard boundary between fill and track.
         val edgeFromTop = when (origin) {
             FillOrigin.BOTTOM -> trackHeight * (1f - animatedFraction)
             FillOrigin.TOP -> trackHeight * animatedFraction
         }
+        // All grip geometry follows the slider width, preserving the reference 88 dp control's
+        // proportions when the cover panel scales it up or down.
+        val gripInset = maxWidth * (8f / 88f)
+        val gripWidth = maxWidth * (30f / 88f)
+        val gripHeight = maxWidth * (4f / 88f)
+        val gripTopLimit = maxWidth * (8f / 88f)
+        val gripBottomClearance = maxWidth * (12f / 88f)
+        val gripCenterFromTop = when (origin) {
+            FillOrigin.BOTTOM -> edgeFromTop + gripInset
+            FillOrigin.TOP -> edgeFromTop - gripInset
+        }
         Box(
             Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = (edgeFromTop - 2.dp).coerceIn(8.dp, (trackHeight - 12.dp).coerceAtLeast(8.dp)))
+                .offset(
+                    y = (gripCenterFromTop - gripHeight / 2f).coerceIn(
+                        gripTopLimit,
+                        (trackHeight - gripBottomClearance).coerceAtLeast(gripTopLimit),
+                    ),
+                )
                 .graphicsLayer { scaleX = gripScale }
-                .width(30.dp)
-                .height(4.dp)
+                .width(gripWidth)
+                .height(gripHeight)
                 .clip(CircleShape)
                 .background(contentColorOn(fillColor).copy(alpha = 0.55f)),
         )

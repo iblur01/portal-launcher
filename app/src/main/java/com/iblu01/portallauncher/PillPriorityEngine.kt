@@ -344,6 +344,13 @@ class PillPriorityEngine(private val context: Context) {
         val unit = e.attributes.optString("unit_of_measurement")
         val phase = related.firstOrNull { it.entityId.contains("cycle") || it.entityId.contains("task_state") || it.entityId.contains("etat_du_cycle") }?.state
         val battery = related.firstOrNull { it.deviceClass == "battery" && it.state.toFloatOrNull() != null }?.state
+        val batteryPercent = listOf("battery_level", "battery", "battery_percentage")
+            .firstNotNullOfOrNull { key ->
+                if (e.attributes.has(key)) e.attributes.optDouble(key).takeIf { !it.isNaN() } else null
+            }
+            ?.roundToInt()
+            ?.takeIf { it in 0..100 }
+            ?: battery?.toFloatOrNull()?.roundToInt()?.takeIf { it in 0..100 }
         val completionTimeStr = completionEntity?.state
         
         val formattedCompletion = runCatching {
@@ -460,6 +467,7 @@ class PillPriorityEngine(private val context: Context) {
         }
         val details = if (rule.kind == PillKind.AIR) listOf(PillDetail(e.name, e.state + e.attributes.optString("unit_of_measurement"))) else emptyList()
         return LauncherChip(rule.entityId, rule.kind.icon, finalLabel, qualitativeAir, visual,
-            ((progressValue ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f), e.entityId, score, false, details, kind = rule.kind)
+            ((progressValue ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f), e.entityId, score, false, details,
+            kind = rule.kind, batteryPercent = batteryPercent)
     }
 }

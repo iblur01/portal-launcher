@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
+import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.domain.model.PlayingMedia
@@ -47,6 +49,7 @@ import com.iblu01.portallauncher.ui.theme.scaled
 import com.iblu01.portallauncher.ui.theme.stateColor
 import com.iblu01.portallauncher.R
 import androidx.compose.ui.res.stringResource
+import kotlin.math.roundToInt
 
 /**
  * What the side panel is currently showing. Media auto-opens when playback starts
@@ -112,6 +115,10 @@ private fun ChipActionsContent(
     onDismiss: () -> Unit,
     onOpenLight: (PillDetail) -> Unit,
 ) {
+    val entity = rememberEntity(chip.entityId)
+    val batteryPercent = chip.batteryPercent ?: entity?.headerBatteryPercent()
+    val showHeadlineValue = chip.toPanelKind() != PanelKind.COVER ||
+        entity?.let { !it.supports(CoverFeature.SET_POSITION) || it.attributes.optInt("current_position", -1) !in 0..100 } != false
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -147,41 +154,72 @@ private fun ChipActionsContent(
                 horizontalArrangement = Arrangement.spacedBy(7.dp.scaled()),
             ) {
                 Icon(launcherIcon(chip.icon), null, tint = accent, modifier = Modifier.size(16.dp.scaled()))
-                Text(chip.label, style = AppleTypography.bodySmall.copy(fontSize = 13.sp.scaled()), color = AppleColors.secondary)
+                Text(
+                    chip.label,
+                    style = AppleTypography.bodySmall.copy(fontSize = 13.sp.scaled()),
+                    color = AppleColors.secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (batteryPercent != null) {
+                    val batteryColor = when {
+                        batteryPercent <= 10 -> AppleColors.error
+                        batteryPercent <= 20 -> AppleColors.warning
+                        else -> AppleColors.secondary
+                    }
+                    Icon(
+                        Icons.Filled.BatteryFull,
+                        contentDescription = stringResource(R.string.side_panel_battery_desc, batteryPercent),
+                        tint = batteryColor,
+                        modifier = Modifier.size(14.dp.scaled()),
+                    )
+                    Text(
+                        stringResource(R.string.side_panel_battery_value, batteryPercent),
+                        style = AppleTypography.bodySmall.copy(fontSize = 12.sp.scaled()),
+                        color = batteryColor,
+                    )
+                }
             }
         }
 
-        Spacer(Modifier.height(14.dp.scaled()))
-        Text(
-            chip.value,
-            style = AppleTypography.titleLarge.copy(fontSize = AppleTypography.titleLarge.fontSize.scaled()),
-            color = AppleColors.primary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(16.dp.scaled()))
+        Spacer(Modifier.height(if (showHeadlineValue) 14.dp.scaled() else 8.dp.scaled()))
+        if (showHeadlineValue) {
+            Text(
+                chip.value,
+                style = AppleTypography.titleLarge.copy(fontSize = AppleTypography.titleLarge.fontSize.scaled()),
+                color = AppleColors.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(16.dp.scaled()))
+        }
 
         // Center the control block vertically in the remaining space; it still scrolls if a
         // panel's content is taller than the panel (keypads, long detail lists).
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-            // Exhaustive typed router (design §4/Finding 8): no string-id branching, no catch-all
-            // `else` — every PanelKind is handled, GENERIC_DETAILS is the explicit detail-rows case.
-            when (chip.toPanelKind()) {
+            if (chip.toPanelKind() == PanelKind.COVER) {
+                // Covers need finite width and height constraints so their slider can choose the
+                // largest size that fits while preserving its aspect ratio.
+                CoverControl(chip, Modifier.fillMaxSize())
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.Center)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // Exhaustive typed router (design §4/Finding 8): no string-id branching, no
+                    // catch-all `else` — every PanelKind is handled explicitly.
+                    when (chip.toPanelKind()) {
                 PanelKind.LIGHTS -> LightsActions(chip, onOpenLight)
                 PanelKind.PURIFIER -> PurifierActions(chip)
                 PanelKind.SCENES -> ScenesActions(chip)
                 PanelKind.PRESENCE -> PresenceActions(chip)
                 PanelKind.ENERGY -> EnergyActions(chip)
                 PanelKind.LOCK -> LockControl(chip)
-                PanelKind.COVER -> CoverControl(chip)
+                PanelKind.COVER -> Unit // Rendered in the bounded branch above.
                 PanelKind.THERMOSTAT -> ThermostatControl(chip)
                 PanelKind.VACUUM -> VacuumControl(chip)
                 PanelKind.FAN -> FanControl(chip)
@@ -191,9 +229,22 @@ private fun ChipActionsContent(
                 // are separate PanelContent types and never reach the chip-actions router.
                 PanelKind.AIR_QUALITY, PanelKind.MEDIA, PanelKind.WEATHER,
                 PanelKind.GENERIC_DETAILS -> chip.details.forEach { PanelDetailRow(it) }
-            }
+                    }
+                }
             }
         }
+    }
+}
+
+/** Battery attributes exposed directly by HA integrations for battery-powered devices. */
+private fun HaEntity.headerBatteryPercent(): Int? {
+    val keys = listOf("battery_level", "battery", "battery_percentage")
+    return keys.firstNotNullOfOrNull { key ->
+        if (!attributes.has(key)) return@firstNotNullOfOrNull null
+        attributes.optDouble(key, Double.NaN)
+            .takeUnless(Double::isNaN)
+            ?.roundToInt()
+            ?.takeIf { it in 0..100 }
     }
 }
 
@@ -236,4 +287,3 @@ fun PanelDetailRow(detail: PillDetail) {
         Text(detail.value, style = rowStyle, color = AppleColors.primary, maxLines = 1)
     }
 }
-

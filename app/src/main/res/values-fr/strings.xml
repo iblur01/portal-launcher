@@ -359,6 +359,8 @@
     <!-- ===== PANEL HELPERS / SHARED ===== -->
     <string name="panel_device_unavailable">Appareil indisponible</string>
     <string name="side_panel_close_desc">Fermer le panneau</string>
+    <string name="side_panel_battery_desc">Batterie à %1$d pour cent</string>
+    <string name="side_panel_battery_value">%1$d%%</string>
 
     <!-- ===== KEYPAD ===== -->
     <string name="keypad_cancel">Annuler</string>
@@ -390,6 +392,9 @@
     <string name="playground_slider_from_top">Depuis le haut</string>
     <string name="playground_slider_disabled">Désactivé</string>
     <string name="playground_section_gradient_slider">Curseur dégradé</string>
+    <string name="playground_section_three_way_control">Contrôle à trois actions</string>
+    <string name="playground_three_way_media">Média</string>
+    <string name="playground_three_way_cover">Stores et volets</string>
     <string name="playground_slider_temperature">Température</string>
     <string name="playground_section_selector">Sélecteur</string>
     <string name="playground_selector_2_options">2 options</string>

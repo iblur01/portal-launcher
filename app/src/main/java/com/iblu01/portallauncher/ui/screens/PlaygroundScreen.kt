@@ -22,13 +22,19 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.Bathtub
 import androidx.compose.material.icons.outlined.Bed
 import androidx.compose.material.icons.outlined.Blinds
 import androidx.compose.material.icons.outlined.Kitchen
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Power
 import androidx.compose.material.icons.outlined.Weekend
@@ -55,6 +61,7 @@ import com.iblu01.portallauncher.ui.components.controls.AccessoryItem
 import com.iblu01.portallauncher.ui.components.controls.ControlContentLayout
 import com.iblu01.portallauncher.ui.components.controls.FillOrigin
 import com.iblu01.portallauncher.ui.components.controls.PinKeypad
+import com.iblu01.portallauncher.ui.components.controls.PortalThreeWayControl
 import com.iblu01.portallauncher.ui.components.controls.ThermostatArc
 import com.iblu01.portallauncher.ui.components.controls.ThermostatMode
 import com.iblu01.portallauncher.ui.components.controls.VacuumMode
@@ -178,6 +185,45 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                     value = disabled, onValueChange = { disabled = it },
                     accent = accent, enabled = false,
                     modifier = Modifier.controlSize(),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        // Three-way controls — the same shell, specialised by content for each domain.
+        SectionTitle(stringResource(R.string.playground_section_three_way_control))
+        var mediaPlaying by remember { mutableStateOf(true) }
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            LabeledControl(stringResource(R.string.playground_three_way_media)) {
+                PortalThreeWayControl(
+                    leadingIcon = Icons.Filled.SkipPrevious,
+                    leadingContentDescription = stringResource(R.string.media_previous_track_desc),
+                    onLeadingClick = {},
+                    centerIcon = if (mediaPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    centerContentDescription = if (mediaPlaying) stringResource(R.string.media_pause_desc) else stringResource(R.string.media_play_desc),
+                    onCenterClick = { mediaPlaying = !mediaPlaying },
+                    trailingIcon = Icons.Filled.SkipNext,
+                    trailingContentDescription = stringResource(R.string.media_next_track_desc),
+                    onTrailingClick = {},
+                )
+            }
+            LabeledControl(stringResource(R.string.playground_three_way_cover)) {
+                PortalThreeWayControl(
+                    leadingIcon = Icons.Outlined.KeyboardArrowDown,
+                    leadingContentDescription = stringResource(R.string.cover_button_close),
+                    leadingLabel = stringResource(R.string.cover_button_close),
+                    onLeadingClick = {},
+                    centerIcon = Icons.Filled.Pause,
+                    centerContentDescription = stringResource(R.string.cover_button_stop),
+                    onCenterClick = {},
+                    trailingIcon = Icons.Outlined.KeyboardArrowUp,
+                    trailingContentDescription = stringResource(R.string.cover_button_open),
+                    trailingLabel = stringResource(R.string.cover_button_open),
+                    onTrailingClick = {},
                 )
             }
         }

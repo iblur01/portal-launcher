@@ -27,7 +27,7 @@ import androidx.compose.ui.res.stringResource
 
 /**
  * Vacuum control: start / pause / stop / dock / locate, gated by the entity's
- * `supported_features`. Battery and status shown as read-only rows.
+ * `supported_features`. Status is shown as a read-only row; battery lives in the shared header.
  */
 @Composable
 fun VacuumControl(chip: LauncherChip) {
@@ -65,13 +65,8 @@ fun VacuumControl(chip: LauncherChip) {
         }
         Spacer(Modifier.height(18.dp))
 
-        val battery = entity.attributes.optInt("battery_level", -1)
         val status = entity.attributes.optString("status").ifBlank { chip.value }
         if (status.isNotBlank()) PanelDetailRow(PillDetail(stringResource(R.string.vacuum_detail_status), status))
-        if (battery in 0..100) {
-            Spacer(Modifier.height(8.dp))
-            PanelDetailRow(PillDetail(stringResource(R.string.vacuum_detail_battery), "$battery %"))
-        }
         chip.details.forEach {
             Spacer(Modifier.height(8.dp))
             PanelDetailRow(it)

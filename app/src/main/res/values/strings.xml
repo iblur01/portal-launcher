@@ -364,6 +364,8 @@
     <!-- ===== PANEL HELPERS / SHARED ===== -->
     <string name="panel_device_unavailable">Device unavailable</string>
     <string name="side_panel_close_desc">Close panel</string>
+    <string name="side_panel_battery_desc">Battery at %1$d percent</string>
+    <string name="side_panel_battery_value">%1$d%%</string>
 
     <!-- ===== KEYPAD ===== -->
     <string name="keypad_cancel">Cancel</string>
@@ -395,6 +397,9 @@
     <string name="playground_slider_from_top">From top</string>
     <string name="playground_slider_disabled">Disabled</string>
     <string name="playground_section_gradient_slider">Gradient slider</string>
+    <string name="playground_section_three_way_control">Three-action control</string>
+    <string name="playground_three_way_media">Media</string>
+    <string name="playground_three_way_cover">Blinds and covers</string>
     <string name="playground_slider_temperature">Temperature</string>
     <string name="playground_section_selector">Selector</string>
     <string name="playground_selector_2_options">2 options</string>
