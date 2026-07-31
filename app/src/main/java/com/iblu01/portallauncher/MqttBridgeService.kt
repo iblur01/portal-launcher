@@ -23,6 +23,7 @@ import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
+import com.iblu01.portallauncher.photo.PhotoStatusSerializer
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.concurrent.Executors
@@ -217,6 +218,7 @@ class MqttBridgeService : Service() {
         pub(HaDiscovery.screenTimeoutDiscoveryTopic(p.deviceId), HaDiscovery.screenTimeoutConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.screenTimeoutMinutesDiscoveryTopic(p.deviceId), HaDiscovery.screenTimeoutMinutesConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.powerModeDiscoveryTopic(p.deviceId), HaDiscovery.powerModeConfigPayload(p.deviceId, p.deviceName))
+        pub(HaDiscovery.photoStatusDiscoveryTopic(p.deviceId), HaDiscovery.photoStatusConfigPayload(p.deviceId, p.deviceName))
     }
 
     private fun publishInitialStates(p: Prefs) {
@@ -229,6 +231,7 @@ class MqttBridgeService : Service() {
         publishVolumeMuteState(p)
         publishBrightnessState(p)
         publishPowerState(p)
+        publishPhotoStatus(p)
     }
 
     private fun pollChangedStates(p: Prefs) {
@@ -238,6 +241,23 @@ class MqttBridgeService : Service() {
         if (muted != lastVolumeMuted) publishVolumeMuteState(p)
         val bright = currentBrightnessPercent()
         if (bright != lastBrightnessPercent) publishBrightnessState(p)
+        publishPhotoStatus(p)
+    }
+
+    private fun publishPhotoStatus(p: Prefs) {
+        val status = (application as PortalApp).photoCoordinator.status.value
+        publishRaw(
+            HaDiscovery.photoStatusStateTopic(p.deviceId),
+            PhotoStatusSerializer.state(status),
+            1,
+            retained = true,
+        )
+        publishRaw(
+            HaDiscovery.photoStatusAttributesTopic(p.deviceId),
+            PhotoStatusSerializer.attributes(status),
+            1,
+            retained = true,
+        )
     }
 
     private fun handleMessage(topic: String, payload: String, p: Prefs) {

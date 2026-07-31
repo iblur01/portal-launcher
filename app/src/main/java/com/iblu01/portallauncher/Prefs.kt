@@ -9,6 +9,7 @@ import androidx.security.crypto.MasterKey
 import com.iblu01.portallauncher.ui.theme.ClockFont
 import com.iblu01.portallauncher.ui.theme.ClockTheme
 import com.iblu01.portallauncher.ui.theme.ClockTint
+import com.iblu01.portallauncher.photo.TransportPolicy
 
 class Prefs(private val context: Context) {
     private val sp = plainPrefs(context)
@@ -19,7 +20,11 @@ class Prefs(private val context: Context) {
     init {
         if (secure !== sp && !migrationDone) {
             migrationDone = true
-            if (secure !== sp) { migrateSecret("ha_token"); migrateSecret("password") }
+            if (secure !== sp) {
+                migrateSecret("ha_token")
+                migrateSecret("password")
+                migrateSecret("immich_api_key")
+            }
         }
     }
 
@@ -164,6 +169,56 @@ class Prefs(private val context: Context) {
     var haToken: String
         get() = secure.getString("ha_token", "") ?: ""
         set(value) = secure.edit().putString("ha_token", value.trim()).apply()
+
+    // --- Immich photo source (see photo.immich) ------------------------------------------------
+    var immichUrl: String
+        get() = sp.getString("immich_url", "") ?: ""
+        set(value) = sp.edit().putString("immich_url", value.trim().trimEnd('/').take(2048)).apply()
+
+    var immichApiKey: String
+        get() = secure.getString("immich_api_key", "") ?: ""
+        set(value) = secure.edit().putString("immich_api_key", value.trim().take(512)).apply()
+
+    val hasImmichApiKey: Boolean
+        get() = secure.getString("immich_api_key", "").orEmpty().isNotBlank()
+
+    var immichAlbumIds: List<String>
+        get() = decodeStringList(sp.getString("immich_album_ids", "[]"))
+        set(value) = sp.edit().putString(
+            "immich_album_ids",
+            encodeStringList(value.map { it.trim().take(128) }.filter { it.isNotBlank() }.distinct().take(20)),
+        ).apply()
+
+    var immichAllowInsecure: Boolean
+        get() = sp.getBoolean("immich_allow_insecure", false)
+        set(value) = sp.edit().putBoolean("immich_allow_insecure", value).apply()
+
+    var immichShuffle: Boolean
+        get() = sp.getBoolean("immich_shuffle", true)
+        set(value) = sp.edit().putBoolean("immich_shuffle", value).apply()
+
+    var immichRefreshMinutes: Int
+        get() = sp.getInt("immich_refresh_minutes", 60)
+        set(value) = sp.edit().putInt("immich_refresh_minutes", value.coerceIn(5, 24 * 60)).apply()
+
+    var immichCadenceSeconds: Int
+        get() = sp.getInt("immich_cadence_seconds", 30)
+        set(value) = sp.edit().putInt("immich_cadence_seconds", value.coerceIn(5, 3600)).apply()
+
+    val immichTransportPolicy: TransportPolicy
+        get() = if (immichAllowInsecure) TransportPolicy.ALLOW_INSECURE else TransportPolicy.REQUIRE_SECURE
+
+    fun clearImmichConfiguration() {
+        secure.edit().remove("immich_api_key").apply()
+        sp.edit()
+            .remove("immich_url")
+            .remove("immich_album_ids")
+            .remove("immich_allow_insecure")
+            .remove("immich_shuffle")
+            .remove("immich_refresh_minutes")
+            .remove("immich_cadence_seconds")
+            .apply()
+    }
 
     var pillRules: List<PillRule>
         get() = PillRuleCodec.decode(sp.getString("pill_rules", "[]") ?: "[]")

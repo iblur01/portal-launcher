@@ -8,4 +8,8 @@ class AmbientBackgroundModesTest {
     @Test fun custom_mode_is_offered() {
         assertTrue(backgroundModes.any { it.first == "custom" })
     }
+
+    @Test fun immich_mode_is_offered() {
+        assertTrue(backgroundModes.any { it.first == "immich" })
+    }
 }

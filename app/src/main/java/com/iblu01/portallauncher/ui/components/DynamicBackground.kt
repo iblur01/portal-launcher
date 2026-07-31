@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import coil.ImageLoader
@@ -21,7 +22,9 @@ import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.R
 
 private val unsplashUrls = listOf(
@@ -36,6 +39,7 @@ val backgroundModes = listOf(
     "neutral" to R.string.bg_mode_neutral,
     "nature" to R.string.bg_mode_nature,
     "custom" to R.string.bg_mode_custom,
+    "immich" to R.string.bg_mode_immich,
 )
 
 @Composable
@@ -43,6 +47,7 @@ fun AmbientBackground(mode: String, wallpaperVersion: Int = 0, modifier: Modifie
     when (mode) {
         "nature" -> UnsplashCycling(modifier)
         "custom" -> CustomWallpaper(modifier, wallpaperVersion)
+        "immich" -> ImmichBackground(modifier)
         else -> NeutralGradient(modifier)
     }
 }
@@ -119,5 +124,39 @@ private fun UnsplashCycling(modifier: Modifier = Modifier) {
             onError = { Log.w("PortalUnsplash", "Unable to load ${url.substringBefore('?')}: ${it.result.throwable.message}") },
             modifier = modifier.fillMaxSize()
         )
+    }
+}
+
+@Composable
+private fun ImmichBackground(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val coordinator = remember(context) {
+        (context.applicationContext as PortalApp).photoCoordinator
+    }
+    val frame by coordinator.currentFrame.collectAsStateWithLifecycle()
+
+    DisposableEffect(coordinator) {
+        coordinator.start()
+        onDispose { coordinator.stop() }
+    }
+
+    Crossfade(targetState = frame, animationSpec = tween(2000), label = "immich-bg") { currentFrame ->
+        if (currentFrame == null) {
+            NeutralGradient(modifier)
+        } else {
+            val request = remember(context, currentFrame.cacheKey) {
+                ImageRequest.Builder(context)
+                    .data(currentFrame.file)
+                    .memoryCacheKey(currentFrame.cacheKey)
+                    .diskCacheKey(currentFrame.cacheKey)
+                    .build()
+            }
+            AsyncImage(
+                model = request,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = modifier.fillMaxSize(),
+            )
+        }
     }
 }

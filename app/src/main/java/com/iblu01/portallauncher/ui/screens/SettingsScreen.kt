@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,7 +55,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.iblu01.portallauncher.AppLanguage
 import com.iblu01.portallauncher.Prefs
+import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.R
+import com.iblu01.portallauncher.photo.PhotoCoordinatorConfig
 import com.iblu01.portallauncher.HaInstance
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.PillRule
@@ -72,6 +75,7 @@ import com.iblu01.portallauncher.ui.components.SettingsSidebar
 import com.iblu01.portallauncher.ui.components.SettingsSlider
 import com.iblu01.portallauncher.ui.components.SettingsSubPageHeader
 import com.iblu01.portallauncher.ui.components.SettingsTile
+import com.iblu01.portallauncher.ui.components.SettingsTextField
 import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.components.backgroundModes
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -416,6 +420,14 @@ private fun AppPage(
     showBack: Boolean = true,
 ) {
     var showLanguagePage by remember { mutableStateOf(false) }
+    var immichUrl by remember { mutableStateOf(prefs.immichUrl) }
+    var immichKeyDraft by remember { mutableStateOf("") }
+    var immichAlbums by remember { mutableStateOf(prefs.immichAlbumIds.joinToString(", ")) }
+    var immichAllowInsecure by remember { mutableStateOf(prefs.immichAllowInsecure) }
+    var immichShuffle by remember { mutableStateOf(prefs.immichShuffle) }
+    var immichRefresh by remember { mutableStateOf(prefs.immichRefreshMinutes.toFloat()) }
+    var immichCadence by remember { mutableStateOf(prefs.immichCadenceSeconds.toFloat()) }
+    val app = LocalContext.current.applicationContext as PortalApp
     if (showLanguagePage) {
         LanguagePage(prefs = prefs, onBack = { showLanguagePage = false })
         return
@@ -454,6 +466,100 @@ private fun AppPage(
                     label = stringResource(R.string.settings_app_label_overlay_opacity),
                     value = "${(bgOverlayOpacity * 100).toInt()} %",
                     onClick = onOpenOpacityPreview,
+                )
+            }
+        }
+
+        if (bgMode == "immich") {
+            SettingsSection(title = stringResource(R.string.settings_immich_section)) {
+                SettingsTextField(
+                    label = stringResource(R.string.settings_immich_url),
+                    value = immichUrl,
+                    onValueChange = { immichUrl = it },
+                    placeholder = "https://photos.example.com",
+                )
+                SettingsDivider()
+                SettingsTextField(
+                    label = stringResource(R.string.settings_immich_api_key),
+                    value = immichKeyDraft,
+                    onValueChange = { immichKeyDraft = it },
+                    placeholder = if (prefs.hasImmichApiKey) {
+                        stringResource(R.string.settings_immich_key_configured)
+                    } else {
+                        stringResource(R.string.settings_immich_key_not_configured)
+                    },
+                    isPassword = true,
+                )
+                SettingsDivider()
+                SettingsTextField(
+                    label = stringResource(R.string.settings_immich_album_ids),
+                    value = immichAlbums,
+                    onValueChange = { immichAlbums = it },
+                    placeholder = stringResource(R.string.settings_immich_album_ids_hint),
+                )
+                SettingsDivider()
+                SettingsToggle(
+                    label = stringResource(R.string.settings_immich_allow_insecure),
+                    checked = immichAllowInsecure,
+                    onCheckedChange = { immichAllowInsecure = it },
+                )
+                SettingsDivider()
+                SettingsToggle(
+                    label = stringResource(R.string.settings_immich_shuffle),
+                    checked = immichShuffle,
+                    onCheckedChange = { immichShuffle = it },
+                )
+                SettingsDivider()
+                SettingsSlider(
+                    label = stringResource(R.string.settings_immich_refresh),
+                    value = immichRefresh,
+                    valueRange = 5f..1440f,
+                    steps = 286,
+                    onValueChange = { immichRefresh = it },
+                    valueSuffix = " min",
+                )
+                SettingsDivider()
+                SettingsSlider(
+                    label = stringResource(R.string.settings_immich_cadence),
+                    value = immichCadence,
+                    valueRange = 5f..3600f,
+                    steps = 718,
+                    onValueChange = { immichCadence = it },
+                    valueSuffix = " s",
+                )
+                SettingsDivider()
+                SettingsRow(
+                    label = stringResource(R.string.settings_immich_apply),
+                    value = if (prefs.hasImmichApiKey) stringResource(R.string.settings_immich_key_configured) else null,
+                    onClick = {
+                        prefs.immichUrl = immichUrl
+                        if (immichKeyDraft.isNotBlank()) prefs.immichApiKey = immichKeyDraft
+                        prefs.immichAlbumIds = immichAlbums.split(',')
+                        prefs.immichAllowInsecure = immichAllowInsecure
+                        prefs.immichShuffle = immichShuffle
+                        prefs.immichRefreshMinutes = immichRefresh.toInt()
+                        prefs.immichCadenceSeconds = immichCadence.toInt()
+                        immichKeyDraft = ""
+                        app.photoCoordinator.reconfigure(
+                            PhotoCoordinatorConfig(
+                                refreshIntervalMinutes = prefs.immichRefreshMinutes,
+                                cadenceSeconds = prefs.immichCadenceSeconds,
+                                shuffle = prefs.immichShuffle,
+                            ),
+                        )
+                    },
+                )
+                SettingsDivider()
+                SettingsRow(
+                    label = stringResource(R.string.settings_immich_remove),
+                    onClick = {
+                        app.photoCoordinator.removeProvider("immich")
+                        prefs.clearImmichConfiguration()
+                        immichUrl = ""
+                        immichKeyDraft = ""
+                        immichAlbums = ""
+                        onBgModeChange("neutral")
+                    },
                 )
             }
         }

@@ -131,6 +131,14 @@ object HaDiscovery {
         return """{"name":"Power Mode","unique_id":"${deviceId}_power_mode","device":${device(deviceId, name)},"state_topic":"${powerModeStateTopic(deviceId)}","command_topic":"${powerModeCommandTopic(deviceId)}","options":["Follow presence","Always on"],"icon":"mdi:power-settings","entity_category":"config"}"""
     }
 
+    fun photoStatusDiscoveryTopic(deviceId: String) = "homeassistant/sensor/${deviceId}_photo_status/config"
+    fun photoStatusStateTopic(deviceId: String) = "portal/$deviceId/photo/status"
+    fun photoStatusAttributesTopic(deviceId: String) = "portal/$deviceId/photo/attributes"
+    fun photoStatusConfigPayload(deviceId: String, deviceName: String): String {
+        val name = deviceName.escape()
+        return """{"name":"Photo Source","unique_id":"${deviceId}_photo_status","device":${device(deviceId, name)},"state_topic":"${photoStatusStateTopic(deviceId)}","json_attributes_topic":"${photoStatusAttributesTopic(deviceId)}","expire_after":15,"icon":"mdi:image","entity_category":"diagnostic"}"""
+    }
+
     fun ipDiscoveryTopic(deviceId: String) = "homeassistant/sensor/${deviceId}_ip/config"
     fun ipStateTopic(deviceId: String) = "portal/$deviceId/sensor/ip"
     fun ipConfigPayload(deviceId: String, deviceName: String): String {

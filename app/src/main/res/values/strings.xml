@@ -87,6 +87,19 @@
     <string name="settings_app_label_app_to_open">App to open</string>
     <string name="settings_app_section_wallpaper">WALLPAPER</string>
     <string name="settings_app_label_overlay_opacity">Overlay opacity</string>
+    <string name="settings_immich_section">IMMICH PHOTO SOURCE</string>
+    <string name="settings_immich_url">Server URL</string>
+    <string name="settings_immich_api_key">New API key</string>
+    <string name="settings_immich_key_configured">Key configured</string>
+    <string name="settings_immich_key_not_configured">Paste a key</string>
+    <string name="settings_immich_album_ids">Album IDs</string>
+    <string name="settings_immich_album_ids_hint">Comma-separated album IDs</string>
+    <string name="settings_immich_allow_insecure">Allow insecure HTTP (trusted LAN only)</string>
+    <string name="settings_immich_shuffle">Shuffle photos</string>
+    <string name="settings_immich_refresh">Refresh albums</string>
+    <string name="settings_immich_cadence">Change photo every</string>
+    <string name="settings_immich_apply">Apply Immich settings</string>
+    <string name="settings_immich_remove">Remove Immich provider and credential</string>
     <string name="settings_app_section_clock">CLOCK</string>
     <string name="settings_app_label_clock_theme">Clock theme</string>
     <string name="settings_app_section_app_grid">APP GRID</string>
@@ -151,6 +164,7 @@
     <string name="bg_mode_neutral">Neutral</string>
     <string name="bg_mode_nature">Nature (Unsplash)</string>
     <string name="bg_mode_custom">Custom photo</string>
+    <string name="bg_mode_immich">Immich album</string>
 
     <!-- ===== QUICK ACTIONS OVERLAY (Home Screen Long-Press) ===== -->
     <string name="quick_actions_set_default_home">Set as default launcher</string>

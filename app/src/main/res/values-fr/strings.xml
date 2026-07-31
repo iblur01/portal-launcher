@@ -82,6 +82,19 @@
     <string name="settings_app_label_app_to_open">Application à ouvrir</string>
     <string name="settings_app_section_wallpaper">FOND D\'ÉCRAN</string>
     <string name="settings_app_label_overlay_opacity">Opacité du voile</string>
+    <string name="settings_immich_section">SOURCE PHOTO IMMICH</string>
+    <string name="settings_immich_url">URL du serveur</string>
+    <string name="settings_immich_api_key">Nouvelle clé API</string>
+    <string name="settings_immich_key_configured">Clé configurée</string>
+    <string name="settings_immich_key_not_configured">Coller une clé</string>
+    <string name="settings_immich_album_ids">ID des albums</string>
+    <string name="settings_immich_album_ids_hint">ID d’albums séparés par des virgules</string>
+    <string name="settings_immich_allow_insecure">Autoriser HTTP non sécurisé (LAN fiable uniquement)</string>
+    <string name="settings_immich_shuffle">Mélanger les photos</string>
+    <string name="settings_immich_refresh">Actualiser les albums</string>
+    <string name="settings_immich_cadence">Changer de photo toutes les</string>
+    <string name="settings_immich_apply">Appliquer les réglages Immich</string>
+    <string name="settings_immich_remove">Supprimer Immich et son identifiant</string>
     <string name="settings_app_section_clock">HORLOGE</string>
     <string name="settings_app_label_clock_theme">Thème de l\'horloge</string>
     <string name="settings_app_section_app_grid">GRILLE D\'APPLICATIONS</string>
@@ -146,6 +159,7 @@
     <string name="bg_mode_neutral">Neutre</string>
     <string name="bg_mode_nature">Nature (Unsplash)</string>
     <string name="bg_mode_custom">Photo perso</string>
+    <string name="bg_mode_immich">Album Immich</string>
 
     <!-- ===== QUICK ACTIONS OVERLAY ===== -->
     <string name="quick_actions_set_default_home">Définir comme launcher par défaut</string>
