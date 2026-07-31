@@ -329,13 +329,18 @@ fun VerticalFillSlider(
         // Base caption (+ optional icon). Contrast follows whichever tone sits behind the base.
         val baseIsFilled = origin == FillOrigin.BOTTOM && targetFraction > 0.14f
         val captionColor = if (baseIsFilled) contentColorOn(fillColor) else AppleColors.secondary
-        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
+        val contentScale = (maxWidth / 88.dp).coerceAtLeast(0.75f)
+        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp * contentScale)) {
             ControlLabel(
                 icon = icon,
                 text = label?.invoke(valueOf(targetFraction, valueRange)),
                 color = captionColor,
-                textStyle = AppleTypography.bodySmall,
+                textStyle = AppleTypography.bodySmall.copy(
+                    fontSize = AppleTypography.bodySmall.fontSize * contentScale,
+                ),
                 layout = contentLayout,
+                iconSize = 18.dp * contentScale,
+                gap = 5.dp * contentScale,
             )
         }
     }
@@ -401,12 +406,11 @@ fun VerticalGradientSlider(
     icon: ((Float) -> ImageVector?)? = null,
     label: ((Float) -> String)? = { percentLabel(it, valueRange) },
     contentLayout: ControlContentLayout = ControlContentLayout.Vertical,
-    shape: Shape = ControlSquircle,
+    shape: Shape = VerticalSliderSquircle,
     thumbColor: ((Float) -> Color)? = null,
     onValueChangeFinished: ((Float) -> Unit)? = null,
 ) {
     require(colors.isNotEmpty()) { "VerticalGradientSlider needs at least one colour" }
-    val inset = 6.dp
     val haptic = LocalHapticFeedback.current
     val fraction = fractionOf(value, valueRange)
     var dragging by remember { mutableStateOf(false) }
@@ -477,9 +481,10 @@ fun VerticalGradientSlider(
             ),
     ) {
         // Thumb: inset from the track edge, rounded concentrically — same rule as the switch.
-        val thumbHeight = (maxHeight * 0.26f).coerceIn(44.dp, 64.dp)
+        val inset = maxWidth * (6f / 88f)
+        val thumbHeight = (maxWidth * (57f / 88f)).coerceAtMost((maxHeight - inset * 2).coerceAtLeast(0.dp))
         val travel = (maxHeight - thumbHeight - inset * 2).coerceAtLeast(0.dp)
-        val thumbShape = innerCorner(inset)
+        val thumbShape = RoundedCornerShape(percent = 30)
         val contentColor = contentColorOn(markerColor)
         Box(
             Modifier
@@ -518,7 +523,7 @@ fun VerticalColorTempSlider(
     maxKelvin: Int,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = ControlSquircle,
+    shape: Shape = VerticalSliderSquircle,
     onKelvinChangeFinished: ((Int) -> Unit)? = null,
 ) {
     val range = minKelvin.toFloat()..maxKelvin.toFloat()

@@ -290,7 +290,7 @@
     <string name="light_open_color_wheel_desc">Open color wheel</string>
     <string name="light_color_active_desc">Active color</string>
     <string name="light_color_apply_desc">Apply this color</string>
-    <string name="light_mode_brightness">Brightness</string>
+    <string name="light_mode_brightness">Color</string>
     <string name="light_mode_temperature">Temperature</string>
     <string name="light_color_wheel_title">Color</string>
     <string name="light_color_wheel_close_desc">Close</string>

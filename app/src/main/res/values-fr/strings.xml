@@ -285,7 +285,7 @@
     <string name="light_open_color_wheel_desc">Ouvrir la roue chromatique</string>
     <string name="light_color_active_desc">Couleur active</string>
     <string name="light_color_apply_desc">Appliquer cette couleur</string>
-    <string name="light_mode_brightness">Luminosité</string>
+    <string name="light_mode_brightness">Couleur</string>
     <string name="light_mode_temperature">Température</string>
     <string name="light_color_wheel_title">Couleur</string>
     <string name="light_color_wheel_close_desc">Fermer</string>
