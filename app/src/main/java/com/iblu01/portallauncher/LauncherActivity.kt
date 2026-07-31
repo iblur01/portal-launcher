@@ -185,7 +185,6 @@ class LauncherActivity : ComponentActivity() {
                 )
             }
         }
-        requestLocationPermissionIfNeeded()
     }
 
     /**
@@ -365,15 +364,6 @@ class LauncherActivity : ComponentActivity() {
 
     private fun uninstallApp(packageName: String) {
         openFromLauncher(LauncherAppsFacade.uninstallIntent(packageName))
-    }
-
-    private fun requestLocationPermissionIfNeeded() {
-        if (
-            checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED &&
-            checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION), 2)
-        }
     }
 
     private companion object {

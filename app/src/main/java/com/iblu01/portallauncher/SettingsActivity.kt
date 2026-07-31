@@ -297,10 +297,7 @@ class SettingsActivity : ComponentActivity() {
     }
 
     private fun grantUsefulPermissions() {
-        val missing = listOf(
-            android.Manifest.permission.RECORD_AUDIO,
-            android.Manifest.permission.ACCESS_COARSE_LOCATION
-        ).filter {
+        val missing = listOf(android.Manifest.permission.RECORD_AUDIO).filter {
             checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
         }
         if (missing.isNotEmpty()) {
