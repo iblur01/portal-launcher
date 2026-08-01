@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher
 
+import android.content.Context
+import androidx.annotation.StringRes
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -76,13 +78,13 @@ data class PillRule(
  * Plain-language buckets grouping the ~20 technical [PillKind]s into a handful of
  * families, so the settings page doesn't expose HA jargon to the user.
  */
-enum class PillFamily(val label: String, val kinds: Set<PillKind>) {
-    SECURITY("Sécurité & accès", setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING)),
-    COMFORT("Confort & air", setOf(PillKind.CLIMATE, PillKind.THERMOSTAT, PillKind.AIR, PillKind.PURIFIER, PillKind.FAN, PillKind.COVER)),
-    APPLIANCES("Appareils & énergie", setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.ENERGY, PillKind.BATTERY)),
-    LIGHTS_SCENES("Lumières & scènes", setOf(PillKind.LIGHTS, PillKind.SCENE)),
-    MEDIA("Médias", setOf(PillKind.MEDIA)),
-    HOME("Maison & présence", setOf(PillKind.PRESENCE, PillKind.TIMER, PillKind.GENERIC));
+enum class PillFamily(@StringRes val labelRes: Int, val kinds: Set<PillKind>) {
+    SECURITY(R.string.pill_family_security, setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING)),
+    COMFORT(R.string.pill_family_comfort, setOf(PillKind.CLIMATE, PillKind.THERMOSTAT, PillKind.AIR, PillKind.PURIFIER, PillKind.FAN, PillKind.COVER)),
+    APPLIANCES(R.string.pill_family_appliances, setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.ENERGY, PillKind.BATTERY)),
+    LIGHTS_SCENES(R.string.pill_family_lights_scenes, setOf(PillKind.LIGHTS, PillKind.SCENE)),
+    MEDIA(R.string.pill_family_media, setOf(PillKind.MEDIA)),
+    HOME(R.string.pill_family_home, setOf(PillKind.PRESENCE, PillKind.TIMER, PillKind.GENERIC));
 
     companion object {
         fun of(kind: PillKind): PillFamily = values().first { kind in it.kinds }
@@ -90,7 +92,7 @@ enum class PillFamily(val label: String, val kinds: Set<PillKind>) {
 }
 
 /** Plain-language rendering of an entity's current state, e.g. "Ouverte", "21°", "Allumé". */
-fun friendlyEntityState(e: HaEntity): String {
+fun friendlyEntityState(context: Context, e: HaEntity): String {
     val raw = e.state.trim()
     val s = raw.lowercase()
     val unit = e.attributes.optString("unit_of_measurement").trim()
@@ -98,29 +100,29 @@ fun friendlyEntityState(e: HaEntity): String {
         if (v == v.toInt().toFloat()) v.toInt().toString() else raw
     }
     return when {
-        s == "unavailable" -> "Indisponible"
+        s == "unavailable" -> context.getString(R.string.entity_state_unavailable)
         s in setOf("unknown", "none", "") -> "—"
-        e.domain == "person" || s in setOf("home", "not_home") -> if (s == "home") "À la maison" else "Absente"
-        e.domain == "lock" -> if (s == "locked") "Verrouillée" else "Déverrouillée"
+        e.domain == "person" || s in setOf("home", "not_home") -> if (s == "home") context.getString(R.string.entity_state_home) else context.getString(R.string.entity_state_away)
+        e.domain == "lock" -> if (s == "locked") context.getString(R.string.entity_state_locked) else context.getString(R.string.entity_state_unlocked)
         s == "on" -> when (e.deviceClass) {
-            "door", "window", "opening", "garage_door" -> "Ouverte"
-            "motion", "occupancy", "presence" -> "Mouvement"
-            "smoke", "carbon_monoxide", "gas", "moisture" -> "Alerte"
-            else -> "Allumé"
+            "door", "window", "opening", "garage_door" -> context.getString(R.string.entity_state_open)
+            "motion", "occupancy", "presence" -> context.getString(R.string.entity_state_motion)
+            "smoke", "carbon_monoxide", "gas", "moisture" -> context.getString(R.string.entity_state_alert)
+            else -> context.getString(R.string.entity_state_on)
         }
         s == "off" -> when (e.deviceClass) {
-            "door", "window", "opening", "garage_door" -> "Fermée"
-            "motion", "occupancy", "presence" -> "Aucun mouvement"
-            "smoke", "carbon_monoxide", "gas", "moisture" -> "Rien à signaler"
-            else -> "Éteint"
+            "door", "window", "opening", "garage_door" -> context.getString(R.string.entity_state_closed)
+            "motion", "occupancy", "presence" -> context.getString(R.string.entity_state_no_motion)
+            "smoke", "carbon_monoxide", "gas", "moisture" -> context.getString(R.string.entity_state_clear)
+            else -> context.getString(R.string.entity_state_off)
         }
-        s == "open" || s == "opening" -> "Ouverte"
-        s == "closed" -> "Fermée"
-        s == "playing" -> "En lecture"
-        s == "paused" -> "En pause"
-        s == "idle" || s == "standby" -> "Inactif"
-        s == "locked" -> "Verrouillée"
-        s == "unlocked" -> "Déverrouillée"
+        s == "open" || s == "opening" -> context.getString(R.string.entity_state_open)
+        s == "closed" -> context.getString(R.string.entity_state_closed)
+        s == "playing" -> context.getString(R.string.entity_state_playing)
+        s == "paused" -> context.getString(R.string.entity_state_paused)
+        s == "idle" || s == "standby" -> context.getString(R.string.entity_state_idle)
+        s == "locked" -> context.getString(R.string.entity_state_locked)
+        s == "unlocked" -> context.getString(R.string.entity_state_unlocked)
         number() != null -> if (unit.isNotEmpty()) "${number()} $unit" else raw
         else -> raw.replaceFirstChar { it.uppercase() }
     }

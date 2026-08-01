@@ -260,7 +260,7 @@ class SettingsActivity : ComponentActivity() {
                     uiState.mqttTestMessage = null
                 } else {
                     uiState.mqttTest = ConnStatus.ERROR
-                    uiState.mqttTestMessage = "Échec de connexion"
+                    uiState.mqttTestMessage = getString(R.string.connection_test_failed)
                 }
             }
         }.also { it.isDaemon = true }.start()
@@ -271,7 +271,7 @@ class SettingsActivity : ComponentActivity() {
         val cleanToken = token.trim()
         if (cleanToken.isEmpty()) {
             uiState.haTest = ConnStatus.ERROR
-            uiState.haTestMessage = "Colle d'abord ta clé"
+            uiState.haTestMessage = getString(R.string.connection_missing_access_key)
             return
         }
         uiState.haTest = ConnStatus.TESTING
@@ -286,10 +286,10 @@ class SettingsActivity : ComponentActivity() {
                 } else {
                     uiState.haTest = ConnStatus.ERROR
                     uiState.haTestMessage = when (result.statusCode) {
-                        401 -> "Clé invalide"
-                        404 -> "Adresse incorrecte"
-                        -1 -> "Serveur introuvable"
-                        else -> "Erreur ${result.statusCode}"
+                        401 -> getString(R.string.connection_invalid_access_key)
+                        404 -> getString(R.string.connection_invalid_address)
+                        -1 -> getString(R.string.connection_server_not_found)
+                        else -> getString(R.string.connection_error_code_format, result.statusCode)
                     }
                 }
             }

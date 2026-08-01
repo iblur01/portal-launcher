@@ -150,6 +150,28 @@
     <string name="pills_extra_battery">battery</string>
     <string name="pills_extra_cycle">cycle</string>
     <string name="pills_extra_completion">est. finish</string>
+    <string name="pill_family_security">Security &amp; access</string>
+    <string name="pill_family_comfort">Comfort &amp; air</string>
+    <string name="pill_family_appliances">Appliances &amp; energy</string>
+    <string name="pill_family_lights_scenes">Lights &amp; scenes</string>
+    <string name="pill_family_media">Media</string>
+    <string name="pill_family_home">Home &amp; presence</string>
+    <string name="entity_state_unavailable">Unavailable</string>
+    <string name="entity_state_home">Home</string>
+    <string name="entity_state_away">Away</string>
+    <string name="entity_state_locked">Locked</string>
+    <string name="entity_state_unlocked">Unlocked</string>
+    <string name="entity_state_open">Open</string>
+    <string name="entity_state_closed">Closed</string>
+    <string name="entity_state_motion">Motion</string>
+    <string name="entity_state_no_motion">No motion</string>
+    <string name="entity_state_alert">Alert</string>
+    <string name="entity_state_clear">Clear</string>
+    <string name="entity_state_on">On</string>
+    <string name="entity_state_off">Off</string>
+    <string name="entity_state_playing">Playing</string>
+    <string name="entity_state_paused">Paused</string>
+    <string name="entity_state_idle">Idle</string>
 
     <!-- ===== CLOCK THEME EDITOR ===== -->
     <string name="clock_theme_label_font">Font</string>
@@ -215,6 +237,12 @@
     <string name="connection_status_testing">Testing…</string>
     <string name="connection_status_ok">Connected</string>
     <string name="connection_status_error">Failed</string>
+    <string name="connection_test_failed">Connection failed</string>
+    <string name="connection_missing_access_key">Paste your access key first</string>
+    <string name="connection_invalid_access_key">Invalid access key</string>
+    <string name="connection_invalid_address">Incorrect address</string>
+    <string name="connection_server_not_found">Server not found</string>
+    <string name="connection_error_code_format">Error %1$d</string>
     <string name="search_placeholder">Search…</string>
     <string name="dialog_button_ok">OK</string>
     <string name="subpage_back_desc">Back</string>

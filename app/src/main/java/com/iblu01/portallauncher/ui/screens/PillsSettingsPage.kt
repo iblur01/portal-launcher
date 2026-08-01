@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.PillCandidate
@@ -154,8 +155,8 @@ private fun PillsHomePage(
                         families.forEachIndexed { index, (family, candidates) ->
                             val enabled = candidates.count { it.primary.entityId in enabledIds }
                             SettingsRow(
-                                label = family.label,
-                                value = "$enabled sur ${candidates.size}",
+                                label = stringResource(family.labelRes),
+                                value = stringResource(R.string.pills_category_count_format, enabled, candidates.size),
                                 onClick = { onOpenFamily(family) }
                             )
                             if (index != families.lastIndex) SettingsDivider()
@@ -183,7 +184,7 @@ private fun PillFamilyPage(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        SettingsSubPageHeader(title = family.label, onBack = onBack)
+        SettingsSubPageHeader(title = stringResource(family.labelRes), onBack = onBack)
         CandidateSection(
             title = stringResource(R.string.pills_section_detected),
             candidates = candidates,
@@ -204,14 +205,15 @@ private fun CandidateSection(
     bulkLabel: String? = null,
     onBulk: (() -> Unit)? = null,
 ) {
+    val context = LocalContext.current
     SettingsSection(title = title, action = bulkLabel, onAction = onBulk) {
         candidates.forEachIndexed { index, candidate ->
-            val state = friendlyEntityState(candidate.primary)
+            val state = friendlyEntityState(context, candidate.primary)
             val extras = candidate.related.mapNotNull { e ->
                 when {
-                    e.deviceClass == "battery" -> "batterie"
-                    e.entityId.contains("cycle") -> "cycle"
-                    e.entityId.contains("completion") -> "fin prévue"
+                    e.deviceClass == "battery" -> stringResource(R.string.pills_extra_battery)
+                    e.entityId.contains("cycle") -> stringResource(R.string.pills_extra_cycle)
+                    e.entityId.contains("completion") -> stringResource(R.string.pills_extra_completion)
                     else -> null
                 }
             }.distinct()

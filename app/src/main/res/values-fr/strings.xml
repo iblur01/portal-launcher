@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Portal Launcher</string>
+    <string name="accessibility_label">Contrôle de l’écran Portal Launcher</string>
+    <string name="accessibility_description">Permet à Portal Launcher d’éteindre l’écran sur commande de Home Assistant. Le service ne lit pas le contenu de l’écran.</string>
+
     <!-- ===== SETUP WIZARD ===== -->
     <string name="setup_welcome_title">Bienvenue</string>
     <string name="setup_welcome_subtitle">Commençons par trouver ta maison. Assure-toi que Home Assistant est allumé sur le même réseau.</string>
@@ -145,6 +149,28 @@
     <string name="pills_extra_battery">batterie</string>
     <string name="pills_extra_cycle">cycle</string>
     <string name="pills_extra_completion">fin prévue</string>
+    <string name="pill_family_security">Sécurité &amp; accès</string>
+    <string name="pill_family_comfort">Confort &amp; air</string>
+    <string name="pill_family_appliances">Appareils &amp; énergie</string>
+    <string name="pill_family_lights_scenes">Lumières &amp; scènes</string>
+    <string name="pill_family_media">Médias</string>
+    <string name="pill_family_home">Maison &amp; présence</string>
+    <string name="entity_state_unavailable">Indisponible</string>
+    <string name="entity_state_home">À la maison</string>
+    <string name="entity_state_away">Absente</string>
+    <string name="entity_state_locked">Verrouillée</string>
+    <string name="entity_state_unlocked">Déverrouillée</string>
+    <string name="entity_state_open">Ouverte</string>
+    <string name="entity_state_closed">Fermée</string>
+    <string name="entity_state_motion">Mouvement</string>
+    <string name="entity_state_no_motion">Aucun mouvement</string>
+    <string name="entity_state_alert">Alerte</string>
+    <string name="entity_state_clear">Rien à signaler</string>
+    <string name="entity_state_on">Allumé</string>
+    <string name="entity_state_off">Éteint</string>
+    <string name="entity_state_playing">En lecture</string>
+    <string name="entity_state_paused">En pause</string>
+    <string name="entity_state_idle">Inactif</string>
 
     <!-- ===== CLOCK THEME EDITOR ===== -->
     <string name="clock_theme_label_font">Police</string>
@@ -210,6 +236,12 @@
     <string name="connection_status_testing">Vérification…</string>
     <string name="connection_status_ok">Connecté</string>
     <string name="connection_status_error">Échec</string>
+    <string name="connection_test_failed">Échec de connexion</string>
+    <string name="connection_missing_access_key">Colle d’abord ta clé</string>
+    <string name="connection_invalid_access_key">Clé invalide</string>
+    <string name="connection_invalid_address">Adresse incorrecte</string>
+    <string name="connection_server_not_found">Serveur introuvable</string>
+    <string name="connection_error_code_format">Erreur %1$d</string>
     <string name="search_placeholder">Rechercher…</string>
     <string name="dialog_button_ok">OK</string>
     <string name="subpage_back_desc">Retour</string>
