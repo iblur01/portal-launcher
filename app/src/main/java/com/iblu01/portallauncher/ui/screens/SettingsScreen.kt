@@ -74,6 +74,10 @@ import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.PillRule
 import com.iblu01.portallauncher.PillCandidate
 import com.iblu01.portallauncher.AutoReturnUiState
+import com.iblu01.portallauncher.MqttBridgeService
+import com.iblu01.portallauncher.session.AppClassification
+import com.iblu01.portallauncher.session.SessionAllowlist
+import com.iblu01.portallauncher.session.SessionAllowlistCodec
 import com.iblu01.portallauncher.ui.components.AppEntry
 import com.iblu01.portallauncher.ui.components.AppPickerDialog
 import com.iblu01.portallauncher.ui.components.AutoReturnOverlay
@@ -152,6 +156,8 @@ private enum class SettingsPage { MAIN, HOME, PILLS, APPLICATION, DEVELOPER, SET
 /** Best-effort host extraction used to pre-fill the MQTT broker from the HA address. */
 private fun hostOf(url: String): String = runCatching { URL(url.trim()).host }.getOrDefault("")
 
+internal fun shouldShowAppSessions(mqttHost: String): Boolean = mqttHost.isNotBlank()
+
 private data class TileDef(
     val page: SettingsPage,
     val icon: ImageVector,
@@ -206,8 +212,13 @@ fun SettingsScreen(
     var autoReturnEnabled by remember { mutableStateOf(prefs.autoReturnEnabled) }
     var autoReturnDelay by remember { mutableStateOf(prefs.autoReturnDelaySeconds.toFloat()) }
     var gridScale by remember { mutableStateOf(prefs.gridScale) }
+    var appSessionsEnabled by remember { mutableStateOf(prefs.appSessionsEnabled) }
+    var sessionAllowlist by remember { mutableStateOf(prefs.appSessionAllowlist.toMap()) }
+    val context = LocalContext.current
 
     var showAppPicker by remember { mutableStateOf(false) }
+    var showSessionAppPicker by remember { mutableStateOf(false) }
+    var sessionClassificationTarget by remember { mutableStateOf<String?>(null) }
 
     val save = {
         callbacks.onSave(
@@ -253,6 +264,34 @@ fun SettingsScreen(
             selectedPackage = haPackage,
             onDismiss = { showAppPicker = false },
             onAppSelected = { app -> haPackage = app.packageName; showAppPicker = false }
+        )
+    }
+    if (showSessionAppPicker) {
+        AppPickerDialog(
+            apps = installedApps,
+            selectedPackage = "",
+            onDismiss = { showSessionAppPicker = false },
+            onAppSelected = { app ->
+                showSessionAppPicker = false
+                sessionClassificationTarget = app.packageName
+            }
+        )
+    }
+    sessionClassificationTarget?.let { packageName ->
+        val appLabel = installedApps.firstOrNull { it.packageName == packageName }?.label ?: packageName
+        SessionClassificationDialog(
+            appLabel = appLabel,
+            current = sessionAllowlist[packageName],
+            onDismiss = { sessionClassificationTarget = null },
+            onSelected = { classification ->
+                val updated = sessionAllowlist + (packageName to classification)
+                if (updated.size <= SessionAllowlistCodec.MAX_ENTRIES) {
+                    sessionAllowlist = updated
+                    prefs.appSessionAllowlist = SessionAllowlist(updated)
+                    MqttBridgeService.reconnect(context)
+                }
+                sessionClassificationTarget = null
+            },
         )
     }
 
@@ -313,6 +352,22 @@ fun SettingsScreen(
                 onAutoReturnEnabledChange = { autoReturnEnabled = it; prefs.autoReturnEnabled = it },
                 autoReturnDelay = autoReturnDelay,
                 onAutoReturnDelayChange = { autoReturnDelay = it; prefs.autoReturnDelaySeconds = it.toInt() },
+                appSessionsEnabled = appSessionsEnabled,
+                mqttConfigured = shouldShowAppSessions(host),
+                installedApps = installedApps,
+                onAppSessionsEnabledChange = {
+                    appSessionsEnabled = it
+                    prefs.appSessionsEnabled = it
+                    MqttBridgeService.reconnect(context)
+                },
+                sessionAllowlist = sessionAllowlist,
+                onAddSessionApp = { showSessionAppPicker = true },
+                onSelectSessionClassification = { sessionClassificationTarget = it },
+                onClearSessionApps = {
+                    sessionAllowlist = emptyMap()
+                    prefs.appSessionAllowlist = SessionAllowlist(emptyMap())
+                    MqttBridgeService.reconnect(context)
+                },
                 gridScale = gridScale,
                 onGridScaleChange = { gridScale = it; prefs.gridScale = it },
                 onBack = { currentPage = SettingsPage.MAIN },
@@ -441,6 +496,13 @@ private fun AppPage(
     timeoutMinutes: Float, onTimeoutMinutesChange: (Float) -> Unit,
     autoReturnEnabled: Boolean, onAutoReturnEnabledChange: (Boolean) -> Unit,
     autoReturnDelay: Float, onAutoReturnDelayChange: (Float) -> Unit,
+    appSessionsEnabled: Boolean, onAppSessionsEnabledChange: (Boolean) -> Unit,
+    mqttConfigured: Boolean,
+    installedApps: List<AppEntry>,
+    sessionAllowlist: Map<String, AppClassification>,
+    onAddSessionApp: () -> Unit,
+    onSelectSessionClassification: (String) -> Unit,
+    onClearSessionApps: () -> Unit,
     gridScale: Float = 1f, onGridScaleChange: (Float) -> Unit = {},
     onBack: () -> Unit,
     showBack: Boolean = true,
@@ -556,6 +618,49 @@ private fun AppPage(
                 label = stringResource(R.string.settings_app_label_app_to_open),
                 value = currentAppLabel.ifBlank { haPackage },
                 onClick = onShowAppPicker,
+            )
+        }
+
+        if (mqttConfigured) SettingsSection(title = stringResource(R.string.settings_app_section_sessions)) {
+            SettingsToggle(
+                label = stringResource(R.string.settings_app_sessions_enabled),
+                checked = appSessionsEnabled,
+                onCheckedChange = onAppSessionsEnabledChange,
+            )
+            SettingsDivider()
+            if (sessionAllowlist.isEmpty()) {
+                SettingsRow(
+                    label = stringResource(R.string.settings_app_sessions_empty),
+                    value = "",
+                    onClick = onAddSessionApp,
+                )
+            } else {
+                sessionAllowlist.toSortedMap().forEach { (packageName, classification) ->
+                    val appLabel = installedApps.firstOrNull { it.packageName == packageName }?.label
+                        ?: packageName
+                    SettingsRow(
+                        label = appLabel,
+                        value = stringResource(
+                            R.string.settings_app_sessions_classification_value,
+                            stringResource(classification.labelRes()),
+                            classification.defaultDurationSeconds,
+                            classification.maxDurationSeconds,
+                        ),
+                        onClick = { onSelectSessionClassification(packageName) },
+                    )
+                }
+                SettingsDivider()
+                SettingsRow(
+                    label = stringResource(R.string.settings_app_sessions_clear),
+                    value = "",
+                    onClick = onClearSessionApps,
+                )
+            }
+            SettingsDivider()
+            SettingsRow(
+                label = stringResource(R.string.settings_app_sessions_add),
+                value = "",
+                onClick = onAddSessionApp,
             )
         }
 
@@ -745,6 +850,63 @@ private fun AppPage(
         }
 
     }
+}
+
+private fun AppClassification.labelRes(): Int = when (this) {
+    AppClassification.HOME -> R.string.settings_app_sessions_class_home
+    AppClassification.MEDIA -> R.string.settings_app_sessions_class_media
+    AppClassification.UTILITY -> R.string.settings_app_sessions_class_utility
+    AppClassification.COMMUNICATION -> R.string.settings_app_sessions_class_communication
+}
+
+@Composable
+private fun SessionClassificationDialog(
+    appLabel: String,
+    current: AppClassification?,
+    onDismiss: () -> Unit,
+    onSelected: (AppClassification) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_app_sessions_choose_class, appLabel)) },
+        text = {
+            Column {
+                AppClassification.entries.forEach { classification ->
+                    TextButton(
+                        onClick = { onSelected(classification) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = if (classification == current) {
+                                    "✓ ${stringResource(classification.labelRes())}"
+                                } else {
+                                    stringResource(classification.labelRes())
+                                },
+                                color = AppleColors.primary,
+                                style = AppleTypography.titleMedium,
+                            )
+                            Text(
+                                text = stringResource(
+                                    R.string.settings_app_sessions_duration_consequence,
+                                    classification.defaultDurationSeconds,
+                                    classification.maxDurationSeconds,
+                                ),
+                                color = AppleColors.secondary,
+                                style = AppleTypography.bodySmall,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.settings_app_sessions_cancel))
+            }
+        },
+    )
 }
 
 @Composable

@@ -6,6 +6,8 @@ import android.provider.Settings
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.iblu01.portallauncher.session.SessionAllowlist
+import com.iblu01.portallauncher.session.SessionAllowlistCodec
 import com.iblu01.portallauncher.ui.theme.ClockFont
 import com.iblu01.portallauncher.ui.theme.ClockTheme
 import com.iblu01.portallauncher.ui.theme.ClockTint
@@ -236,7 +238,17 @@ class Prefs(private val context: Context) {
         get() = sp.getInt("auto_return_delay_seconds", 10)
         set(value) = sp.edit().putInt("auto_return_delay_seconds", value.coerceIn(5, 60)).apply()
 
+    /** Local kill switch for the bounded external-app session feature. Defaults off (fail-closed). */
+    var appSessionsEnabled: Boolean
+        get() = sp.getBoolean("app_sessions_enabled", false)
+        set(value) = sp.edit().putBoolean("app_sessions_enabled", value).apply()
 
+    /** Classified package allowlist, configured only from local app settings. Empty by default. */
+    var appSessionAllowlist: SessionAllowlist
+        get() = SessionAllowlistCodec.decode(sp.getStringSet("app_session_allowlist", emptySet()))
+        set(value) = sp.edit()
+            .putStringSet("app_session_allowlist", SessionAllowlistCodec.encode(value))
+            .apply()
 
     // --- Launcher grid (see ui.apps.LauncherLayoutStore) --------------------------------------
     /**

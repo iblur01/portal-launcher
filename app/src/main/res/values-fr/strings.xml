@@ -437,6 +437,20 @@
     <string name="notification_content_title">Portal Launcher</string>
     <string name="power_mode_always_on">Always on</string>
     <string name="power_mode_follow_presence">Follow presence</string>
+    <string name="settings_app_section_sessions">Sessions d’applications externes</string>
+    <string name="settings_app_sessions_enabled">Autoriser les sessions MQTT limitées</string>
+    <string name="settings_app_sessions_add">Ajouter une application autorisée</string>
+    <string name="settings_app_sessions_empty">Aucune application autorisée</string>
+    <string name="settings_app_sessions_clear">Effacer les applications autorisées</string>
+    <string name="settings_app_sessions_cycle_hint">Touchez une application pour changer sa classification</string>
+    <string name="settings_app_sessions_choose_class">Choisir le type de session pour %1$s</string>
+    <string name="settings_app_sessions_class_home">Accueil</string>
+    <string name="settings_app_sessions_class_media">Média</string>
+    <string name="settings_app_sessions_class_utility">Utilitaire</string>
+    <string name="settings_app_sessions_class_communication">Communication</string>
+    <string name="settings_app_sessions_classification_value">%1$s · %2$d s par défaut · %3$d s max.</string>
+    <string name="settings_app_sessions_duration_consequence">%1$d s par défaut · %2$d s maximum</string>
+    <string name="settings_app_sessions_cancel">Annuler</string>
 
     <!-- ===== PILL PRIORITY ENGINE (Dynamic Labels) ===== -->
     <string name="presence_home">À la maison</string>
