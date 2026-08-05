@@ -2,18 +2,20 @@ package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Luggage
 import androidx.compose.material.icons.outlined.NightShelter
+import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,14 +28,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.ui.LocalCallService
-import com.iblu01.portallauncher.ui.components.controls.AccessoryGrid
-import com.iblu01.portallauncher.ui.components.controls.AccessoryItem
 import com.iblu01.portallauncher.ui.components.controls.PinKeypad
+import com.iblu01.portallauncher.ui.components.controls.VerticalSegmentedSelector
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -55,50 +57,89 @@ fun AlarmControl(chip: LauncherChip) {
     val entity = rememberEntity(chip.entityId)
     if (entity == null || entity.isUnavailable()) { PanelUnavailable(); return }
     val state = entity.state.lowercase()
-    val armed = state != "disarmed"
     val alerting = state == "triggered" || state == "pending"
+    val confirmedMode = ArmOption.entries.firstOrNull { it.armedState == state } ?: ArmOption.DISABLED
 
-    var pendingArm by remember(chip.entityId) { mutableStateOf<String?>(null) }
+    var pendingService by remember(chip.entityId) { mutableStateOf<String?>(null) }
+    var optimisticMode by remember(chip.entityId) { mutableStateOf<ArmOption?>(null) }
+
+    LaunchedEffect(confirmedMode, optimisticMode) {
+        val pending = optimisticMode ?: return@LaunchedEffect
+        if (confirmedMode == pending) optimisticMode = null
+        else {
+            kotlinx.coroutines.delay(5000)
+            optimisticMode = null
+        }
+    }
+
+    LaunchedEffect(state, pendingService) {
+        val target = ArmOption.entries.firstOrNull { it.service == pendingService } ?: return@LaunchedEffect
+        if (state == target.armedState) pendingService = null
+    }
 
     // The armed/mode label is already shown in the panel header (chip.value), so it isn't
     // repeated here — this composable renders only the keypad / arm actions.
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         when {
-            // Armed + code required, or an arm action is awaiting its code → keypad.
-            (armed && entity.alarmCodeRequired(arming = false)) || pendingArm != null -> {
-                val service = pendingArm ?: "alarm_disarm"
+            // Triggered alarms keep disarming prominent. Other protected actions open the keypad
+            // only after the user selects their target mode.
+            (alerting && entity.alarmCodeRequired(arming = false)) || pendingService != null -> {
+                val service = pendingService ?: ArmOption.DISABLED.service
                 AlarmKeypad(
                     entityId = chip.entityId,
                     service = service,
                     currentState = state,
                     prompt = if (service == "alarm_disarm") stringResource(R.string.alarm_disarm_prompt) else stringResource(R.string.alarm_arm_prompt),
-                    onCancel = if (pendingArm != null) ({ pendingArm = null }) else null,
+                    onCancel = if (pendingService != null) ({ pendingService = null }) else null,
                 )
             }
-            // Armed, no code needed → single disarm button.
-            armed -> {
-                DisarmButton(highlight = alerting) { callService(ALARM_DOMAIN, "alarm_disarm", chip.entityId) }
-            }
-            // Disarmed → arm options.
+            // Complete mode selector, including the neutral disabled state.
             else -> {
-                val arm: (String) -> Unit = { svc ->
-                    if (entity.alarmCodeRequired(arming = true)) pendingArm = svc
-                    else callService(ALARM_DOMAIN, svc, chip.entityId)
+                val options = ArmOption.entries.filter { it.feature == null || entity.supports(it.feature) }
+                if (options.isNotEmpty()) {
+                    val labels = options.associateWith { stringResource(it.labelRes) }
+                    BoxWithConstraints(
+                        // Use the same responsive viewport and 96:240 aspect ratio as the cover
+                        // control instead of pinning the selector to hard-coded dp dimensions.
+                        modifier = Modifier.fillMaxWidth(0.54f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val widthToHeightRatio = 96f / 240f
+                        val selectorWidth = maxWidth
+                        val selectorHeight = selectorWidth / widthToHeightRatio
+                        // The cover slider rounds by 30% of its width. Derive both selector
+                        // radii from that same live width and keep the inset highlight concentric.
+                        val outerRadius = selectorWidth * 0.30f
+                        val highlightInset = 5.dp
+                        VerticalSegmentedSelector(
+                            options = options,
+                            selected = optimisticMode ?: confirmedMode,
+                            onSelect = { option ->
+                                if (option != confirmedMode) {
+                                    val needsCode = entity.alarmCodeRequired(
+                                        arming = option != ArmOption.DISABLED,
+                                    )
+                                    if (needsCode) pendingService = option.service
+                                    else {
+                                        optimisticMode = option
+                                        callService(ALARM_DOMAIN, option.service, chip.entityId)
+                                    }
+                                }
+                            },
+                            label = { labels[it]!! },
+                            icon = { it.icon },
+                            accent = AppleColors.active,
+                            isNeutral = { it == ArmOption.DISABLED },
+                            shape = RoundedCornerShape(outerRadius),
+                            highlightShape = RoundedCornerShape(
+                                (outerRadius - highlightInset).coerceAtLeast(0.dp),
+                            ),
+                            segmentHeight = selectorHeight / options.size,
+                            segmentPadding = 4.dp,
+                            modifier = Modifier.size(selectorWidth, selectorHeight),
+                        )
+                    }
                 }
-                AccessoryGrid(
-                    items = ArmOption.entries
-                        .filter { entity.supports(it.feature) }
-                        .map { option ->
-                            AccessoryItem(
-                                id = option.service,
-                                title = stringResource(option.labelRes),
-                                icon = option.icon,
-                                // Disarmed here, so no option is live — the tiles read as actions.
-                                on = state == option.armedState,
-                                onToggle = { arm(option.service) },
-                            )
-                        },
-                )
             }
         }
     }
@@ -106,7 +147,7 @@ fun AlarmControl(chip: LauncherChip) {
 
 /** The arm actions an entity can expose, in the order they're offered. */
 private enum class ArmOption(
-    val feature: Int,
+    val feature: Int?,
     val service: String,
     val armedState: String,
     val labelRes: Int,
@@ -116,23 +157,7 @@ private enum class ArmOption(
     HOME(AlarmFeature.ARM_HOME, "alarm_arm_home", "armed_home", R.string.alarm_mode_home, Icons.Outlined.Home),
     NIGHT(AlarmFeature.ARM_NIGHT, "alarm_arm_night", "armed_night", R.string.alarm_mode_night, Icons.Outlined.Bedtime),
     VACATION(AlarmFeature.ARM_VACATION, "alarm_arm_vacation", "armed_vacation", R.string.alarm_mode_vacation, Icons.Outlined.NightShelter),
-}
-
-@Composable
-private fun DisarmButton(highlight: Boolean, onClick: () -> Unit) {
-    val color = if (highlight) AppleColors.error else AppleColors.accent
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(AppleShapes.pill)
-            .background(color.copy(alpha = 0.16f), AppleShapes.pill)
-            .border(0.5.dp, color.copy(alpha = 0.4f), AppleShapes.pill)
-            .appleClickable(onClick)
-            .padding(vertical = 16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(stringResource(R.string.alarm_disarm_button), style = AppleTypography.titleMedium.copy(fontSize = 17.sp), color = color)
-    }
+    DISABLED(null, "alarm_disarm", "disarmed", R.string.alarm_mode_off, Icons.Outlined.PowerSettingsNew),
 }
 
 /**
@@ -154,6 +179,7 @@ private fun AlarmKeypad(
     val callService = LocalCallService.current
     var submitCount by remember(service) { mutableIntStateOf(0) }
     var wrongCode by remember(service) { mutableStateOf(false) }
+    var waitingForHa by remember(service) { mutableStateOf(false) }
     val stateAtSubmit = remember { mutableStateOf("") }
     val liveState by rememberUpdatedState(currentState)
 
@@ -161,18 +187,25 @@ private fun AlarmKeypad(
         if (submitCount > 0) {
             kotlinx.coroutines.delay(2600)
             if (liveState == stateAtSubmit.value) wrongCode = true
+            waitingForHa = false
         }
+    }
+
+    LaunchedEffect(currentState, submitCount) {
+        if (submitCount > 0 && currentState != stateAtSubmit.value) waitingForHa = false
     }
 
     PinKeypad(
         onSubmit = { code ->
             stateAtSubmit.value = liveState
+            waitingForHa = true
             callService(ALARM_DOMAIN, service, entityId, mapOf("code" to code))
             submitCount++
         },
         codeLength = 0,
         subtitle = prompt,
         error = wrongCode,
+        loading = waitingForHa,
         onErrorConsumed = { wrongCode = false },
         onCancel = onCancel,
     )

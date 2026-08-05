@@ -13,6 +13,11 @@ import androidx.compose.material.icons.outlined.Pets
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -45,6 +50,16 @@ fun PurifierActions(chip: LauncherChip) {
             ?: PurifierMode.MANUAL
         else -> PurifierMode.MANUAL
     }
+    var optimisticMode by remember(chip.entityId) { mutableStateOf<PurifierMode?>(null) }
+
+    LaunchedEffect(currentMode, optimisticMode) {
+        val pending = optimisticMode ?: return@LaunchedEffect
+        if (currentMode == pending) optimisticMode = null
+        else {
+            kotlinx.coroutines.delay(5000)
+            optimisticMode = null
+        }
+    }
 
     val purifierLabels = mapOf(
         PurifierMode.AUTO to stringResource(R.string.purifier_mode_auto),
@@ -57,12 +72,15 @@ fun PurifierActions(chip: LauncherChip) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         VerticalSegmentedSelector(
             options = PurifierMode.entries.toList(),
-            selected = currentMode,
+            selected = optimisticMode ?: currentMode,
             onSelect = { mode ->
-                if (mode == PurifierMode.OFF) {
-                    callService("fan", "turn_off", chip.entityId)
-                } else {
-                    callService("fan", "set_preset_mode", chip.entityId, mapOf("preset_mode" to mode.preset!!))
+                if (mode != currentMode) {
+                    optimisticMode = mode
+                    if (mode == PurifierMode.OFF) {
+                        callService("fan", "turn_off", chip.entityId)
+                    } else {
+                        callService("fan", "set_preset_mode", chip.entityId, mapOf("preset_mode" to mode.preset!!))
+                    }
                 }
             },
             label = { purifierLabels[it]!! },

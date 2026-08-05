@@ -19,17 +19,25 @@ sealed interface PanelRequest {
     }
 }
 
-/** Who opened the panel — an AUTO (media) open must never clobber a USER intent. */
-enum class PanelSource { USER, AUTO }
+/**
+ * Who opened the panel. Precedence is AUTO < USER < ALERT: an AUTO (media) open must never clobber
+ * a USER intent, and an ALERT (alarm entry delay / triggered) outranks both — the disarm keypad has
+ * to be on screen before the siren fires, whatever the user was doing.
+ */
+enum class PanelSource { USER, AUTO, ALERT }
 
 /**
  * @param dismissedAutoKey the media key the user dismissed; auto-open is suppressed for it until
  *   the session stops ([PanelEvent.MediaStopped] rearms). Mirrors the old `mediaPlayerDismissed`.
+ * @param dismissedAlertKey the alarm key the user dismissed; the alert panel stays closed for it
+ *   until the alarm leaves its alerting state ([PanelEvent.AlarmCleared] rearms). Without this a
+ *   dismiss would be undone on the next state push.
  */
 data class PanelState(
     val request: PanelRequest? = null,
     val source: PanelSource = PanelSource.USER,
     val dismissedAutoKey: String? = null,
+    val dismissedAlertKey: String? = null,
 )
 
 /**
@@ -43,6 +51,12 @@ sealed interface PanelEvent {
     data object WeatherTap : PanelEvent
     data class MediaAutoOpen(val key: String) : PanelEvent
     data object MediaStopped : PanelEvent
+
+    /** The alarm entered `pending` (entry delay) or `triggered`: force its keypad panel up. */
+    data class AlarmAlert(val request: PanelRequest.Chip) : PanelEvent
+
+    /** The alarm left its alerting states (disarmed, or armed again): drop the forced panel. */
+    data object AlarmCleared : PanelEvent
     data object Dismiss : PanelEvent
 }
 
@@ -73,14 +87,31 @@ fun reduce(state: PanelState, event: PanelEvent): PanelState = when (event) {
     }
 
     // Session ended: close if we were showing media, and rearm auto-open (clear the dismiss guard).
+    // The alert guard is carried over — it belongs to the alarm episode, not to the media session.
     PanelEvent.MediaStopped ->
-        if (state.request is PanelRequest.Media) PanelState()
+        if (state.request is PanelRequest.Media) PanelState(dismissedAlertKey = state.dismissedAlertKey)
         else state.copy(dismissedAutoKey = null)
 
-    // Dismiss: remember a dismissed media key so it won't auto-reopen while it keeps playing.
+    // Alarm alerting: opens over anything, including a USER panel — this is the one case where the
+    // user's current panel is overridden, because the entry delay is running out. Only an explicit
+    // dismissal of this very alarm holds it back.
+    is PanelEvent.AlarmAlert ->
+        if (event.request.key == state.dismissedAlertKey) state
+        else state.copy(request = event.request, source = PanelSource.ALERT)
+
+    // Alarm back to a calm state: close the forced panel and rearm the alert for the next episode.
+    PanelEvent.AlarmCleared ->
+        if (state.source == PanelSource.ALERT) PanelState(dismissedAutoKey = state.dismissedAutoKey)
+        else state.copy(dismissedAlertKey = null)
+
+    // Dismiss: remember a dismissed media/alert key so it won't reopen while the cause persists.
     PanelEvent.Dismiss -> {
         val req = state.request
-        if (req is PanelRequest.Media) state.copy(request = null, dismissedAutoKey = req.key)
-        else state.copy(request = null)
+        when {
+            req is PanelRequest.Media -> state.copy(request = null, dismissedAutoKey = req.key)
+            req != null && state.source == PanelSource.ALERT ->
+                state.copy(request = null, source = PanelSource.USER, dismissedAlertKey = req.key)
+            else -> state.copy(request = null)
+        }
     }
 }

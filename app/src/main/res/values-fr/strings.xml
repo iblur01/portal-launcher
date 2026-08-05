@@ -298,6 +298,7 @@
     <string name="alarm_mode_home">Présence</string>
     <string name="alarm_mode_night">Nuit</string>
     <string name="alarm_mode_vacation">Vacances</string>
+    <string name="alarm_mode_off">Désactivée</string>
     <string name="alarm_disarm_button">Désarmer</string>
 
     <!-- ===== COVER PANEL (Blinds) ===== -->

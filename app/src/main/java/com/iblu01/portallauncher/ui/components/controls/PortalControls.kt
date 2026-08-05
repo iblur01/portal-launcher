@@ -576,6 +576,7 @@ fun <T> VerticalSegmentedSelector(
     contentLayout: ControlContentLayout = ControlContentLayout.Vertical,
     enabled: Boolean = true,
     shape: Shape = ControlSquircle,
+    highlightShape: Shape = innerCorner(5.dp),
     segmentHeight: Dp = SegmentHeight,
     segmentPadding: Dp = 0.dp,
 ) {
@@ -677,7 +678,7 @@ fun <T> VerticalSegmentedSelector(
                 .fillMaxWidth()
                 .height(segmentHeight)
                 .padding(highlightInset)
-                .clip(innerCorner(highlightInset))
+                .clip(highlightShape)
                 .background(highlightColor.copy(alpha = if (enabled) 1f else 0.4f)),
         )
 

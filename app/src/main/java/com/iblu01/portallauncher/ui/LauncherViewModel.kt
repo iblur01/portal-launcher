@@ -8,6 +8,8 @@ import com.iblu01.portallauncher.domain.model.PillSnapshot
 import com.iblu01.portallauncher.domain.model.PlayingMedia
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 import kotlinx.coroutines.flow.Flow
+import com.iblu01.portallauncher.ui.mapper.toPanelKind
+import com.iblu01.portallauncher.ui.model.PanelKind
 import com.iblu01.portallauncher.ui.panel.PanelEvent
 import com.iblu01.portallauncher.ui.panel.PanelRequest
 import com.iblu01.portallauncher.ui.panel.PanelState
@@ -41,6 +43,23 @@ data class LauncherUiState(
 )
 
 /**
+ * Alarm states that must put the disarm keypad on screen by themselves: `pending` is the entry
+ * delay (the siren is about to fire) and `triggered` is the siren itself. `arming` (exit delay) is
+ * deliberately excluded — the user just armed and is walking out, forcing a keypad there would be
+ * in the way.
+ */
+private val ALERTING_ALARM_STATES = setOf("pending", "triggered")
+
+/** The alarm chip that is currently alerting, as a panel request — null when none is. */
+private fun LauncherUiState.alarmAlert(): PanelRequest.Chip? {
+    val chip = chips.firstOrNull {
+        it.toPanelKind() == PanelKind.ALARM &&
+            latestStates[it.entityId]?.state?.lowercase() in ALERTING_ALARM_STATES
+    } ?: return null
+    return PanelRequest.Chip(chip.id, PanelKind.ALARM)
+}
+
+/**
  * Owns the screen state (MAD/UDF). Collects the injected snapshot `Flow` (transforms already run on
  * `Dispatchers.Default`) into a conflated `StateFlow`. Also drives the panel state machine
  * ([reduce]) via [onEvent] and resolves the panel chip last-known-good.
@@ -67,6 +86,15 @@ class LauncherViewModel(
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherUiState())
+
+    /**
+     * True while an alarm is in its entry delay or already triggered. The Activity mirrors this
+     * onto the screen policy so the idle timeout cannot lock the panel away mid-countdown.
+     */
+    val alarmAlerting: StateFlow<Boolean> = uiState
+        .map { it.alarmAlert() != null }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val _panel = MutableStateFlow(PanelState())
     val panel: StateFlow<PanelState> = _panel.asStateFlow()
@@ -105,6 +133,21 @@ class LauncherViewModel(
             ) { primaryId, _ -> primaryId }
                 .collect { id ->
                     if (id != null) onEvent(PanelEvent.MediaAutoOpen(id)) else onEvent(PanelEvent.MediaStopped)
+                }
+        }
+
+        // Alarm entry delay / triggered: the keypad panel is forced open, over whatever is showing.
+        // Keyed on "is the panel closed" for the same reason as media above — if the user navigates
+        // elsewhere and comes back to the resting state while the alarm is still counting down, the
+        // keypad must come back too. `dismissedAlertKey` in the reducer is what makes an explicit
+        // dismissal stick.
+        viewModelScope.launch {
+            combine(
+                uiState.map { it.alarmAlert() }.distinctUntilChanged(),
+                _panel.map { it.request == null }.distinctUntilChanged(),
+            ) { alert, _ -> alert }
+                .collect { alert ->
+                    if (alert != null) onEvent(PanelEvent.AlarmAlert(alert)) else onEvent(PanelEvent.AlarmCleared)
                 }
         }
     }

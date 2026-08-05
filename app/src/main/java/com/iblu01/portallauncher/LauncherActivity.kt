@@ -147,6 +147,8 @@ class LauncherActivity : ComponentActivity() {
      * appears and coming back lands on the clock instead of where the icon was.
      */
     private var openingFromLauncher = false
+    /** True while an alarm is counting down / triggered: the screen must not lock under the keypad. */
+    private var alarmHold = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -186,6 +188,7 @@ class LauncherActivity : ComponentActivity() {
                     onAddWidget = ::addWidget,
                     onRemoveWidget = { widgets.release(it) },
                     keepPageAcrossPause = ::keepPageAcrossPause,
+                    onAlarmAlerting = ::onAlarmAlerting,
                 )
             }
         }
@@ -263,6 +266,9 @@ class LauncherActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // The hold lives in a process-wide object: leaving it set would keep the idle timeout off
+        // for good if the alarm is still alerting when the launcher goes away.
+        onAlarmAlerting(false)
         appList.stop()
         super.onDestroy()
     }
@@ -280,8 +286,19 @@ class LauncherActivity : ComponentActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
+    /**
+     * Alarm entry delay / triggered: hold the screen awake and suspend the idle timeout, so the
+     * disarm keypad the UI just forced open cannot be locked away before the code is typed.
+     */
+    private fun onAlarmAlerting(active: Boolean) {
+        if (alarmHold == active) return
+        alarmHold = active
+        SleepScheduler.setAlarmHold(this, active)
+        applyPowerPolicy()
+    }
+
     private fun applyPowerPolicy() {
-        if (prefs.powerMode == PowerMode.ALWAYS_ON || prefs.devKeepScreenOn) {
+        if (alarmHold || prefs.powerMode == PowerMode.ALWAYS_ON || prefs.devKeepScreenOn) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -437,6 +454,7 @@ private fun PortalLauncherApp(
     onAddWidget: (WidgetOffer) -> Unit,
     onRemoveWidget: (Int) -> Unit,
     keepPageAcrossPause: () -> Boolean,
+    onAlarmAlerting: (Boolean) -> Unit,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var backgroundMode by remember { mutableStateOf(prefs.backgroundMode) }
@@ -585,15 +603,23 @@ private fun PortalLauncherApp(
     val panelChip by vm.panelChip.collectAsStateWithLifecycle()
     val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
 
+    // Alarm entry delay / triggered: the VM forces the keypad panel up (PanelSource.ALERT); the
+    // Activity mirrors the flag onto the screen policy so nothing locks it away mid-countdown.
+    val alarmAlerting by vm.alarmAlerting.collectAsStateWithLifecycle()
+    LaunchedEffect(alarmAlerting) { onAlarmAlerting(alarmAlerting) }
+
     // Auto-return is for *user* state only: a USER panel, the expanded tray, the app overlay. An
     // AUTO (media) panel is the resting state while something plays, so it must not arm the timer.
     // Sitting on the apps page is user state too, exactly like the expanded tray: the wall panel
     // must fall back to the clock on its own.
     val onAppsPage = pagerState.currentPage != PAGE_CLOCK
     val userState = pillsExpanded || overlayVisible || onAppsPage || menuTarget != null || showHidden
-    LaunchedEffect(panel.request, panel.source, userState, resumed) {
+    // While an alarm is alerting the countdown is suspended outright: returning to the clock would
+    // take the disarm keypad off screen exactly when it is needed.
+    LaunchedEffect(panel.request, panel.source, userState, resumed, alarmAlerting) {
         val userPanelOpen = panel.request != null && panel.source == PanelSource.USER
-        if (resumed && (userPanelOpen || userState)) autoReturnTimer.start() else autoReturnTimer.stop()
+        if (resumed && !alarmAlerting && (userPanelOpen || userState)) autoReturnTimer.start()
+        else autoReturnTimer.stop()
     }
 
     LaunchedEffect(autoReturnState.shouldReturn) {

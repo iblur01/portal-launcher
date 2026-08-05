@@ -20,7 +20,22 @@ object SleepScheduler {
     private const val ARM_THROTTLE_MS = 5_000L
     @Volatile private var lastArmAtMs = 0L
 
+    /**
+     * Set while an alarm is in its entry delay or triggered: the screen must stay up so the disarm
+     * keypad is reachable, so every path here becomes a no-op and any pending idle alarm is dropped.
+     */
+    @Volatile private var alarmHold = false
+
+    /** Called by the UI when the alarm enters/leaves an alerting state. */
+    fun setAlarmHold(context: Context, hold: Boolean) {
+        if (alarmHold == hold) return
+        alarmHold = hold
+        Log.i(TAG, "alarm hold=$hold")
+        if (hold) cancel(context) else apply(context)
+    }
+
     fun apply(context: Context) {
+        if (alarmHold) { cancel(context); return }
         val prefs = Prefs(context)
         if (prefs.devKeepScreenOn || !prefs.screenTimeoutEnabled || prefs.powerMode == PowerMode.ALWAYS_ON) {
             cancel(context)
@@ -36,12 +51,14 @@ object SleepScheduler {
     }
 
     fun onInteraction(context: Context) {
+        if (alarmHold) return
         val prefs = Prefs(context)
         if (prefs.devKeepScreenOn || !prefs.screenTimeoutEnabled || prefs.powerMode == PowerMode.ALWAYS_ON) return
         if (DeviceStateHub.current.display == DisplayMode.SCREENSAVER) arm(context)
     }
 
     fun onIdleElapsed(context: Context) {
+        if (alarmHold) return
         val prefs = Prefs(context)
         if (prefs.devKeepScreenOn || !prefs.screenTimeoutEnabled || prefs.powerMode == PowerMode.ALWAYS_ON) return
         if (!isInteractive(context)) return
@@ -52,6 +69,7 @@ object SleepScheduler {
     }
 
     fun arm(context: Context) {
+        if (alarmHold) { cancel(context); return }
         val prefs = Prefs(context)
         if (prefs.devKeepScreenOn || !prefs.screenTimeoutEnabled || prefs.powerMode == PowerMode.ALWAYS_ON) {
             cancel(context)

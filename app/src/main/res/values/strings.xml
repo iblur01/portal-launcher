@@ -303,6 +303,7 @@
     <string name="alarm_mode_home">Home</string>
     <string name="alarm_mode_night">Night</string>
     <string name="alarm_mode_vacation">Vacation</string>
+    <string name="alarm_mode_off">Disabled</string>
     <string name="alarm_disarm_button">Disarm</string>
 
     <!-- ===== COVER PANEL (Blinds) ===== -->
