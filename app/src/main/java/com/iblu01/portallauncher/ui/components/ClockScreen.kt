@@ -139,17 +139,14 @@ fun ClockHeader(
     lastUpdateAt: Long,
     clockTheme: ClockTheme,
     modifier: Modifier = Modifier,
-    collapse: Float = 0f,
+    collapse: () -> Float = { 0f },
 ) {
     val time by rememberClock(if (clockTheme.format24h) "HH:mm" else "h:mm a")
     val date by rememberClock("EEEE d MMMM")
-    // Secondary rows fade out over the first half of the swipe, before the clock is tiny.
-    val secondaryAlpha = (1f - collapse * 2f).coerceIn(0f, 1f)
-
     Column(
         modifier = modifier
             .graphicsLayer {
-                val scale = 1f - (1f - COLLAPSED_SCALE) * collapse
+                val scale = 1f - (1f - COLLAPSED_SCALE) * collapse()
                 transformOrigin = TransformOrigin(0.5f, 0f)
                 scaleX = scale
                 scaleY = scale
@@ -186,27 +183,27 @@ fun ClockHeader(
             maxLines = 1,
             softWrap = false
         )
-        if (secondaryAlpha > 0f) {
+        // Keep these nodes composed throughout the gesture. Removing them when alpha reaches zero
+        // causes a structural recomposition and a text remeasure exactly halfway through the swipe.
+        Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
+        Row(
+            modifier = Modifier
+                .graphicsLayer { alpha = (1f - collapse() * 2f).coerceIn(0f, 1f) }
+                .clip(AppleShapes.pill)
+                .background(Color.White.copy(alpha = 0.15f), AppleShapes.pill)
+                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
+                .appleClickable(onWeatherClick)
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
+            Text(stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
+        }
+        if (!connected && lastUpdateAt > 0L) {
             Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
-            Row(
-                modifier = Modifier
-                    .graphicsLayer { alpha = secondaryAlpha }
-                    .clip(AppleShapes.pill)
-                    .background(Color.White.copy(alpha = 0.15f), AppleShapes.pill)
-                    .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                    .appleClickable(onWeatherClick)
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
-                Text(stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
-            }
-            if (!connected && lastUpdateAt > 0L) {
-                Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
-                Box(Modifier.graphicsLayer { alpha = secondaryAlpha }) {
-                    StaleBanner(lastUpdateAt = lastUpdateAt)
-                }
+            Box(Modifier.graphicsLayer { alpha = (1f - collapse() * 2f).coerceIn(0f, 1f) }) {
+                StaleBanner(lastUpdateAt = lastUpdateAt)
             }
         }
     }

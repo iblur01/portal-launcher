@@ -1,14 +1,11 @@
 package com.iblu01.portallauncher.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,9 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -114,6 +112,11 @@ fun LauncherPager(
     // Keep the rapidly changing pager offset out of composition. Consumers invoke this only from
     // layout or draw/layer blocks, which Compose can invalidate without rebuilding the subtree.
     val collapse = remember(state) { { state.collapseFraction() } }
+    // This derived boolean changes only twice per complete swipe. It prevents the transparent
+    // actions layer from intercepting clock taps without subscribing composition to every offset.
+    val showHeaderActions by remember(state) {
+        derivedStateOf { state.collapseFraction() > 0.01f }
+    }
     val edgePx = with(LocalDensity.current) { EDGE_FLIP_WIDTH.toPx() }
 
     // Holding a dragged icon against a page edge flips pages, which is the only way to move an app
@@ -190,13 +193,15 @@ fun LauncherPager(
         // Top-right chrome. Gated on the collapse so the idle clock screen stays bare: these are
         // launcher controls, and they appear as soon as the swipe starts. Removing them mid-swipe is
         // safe — they are tap targets, so no gesture is ever in flight on them.
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 14.dp, end = 16.dp)
-                .graphicsLayer { alpha = collapse() },
-        ) {
-            headerActions(collapse)
+        if (showHeaderActions) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 14.dp, end = 16.dp)
+                    .graphicsLayer { alpha = collapse() },
+            ) {
+                headerActions(collapse)
+            }
         }
 
         PageDots(

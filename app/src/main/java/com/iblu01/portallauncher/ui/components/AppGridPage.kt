@@ -113,7 +113,9 @@ fun AppGridPage(
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
     var contentRect by remember { mutableStateOf(Rect.Zero) }
-    val onPage = items.filter { it.cell.page == page }
+    // Page contents change only when placement changes, not while the pager moves. Avoid scanning
+    // and allocating a new list if an ancestor happens to recompose during a gesture.
+    val onPage = remember(items, page) { items.filter { it.cell.page == page } }
     // Read inside the gesture rather than captured by it: the pointer-input block must survive the
     // whole drag, so it cannot be keyed on anything that changes while dragging.
     val currentOnPage = rememberUpdatedState(onPage)
