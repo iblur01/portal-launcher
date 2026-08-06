@@ -1,7 +1,6 @@
 package com.iblu01.portallauncher
 
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -297,13 +296,6 @@ class SettingsActivity : ComponentActivity() {
     }
 
     private fun grantUsefulPermissions() {
-        val missing = listOf(android.Manifest.permission.RECORD_AUDIO).filter {
-            checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
-        }
-        if (missing.isNotEmpty()) {
-            requestPermissions(missing.toTypedArray(), 1)
-            return
-        }
         if (!Settings.System.canWrite(this)) {
             startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:$packageName")))
             return

@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.AlertDialog
@@ -93,6 +96,7 @@ import com.iblu01.portallauncher.ui.components.SettingsTile
 import com.iblu01.portallauncher.ui.components.SettingsTextField
 import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.components.backgroundModes
+import com.iblu01.portallauncher.ui.onboarding.OnboardingActivity
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import java.net.URL
@@ -151,7 +155,8 @@ interface SettingsCallbacks {
     fun onSetPillEnabled(candidates: List<PillCandidate>, enabled: Boolean)
 }
 
-private enum class SettingsPage { MAIN, HOME, PILLS, APPLICATION, DEVELOPER, SETUP }
+private enum class SettingsPage { MAIN, HOME, PILLS, APPLICATION, DEVELOPER, INFORMATION }
+private enum class UpdateState { IDLE, CHECKING, UP_TO_DATE, DOWNLOADING, ERROR }
 
 /** Best-effort host extraction used to pre-fill the MQTT broker from the HA address. */
 private fun hostOf(url: String): String = runCatching { URL(url.trim()).host }.getOrDefault("")
@@ -176,9 +181,9 @@ fun SettingsScreen(
     autoReturnState: AutoReturnUiState = AutoReturnUiState(),
     onAutoReturnCancel: (() -> Unit)? = null,
 ) {
-    var currentPage by remember {
-        mutableStateOf(if (prefs.haToken.isBlank()) SettingsPage.SETUP else SettingsPage.MAIN)
-    }
+    // First-run configuration is its own flow now (ui.onboarding), not a page of the settings, so
+    // the settings always open on their own root — even when no home has been connected.
+    var currentPage by remember { mutableStateOf(SettingsPage.MAIN) }
 
     var haPackage by remember { mutableStateOf(prefs.homeAssistantPackage) }
     var host by remember { mutableStateOf(prefs.brokerHost) }
@@ -303,16 +308,6 @@ fun SettingsScreen(
                 homeSubtitle = homeSubtitle,
                 onNavigate = { currentPage = it },
             )
-            SettingsPage.SETUP -> SetupWizard(
-                uiState = uiState,
-                haUrl = haUrl, haToken = haToken,
-                onUrlChange = onUrlChange,
-                onTokenChange = onTokenChange,
-                onSelectInstance = onSelectInstance,
-                onTest = { callbacks.onTestHaApi(haUrl, haToken) },
-                onFinish = { save(); currentPage = SettingsPage.MAIN },
-                onSkip = { currentPage = SettingsPage.MAIN },
-            )
             SettingsPage.HOME -> HomeConnectionPage(
                 uiState = uiState,
                 haUrl = haUrl, haToken = haToken,
@@ -388,6 +383,10 @@ fun SettingsScreen(
                 onBack = { currentPage = SettingsPage.MAIN },
                 showBack = showBack,
             )
+            SettingsPage.INFORMATION -> InformationPage(
+                onBack = { currentPage = SettingsPage.MAIN },
+                showBack = showBack,
+            )
         }
     }
 
@@ -401,16 +400,13 @@ fun SettingsScreen(
                 // tablet has room for a permanent nav sidebar next to the detail pane.
                 val isExpanded = maxWidth >= 840.dp
 
-                if (currentPage == SettingsPage.SETUP) {
-                    Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 20.dp)) {
-                        detailContent(SettingsPage.SETUP, true)
-                    }
-                } else if (isExpanded) {
+                if (isExpanded) {
                     val sidebarItems = listOf(
                         Triple(SettingsPage.HOME, Icons.Outlined.Home, stringResource(R.string.settings_tile_home_title)),
                         Triple(SettingsPage.PILLS, Icons.Outlined.Dashboard, stringResource(R.string.settings_tile_pills_title)),
                         Triple(SettingsPage.APPLICATION, Icons.Outlined.Settings, stringResource(R.string.settings_tile_app_title)),
                         Triple(SettingsPage.DEVELOPER, Icons.Outlined.Build, stringResource(R.string.settings_tile_dev_title)),
+                        Triple(SettingsPage.INFORMATION, Icons.Outlined.Info, stringResource(R.string.settings_tile_info_title)),
                     )
                     // The MAIN tile grid only exists for the narrow layout; land on "Ma maison" instead.
                     val selectedPage = if (currentPage == SettingsPage.MAIN) SettingsPage.HOME else currentPage
@@ -463,6 +459,7 @@ private fun MainPage(homeSubtitle: String, onNavigate: (SettingsPage) -> Unit) {
         TileDef(SettingsPage.PILLS, Icons.Outlined.Dashboard, stringResource(R.string.settings_tile_pills_title), stringResource(R.string.settings_tile_pills_subtitle)),
         TileDef(SettingsPage.APPLICATION, Icons.Outlined.Settings, stringResource(R.string.settings_tile_app_title), stringResource(R.string.settings_tile_app_subtitle)),
         TileDef(SettingsPage.DEVELOPER, Icons.Outlined.Build, stringResource(R.string.settings_tile_dev_title), stringResource(R.string.settings_tile_dev_subtitle)),
+        TileDef(SettingsPage.INFORMATION, Icons.Outlined.Info, stringResource(R.string.settings_tile_info_title), stringResource(R.string.settings_tile_info_subtitle)),
     )
 
     Column(
@@ -479,9 +476,9 @@ private fun MainPage(homeSubtitle: String, onNavigate: (SettingsPage) -> Unit) {
                     }
                 }
                 if (rowTiles.size < 2) Spacer(Modifier.weight(1f))
-            }
         }
     }
+}
 }
 
 @Composable
@@ -523,7 +520,8 @@ private fun AppPage(
     var immichErrorCategory by remember { mutableStateOf<String?>(null) }
     var immichConnectedAlbumCount by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
-    val app = LocalContext.current.applicationContext as PortalApp
+    val settingsContext = LocalContext.current
+    val app = settingsContext.applicationContext as PortalApp
 
     fun loadImmichAlbums(openPicker: Boolean) {
         if (immichBusy) return
@@ -608,6 +606,23 @@ private fun AppPage(
                 label = stringResource(R.string.settings_app_label_language),
                 value = "${currentLanguage.flag} ${stringResource(currentLanguage.nameRes)}",
                 onClick = { showLanguagePage = true },
+            )
+            SettingsDivider()
+            // The first-run assistant is offered again from here, and only from here: it never
+            // reopens by itself once it has been completed.
+            SettingsRow(
+                label = stringResource(R.string.onb_settings_restart_setup_label),
+                onClick = {
+                    settingsContext.startActivity(
+                        OnboardingActivity.intent(settingsContext, reset = true)
+                    )
+                },
+            )
+            Text(
+                stringResource(R.string.onb_settings_restart_setup_subtitle),
+                style = AppleTypography.bodySmall,
+                color = AppleColors.secondary,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
             )
         }
 
@@ -1037,6 +1052,145 @@ private fun DeveloperPage(
                                 process.waitFor()
                             }
                         }.also { it.isDaemon = true }.start()
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun InformationPage(
+    onBack: () -> Unit,
+    showBack: Boolean = true,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val version = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    }.getOrDefault("unknown")
+
+    var updateState by remember { mutableStateOf(UpdateState.IDLE) }
+    var latestVersion by remember { mutableStateOf<String?>(null) }
+    var downloadUrl by remember { mutableStateOf<String?>(null) }
+
+    fun checkForUpdates() {
+        if (updateState == UpdateState.CHECKING) return
+        updateState = UpdateState.CHECKING
+        scope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val url = URL("https://api.github.com/repos/iblu01/portal-launcher/releases/latest")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.setRequestProperty("Accept", "application/vnd.github+json")
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 10_000
+                val body = conn.inputStream.bufferedReader().readText()
+                val json = org.json.JSONObject(body)
+                val tag = json.optString("tag_name", "")
+                val assets = json.optJSONArray("assets")
+                val apkUrl = assets?.optJSONObject(0)?.optString("browser_download_url", "") ?: ""
+                Pair(tag, apkUrl)
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess { (tag, apkUrl) ->
+                    val cleanTag = tag.removePrefix("v")
+                    if (cleanTag.isEmpty() || cleanTag == version) {
+                        updateState = UpdateState.UP_TO_DATE
+                    } else {
+                        latestVersion = cleanTag
+                        downloadUrl = apkUrl
+                        updateState = if (apkUrl.isNotBlank()) UpdateState.IDLE
+                        else UpdateState.UP_TO_DATE
+                    }
+                }.onFailure {
+                    updateState = UpdateState.ERROR
+                }
+            }
+        }
+    }
+
+    fun downloadAndInstall(url: String) {
+        updateState = UpdateState.DOWNLOADING
+        scope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val cacheDir = java.io.File(context.cacheDir, "updates")
+                cacheDir.mkdirs()
+                val apkFile = java.io.File(cacheDir, "portal-launcher-update.apk")
+                val conn = URL(url).openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 30_000
+                conn.readTimeout = 60_000
+                conn.inputStream.use { input ->
+                    apkFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                apkFile
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess { apkFile ->
+                    val apkUri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        apkFile
+                    )
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    runCatching { context.startActivity(intent) }
+                    updateState = UpdateState.IDLE
+                }.onFailure {
+                    updateState = UpdateState.ERROR
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        SettingsSubPageHeader(
+            title = stringResource(R.string.settings_info_page_title),
+            onBack = onBack,
+            showBack = showBack,
+        )
+
+        SettingsSection(title = stringResource(R.string.settings_info_section_app)) {
+            SettingsRow(
+                label = stringResource(R.string.settings_info_label_version),
+                value = version,
+                onClick = {},
+            )
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_info_section_updates)) {
+            val isBusy = updateState == UpdateState.CHECKING ||
+                updateState == UpdateState.DOWNLOADING
+
+            val label = when (updateState) {
+                UpdateState.CHECKING -> stringResource(R.string.settings_info_checking)
+                UpdateState.UP_TO_DATE -> stringResource(R.string.settings_info_up_to_date)
+                UpdateState.DOWNLOADING -> stringResource(R.string.settings_info_downloading)
+                UpdateState.ERROR -> stringResource(R.string.settings_info_check_error)
+                UpdateState.IDLE -> if (latestVersion != null)
+                    stringResource(R.string.settings_info_update_available, latestVersion!!)
+                else stringResource(R.string.settings_info_label_check_updates)
+            }
+
+            val isUpdateAvailable = latestVersion != null &&
+                downloadUrl?.isNotBlank() == true &&
+                updateState == UpdateState.IDLE
+
+            SettingsRow(
+                label = if (isUpdateAvailable)
+                    stringResource(R.string.settings_info_install)
+                else label,
+                onClick = {
+                    if (isUpdateAvailable) {
+                        downloadAndInstall(downloadUrl!!)
+                    } else if (!isBusy) {
+                        checkForUpdates()
                     }
                 },
             )

@@ -72,9 +72,11 @@
     <string name="settings_tile_pills_title">Displayed info</string>
     <string name="settings_tile_pills_subtitle">What Portal shows at the top of the screen</string>
     <string name="settings_tile_app_title">Application</string>
-    <string name="settings_tile_app_subtitle">Wallpaper, sleep, applications</string>
+    <string name="settings_tile_app_subtitle">Language, clock, grid, sleep</string>
     <string name="settings_tile_dev_title">Developer</string>
     <string name="settings_tile_dev_subtitle">Advanced options</string>
+    <string name="settings_tile_info_title">Information</string>
+    <string name="settings_tile_info_subtitle">Version &amp; updates</string>
     <string name="settings_main_title">Portal Launcher</string>
     <string name="settings_app_page_title">Application</string>
     <string name="settings_app_section_language">LANGUAGE</string>
@@ -130,6 +132,19 @@
     <string name="settings_dev_label_permissions">Sensor / sound / brightness permissions</string>
     <string name="settings_dev_rebooting">Rebooting…</string>
     <string name="settings_dev_reboot">Reboot</string>
+
+    <!-- ===== INFORMATION PAGE ===== -->
+    <string name="settings_info_page_title">Information</string>
+    <string name="settings_info_section_app">APP</string>
+    <string name="settings_info_label_version">Version</string>
+    <string name="settings_info_section_updates">UPDATES</string>
+    <string name="settings_info_label_check_updates">Check for updates</string>
+    <string name="settings_info_checking">Checking…</string>
+    <string name="settings_info_up_to_date">Up to date</string>
+    <string name="settings_info_update_available">Update available: %s</string>
+    <string name="settings_info_downloading">Downloading…</string>
+    <string name="settings_info_install">Download &amp; install</string>
+    <string name="settings_info_check_error">Check failed</string>
 
     <!-- ===== PILL SETTINGS PAGE ===== -->
     <string name="pills_page_title">Displayed info</string>
@@ -559,4 +574,302 @@
     <string name="pill_lock_jammed">Jammed</string>
     <string name="pill_individual_energy_power">Power</string>
     <string name="pill_individual_energy_today">Today</string>
+
+    <!-- ===== ONBOARDING — COMMON ===== -->
+    <string name="onb_common_nav_back">Back</string>
+    <string name="onb_common_nav_skip">Skip</string>
+    <string name="onb_common_nav_continue">Continue</string>
+    <string name="onb_common_nav_test_connection">Test connection</string>
+    <string name="onb_common_nav_retry">Retry</string>
+    <string name="onb_common_nav_edit_details">Edit details</string>
+    <string name="onb_common_nav_set_up_later">Set up later</string>
+    <string name="onb_common_nav_later">Later</string>
+    <string name="onb_common_nav_done">Done</string>
+    <string name="onb_common_nav_i_understand">I understand</string>
+    <string name="onb_common_nav_apply">Apply</string>
+    <string name="onb_common_chapter_launcher">Launcher</string>
+    <string name="onb_common_chapter_home">Home</string>
+    <string name="onb_common_chapter_finish">Finish</string>
+    <string name="onb_common_toast_copied">Copied to clipboard</string>
+
+    <!-- ===== ONBOARDING — WELCOME ===== -->
+    <string name="onb_language_title">Choose your language</string>
+    <string name="onb_language_body">Select the language Portal should use. You can change it later in settings.</string>
+    <string name="onb_welcome_title">Welcome to your new calm launcher</string>
+    <string name="onb_welcome_body">Portal turns this screen into a space that\'s smart, useful, and calm. The time, your home, and your apps stay within reach without constantly demanding your attention.</string>
+    <string name="onb_welcome_action_primary">Set up the launcher</string>
+    <string name="onb_welcome_action_secondary">Skip setup</string>
+    <string name="onb_welcome_skip_dialog_title">Skip setup?</string>
+    <string name="onb_welcome_skip_dialog_body">Portal will use its default settings. You can restart this setup anytime from the app settings.</string>
+    <string name="onb_welcome_skip_dialog_continue">Continue setup</string>
+    <string name="onb_welcome_skip_dialog_confirm">Use default settings</string>
+    <string name="onb_welcome_language_label">Language</string>
+
+    <!-- ===== ONBOARDING — SYSTEM_SETUP ===== -->
+    <string name="onb_setup_title">Let\'s prepare this screen</string>
+    <string name="onb_setup_body">A few permissions let Portal behave like a true smart display.</string>
+    <string name="onb_setup_status_not_configured">Not configured</string>
+    <string name="onb_setup_status_configured">Configured</string>
+    <string name="onb_setup_status_unavailable">Not available on this device</string>
+    <string name="onb_setup_status_enabled">Enabled</string>
+    <string name="onb_setup_status_to_enable">To enable</string>
+    <string name="onb_setup_status_advanced_required">Advanced setup required</string>
+    <string name="onb_setup_default_launcher_title">Default launcher</string>
+    <string name="onb_setup_default_launcher_desc">Lets Portal replace the Android home screen and manage apps, widgets, and shortcuts.</string>
+    <string name="onb_setup_default_launcher_action">Set as default launcher</string>
+    <string name="onb_setup_default_launcher_badge_recommended">Strongly recommended</string>
+    <string name="onb_setup_adb_help_title">Advanced help (ADB)</string>
+    <string name="onb_setup_adb_help_body">If this device doesn\'t offer the corresponding Android screen, run this command from a computer:</string>
+    <string name="onb_setup_adb_help_copy_command">Copy the command</string>
+    <string name="onb_setup_screen_control_title">Screen control</string>
+    <string name="onb_setup_screen_control_desc">Lets Portal turn the screen off or wake it when used as a wall panel.</string>
+    <string name="onb_setup_screen_control_action">Enable screen control</string>
+    <string name="onb_setup_screen_control_explanation">Portal uses an accessibility service only to turn the screen off and back on. It doesn\'t read any displayed content or record any interaction.</string>
+    <string name="onb_setup_brightness_title">Brightness control</string>
+    <string name="onb_setup_brightness_desc">Lets Portal and Home Assistant adjust this screen\'s brightness.</string>
+    <string name="onb_setup_brightness_action">Allow brightness control</string>
+
+    <!-- ===== ONBOARDING — GRID ===== -->
+    <string name="onb_grid_title">How much room for your apps?</string>
+    <string name="onb_grid_body">Choose a comfortable size. You can always change it later.</string>
+    <string name="onb_grid_preset_large_icons">Large icons</string>
+    <string name="onb_grid_preset_balanced">Balanced</string>
+    <string name="onb_grid_preset_more_apps">More apps</string>
+    <string name="onb_grid_preset_subtitle_format">%1$d × %2$d</string>
+    <string name="onb_grid_manual_toggle">Adjust manually</string>
+    <string name="onb_grid_slider_label">Size</string>
+    <string name="onb_grid_slider_percent_format">%1$d%%</string>
+
+    <!-- ===== ONBOARDING — BACKGROUND ===== -->
+    <string name="onb_bg_title">Choose your mood</string>
+    <string name="onb_bg_body">The background stays deliberately understated to keep the time and important information readable.</string>
+    <string name="onb_bg_tile_calm">Calm</string>
+    <string name="onb_bg_tile_nature">Nature</string>
+    <string name="onb_bg_tile_my_photo">My photo</string>
+    <string name="onb_bg_tile_immich">Immich</string>
+    <string name="onb_bg_calm_desc">A dark gradient, entirely offline.</string>
+    <string name="onb_bg_calm_opacity_label">Interface opacity</string>
+    <string name="onb_bg_calm_preview_action">Full-screen preview</string>
+    <string name="onb_bg_nature_desc">Portal gently cycles through a selection of landscapes.</string>
+    <string name="onb_bg_nature_warning_internet">This option requires an Internet connection.</string>
+    <string name="onb_bg_nature_auto_change_label">Automatic change</string>
+    <string name="onb_bg_photo_desc">Choose an image from this device.</string>
+    <string name="onb_bg_photo_choose_action">Choose an image</string>
+    <string name="onb_bg_photo_dim_label">Dimming</string>
+    <string name="onb_bg_photo_readability_hint">Make sure the time stays readable.</string>
+    <string name="onb_bg_photo_error_load">Couldn\'t load this image.</string>
+    <string name="onb_bg_immich_desc">Automatically display photos from your Immich albums on your screen.</string>
+    <string name="onb_bg_immich_field_server">Server address</string>
+    <string name="onb_bg_immich_field_api_key">API key</string>
+    <string name="onb_bg_immich_field_albums">Albums</string>
+    <string name="onb_bg_immich_field_change_frequency">Change frequency</string>
+    <string name="onb_bg_immich_field_shuffle">Random order</string>
+    <string name="onb_bg_immich_field_allow_insecure">Allow an insecure connection</string>
+    <string name="onb_bg_immich_loading">Connecting to Immich…</string>
+    <string name="onb_bg_immich_success">Immich is connected.</string>
+    <string name="onb_bg_immich_error_unreachable">Couldn\'t reach the Immich server.</string>
+    <string name="onb_bg_immich_error_api_key">API key rejected.</string>
+    <string name="onb_bg_immich_error_unexpected">Unexpected response from the server.</string>
+    <string name="onb_bg_immich_leave_hint">You can leave this step without finishing the Immich setup.</string>
+    <string name="onb_bg_selected_a11y">Selected</string>
+
+    <!-- ===== ONBOARDING — HOME_ASSISTANT_INTRO ===== -->
+    <string name="onb_ha_intro_title">Portal is even better with Home Assistant</string>
+    <string name="onb_ha_intro_body">Connect your home to view and control your lights, openings, alarms, media, temperatures, and other important devices.</string>
+    <string name="onb_ha_intro_question">Would you like to connect your home now?</string>
+    <string name="onb_ha_intro_discovery_searching">Looking for your home on the network…</string>
+    <string name="onb_ha_intro_discovery_found_none">No home found on this network.</string>
+    <plurals name="onb_ha_intro_discovery_found_count">
+        <item quantity="one">Home found</item>
+        <item quantity="other">%1$d homes found</item>
+    </plurals>
+    <string name="onb_ha_intro_action_continue">Continue with this home</string>
+    <string name="onb_ha_intro_action_manual">Add manually</string>
+
+    <!-- ===== ONBOARDING — HOME_ASSISTANT_CREDENTIALS ===== -->
+    <string name="onb_ha_creds_title">Connect Portal to your home</string>
+    <string name="onb_ha_creds_label_address">Home Assistant address</string>
+    <string name="onb_ha_creds_placeholder_address" translatable="false">http://homeassistant.local:8123</string>
+    <string name="onb_ha_creds_label_token">Long-lived access token</string>
+    <string name="onb_ha_creds_placeholder_token">Paste your token here</string>
+    <string name="onb_ha_creds_action_show">Show</string>
+    <string name="onb_ha_creds_action_hide">Hide</string>
+    <string name="onb_ha_creds_action_paste">Paste</string>
+    <string name="onb_ha_creds_action_find_token">Where do I find my token?</string>
+    <string name="onb_ha_creds_help_step1">1. Open Home Assistant in your browser.</string>
+    <string name="onb_ha_creds_help_step2">2. Open your user profile.</string>
+    <string name="onb_ha_creds_help_step3">3. Go to the Security tab.</string>
+    <string name="onb_ha_creds_help_step4">4. Under “Long-lived access tokens”, create a new token.</string>
+    <string name="onb_ha_creds_help_step5">5. Name it “Portal”, then copy it here.</string>
+    <string name="onb_ha_creds_error_invalid_address">Invalid address.</string>
+    <string name="onb_ha_creds_error_token_required">Token is required.</string>
+    <string name="onb_ha_creds_skip_dialog_title">Discard this connection?</string>
+    <string name="onb_ha_creds_skip_dialog_body">The information entered won\'t be saved.</string>
+    <string name="onb_ha_creds_skip_dialog_continue">Keep editing</string>
+    <string name="onb_ha_creds_skip_dialog_discard">Discard</string>
+
+    <!-- ===== ONBOARDING — HOME_ASSISTANT_TEST ===== -->
+    <string name="onb_ha_test_running_title">Connecting to your home…</string>
+    <string name="onb_ha_test_phase_address">Checking the address</string>
+    <string name="onb_ha_test_phase_auth">Authenticating</string>
+    <string name="onb_ha_test_phase_devices">Retrieving devices</string>
+    <string name="onb_ha_test_success_title">Your home is connected</string>
+    <string name="onb_ha_test_success_body_format">Portal found %1$d entities in your home.</string>
+    <plurals name="onb_ha_test_category_lights">
+        <item quantity="one">%1$d light</item>
+        <item quantity="other">%1$d lights</item>
+    </plurals>
+    <plurals name="onb_ha_test_category_openings">
+        <item quantity="one">%1$d opening</item>
+        <item quantity="other">%1$d openings</item>
+    </plurals>
+    <plurals name="onb_ha_test_category_media_players">
+        <item quantity="one">%1$d media player</item>
+        <item quantity="other">%1$d media players</item>
+    </plurals>
+    <plurals name="onb_ha_test_category_alarms">
+        <item quantity="one">%1$d alarm</item>
+        <item quantity="other">%1$d alarms</item>
+    </plurals>
+    <plurals name="onb_ha_test_category_weather">
+        <item quantity="one">%1$d weather station</item>
+        <item quantity="other">%1$d weather stations</item>
+    </plurals>
+    <plurals name="onb_ha_test_category_thermostats">
+        <item quantity="one">%1$d thermostat</item>
+        <item quantity="other">%1$d thermostats</item>
+    </plurals>
+    <string name="onb_ha_test_error_unreachable_title">Address unreachable</string>
+    <string name="onb_ha_test_error_unreachable_body">Portal couldn\'t reach Home Assistant at this address.</string>
+    <string name="onb_ha_test_error_timeout_title">Timed out</string>
+    <string name="onb_ha_test_error_timeout_body">Home Assistant took too long to respond.</string>
+    <string name="onb_ha_test_error_token_title">Token rejected</string>
+    <string name="onb_ha_test_error_token_body">Check that the token was copied correctly.</string>
+    <string name="onb_ha_test_error_certificate_title">Invalid certificate</string>
+    <string name="onb_ha_test_error_certificate_body">Portal couldn\'t verify this server\'s security certificate.</string>
+    <string name="onb_ha_test_error_offline_title">Device outside the local network</string>
+    <string name="onb_ha_test_error_offline_body">This screen must be on the same network as Home Assistant.</string>
+    <string name="onb_ha_test_error_invalid_response_title">Invalid response from Home Assistant</string>
+    <string name="onb_ha_test_error_invalid_response_body">The server replied in an unexpected format.</string>
+    <string name="onb_ha_test_error_generic_title">Couldn\'t connect</string>
+    <string name="onb_ha_test_error_generic_body">Something went wrong. Please try again.</string>
+
+    <!-- ===== ONBOARDING — PILLS_INTRO ===== -->
+    <string name="onb_pills_title">Important information comes to you</string>
+    <string name="onb_pills_body">Portal uses pills to show, at a glance, what matters in your home.</string>
+    <string name="onb_pills_demo_caption_normal">Normal situation</string>
+    <string name="onb_pills_demo_caption_door">A door opens</string>
+    <string name="onb_pills_demo_caption_alarm">An alarm goes off</string>
+    <string name="onb_pills_explanation_priority">Pills don\'t simply follow device order. They\'re ranked automatically by importance.</string>
+    <string name="onb_pills_explanation_more">Portal shows only a few pieces of information on the main screen. Tap “See more” to find the rest of your home.</string>
+    <string name="onb_pills_choice_recommended">Use the recommended selection</string>
+    <string name="onb_pills_choice_custom">Choose my information</string>
+    <string name="onb_pills_search_placeholder">Search for an entity</string>
+    <string name="onb_pills_empty_state">No entity found.</string>
+    <string name="onb_pills_action_enable_all">Enable all</string>
+    <string name="onb_pills_action_disable_all">Disable all</string>
+
+    <!-- ===== ONBOARDING — REMOTE_CONTROL ===== -->
+    <string name="onb_remote_title">Would you also like to control this screen from Home Assistant?</string>
+    <string name="onb_remote_body">Portal can appear as a device in Home Assistant. You\'ll be able to control its screen, brightness, volume, power mode, and send it notifications.</string>
+    <string name="onb_remote_feature_screen">Screen</string>
+    <string name="onb_remote_feature_brightness">Brightness</string>
+    <string name="onb_remote_feature_volume">Volume</string>
+    <string name="onb_remote_feature_presence">Presence</string>
+    <string name="onb_remote_feature_notification">Notification</string>
+    <string name="onb_remote_action_primary">Set up</string>
+
+    <!-- ===== ONBOARDING — MQTT_CONFIGURATION ===== -->
+    <string name="onb_mqtt_config_title">Set up remote control</string>
+    <string name="onb_mqtt_config_body">Portal connects to your home\'s MQTT server.</string>
+    <string name="onb_mqtt_config_field_server">Server</string>
+    <string name="onb_mqtt_config_field_port">Port</string>
+    <string name="onb_mqtt_config_field_auth">Authentication</string>
+    <string name="onb_mqtt_config_field_username">Username</string>
+    <string name="onb_mqtt_config_field_password">Password</string>
+    <string name="onb_mqtt_config_field_device_name">Device name</string>
+    <string name="onb_mqtt_config_suggestion_hint">Suggested from the Home Assistant address.</string>
+    <string name="onb_mqtt_config_note_credentials">Home Assistant doesn\'t share its MQTT server credentials. Enter them manually.</string>
+    <string name="onb_mqtt_config_discovery_searching">Looking for an MQTT server…</string>
+    <string name="onb_mqtt_config_discovery_found">MQTT server found</string>
+    <string name="onb_mqtt_config_discovery_not_found">No MQTT server found automatically.</string>
+    <string name="onb_mqtt_config_device_name_placeholder">Living room Portal</string>
+    <string name="onb_mqtt_config_error_server_required">Server address is required.</string>
+    <string name="onb_mqtt_config_error_invalid_port">Invalid port.</string>
+
+    <!-- ===== ONBOARDING — MQTT_TEST ===== -->
+    <string name="onb_mqtt_test_running_title">Connecting Portal to Home Assistant…</string>
+    <string name="onb_mqtt_test_phase_connect">Connecting to the server</string>
+    <string name="onb_mqtt_test_phase_publish">Publishing the device</string>
+    <string name="onb_mqtt_test_phase_verify">Checking the response</string>
+    <string name="onb_mqtt_test_success_title">Portal can now be controlled</string>
+    <string name="onb_mqtt_test_success_body">This screen will appear in Home Assistant with its sensors and controls.</string>
+    <string name="onb_mqtt_test_features_header">Available features</string>
+    <string name="onb_mqtt_test_error_unreachable">Server unreachable</string>
+    <string name="onb_mqtt_test_error_bad_credentials">Incorrect credentials</string>
+    <string name="onb_mqtt_test_error_connection_refused">Connection refused</string>
+    <string name="onb_mqtt_test_error_timeout">Timed out</string>
+    <string name="onb_mqtt_test_error_publish_refused">Publishing refused by the server</string>
+    <string name="onb_mqtt_test_error_subscribe_refused">Subscription refused by the server</string>
+    <string name="onb_mqtt_test_error_generic">Couldn\'t connect</string>
+
+    <!-- ===== ONBOARDING — HIDDEN_APPS ===== -->
+    <string name="onb_hidden_title">Keep only what matters</string>
+    <string name="onb_hidden_body">Hide the apps you don\'t want to see on this screen. They\'ll stay installed and can be restored anytime.</string>
+    <string name="onb_hidden_search_placeholder">Search for an app</string>
+    <string name="onb_hidden_action_show_all">Show all</string>
+    <string name="onb_hidden_action_hide_system">Hide system apps</string>
+    <string name="onb_hidden_action_select_manually">Select manually</string>
+    <string name="onb_hidden_status_visible">Visible</string>
+    <string name="onb_hidden_status_hidden">Hidden</string>
+    <string name="onb_hidden_badge_recommended">Recommended</string>
+    <string name="onb_hidden_badge_required">Required by Portal</string>
+    <plurals name="onb_hidden_count_hidden">
+        <item quantity="one">%1$d hidden</item>
+        <item quantity="other">%1$d hidden</item>
+    </plurals>
+    <string name="onb_hidden_action_hide_none">Hide nothing</string>
+    <string name="onb_hidden_hint_settings">You can change this list from the settings.</string>
+
+    <!-- ===== ONBOARDING — GESTURES ===== -->
+    <string name="onb_gestures_title">Everything is within a gesture\'s reach</string>
+    <string name="onb_gestures_hint_apps">Swipe left to see your apps.</string>
+    <string name="onb_gestures_hint_clock">Tap the clock to open your main app.</string>
+    <string name="onb_gestures_hint_hold">Hold an empty space to change the background or open settings.</string>
+
+    <!-- ===== ONBOARDING — COMPLETE ===== -->
+    <string name="onb_complete_title">Your Portal is ready</string>
+    <string name="onb_complete_body">Your screen is now set up to stay calm, useful, and always in its place.</string>
+    <string name="onb_complete_summary_default_launcher">Default launcher</string>
+    <string name="onb_complete_summary_grid">Grid</string>
+    <string name="onb_complete_summary_background">Background</string>
+    <string name="onb_complete_summary_home_assistant">Home Assistant</string>
+    <string name="onb_complete_summary_remote_control">Control from Home Assistant</string>
+    <string name="onb_complete_summary_hidden_apps">Hidden apps</string>
+    <string name="onb_complete_value_enabled">Enabled</string>
+    <string name="onb_complete_value_disabled">Disabled</string>
+    <string name="onb_complete_value_connected">Connected</string>
+    <string name="onb_complete_value_not_connected">Not connected</string>
+    <string name="onb_complete_value_grid_format">%1$d × %2$d</string>
+    <string name="onb_complete_action_discover">Discover your Portal</string>
+    <string name="onb_complete_action_open_settings">Open settings</string>
+
+    <!-- ===== ONBOARDING — SETTINGS ===== -->
+    <string name="onb_settings_restart_setup_label">Restart setup assistant</string>
+    <string name="onb_settings_restart_setup_subtitle">Resume Portal\'s setup from the beginning.</string>
+
+    <!-- ===== ONBOARDING — PILLS DEMO LABELS ===== -->
+    <string name="onb_pills_demo_pill_light">Living room light</string>
+    <string name="onb_pills_demo_pill_weather">Weather</string>
+    <string name="onb_pills_demo_pill_temperature">Temperature</string>
+    <string name="onb_pills_demo_pill_door">Front door open</string>
+    <string name="onb_pills_demo_pill_alarm">Alarm triggered</string>
+    <string name="settings_tile_wallpaper_title">Wallpaper</string>
+    <string name="settings_tile_wallpaper_subtitle">Background, photos, Immich</string>
+    <string name="settings_wallpaper_page_title">Wallpaper</string>
+    <string name="settings_wallpaper_section_readability">READABILITY</string>
+    <string name="settings_wallpaper_choose_photo">Choose a photo</string>
+    <string name="settings_wallpaper_replace_photo">Replace the photo</string>
+    <string name="settings_wallpaper_photo_missing">No photo chosen yet</string>
+    <string name="settings_wallpaper_photo_error">This image could not be read. Try another one.</string>
 </resources>

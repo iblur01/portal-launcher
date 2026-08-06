@@ -1,13 +1,11 @@
 package com.iblu01.portallauncher.ui.components
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -27,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Rect
@@ -98,12 +94,12 @@ fun appPageOf(pagerPage: Int): Int? =
 fun LauncherPager(
     state: PagerState,
     userScrollEnabled: Boolean,
-    header: @Composable (collapse: Float) -> Unit,
+    header: @Composable (collapse: () -> Float) -> Unit,
     clockPage: @Composable () -> Unit,
     appPage: @Composable (page: Int, appear: () -> Float) -> Unit,
     modifier: Modifier = Modifier,
     /** Launcher chrome pinned to the top bar next to the clock; fades in with the swipe. */
-    headerActions: @Composable (collapse: Float) -> Unit = {},
+    headerActions: @Composable (collapse: () -> Float) -> Unit = {},
     /** Drawn above every page so an icon drag can cross them. */
     dragOverlay: @Composable () -> Unit = {},
     /** The drag in flight, if any. Drives the edge-held page flip. */
@@ -113,7 +109,14 @@ fun LauncherPager(
     /** Long-press on the (expanded) clock — the quick-actions menu. */
     onHeaderLongPress: () -> Unit = {},
 ) {
-    val collapse by remember(state) { derivedStateOf { state.collapseFraction() } }
+    // Keep the rapidly changing pager offset out of composition. Consumers invoke this only from
+    // layout or draw/layer blocks, which Compose can invalidate without rebuilding the subtree.
+    val collapse = remember(state) { { state.collapseFraction() } }
+    // This derived boolean changes only twice per complete swipe. It prevents the transparent
+    // actions layer from intercepting clock taps without subscribing composition to every offset.
+    val showHeaderActions by remember(state) {
+        derivedStateOf { state.collapseFraction() > 0.01f }
+    }
     val edgePx = with(LocalDensity.current) { EDGE_FLIP_WIDTH.toPx() }
 
     // Holding a dragged icon against a page edge flips pages, which is the only way to move an app
@@ -177,7 +180,9 @@ fun LauncherPager(
                         onLongPress = { if (state.collapseFraction() < 0.5f) onHeaderLongPress() },
                     )
                 }
-                .collapsingHeight { headerHeight -> (headerHeight * headerScale(collapse)).roundToInt() },
+                .collapsingHeight { headerHeight ->
+                    (headerHeight * headerScale(collapse())).roundToInt()
+                },
             // The wrapper fills the width (so the whole clock band forwards drags), so the clock
             // itself has to be centred here — it wraps its own width.
             contentAlignment = Alignment.TopCenter,
@@ -188,19 +193,19 @@ fun LauncherPager(
         // Top-right chrome. Gated on the collapse so the idle clock screen stays bare: these are
         // launcher controls, and they appear as soon as the swipe starts. Removing them mid-swipe is
         // safe — they are tap targets, so no gesture is ever in flight on them.
-        if (collapse > 0.01f) {
+        if (showHeaderActions) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 14.dp, end = 16.dp)
-                    .graphicsLayer { alpha = collapse },
+                    .graphicsLayer { alpha = collapse() },
             ) {
                 headerActions(collapse)
             }
         }
 
         PageDots(
-            progress = state.currentPage + state.currentPageOffsetFraction,
+            progress = { state.currentPage + state.currentPageOffsetFraction },
             count = state.pageCount,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -268,20 +273,27 @@ private const val EDGE_FLIP_DWELL_MS = 450L
 
 /** Two small dots; the active one slides continuously with [progress]. */
 @Composable
-private fun PageDots(progress: Float, count: Int, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+private fun PageDots(progress: () -> Float, count: Int, modifier: Modifier = Modifier) {
+    val dotWidth = 12.dp
+    val dotHeight = 6.dp
+    val spacing = 6.dp
+    Canvas(modifier.size(width = dotWidth * count + spacing * (count - 1).coerceAtLeast(0), height = dotHeight)) {
+        val dotWidthPx = dotWidth.toPx()
+        val minWidthPx = dotHeight.toPx()
+        val spacingPx = spacing.toPx()
+        val radius = size.height / 2f
+        val currentProgress = progress()
         repeat(count) { index ->
-            // Distance to the current position, so both dots cross-fade mid-swipe.
-            val weight = (1f - kotlin.math.abs(progress - index)).coerceIn(0f, 1f)
-            Box(
-                Modifier
-                    .size(width = 6.dp + 6.dp * weight, height = 6.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.25f + 0.55f * weight))
+            // Reserve the maximum width for every dot, then animate only pixels inside the Canvas.
+            // The pager offset therefore invalidates draw, never composition or measurement.
+            val weight = (1f - kotlin.math.abs(currentProgress - index)).coerceIn(0f, 1f)
+            val width = minWidthPx + (dotWidthPx - minWidthPx) * weight
+            val slotLeft = index * (dotWidthPx + spacingPx)
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.25f + 0.55f * weight),
+                topLeft = androidx.compose.ui.geometry.Offset(slotLeft + (dotWidthPx - width) / 2f, 0f),
+                size = androidx.compose.ui.geometry.Size(width, size.height),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius),
             )
         }
     }

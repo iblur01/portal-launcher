@@ -25,8 +25,8 @@ android {
         applicationId = "com.iblu01.portallauncher"
         minSdk = 28
         targetSdk = 28
-        versionCode = 3
-        versionName = "0.0.3-beta"
+        versionCode = 4
+        versionName = "0.0.4-beta"
     }
 
     signingConfigs {
@@ -46,6 +46,15 @@ android {
             if (releaseStoreFile != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
+        }
+        // Release-equivalent build for profiling on devices that already have the debug-signed
+        // package installed. Keeping the same signing key lets adb update the app in place, so its
+        // preferences, encrypted credentials, launcher layout and widget bindings are preserved.
+        // This variant must never be distributed: the public release still uses the private key.
+        create("productionTest") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
         }
     }
 

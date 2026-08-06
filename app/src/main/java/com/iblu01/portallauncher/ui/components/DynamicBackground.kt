@@ -27,7 +27,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.R
 
-private val unsplashUrls = listOf(
+/**
+ * The landscapes the "nature" background cycles through.
+ *
+ * Internal rather than private so the onboarding can show the same photos in its preview instead of
+ * a second, invented set — the tile promises exactly what the launcher will display.
+ */
+internal val unsplashUrls = listOf(
     "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80" to "Mer",
     "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80" to "Montagne",
     "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&q=80" to "Forêt",
@@ -92,10 +98,11 @@ private fun CustomWallpaper(modifier: Modifier = Modifier, wallpaperVersion: Int
     }
 }
 
+/** The image loader the landscapes use: no proxy, generous timeouts, long crossfade. */
 @Composable
-private fun UnsplashCycling(modifier: Modifier = Modifier) {
+internal fun rememberWallpaperImageLoader(): ImageLoader {
     val context = LocalContext.current
-    val imageLoader = remember(context) {
+    return remember(context) {
         ImageLoader.Builder(context.applicationContext)
             .okHttpClient {
                 OkHttpClient.Builder()
@@ -108,6 +115,11 @@ private fun UnsplashCycling(modifier: Modifier = Modifier) {
             .respectCacheHeaders(false)
             .build()
     }
+}
+
+@Composable
+private fun UnsplashCycling(modifier: Modifier = Modifier) {
+    val imageLoader = rememberWallpaperImageLoader()
     val index by produceState(0) {
         while (true) {
             delay(30_000L)

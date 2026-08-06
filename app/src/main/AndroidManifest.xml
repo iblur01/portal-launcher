@@ -7,9 +7,9 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <queries>
         <package android:name="io.homeassistant.companion.android" />
         <intent>
@@ -70,6 +70,16 @@
             android:name=".SettingsActivity"
             android:exported="false" />
 
+        <!--
+            First-run assistant. Not exported: it writes settings, so only Portal opens it. A
+            debug-only activity-alias (app/src/debug/AndroidManifest.xml) exposes it to ADB for
+            testing without shipping that entry point.
+        -->
+        <activity
+            android:name=".ui.onboarding.OnboardingActivity"
+            android:exported="false"
+            android:screenOrientation="fullSensor" />
+
         <activity
             android:name=".PlaygroundActivity"
             android:exported="false" />
@@ -112,5 +122,15 @@
         <receiver
             android:name=".SleepReceiver"
             android:exported="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>
