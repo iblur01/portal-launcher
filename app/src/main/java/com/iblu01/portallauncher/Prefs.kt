@@ -164,6 +164,58 @@ class Prefs(private val context: Context) {
         set(value) = sp.edit().putFloat("grid_scale", value.coerceIn(0.7f, 1.3f)).apply()
 
 
+    // --- First-run onboarding (see ui.onboarding) ----------------------------------------------
+    /**
+     * Content version of the onboarding the user last completed, 0 when they never did.
+     *
+     * Deliberately independent of [haToken]: Portal is a launcher first, so a user who never
+     * connects a home has still finished setting it up. A newer [ONBOARDING_VERSION] never
+     * overwrites existing choices — it only makes the flow offerable again.
+     */
+    var onboardingVersion: Int
+        get() = sp.getInt("onboarding_version", 0)
+        set(value) = sp.edit().putInt("onboarding_version", value).apply()
+
+    /** Name of the [com.iblu01.portallauncher.ui.onboarding.OnboardingStep] to resume on. */
+    var onboardingStep: String
+        get() = sp.getString("onboarding_step", "") ?: ""
+        set(value) = sp.edit().putString("onboarding_step", value).apply()
+
+    var onboardingCompleted: Boolean
+        get() = sp.getBoolean("onboarding_completed", false)
+        set(value) = sp.edit().putBoolean("onboarding_completed", value).apply()
+
+    /** Set when the user declined the Home Assistant branch; scopes only that branch. */
+    var homeAssistantOnboardingSkipped: Boolean
+        get() = sp.getBoolean("onboarding_skipped_ha", false)
+        set(value) = sp.edit().putBoolean("onboarding_skipped_ha", value).apply()
+
+    var mqttOnboardingSkipped: Boolean
+        get() = sp.getBoolean("onboarding_skipped_mqtt", false)
+        set(value) = sp.edit().putBoolean("onboarding_skipped_mqtt", value).apply()
+
+    var appCleanupOnboardingSkipped: Boolean
+        get() = sp.getBoolean("onboarding_skipped_app_cleanup", false)
+        set(value) = sp.edit().putBoolean("onboarding_skipped_app_cleanup", value).apply()
+
+    /** True once the home-screen gesture hints have been dismissed for good. */
+    var gestureHintsSeen: Boolean
+        get() = sp.getBoolean("onboarding_gestures_seen", false)
+        set(value) = sp.edit().putBoolean("onboarding_gestures_seen", value).apply()
+
+    /** Wipes the flow's progress so the assistant can be offered again, keeping every setting. */
+    fun resetOnboarding() {
+        sp.edit()
+            .remove("onboarding_version")
+            .remove("onboarding_step")
+            .remove("onboarding_completed")
+            .remove("onboarding_skipped_ha")
+            .remove("onboarding_skipped_mqtt")
+            .remove("onboarding_skipped_app_cleanup")
+            .remove("onboarding_gestures_seen")
+            .apply()
+    }
+
     var haUrl: String
         get() = sp.getString("ha_url", "http://homeassistant.local:8123") ?: "http://homeassistant.local:8123"
         set(value) = sp.edit().putString("ha_url", value.trim().trimEnd('/').ifEmpty { "http://homeassistant.local:8123" }).apply()

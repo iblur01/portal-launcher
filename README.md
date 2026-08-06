@@ -224,7 +224,21 @@ Each one only unlocks a feature — none are required to boot:
 
 **4. Point it at Home Assistant**
 
-Open Settings from the dashboard → HA base URL + long-lived token → MQTT broker. The token is stored in `EncryptedSharedPreferences` and is never read back out by the config API.
+On a fresh install the first-run assistant opens by itself and walks the whole setup: system permissions, grid density, background, Home Assistant (mDNS discovery + token, with a real connection test), remote control over MQTT, and hiding the apps you do not want on the grid. Home Assistant is optional throughout — Portal is a launcher first, and the assistant finishes without a token.
+
+It can be replayed at any time from Settings → Application → "Relaunch the setup assistant", and on a debug build it can be driven from a workstation:
+
+```sh
+# Open the assistant where it left off
+adb shell am start -a com.iblu01.portallauncher.action.ONBOARDING
+
+# Wipe the stored progress first, to replay it from the welcome screen
+adb shell am start -a com.iblu01.portallauncher.action.ONBOARDING --ez reset true
+```
+
+The trigger is declared in the debug source set only, so release builds ship no exported entry point to it. `./dev.sh --onboarding` does the same after deploying.
+
+The token is stored in `EncryptedSharedPreferences` and is never read back out by the config API.
 
 **5. Run the tests** (all JVM, no emulator, no device)
 
@@ -238,7 +252,7 @@ Open Settings from the dashboard → HA base URL + long-lived token → MQTT bro
 
 ## Configuration
 
-Everything is reachable from the on-device Settings screens: a first-run wizard (mDNS instance discovery + token), HA connection, MQTT broker, per-entity pill enable/disable with search and bulk toggles, background mode + scrim opacity, clock theme, power mode, screen timeout, auto-return delay, temperature offset, and a Developer page (wireless ADB, permission grants, reboot).
+Everything is reachable from the on-device Settings screens: the first-run assistant (relaunchable from Application), HA connection, MQTT broker, per-entity pill enable/disable with search and bulk toggles, background mode + scrim opacity, clock theme, power mode, screen timeout, auto-return delay, temperature offset, and a Developer page (wireless ADB, permission grants, reboot).
 
 > The **tap-sensitivity** slider is currently inert (the accelerometer is no longer registered — see the sensors note below).
 

@@ -70,6 +70,16 @@
             android:name=".SettingsActivity"
             android:exported="false" />
 
+        <!--
+            First-run assistant. Not exported: it writes settings, so only Portal opens it. A
+            debug-only activity-alias (app/src/debug/AndroidManifest.xml) exposes it to ADB for
+            testing without shipping that entry point.
+        -->
+        <activity
+            android:name=".ui.onboarding.OnboardingActivity"
+            android:exported="false"
+            android:screenOrientation="fullSensor" />
+
         <activity
             android:name=".PlaygroundActivity"
             android:exported="false" />

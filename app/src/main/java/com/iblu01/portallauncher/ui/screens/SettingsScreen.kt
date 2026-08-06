@@ -93,6 +93,7 @@ import com.iblu01.portallauncher.ui.components.SettingsTile
 import com.iblu01.portallauncher.ui.components.SettingsTextField
 import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.components.backgroundModes
+import com.iblu01.portallauncher.ui.onboarding.OnboardingActivity
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import java.net.URL
@@ -151,7 +152,7 @@ interface SettingsCallbacks {
     fun onSetPillEnabled(candidates: List<PillCandidate>, enabled: Boolean)
 }
 
-private enum class SettingsPage { MAIN, HOME, PILLS, APPLICATION, DEVELOPER, SETUP }
+private enum class SettingsPage { MAIN, HOME, PILLS, APPLICATION, DEVELOPER }
 
 /** Best-effort host extraction used to pre-fill the MQTT broker from the HA address. */
 private fun hostOf(url: String): String = runCatching { URL(url.trim()).host }.getOrDefault("")
@@ -176,9 +177,9 @@ fun SettingsScreen(
     autoReturnState: AutoReturnUiState = AutoReturnUiState(),
     onAutoReturnCancel: (() -> Unit)? = null,
 ) {
-    var currentPage by remember {
-        mutableStateOf(if (prefs.haToken.isBlank()) SettingsPage.SETUP else SettingsPage.MAIN)
-    }
+    // First-run configuration is its own flow now (ui.onboarding), not a page of the settings, so
+    // the settings always open on their own root — even when no home has been connected.
+    var currentPage by remember { mutableStateOf(SettingsPage.MAIN) }
 
     var haPackage by remember { mutableStateOf(prefs.homeAssistantPackage) }
     var host by remember { mutableStateOf(prefs.brokerHost) }
@@ -303,16 +304,6 @@ fun SettingsScreen(
                 homeSubtitle = homeSubtitle,
                 onNavigate = { currentPage = it },
             )
-            SettingsPage.SETUP -> SetupWizard(
-                uiState = uiState,
-                haUrl = haUrl, haToken = haToken,
-                onUrlChange = onUrlChange,
-                onTokenChange = onTokenChange,
-                onSelectInstance = onSelectInstance,
-                onTest = { callbacks.onTestHaApi(haUrl, haToken) },
-                onFinish = { save(); currentPage = SettingsPage.MAIN },
-                onSkip = { currentPage = SettingsPage.MAIN },
-            )
             SettingsPage.HOME -> HomeConnectionPage(
                 uiState = uiState,
                 haUrl = haUrl, haToken = haToken,
@@ -401,11 +392,7 @@ fun SettingsScreen(
                 // tablet has room for a permanent nav sidebar next to the detail pane.
                 val isExpanded = maxWidth >= 840.dp
 
-                if (currentPage == SettingsPage.SETUP) {
-                    Box(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 20.dp)) {
-                        detailContent(SettingsPage.SETUP, true)
-                    }
-                } else if (isExpanded) {
+                if (isExpanded) {
                     val sidebarItems = listOf(
                         Triple(SettingsPage.HOME, Icons.Outlined.Home, stringResource(R.string.settings_tile_home_title)),
                         Triple(SettingsPage.PILLS, Icons.Outlined.Dashboard, stringResource(R.string.settings_tile_pills_title)),
@@ -523,7 +510,8 @@ private fun AppPage(
     var immichErrorCategory by remember { mutableStateOf<String?>(null) }
     var immichConnectedAlbumCount by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
-    val app = LocalContext.current.applicationContext as PortalApp
+    val settingsContext = LocalContext.current
+    val app = settingsContext.applicationContext as PortalApp
 
     fun loadImmichAlbums(openPicker: Boolean) {
         if (immichBusy) return
@@ -608,6 +596,23 @@ private fun AppPage(
                 label = stringResource(R.string.settings_app_label_language),
                 value = "${currentLanguage.flag} ${stringResource(currentLanguage.nameRes)}",
                 onClick = { showLanguagePage = true },
+            )
+            SettingsDivider()
+            // The first-run assistant is offered again from here, and only from here: it never
+            // reopens by itself once it has been completed.
+            SettingsRow(
+                label = stringResource(R.string.onb_settings_restart_setup_label),
+                onClick = {
+                    settingsContext.startActivity(
+                        OnboardingActivity.intent(settingsContext, reset = true)
+                    )
+                },
+            )
+            Text(
+                stringResource(R.string.onb_settings_restart_setup_subtitle),
+                style = AppleTypography.bodySmall,
+                color = AppleColors.secondary,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
             )
         }
 

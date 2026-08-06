@@ -112,6 +112,9 @@ import com.iblu01.portallauncher.ui.components.PresenceIndicator
 import com.iblu01.portallauncher.ui.components.QuickActionsOverlay
 import com.iblu01.portallauncher.ui.components.WeatherController
 import com.iblu01.portallauncher.ui.components.WeatherPanel
+import com.iblu01.portallauncher.ui.onboarding.OnboardingActivity
+import com.iblu01.portallauncher.ui.onboarding.OnboardingStatus
+import com.iblu01.portallauncher.ui.onboarding.shouldRunOnboarding
 import com.iblu01.portallauncher.ui.theme.PortalTheme
 import com.iblu01.portallauncher.ui.theme.blurCompat
 import kotlinx.coroutines.Dispatchers
@@ -147,6 +150,7 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (openOnboardingIfNeeded()) return
         MqttBridgeService.start(this)
         applyPowerPolicy()
 
@@ -185,6 +189,26 @@ class LauncherActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    /**
+     * Hands over to the first-run assistant when this device has never been set up, and reports
+     * whether it did — the launcher then skips its own start-up entirely rather than briefly
+     * drawing a home screen behind the assistant.
+     *
+     * A panel that already had a working Home Assistant setup before the assistant existed counts
+     * as configured (see [shouldRunOnboarding]), so an update never drops it into a wizard.
+     */
+    private fun openOnboardingIfNeeded(): Boolean {
+        val status = OnboardingStatus(
+            completed = prefs.onboardingCompleted,
+            version = prefs.onboardingVersion,
+            legacyConfigured = prefs.haToken.isNotBlank(),
+        )
+        if (!shouldRunOnboarding(status)) return false
+        startActivity(OnboardingActivity.intent(this))
+        finish()
+        return true
     }
 
     /**

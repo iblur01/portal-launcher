@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+            Debug-only entry point for driving the first-run assistant from a workstation:
+
+              adb shell am start -a com.iblu01.portallauncher.action.ONBOARDING
+
+            Add the boolean extra "reset" (ez) to wipe the stored progress first; see README.
+
+            Lives in the debug source set on purpose: OnboardingActivity itself stays
+            android:exported="false" in the shipped manifest, so no third-party app can pop the
+            assistant — or reset its progress — on a real panel.
+        -->
+        <activity-alias
+            android:name=".ui.onboarding.OnboardingDevTrigger"
+            android:targetActivity=".ui.onboarding.OnboardingActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.iblu01.portallauncher.action.ONBOARDING" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+    </application>
+</manifest>
