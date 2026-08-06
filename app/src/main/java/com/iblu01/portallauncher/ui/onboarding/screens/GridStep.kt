@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,6 +27,7 @@ import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.onboarding.GridPreset
 import com.iblu01.portallauncher.ui.onboarding.OnboardingUiState
 import com.iblu01.portallauncher.ui.onboarding.components.ChoiceTile
+import com.iblu01.portallauncher.ui.onboarding.components.LocalOnboardingLayout
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingNavigationBar
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingScaffold
 import com.iblu01.portallauncher.ui.onboarding.specForScale
@@ -51,6 +53,7 @@ fun GridStep(
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.toFloat()
     val screenHeight = configuration.screenHeightDp.toFloat()
+    val layout = LocalOnboardingLayout.current
 
     OnboardingScaffold(
         step = state.step,
@@ -58,7 +61,11 @@ fun GridStep(
         title = stringResource(R.string.onb_grid_title),
         description = stringResource(R.string.onb_grid_body),
         modifier = modifier,
-        aside = { GridPreview(state.gridScale, screenWidth, screenHeight) },
+        // On a short display the preview pushes the actual choices below the fold. The three
+        // outcomes are more useful than a decorative miniature when height is scarce.
+        aside = if (layout.short) null else {
+            { GridPreview(state.gridScale, screenWidth, screenHeight) }
+        },
         navigation = {
             OnboardingNavigationBar(
                 onBack = onBack,
@@ -67,18 +74,40 @@ fun GridStep(
             )
         },
     ) {
-        GridPreset.values().forEach { preset ->
-            val spec = specForScale(screenWidth, screenHeight, preset.scale)
-            ChoiceTile(
-                title = stringResource(presetLabel(preset)),
-                subtitle = stringResource(
-                    R.string.onb_grid_preset_subtitle_format,
-                    spec.columns,
-                    spec.rows,
-                ),
-                selected = state.gridPreset == preset,
-                onClick = { onSelectPreset(preset) },
-            )
+        if (layout.short) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                GridPreset.values().forEach { preset ->
+                    val spec = specForScale(screenWidth, screenHeight, preset.scale)
+                    ChoiceTile(
+                        title = stringResource(presetLabel(preset)),
+                        subtitle = stringResource(
+                            R.string.onb_grid_preset_subtitle_format,
+                            spec.columns,
+                            spec.rows,
+                        ),
+                        selected = state.gridPreset == preset,
+                        onClick = { onSelectPreset(preset) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        } else {
+            GridPreset.values().forEach { preset ->
+                val spec = specForScale(screenWidth, screenHeight, preset.scale)
+                ChoiceTile(
+                    title = stringResource(presetLabel(preset)),
+                    subtitle = stringResource(
+                        R.string.onb_grid_preset_subtitle_format,
+                        spec.columns,
+                        spec.rows,
+                    ),
+                    selected = state.gridPreset == preset,
+                    onClick = { onSelectPreset(preset) },
+                )
+            }
         }
 
         SettingsToggle(
@@ -119,6 +148,7 @@ private fun GridPreview(scale: Float, screenWidthDp: Float, screenHeightDp: Floa
     val spec = specForScale(screenWidthDp, screenHeightDp, scale)
     Box(
         Modifier
+            .widthIn(max = LocalOnboardingLayout.current.previewMaxWidth)
             .fillMaxWidth()
             .aspectRatio((screenWidthDp / screenHeightDp).coerceIn(0.6f, 2.2f))
             .clip(AppleShapes.card)

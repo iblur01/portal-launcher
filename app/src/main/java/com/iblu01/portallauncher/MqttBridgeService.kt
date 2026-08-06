@@ -76,7 +76,6 @@ class MqttBridgeService : Service() {
     @Volatile private var mqtt: MqttClient? = null
     private lateinit var prefs: Prefs
     private var sensorBridge: SensorBridge? = null
-    private var soundMonitor: SoundMonitor? = null
     private var screenReceiver: BroadcastReceiver? = null
     private var audioReceiver: BroadcastReceiver? = null
     @Volatile private var sessionCoordinator: SessionCoordinator? = null
@@ -115,9 +114,6 @@ class MqttBridgeService : Service() {
         DeviceStateHub.addListener(deviceStateListener)
         ScreenControl.enableAccessibility(this)
         sensorBridge = SensorBridge(this, ::publishRaw).also { it.start(prefs) }
-        soundMonitor = SoundMonitor(this) { level ->
-            publishRaw(HaDiscovery.soundStateTopic(prefs.deviceId), level.toString(), 0)
-        }.also { it.start() }
 
         registerScreenReceiver()
         registerAudioReceiver()
@@ -147,7 +143,6 @@ class MqttBridgeService : Service() {
         commands.shutdownNow()
         runCatching { mqtt?.disconnect(0) }
         sensorBridge?.stop()
-        soundMonitor?.stop()
         screenReceiver?.let { runCatching { unregisterReceiver(it) } }
         audioReceiver?.let { runCatching { unregisterReceiver(it) } }
         DeviceStateHub.removeListener(deviceStateListener)
@@ -245,8 +240,6 @@ class MqttBridgeService : Service() {
         } else {
             client.publish(HaDiscovery.tempDiscoveryTopic(p.deviceId), emptyRetained())
         }
-        pub(HaDiscovery.soundDiscoveryTopic(p.deviceId), HaDiscovery.soundConfigPayload(p.deviceId, p.deviceName))
-        pub(HaDiscovery.micMuteDiscoveryTopic(p.deviceId), HaDiscovery.micMuteConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.volumeDiscoveryTopic(p.deviceId), HaDiscovery.volumeConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.volumeMuteDiscoveryTopic(p.deviceId), HaDiscovery.volumeMuteConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.doorbellDiscoveryTopic(p.deviceId), HaDiscovery.doorbellConfigPayload(p.deviceId, p.deviceName))
@@ -265,7 +258,6 @@ class MqttBridgeService : Service() {
         publishRaw(HaDiscovery.screenStateTopic(p.deviceId), if (interactive) "ON" else "OFF", 1, retained = true)
         publishDeviceState(DeviceStateHub.current)
         publishRaw(HaDiscovery.ipStateTopic(p.deviceId), localIp() ?: "unknown", 1, retained = true)
-        publishMicState(p)
         publishVolumeState(p)
         publishVolumeMuteState(p)
         publishBrightnessState(p)
@@ -309,12 +301,6 @@ class MqttBridgeService : Service() {
             HaDiscovery.screenCommandTopic(p.deviceId) -> when (payload.uppercase()) {
                 "ON" -> ScreenControl.wake(this)
                 "OFF" -> ScreenControl.sleep(this)
-            }
-            HaDiscovery.micMuteCommandTopic(p.deviceId) -> {
-                val muted = payload.uppercase() == "ON"
-                getSystemService(AudioManager::class.java).setMicrophoneMute(muted)
-                publishMicState(p)
-                toast(if (muted) "Microphone muted" else "Microphone unmuted")
             }
             HaDiscovery.volumeCommandTopic(p.deviceId) -> {
                 val pct = (payload.toIntOrNull() ?: return).coerceIn(0, 100)
@@ -398,22 +384,15 @@ class MqttBridgeService : Service() {
         audioReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
-                    AudioManager.ACTION_MICROPHONE_MUTE_CHANGED -> publishMicState(prefs)
                     "android.media.VOLUME_CHANGED_ACTION" -> publishVolumeState(prefs)
                     "android.media.STREAM_MUTE_CHANGED_ACTION" -> publishVolumeMuteState(prefs)
                 }
             }
         }
         registerReceiver(audioReceiver, IntentFilter().apply {
-            addAction(AudioManager.ACTION_MICROPHONE_MUTE_CHANGED)
             addAction("android.media.VOLUME_CHANGED_ACTION")
             addAction("android.media.STREAM_MUTE_CHANGED_ACTION")
         })
-    }
-
-    private fun publishMicState(p: Prefs) {
-        val muted = getSystemService(AudioManager::class.java).isMicrophoneMute
-        publishRaw(HaDiscovery.micMuteStateTopic(p.deviceId), if (muted) "ON" else "OFF", 1, retained = true)
     }
 
     private fun publishVolumeState(p: Prefs) {

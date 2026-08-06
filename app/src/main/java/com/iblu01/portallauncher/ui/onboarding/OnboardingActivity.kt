@@ -5,13 +5,17 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iblu01.portallauncher.LauncherActivity
 import com.iblu01.portallauncher.LocaleHelper
 import com.iblu01.portallauncher.Prefs
+import com.iblu01.portallauncher.ui.onboarding.components.ProvideOnboardingLayout
 import com.iblu01.portallauncher.ui.theme.PortalTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -29,18 +33,19 @@ class OnboardingActivity : ComponentActivity() {
 
     private val viewModel: OnboardingViewModel by viewModels()
 
-    /** Permission requests are owned by the activity; the ViewModel only reads the outcome. */
-    private val requestMicrophone =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            viewModel.refreshCapabilities()
-        }
-
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleHelper.wrap(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val insetsController = WindowInsetsControllerCompat(window, window.decorView)
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
         // A dev trigger may ask for a clean run (see the debug manifest / ADB commands in README).
         if (intent?.getBooleanExtra(EXTRA_RESET, false) == true) {
@@ -50,29 +55,30 @@ class OnboardingActivity : ComponentActivity() {
         setContent {
             PortalTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
-                OnboardingScreen(
-                    state = state,
-                    viewModel = viewModel,
-                    onRequestMicrophone = { requestMicrophone.launch(android.Manifest.permission.RECORD_AUDIO) },
-                    onOpenSystemSetting = ::openSystemSetting,
-                    onFinish = ::finishOnboarding,
-                )
+                // Measured once for the whole flow: a step reads its layout before it lays anything
+                // out, so the measurement cannot live inside the scaffold it is about to call.
+                ProvideOnboardingLayout {
+                    OnboardingScreen(
+                        state = state,
+                        viewModel = viewModel,
+                        onOpenSystemSetting = ::openSystemSetting,
+                        onFinish = ::finishOnboarding,
+                    )
+                }
             }
         }
     }
 
     override fun onResume() {
         super.onResume()
+        WindowInsetsControllerCompat(window, window.decorView)
+            .hide(WindowInsetsCompat.Type.systemBars())
         // Every capability is re-read here, so a trip into Android's settings shows up as soon as
         // the user comes back — with its own check animation, without advancing the flow.
         viewModel.refreshCapabilities()
     }
 
     private fun openSystemSetting(capability: Capability) {
-        if (capability == Capability.MICROPHONE) {
-            requestMicrophone.launch(android.Manifest.permission.RECORD_AUDIO)
-            return
-        }
         if (capability == Capability.SCREEN_CONTROL && viewModel.tryEnableScreenControlDirectly()) {
             viewModel.refreshCapabilities()
             return

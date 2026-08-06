@@ -104,6 +104,11 @@ class Prefs(private val context: Context) {
         get() = sp.getString("app_language", "") ?: ""
         set(value) { sp.edit().putString("app_language", value).commit() }
 
+    /** Distinguishes the valid "system language" choice from a language never chosen yet. */
+    var onboardingLanguageSelected: Boolean
+        get() = sp.getBoolean("onboarding_language_selected", false)
+        set(value) { sp.edit().putBoolean("onboarding_language_selected", value).commit() }
+
     var bgOverlayOpacity: Float
         get() = sp.getFloat("bg_overlay_opacity", 0.25f)
         set(value) = sp.edit().putFloat("bg_overlay_opacity", value.coerceIn(0f, 0.6f)).apply()

@@ -28,10 +28,6 @@ class OnboardingCapabilities @Inject constructor(
         else CapabilityStatus.MISSING,
         brightness = if (Settings.System.canWrite(context)) CapabilityStatus.GRANTED
         else CapabilityStatus.MISSING,
-        microphone = if (
-            context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
-        ) CapabilityStatus.GRANTED else CapabilityStatus.MISSING,
     )
 
     /** True when Portal is the activity Android launches for HOME. */
@@ -54,8 +50,7 @@ class OnboardingCapabilities @Inject constructor(
         Intent(Settings.ACTION_HOME_SETTINGS).resolveActivity(context.packageManager) != null
 
     /**
-     * The system screen to send the user to for [capability], or null when the capability is granted
-     * from inside the app (the microphone, which goes through a runtime permission request).
+     * The system screen to send the user to for [capability].
      *
      * `RoleManager.ROLE_HOME` is the modern way to ask; it only exists from API 29, and this app
      * still runs on API 28 panels, hence the fallback to the home-settings screen.
@@ -67,7 +62,6 @@ class OnboardingCapabilities @Inject constructor(
             Settings.ACTION_MANAGE_WRITE_SETTINGS,
             Uri.parse("package:${context.packageName}"),
         )
-        Capability.MICROPHONE -> null
     }
 
     private fun homeRoleIntent(): Intent? {

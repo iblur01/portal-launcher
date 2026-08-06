@@ -22,5 +22,21 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity-alias>
+
+        <!--
+            Same idea for the settings, so a panel's configuration can be inspected without
+            walking the launcher's gestures:
+
+              adb shell am start -a com.iblu01.portallauncher.action.SETTINGS
+        -->
+        <activity-alias
+            android:name=".SettingsDevTrigger"
+            android:targetActivity=".SettingsActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.iblu01.portallauncher.action.SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

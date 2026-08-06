@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -33,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.onboarding.OnboardingUiState
+import com.iblu01.portallauncher.ui.onboarding.components.LocalOnboardingLayout
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingNavigationBar
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingScaffold
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -161,6 +163,7 @@ private fun CoachMarker(index: Int, highlighted: Boolean, size: Int = 26) {
 private fun HomeScreenMock(highlighted: Int) {
     Box(
         modifier = Modifier
+            .widthIn(max = LocalOnboardingLayout.current.previewMaxWidth)
             .fillMaxWidth()
             .aspectRatio(16f / 10f)
             .clip(AppleShapes.card)

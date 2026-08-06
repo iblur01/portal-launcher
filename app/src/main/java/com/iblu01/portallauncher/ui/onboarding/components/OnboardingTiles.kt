@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.components.PillButton
@@ -57,6 +58,10 @@ fun ChoiceTile(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     icon: ImageVector? = null,
+    /** Dense horizontal treatment for short onboarding windows. */
+    compact: Boolean = false,
+    /** True when the tile has a fixed height and the preview should absorb the leftover space. */
+    previewFillsHeight: Boolean = false,
     preview: (@Composable () -> Unit)? = null,
 ) {
     val borderAlpha by animateFloatAsState(
@@ -76,14 +81,16 @@ fun ChoiceTile(
                 shape = AppleShapes.card,
             )
             .appleClickable { onClick() }
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(if (compact) 12.dp else 18.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
     ) {
         if (preview != null) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 96.dp)
+                    // weight(1f) when the tile has a fixed height: the preview takes what the text
+                    // leaves, so every tile in a row shows the same amount of image.
+                    .then(if (previewFillsHeight) Modifier.weight(1f) else Modifier.heightIn(min = 96.dp))
                     .clip(AppleShapes.section)
             ) { preview() }
         }
@@ -93,14 +100,30 @@ fun ChoiceTile(
                     icon,
                     contentDescription = null,
                     tint = if (selected) AppleColors.accent else AppleColors.secondary,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(if (compact) 20.dp else 22.dp),
                 )
                 Spacer(Modifier.width(12.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(title, style = AppleTypography.titleMedium, color = AppleColors.primary)
+                Text(
+                    title,
+                    style = AppleTypography.titleMedium,
+                    color = AppleColors.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 if (subtitle != null) {
-                    Text(subtitle, style = AppleTypography.bodySmall, color = AppleColors.secondary)
+                    // Bounded so a long description cannot make one tile of a row taller than its
+                    // neighbours — and, in a fixed-height row, pinned to two lines so every tile
+                    // reserves the same text block and every preview ends up the same size.
+                    Text(
+                        subtitle,
+                        style = AppleTypography.bodySmall,
+                        color = AppleColors.secondary,
+                        minLines = if (previewFillsHeight && !compact) 2 else 1,
+                        maxLines = if (compact) 1 else 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             SelectedCheck(visible = selected)

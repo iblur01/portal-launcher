@@ -39,7 +39,6 @@ import com.iblu01.portallauncher.ui.theme.AppleMotion
 fun OnboardingScreen(
     state: OnboardingUiState,
     viewModel: OnboardingViewModel,
-    onRequestMicrophone: () -> Unit,
     onOpenSystemSetting: (Capability) -> Unit,
     onFinish: (openSettings: Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -73,7 +72,6 @@ fun OnboardingScreen(
             OnboardingStep.SYSTEM_SETUP -> SystemSetupStep(
                 state = state,
                 onOpenSetting = onOpenSystemSetting,
-                onRequestMicrophone = onRequestMicrophone,
                 onAcknowledgeGrant = viewModel::acknowledgeGrant,
                 adbCommand = viewModel.adbSetHomeCommand(),
                 onBack = viewModel::goBack,

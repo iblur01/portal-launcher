@@ -72,9 +72,11 @@
     <string name="settings_tile_pills_title">Displayed info</string>
     <string name="settings_tile_pills_subtitle">What Portal shows at the top of the screen</string>
     <string name="settings_tile_app_title">Application</string>
-    <string name="settings_tile_app_subtitle">Wallpaper, sleep, applications</string>
+    <string name="settings_tile_app_subtitle">Language, clock, grid, sleep</string>
     <string name="settings_tile_dev_title">Developer</string>
     <string name="settings_tile_dev_subtitle">Advanced options</string>
+    <string name="settings_tile_info_title">Information</string>
+    <string name="settings_tile_info_subtitle">Version &amp; updates</string>
     <string name="settings_main_title">Portal Launcher</string>
     <string name="settings_app_page_title">Application</string>
     <string name="settings_app_section_language">LANGUAGE</string>
@@ -130,6 +132,19 @@
     <string name="settings_dev_label_permissions">Sensor / sound / brightness permissions</string>
     <string name="settings_dev_rebooting">Rebooting…</string>
     <string name="settings_dev_reboot">Reboot</string>
+
+    <!-- ===== INFORMATION PAGE ===== -->
+    <string name="settings_info_page_title">Information</string>
+    <string name="settings_info_section_app">APP</string>
+    <string name="settings_info_label_version">Version</string>
+    <string name="settings_info_section_updates">UPDATES</string>
+    <string name="settings_info_label_check_updates">Check for updates</string>
+    <string name="settings_info_checking">Checking…</string>
+    <string name="settings_info_up_to_date">Up to date</string>
+    <string name="settings_info_update_available">Update available: %s</string>
+    <string name="settings_info_downloading">Downloading…</string>
+    <string name="settings_info_install">Download &amp; install</string>
+    <string name="settings_info_check_error">Check failed</string>
 
     <!-- ===== PILL SETTINGS PAGE ===== -->
     <string name="pills_page_title">Displayed info</string>
@@ -578,6 +593,8 @@
     <string name="onb_common_toast_copied">Copied to clipboard</string>
 
     <!-- ===== ONBOARDING — WELCOME ===== -->
+    <string name="onb_language_title">Choose your language</string>
+    <string name="onb_language_body">Select the language Portal should use. You can change it later in settings.</string>
     <string name="onb_welcome_title">Welcome to your new calm launcher</string>
     <string name="onb_welcome_body">Portal turns this screen into a space that\'s smart, useful, and calm. The time, your home, and your apps stay within reach without constantly demanding your attention.</string>
     <string name="onb_welcome_action_primary">Set up the launcher</string>
@@ -611,10 +628,6 @@
     <string name="onb_setup_brightness_title">Brightness control</string>
     <string name="onb_setup_brightness_desc">Lets Portal and Home Assistant adjust this screen\'s brightness.</string>
     <string name="onb_setup_brightness_action">Allow brightness control</string>
-    <string name="onb_setup_microphone_title">Microphone</string>
-    <string name="onb_setup_microphone_badge_optional">Optional</string>
-    <string name="onb_setup_microphone_desc">Lets Portal publish the room\'s sound level to Home Assistant. No audio is ever recorded.</string>
-    <string name="onb_setup_microphone_action">Allow</string>
 
     <!-- ===== ONBOARDING — GRID ===== -->
     <string name="onb_grid_title">How much room for your apps?</string>
@@ -851,4 +864,12 @@
     <string name="onb_pills_demo_pill_temperature">Temperature</string>
     <string name="onb_pills_demo_pill_door">Front door open</string>
     <string name="onb_pills_demo_pill_alarm">Alarm triggered</string>
+    <string name="settings_tile_wallpaper_title">Wallpaper</string>
+    <string name="settings_tile_wallpaper_subtitle">Background, photos, Immich</string>
+    <string name="settings_wallpaper_page_title">Wallpaper</string>
+    <string name="settings_wallpaper_section_readability">READABILITY</string>
+    <string name="settings_wallpaper_choose_photo">Choose a photo</string>
+    <string name="settings_wallpaper_replace_photo">Replace the photo</string>
+    <string name="settings_wallpaper_photo_missing">No photo chosen yet</string>
+    <string name="settings_wallpaper_photo_error">This image could not be read. Try another one.</string>
 </resources>

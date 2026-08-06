@@ -52,21 +52,6 @@ object HaDiscovery {
         return """{"name":"Light ${channel.uppercase()}","unique_id":"${deviceId}_rgb_$channel","device":${device(deviceId, name)},"state_topic":"${rgbStateTopic(deviceId)}","value_template":"{{ value_json.$channel }}","unit_of_measurement":"lx","state_class":"measurement","icon":"mdi:palette"}"""
     }
 
-    fun soundDiscoveryTopic(deviceId: String) = "homeassistant/sensor/${deviceId}_sound/config"
-    fun soundStateTopic(deviceId: String) = "portal/$deviceId/sensor/sound"
-    fun soundConfigPayload(deviceId: String, deviceName: String): String {
-        val name = deviceName.escape()
-        return """{"name":"Sound Level","unique_id":"${deviceId}_sound","device":${device(deviceId, name)},"state_topic":"${soundStateTopic(deviceId)}","unit_of_measurement":"%","state_class":"measurement","icon":"mdi:microphone"}"""
-    }
-
-    fun micMuteDiscoveryTopic(deviceId: String) = "homeassistant/switch/${deviceId}_mic_mute/config"
-    fun micMuteStateTopic(deviceId: String) = "portal/$deviceId/mic/mute/state"
-    fun micMuteCommandTopic(deviceId: String) = "portal/$deviceId/mic/mute/set"
-    fun micMuteConfigPayload(deviceId: String, deviceName: String): String {
-        val name = deviceName.escape()
-        return """{"name":"Mic Mute","unique_id":"${deviceId}_mic_mute","device":${device(deviceId, name)},"state_topic":"${micMuteStateTopic(deviceId)}","command_topic":"${micMuteCommandTopic(deviceId)}","payload_on":"ON","payload_off":"OFF","state_on":"ON","state_off":"OFF","icon":"mdi:microphone-off"}"""
-    }
-
     fun volumeDiscoveryTopic(deviceId: String) = "homeassistant/number/${deviceId}_volume/config"
     fun volumeStateTopic(deviceId: String) = "portal/$deviceId/audio/volume/state"
     fun volumeCommandTopic(deviceId: String) = "portal/$deviceId/audio/volume/set"
@@ -165,7 +150,6 @@ object HaDiscovery {
 
     fun commandTopics(deviceId: String) = listOf(
         screenCommandTopic(deviceId),
-        micMuteCommandTopic(deviceId),
         volumeCommandTopic(deviceId),
         volumeMuteCommandTopic(deviceId),
         soundCommandTopic(deviceId),

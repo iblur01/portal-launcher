@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,9 +34,12 @@ import com.iblu01.portallauncher.ui.components.appleClickable
 import com.iblu01.portallauncher.ui.onboarding.Capability
 import com.iblu01.portallauncher.ui.onboarding.CapabilityStatus
 import com.iblu01.portallauncher.ui.onboarding.OnboardingUiState
+import com.iblu01.portallauncher.ui.onboarding.SystemCapabilities
 import com.iblu01.portallauncher.ui.onboarding.components.CapabilityCard
+import com.iblu01.portallauncher.ui.onboarding.components.LocalOnboardingLayout
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingNavigationBar
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingScaffold
+import com.iblu01.portallauncher.ui.onboarding.components.OnboardingSize
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -55,7 +59,6 @@ private const val GRANT_ACKNOWLEDGE_MILLIS = 1200L
 fun SystemSetupStep(
     state: OnboardingUiState,
     onOpenSetting: (Capability) -> Unit,
-    onRequestMicrophone: () -> Unit,
     onAcknowledgeGrant: () -> Unit,
     adbCommand: String,
     onBack: () -> Unit,
@@ -71,47 +74,92 @@ fun SystemSetupStep(
     }
 
     val capabilities = state.systemCapabilities
+    val layout = LocalOnboardingLayout.current
+    // A small or short window cannot show four permission cards at once, and a scrolled list of
+    // them reads as a settings page. There, the step becomes one capability per page — which is the
+    // "one decision per screen" rule the rest of the flow already follows.
+    val paged = layout.size == OnboardingSize.COMPACT || layout.short
+    // Compact flows start with a dedicated introduction. Combining that explanation with the
+    // first permission recreated the tablet layout in miniature and made both hard to scan.
+    var page by remember { mutableIntStateOf(0) }
+    val compactPageCount = Capability.values().size + 1
+
+    val advance: () -> Unit = { if (paged && page < compactPageCount - 1) page++ else onContinue() }
+    val retreat: () -> Unit = { if (paged && page > 0) page-- else onBack() }
 
     OnboardingScaffold(
         step = state.step,
         flags = state.flags,
         title = stringResource(R.string.onb_setup_title),
         modifier = modifier,
-        description = stringResource(R.string.onb_setup_body),
+        description = if (!paged || page == 0) stringResource(R.string.onb_setup_body) else null,
+        showHeader = !paged || page == 0,
         navigation = {
             OnboardingNavigationBar(
-                onBack = onBack,
+                onBack = retreat,
                 primaryLabel = stringResource(R.string.onb_common_nav_continue),
-                onPrimary = onContinue,
+                onPrimary = advance,
             )
         },
     ) {
-        val launcherStatus = capabilities[Capability.DEFAULT_LAUNCHER]
-        CapabilityCard(
+        if (paged) {
+            if (page > 0) {
+                CapabilityPage(
+                    capability = Capability.values()[page - 1],
+                    capabilities = capabilities,
+                    adbCommand = adbCommand,
+                    onOpenSetting = onOpenSetting,
+                    onLater = advance,
+                )
+            }
+        } else {
+            Capability.values().forEach { capability ->
+                CapabilityPage(
+                    capability = capability,
+                    capabilities = capabilities,
+                    adbCommand = adbCommand,
+                    onOpenSetting = onOpenSetting,
+                    onLater = onContinue,
+                )
+            }
+        }
+    }
+}
+
+/** One capability's card, wherever it is shown: on its own page, or in the full list. */
+@Composable
+private fun CapabilityPage(
+    capability: Capability,
+    capabilities: SystemCapabilities,
+    adbCommand: String,
+    onOpenSetting: (Capability) -> Unit,
+    onLater: () -> Unit,
+) {
+    val status = capabilities[capability]
+    when (capability) {
+        Capability.DEFAULT_LAUNCHER -> CapabilityCard(
             title = stringResource(R.string.onb_setup_default_launcher_title),
             description = stringResource(R.string.onb_setup_default_launcher_desc),
-            status = launcherStatus,
-            statusLabel = stringResource(configurationStatusLabel(launcherStatus)),
+            status = status,
+            statusLabel = stringResource(configurationStatusLabel(status)),
             actionLabel = stringResource(R.string.onb_setup_default_launcher_action),
             onAction = { onOpenSetting(Capability.DEFAULT_LAUNCHER) },
             badge = stringResource(R.string.onb_setup_default_launcher_badge_recommended),
-            footer = if (launcherStatus == CapabilityStatus.UNAVAILABLE) {
+            footer = if (status == CapabilityStatus.UNAVAILABLE) {
                 { AdbHelp(command = adbCommand) }
             } else {
                 null
             },
         )
 
-        val screenStatus = capabilities[Capability.SCREEN_CONTROL]
-        CapabilityCard(
+        Capability.SCREEN_CONTROL -> CapabilityCard(
             title = stringResource(R.string.onb_setup_screen_control_title),
             description = stringResource(R.string.onb_setup_screen_control_desc),
-            status = screenStatus,
-            statusLabel = stringResource(screenControlStatusLabel(screenStatus)),
+            status = status,
+            statusLabel = stringResource(screenControlStatusLabel(status)),
             actionLabel = stringResource(R.string.onb_setup_screen_control_action),
             onAction = { onOpenSetting(Capability.SCREEN_CONTROL) },
             footer = {
-                // An accessibility service is a large-sounding ask; say exactly what it is used for.
                 Text(
                     stringResource(R.string.onb_setup_screen_control_explanation),
                     style = AppleTypography.bodySmall,
@@ -120,28 +168,13 @@ fun SystemSetupStep(
             },
         )
 
-        val brightnessStatus = capabilities[Capability.BRIGHTNESS]
-        CapabilityCard(
+        Capability.BRIGHTNESS -> CapabilityCard(
             title = stringResource(R.string.onb_setup_brightness_title),
             description = stringResource(R.string.onb_setup_brightness_desc),
-            status = brightnessStatus,
-            statusLabel = stringResource(configurationStatusLabel(brightnessStatus)),
+            status = status,
+            statusLabel = stringResource(configurationStatusLabel(status)),
             actionLabel = stringResource(R.string.onb_setup_brightness_action),
             onAction = { onOpenSetting(Capability.BRIGHTNESS) },
-        )
-
-        val microphoneStatus = capabilities[Capability.MICROPHONE]
-        CapabilityCard(
-            title = stringResource(R.string.onb_setup_microphone_title),
-            description = stringResource(R.string.onb_setup_microphone_desc),
-            status = microphoneStatus,
-            statusLabel = stringResource(configurationStatusLabel(microphoneStatus)),
-            actionLabel = stringResource(R.string.onb_setup_microphone_action),
-            // The runtime prompt is only ever raised by this button, never by opening the step.
-            onAction = onRequestMicrophone,
-            badge = stringResource(R.string.onb_setup_microphone_badge_optional),
-            secondaryLabel = stringResource(R.string.onb_common_nav_later),
-            onSecondary = onContinue,
         )
     }
 }

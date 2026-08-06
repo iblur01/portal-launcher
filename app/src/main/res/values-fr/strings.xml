@@ -67,9 +67,11 @@
     <string name="settings_tile_pills_title">Informations affichées</string>
     <string name="settings_tile_pills_subtitle">Ce que Portal montre en haut de l\'écran</string>
     <string name="settings_tile_app_title">Application</string>
-    <string name="settings_tile_app_subtitle">Fond d\'écran, veille, applications</string>
+    <string name="settings_tile_app_subtitle">Langue, horloge, grille, veille</string>
     <string name="settings_tile_dev_title">Développeur</string>
     <string name="settings_tile_dev_subtitle">Options avancées</string>
+    <string name="settings_tile_info_title">Informations</string>
+    <string name="settings_tile_info_subtitle">Version &amp; mises à jour</string>
     <string name="settings_main_title">Portal Launcher</string>
     <string name="settings_app_page_title">Application</string>
     <string name="settings_app_section_language">LANGUE</string>
@@ -125,6 +127,19 @@
     <string name="settings_dev_label_permissions">Permissions capteurs / son / luminosité</string>
     <string name="settings_dev_rebooting">Redémarrage…</string>
     <string name="settings_dev_reboot">Redémarrer</string>
+
+    <!-- ===== INFORMATION PAGE ===== -->
+    <string name="settings_info_page_title">Informations</string>
+    <string name="settings_info_section_app">APPLICATION</string>
+    <string name="settings_info_label_version">Version</string>
+    <string name="settings_info_section_updates">MISES À JOUR</string>
+    <string name="settings_info_label_check_updates">Vérifier les mises à jour</string>
+    <string name="settings_info_checking">Vérification…</string>
+    <string name="settings_info_up_to_date">À jour</string>
+    <string name="settings_info_update_available">Mise à jour disponible : %s</string>
+    <string name="settings_info_downloading">Téléchargement…</string>
+    <string name="settings_info_install">Télécharger &amp; installer</string>
+    <string name="settings_info_check_error">Échec de la vérification</string>
 
     <!-- ===== PILL SETTINGS PAGE ===== -->
     <string name="pills_page_title">Informations affichées</string>
@@ -573,6 +588,8 @@
     <string name="onb_common_toast_copied">Copié dans le presse-papiers</string>
 
     <!-- ===== ONBOARDING — WELCOME ===== -->
+    <string name="onb_language_title">Choisissez votre langue</string>
+    <string name="onb_language_body">Sélectionnez la langue utilisée par Portal. Vous pourrez la modifier plus tard dans les réglages.</string>
     <string name="onb_welcome_title">Bienvenue dans votre nouveau launcher calme</string>
     <string name="onb_welcome_body">Portal transforme cet écran en un espace intelligent, utile et apaisé. L\'heure, votre maison et vos applications restent accessibles sans attirer constamment votre attention.</string>
     <string name="onb_welcome_action_primary">Configurer le launcher</string>
@@ -606,10 +623,6 @@
     <string name="onb_setup_brightness_title">Modification de la luminosité</string>
     <string name="onb_setup_brightness_desc">Permet à Portal et à Home Assistant de régler la luminosité de cet écran.</string>
     <string name="onb_setup_brightness_action">Autoriser la luminosité</string>
-    <string name="onb_setup_microphone_title">Microphone</string>
-    <string name="onb_setup_microphone_badge_optional">Facultatif</string>
-    <string name="onb_setup_microphone_desc">Permet de publier le niveau sonore de la pièce dans Home Assistant. Aucun enregistrement audio n\'est conservé.</string>
-    <string name="onb_setup_microphone_action">Autoriser</string>
 
     <!-- ===== ONBOARDING — GRID ===== -->
     <string name="onb_grid_title">Combien d\'espace pour vos applications&#160;?</string>
@@ -846,4 +859,12 @@
     <string name="onb_pills_demo_pill_temperature">Température</string>
     <string name="onb_pills_demo_pill_door">Porte d\'entrée ouverte</string>
     <string name="onb_pills_demo_pill_alarm">Alarme déclenchée</string>
+    <string name="settings_tile_wallpaper_title">Fond d\'écran</string>
+    <string name="settings_tile_wallpaper_subtitle">Arrière-plan, photos, Immich</string>
+    <string name="settings_wallpaper_page_title">Fond d\'écran</string>
+    <string name="settings_wallpaper_section_readability">LISIBILITÉ</string>
+    <string name="settings_wallpaper_choose_photo">Choisir une photo</string>
+    <string name="settings_wallpaper_replace_photo">Remplacer la photo</string>
+    <string name="settings_wallpaper_photo_missing">Aucune photo choisie</string>
+    <string name="settings_wallpaper_photo_error">Cette image n\'a pas pu être lue. Essayez-en une autre.</string>
 </resources>

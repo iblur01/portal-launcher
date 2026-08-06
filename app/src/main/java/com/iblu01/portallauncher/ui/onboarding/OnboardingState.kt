@@ -4,20 +4,18 @@ package com.iblu01.portallauncher.ui.onboarding
 enum class CapabilityStatus { GRANTED, MISSING, UNAVAILABLE }
 
 /** The system capabilities the onboarding walks through, in the order they are presented. */
-enum class Capability { DEFAULT_LAUNCHER, SCREEN_CONTROL, BRIGHTNESS, MICROPHONE }
+enum class Capability { DEFAULT_LAUNCHER, SCREEN_CONTROL, BRIGHTNESS }
 
 /** Live status of every capability, re-read on every `onResume`. */
 data class SystemCapabilities(
     val defaultLauncher: CapabilityStatus = CapabilityStatus.MISSING,
     val screenControl: CapabilityStatus = CapabilityStatus.MISSING,
     val brightness: CapabilityStatus = CapabilityStatus.MISSING,
-    val microphone: CapabilityStatus = CapabilityStatus.MISSING,
 ) {
     operator fun get(capability: Capability): CapabilityStatus = when (capability) {
         Capability.DEFAULT_LAUNCHER -> defaultLauncher
         Capability.SCREEN_CONTROL -> screenControl
         Capability.BRIGHTNESS -> brightness
-        Capability.MICROPHONE -> microphone
     }
 }
 

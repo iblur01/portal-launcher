@@ -11,10 +11,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -49,6 +52,8 @@ import com.iblu01.portallauncher.photo.PhotoSourceException
 import com.iblu01.portallauncher.photo.TransportPolicy
 import com.iblu01.portallauncher.photo.immich.ImmichPhotoSource
 import com.iblu01.portallauncher.ui.components.AmbientBackground
+import com.iblu01.portallauncher.ui.components.copyWallpaper
+import com.iblu01.portallauncher.ui.components.wallpaperFile
 import com.iblu01.portallauncher.ui.components.PillButton
 import com.iblu01.portallauncher.ui.components.SettingsDivider
 import com.iblu01.portallauncher.ui.components.SettingsSection
@@ -58,13 +63,14 @@ import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.onboarding.OnboardingUiState
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingNavigationBar
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingScaffold
+import com.iblu01.portallauncher.ui.onboarding.components.LocalOnboardingLayout
+import com.iblu01.portallauncher.ui.onboarding.components.OnboardingSize
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /*
  * The four background branches.
@@ -99,19 +105,21 @@ internal fun CalmSubPage(
         onValidate = onValidate,
         modifier = modifier,
     ) {
-        BackgroundPreview(overlay = opacity) {
-            AmbientBackground(BG_MODE_CALM, modifier = Modifier.fillMaxSize())
+        WallpaperPreviewWithControls(
+            overlay = opacity,
+            preview = { AmbientBackground(BG_MODE_CALM, modifier = Modifier.fillMaxSize()) },
+        ) {
+            OpacitySlider(
+                label = stringResource(R.string.onb_bg_calm_opacity_label),
+                value = opacity,
+                onValueChange = { opacity = it },
+                onCommit = { onSetOpacity(opacity) },
+            )
+            PillButton(
+                label = stringResource(R.string.onb_bg_calm_preview_action),
+                onClick = { openOpacityPreview(context) },
+            )
         }
-        OpacitySlider(
-            label = stringResource(R.string.onb_bg_calm_opacity_label),
-            value = opacity,
-            onValueChange = { opacity = it },
-            onCommit = { onSetOpacity(opacity) },
-        )
-        PillButton(
-            label = stringResource(R.string.onb_bg_calm_preview_action),
-            onClick = { openOpacityPreview(context) },
-        )
     }
 }
 
@@ -134,10 +142,12 @@ internal fun NatureSubPage(
     ) {
         // The landscape list is private to DynamicBackground, so the preview is the real cycling
         // background rather than a duplicated copy of its URLs.
-        BackgroundPreview(height = 220.dp) {
-            AmbientBackground(BG_MODE_NATURE, modifier = Modifier.fillMaxSize())
+        WallpaperPreviewWithControls(
+            height = 220.dp,
+            preview = { AmbientBackground(BG_MODE_NATURE, modifier = Modifier.fillMaxSize()) },
+        ) {
+            NoticeText(stringResource(R.string.onb_bg_nature_warning_internet))
         }
-        NoticeText(stringResource(R.string.onb_bg_nature_warning_internet))
     }
 }
 
@@ -181,43 +191,33 @@ internal fun PhotoSubPage(
         onValidate = onValidate.takeIf { hasPhoto },
         modifier = modifier,
     ) {
-        BackgroundPreview(overlay = opacity, height = 220.dp) {
+        WallpaperPreviewWithControls(
+            overlay = opacity,
+            height = 220.dp,
+            preview = {
+                if (hasPhoto) {
+                    AmbientBackground(BG_MODE_PHOTO, wallpaperVersion, Modifier.fillMaxSize())
+                } else {
+                    AmbientBackground(BG_MODE_CALM, modifier = Modifier.fillMaxSize())
+                }
+            },
+        ) {
+            PillButton(
+                label = stringResource(R.string.onb_bg_photo_choose_action),
+                onClick = { picker.launch("image/*") },
+            )
+            if (failed) ErrorText(stringResource(R.string.onb_bg_photo_error_load))
             if (hasPhoto) {
-                AmbientBackground(BG_MODE_PHOTO, wallpaperVersion, Modifier.fillMaxSize())
-            } else {
-                AmbientBackground(BG_MODE_CALM, modifier = Modifier.fillMaxSize())
+                OpacitySlider(
+                    label = stringResource(R.string.onb_bg_photo_dim_label),
+                    value = opacity,
+                    onValueChange = { opacity = it },
+                    onCommit = { onSetOpacity(opacity) },
+                )
+                NoticeText(stringResource(R.string.onb_bg_photo_readability_hint))
             }
         }
-        PillButton(
-            label = stringResource(R.string.onb_bg_photo_choose_action),
-            onClick = { picker.launch("image/*") },
-        )
-        if (failed) ErrorText(stringResource(R.string.onb_bg_photo_error_load))
-        if (hasPhoto) {
-            OpacitySlider(
-                label = stringResource(R.string.onb_bg_photo_dim_label),
-                value = opacity,
-                onValueChange = { opacity = it },
-                onCommit = { onSetOpacity(opacity) },
-            )
-            NoticeText(stringResource(R.string.onb_bg_photo_readability_hint))
-        }
     }
-}
-
-private fun wallpaperFile(context: Context) = File(context.filesDir, "wallpaper.jpg")
-
-private fun copyWallpaper(context: Context, uri: android.net.Uri): Boolean {
-    val target = wallpaperFile(context)
-    val staging = File(context.filesDir, "wallpaper.jpg.tmp")
-    return runCatching {
-        context.contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input)
-            staging.outputStream().use { output -> input.copyTo(output) }
-        }
-        check(staging.length() > 0L)
-        check(staging.renameTo(target) || (target.delete() && staging.renameTo(target)))
-    }.onFailure { staging.delete() }.isSuccess
 }
 
 // --- Immich -------------------------------------------------------------------------------------
@@ -276,7 +276,7 @@ internal fun ImmichSubPage(
         modifier = modifier,
     ) {
         (test as? ImmichTest.Connected)?.sample?.let { sample ->
-            BackgroundPreview(height = 220.dp) {
+            BackgroundPreview(height = 220.dp, compact = compactWallpaperLayout()) {
                 Image(
                     bitmap = sample,
                     contentDescription = null,
@@ -385,6 +385,42 @@ internal fun ImmichSubPage(
     }
 }
 
+/** A wide preview on tablets; a small landscape swatch beside the controls on compact screens. */
+@Composable
+private fun WallpaperPreviewWithControls(
+    overlay: Float = 0f,
+    height: androidx.compose.ui.unit.Dp = 180.dp,
+    preview: @Composable () -> Unit,
+    controls: @Composable ColumnScope.() -> Unit,
+) {
+    val compact = compactWallpaperLayout()
+    if (compact) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.Top,
+        ) {
+            BackgroundPreview(overlay = overlay, compact = true, content = preview)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                content = controls,
+            )
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            BackgroundPreview(overlay = overlay, height = height, content = preview)
+            controls()
+        }
+    }
+}
+
+@Composable
+private fun compactWallpaperLayout(): Boolean {
+    val layout = LocalOnboardingLayout.current
+    return layout.short || layout.size == OnboardingSize.COMPACT
+}
+
 /** Change-frequency choices, matching the range accepted by `Prefs.immichCadenceSeconds`. */
 private val IMMICH_CADENCES = listOf(5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600)
 
@@ -450,7 +486,7 @@ private fun BackgroundSubPage(
     onBack: () -> Unit,
     onValidate: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     OnboardingScaffold(
         step = state.step,
@@ -475,12 +511,12 @@ private fun BackgroundPreview(
     modifier: Modifier = Modifier,
     overlay: Float = 0f,
     height: androidx.compose.ui.unit.Dp = 180.dp,
+    compact: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     Box(
         modifier
-            .fillMaxWidth()
-            .height(height)
+            .then(if (compact) Modifier.width(132.dp).height(84.dp) else Modifier.fillMaxWidth().height(height))
             .clip(AppleShapes.card)
             .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.card)
     ) {

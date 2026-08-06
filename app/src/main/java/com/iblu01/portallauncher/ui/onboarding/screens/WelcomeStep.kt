@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -50,9 +51,9 @@ import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.components.PillButton
 import com.iblu01.portallauncher.ui.components.appleClickable
 import com.iblu01.portallauncher.ui.onboarding.OnboardingUiState
+import com.iblu01.portallauncher.ui.onboarding.components.LocalOnboardingLayout
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingNavigationBar
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingScaffold
-import com.iblu01.portallauncher.ui.onboarding.components.SelectedCheck
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -71,8 +72,28 @@ fun WelcomeStep(
     onSkipEverything: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val prefs = remember(context) { Prefs(context) }
+    var languageSelected by remember { mutableStateOf(prefs.onboardingLanguageSelected) }
     var askingToSkip by remember { mutableStateOf(false) }
-    var pickingLanguage by remember { mutableStateOf(false) }
+
+    if (!languageSelected) {
+        InitialLanguageStep(
+            state = state,
+            onSelect = { language ->
+                val changed = prefs.appLanguage != language.code
+                prefs.appLanguage = language.code
+                prefs.onboardingLanguageSelected = true
+                if (changed) {
+                    restartOnboarding(context)
+                } else {
+                    languageSelected = true
+                }
+            },
+            modifier = modifier,
+        )
+        return
+    }
 
     OnboardingScaffold(
         step = state.step,
@@ -91,8 +112,9 @@ fun WelcomeStep(
             )
         },
     ) {
-        HomeScreenDemo()
-        LanguageEntryPoint(onClick = { pickingLanguage = true })
+        if (LocalOnboardingLayout.current.showPreview) {
+            HomeScreenDemo(Modifier.align(Alignment.CenterHorizontally))
+        }
     }
 
     if (askingToSkip) {
@@ -105,8 +127,50 @@ fun WelcomeStep(
         )
     }
 
-    if (pickingLanguage) {
-        LanguageDialog(onDismiss = { pickingLanguage = false })
+}
+
+/** First-run language choice, intentionally before any product copy is presented. */
+@Composable
+private fun InitialLanguageStep(
+    state: OnboardingUiState,
+    onSelect: (AppLanguage) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OnboardingScaffold(
+        step = state.step,
+        flags = state.flags,
+        title = stringResource(R.string.onb_language_title),
+        description = stringResource(R.string.onb_language_body),
+        modifier = modifier,
+        showProgress = false,
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 520.dp)
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            AppLanguage.values().forEach { language ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(AppleShapes.section)
+                        .background(AppleColors.frostedFill, AppleShapes.section)
+                        .appleClickable { onSelect(language) }
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Text(language.flag, style = AppleTypography.titleLarge)
+                    Text(
+                        stringResource(language.nameRes),
+                        style = AppleTypography.titleMedium,
+                        color = AppleColors.primary,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -157,8 +221,10 @@ private fun HomeScreenDemo(modifier: Modifier = Modifier) {
         label = "demo-swipe",
     )
 
+    val layout = LocalOnboardingLayout.current
     BoxWithConstraints(
         modifier = modifier
+            .widthIn(max = layout.previewMaxWidth)
             .fillMaxWidth()
             .aspectRatio(16f / 10f)
             .clip(AppleShapes.card)
@@ -284,89 +350,15 @@ private fun animatorScale(context: Context): Float = runCatching {
 // Language
 // ---------------------------------------------------------------------------------------------
 
-/** Discreet row under the demo: the current language, and a tap to change it. */
-@Composable
-private fun LanguageEntryPoint(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val current = remember(context) { AppLanguage.from(Prefs(context).appLanguage) }
-    Row(
-        modifier = modifier
-            .clip(AppleShapes.pill)
-            .background(AppleColors.frostedFill, AppleShapes.pill)
-            .appleClickable(onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            stringResource(R.string.onb_welcome_language_label),
-            style = AppleTypography.bodySmall,
-            color = AppleColors.secondary,
-        )
-        Text(current.flag, style = AppleTypography.bodyLarge)
-        Text(
-            stringResource(current.nameRes),
-            style = AppleTypography.titleMedium,
-            color = AppleColors.primary,
-        )
-    }
-}
-
 /**
- * Language picker. Applying a language restarts the process the same way the settings page does:
- * the per-app locale is installed by `attachBaseContext`, so a live recomposition would leave every
- * already-resolved string behind.
- */
-@Composable
-private fun LanguageDialog(onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    val prefs = remember(context) { Prefs(context) }
-    val current = remember(prefs) { AppLanguage.from(prefs.appLanguage) }
-
-    OnboardingDialog(
-        title = stringResource(R.string.onb_welcome_language_label),
-        onDismiss = onDismiss,
-    ) {
-        AppLanguage.values().forEach { language ->
-            val selected = language == current
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(AppleShapes.section)
-                    .appleClickable {
-                        if (selected) {
-                            onDismiss()
-                        } else {
-                            prefs.appLanguage = language.code
-                            restartOnboarding(context)
-                        }
-                    }
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(language.flag, style = AppleTypography.titleLarge)
-                Text(
-                    stringResource(language.nameRes),
-                    style = AppleTypography.titleMedium,
-                    color = AppleColors.primary,
-                    modifier = Modifier.weight(1f),
-                )
-                SelectedCheck(visible = selected)
-            }
-        }
-    }
-}
-
-/**
- * Full process restart, back into the assistant: the flow remembers the step it was on, so the user
- * lands where they were, in the language they just chose.
+ * Recreate the assistant task so [LocaleHelper] wraps the new activity with the chosen locale.
+ * Killing the process after launching the replacement raced with that activity and could leave a
+ * black screen on slower devices.
  */
 private fun restartOnboarding(context: Context) {
     val intent = Intent(context, com.iblu01.portallauncher.ui.onboarding.OnboardingActivity::class.java)
         .apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK }
     context.startActivity(intent)
-    Runtime.getRuntime().exit(0)
 }
 
 // ---------------------------------------------------------------------------------------------

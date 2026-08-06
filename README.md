@@ -439,6 +439,7 @@ Standing on community work that made this possible:
 - **[portal-ha-bridge](https://github.com/RoadRunner-1024/portal-ha-bridge)** — MQTT bridge concepts behind the HA ↔ Portal integration layer
 - **[Immortal](https://github.com/starbrightlab/immortal)** — presence proxy model and screen-off strategy that made power management practical here
 - Weather icons: **Meteocons**, bundled offline
+- Immich logo (`res/drawable-nodpi/immich_logo.png`, from [immich-app/immich](https://github.com/immich-app/immich)) — bundled to identify the Immich photo source in the setup assistant, not as an endorsement
 
 ## License
 
