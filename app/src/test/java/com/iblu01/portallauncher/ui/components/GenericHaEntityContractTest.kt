@@ -32,4 +32,14 @@ class GenericHaEntityContractTest {
     @Test fun `lawn mower exposes only supported commands`() {
         assertEquals(listOf("start_mowing", "dock"), entity("lawn_mower", "docked", "{\"supported_features\":5}").toGenericControlContract().actions)
     }
+
+    @Test fun `siren feature bits gate optional turn on parameters not base services`() {
+        assertEquals(
+            listOf("turn_on", "turn_off"),
+            entity("siren", "off", "{\"supported_features\":0}").toGenericControlContract().actions,
+        )
+        val all = entity("siren", "off", "{\"supported_features\":7,\"available_tones\":[\"alarm\"]}").toGenericControlContract()
+        assertEquals(listOf("turn_on", "turn_off", "tone", "duration", "volume_level"), all.actions)
+        assertEquals(listOf("alarm"), all.options)
+    }
 }

@@ -27,6 +27,10 @@ import com.iblu01.portallauncher.ui.theme.AppleTypography
 fun GenericHaEntityControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val entity = rememberEntity(chip.entityId)
     if (entity == null || entity.isUnavailable()) { PanelUnavailable(); return }
+    when (entity.domain) {
+        "humidifier" -> { HumidifierControl(entity, modifier); return }
+        "lawn_mower" -> { LawnMowerControl(entity, modifier); return }
+    }
     val contract = remember(entity) { entity.toGenericControlContract() }
     val callService = LocalCallService.current
     var value by remember(entity.entityId, contract.value) { mutableFloatStateOf(contract.value ?: contract.min) }

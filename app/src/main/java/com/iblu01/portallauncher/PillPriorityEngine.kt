@@ -17,7 +17,15 @@ class PillPriorityEngine(private val context: Context) {
         }
 
     fun select(rules: List<PillRule>, states: Map<String, HaEntity>, nowMs: Long = System.currentTimeMillis()): List<LauncherChip> {
-        val enabled = rules.filter { it.enabled }
+        // Re-check the live entity even for persisted rules. This is the migration boundary that
+        // prevents old button/number/select/camera and passive diagnostic rules from resurfacing.
+        val enabled = rules.mapNotNull { rule ->
+            val entity = states[rule.entityId] ?: return@mapNotNull null
+            if (!rule.enabled || !PillSupport.isAllowedAsPersistedChip(rule, entity)) return@mapNotNull null
+            // Kinds are derived data. Normalize stale persisted classifications (notably the old
+            // motion -> PRESENCE mapping) while preserving legacy appliance heuristics.
+            rule.copy(kind = if (rule.kind == PillKind.APPLIANCE) PillKind.APPLIANCE else PillSupport.kind(entity))
+        }
         val groupedKinds = setOf(PillKind.OPENING, PillKind.CLIMATE, PillKind.LIGHTS, PillKind.MEDIA, PillKind.PURIFIER, PillKind.AIR, PillKind.SCENE, PillKind.PRESENCE, PillKind.ENERGY)
         val individual = enabled.asSequence().filter { it.kind !in groupedKinds }
             .mapNotNull { rule -> states[rule.entityId]?.let { toChip(rule, it, states, nowMs) } }.toList()
@@ -306,7 +314,16 @@ class PillPriorityEngine(private val context: Context) {
                 s in activeAppliance -> visual = "active"
                 else -> visible = false
             }
-            PillKind.BATTERY -> { val value = s.toFloatOrNull() ?: return null; visible = value <= 30; score = if (value <= 10) 82 else 45; visual = if (value <= 10) "critical" else "warning" }
+            PillKind.BATTERY -> if (e.domain == "binary_sensor") {
+                visible = s == "on"
+                score = 82
+                visual = "critical"
+            } else {
+                val value = s.toFloatOrNull() ?: return null
+                visible = value <= 30
+                score = if (value <= 10) 82 else 45
+                visual = if (value <= 10) "critical" else "warning"
+            }
             PillKind.AIR -> {
                 val reading = s.toFloatOrNull()
                 val warning = when (e.deviceClass) {
@@ -340,7 +357,19 @@ class PillPriorityEngine(private val context: Context) {
             PillKind.LAWN_MOWER -> { visual = if (s in setOf("mowing", "returning")) "active" else if (s == "error") "critical" else "ok" }
             PillKind.BUTTON, PillKind.NUMBER, PillKind.SELECT, PillKind.CAMERA -> { visual = if (s == "on" || s == "streaming" || s == "recording") "active" else "info" }
             PillKind.LIGHTS, PillKind.MEDIA, PillKind.PURIFIER, PillKind.CLIMATE, PillKind.SCENE, PillKind.PRESENCE -> visible = false
-            PillKind.GENERIC -> visible = s !in inactive
+            PillKind.GENERIC -> when {
+                e.domain == "binary_sensor" && e.deviceClass == "connectivity" -> {
+                    visible = s == "off"
+                    score = 72
+                    visual = "warning"
+                }
+                e.domain == "binary_sensor" && e.deviceClass in setOf("motion", "occupancy", "presence", "moving", "vibration", "sound", "running") -> {
+                    visible = s == "on"
+                    score = 42
+                    visual = "active"
+                }
+                else -> visible = false
+            }
         }
         if (!visible) return null
         val related = rule.relatedEntityIds.mapNotNull(states::get)
@@ -465,6 +494,7 @@ class PillPriorityEngine(private val context: Context) {
                 else -> rawDisplay
             }
             PillKind.SWITCH -> when (s) { "on" -> context.getString(R.string.pill_switch_on); "off" -> context.getString(R.string.pill_switch_off); else -> rawDisplay }
+            PillKind.GENERIC -> if (e.domain == "binary_sensor") friendlyEntityState(e) else rawDisplay
             PillKind.FAN -> when (s) {
                 "on" -> e.attributes.optInt("percentage", -1).let { if (it in 0..100) context.getString(R.string.pill_fan_on_format, it.toString()) else context.getString(R.string.pill_fan_on) }
                 "off" -> context.getString(R.string.pill_fan_off)

@@ -186,7 +186,7 @@ class SettingsActivity : ComponentActivity() {
                 val entities = if (result.ok) parseHaEntities(result.body.orEmpty()) else emptyList()
                 runOnUiThread {
                     uiState.pillLoading = false
-                    val candidates = PillSupport.candidates(entities).sortedWith(compareBy({ it.kind.ordinal }, { it.label.lowercase() }))
+                    val candidates = PillSupport.candidates(entities, pills.latestDeviceIds).sortedWith(compareBy({ it.kind.ordinal }, { it.label.lowercase() }))
                     uiState.pillCandidates.clear()
                     uiState.pillCandidates.addAll(candidates)
                     val hydrated = uiState.pillRules.map { old ->

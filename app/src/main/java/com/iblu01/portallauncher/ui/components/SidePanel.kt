@@ -164,7 +164,7 @@ private fun ChipActionsContent(
         // Center the control block vertically in the remaining space; it still scrolls if a
         // panel's content is taller than the panel (keypads, long detail lists).
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.PURIFIER, PanelKind.VACUUM, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN)) {
+            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.PURIFIER, PanelKind.VACUUM, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
                 // Vertical controls need finite panel constraints so they can fill the available
                 // height while preserving the same proportions as lights and covers.
                 when (chip.toPanelKind()) {
@@ -174,9 +174,11 @@ private fun ChipActionsContent(
                     PanelKind.LOCK -> LockControl(chip, Modifier.fillMaxSize())
                     PanelKind.PURIFIER -> PurifierActions(chip, Modifier.fillMaxSize())
                     PanelKind.VACUUM -> VacuumControl(chip, Modifier.fillMaxSize())
-                    PanelKind.WATER_HEATER -> WaterHeaterControl(chip)
+                    PanelKind.HUMIDIFIER -> GenericHaEntityControl(chip, Modifier.fillMaxSize())
+                    PanelKind.WATER_HEATER -> WaterHeaterControl(chip, Modifier.fillMaxSize())
                     PanelKind.VALVE -> ValveControl(chip, Modifier.fillMaxSize())
                     PanelKind.SIREN -> SirenControl(chip, Modifier.fillMaxSize())
+                    PanelKind.LAWN_MOWER -> GenericHaEntityControl(chip, Modifier.fillMaxSize())
                     else -> Unit
                 }
             } else {
@@ -202,9 +204,9 @@ private fun ChipActionsContent(
                 PanelKind.VACUUM -> Unit // Bounded branch above.
                 PanelKind.ALARM -> AlarmControl(chip)
                 PanelKind.WASHER -> WasherControl(chip)
-                PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN -> Unit // Bounded branch above.
-                PanelKind.HUMIDIFIER, PanelKind.LAWN_MOWER, PanelKind.ENTITY_CONTROL,
-                PanelKind.CAMERA -> GenericHaEntityControl(chip)
+                PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
+                PanelKind.LAWN_MOWER -> Unit // Bounded branch above.
+                PanelKind.ENTITY_CONTROL, PanelKind.CAMERA -> GenericHaEntityControl(chip)
                 // AIR_QUALITY is rendered full-screen upstream in ChipActionsPanel; MEDIA/WEATHER
                 // are separate PanelContent types and never reach the chip-actions router.
                 PanelKind.AIR_QUALITY, PanelKind.MEDIA, PanelKind.WEATHER,

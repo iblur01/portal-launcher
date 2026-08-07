@@ -36,7 +36,10 @@ fun SirenControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val active = entity.state.equals("on", true)
     val canStart = "turn_on" in contract.actions
     val canStop = "turn_off" in contract.actions
-    var tone by remember(entity.entityId) { mutableStateOf(contract.options.firstOrNull()) }
+    // Do not silently send the first advertised tone: no choice was made by the user.
+    var tone by remember(entity.entityId, contract.selectedOption) {
+        mutableStateOf(contract.selectedOption?.takeIf(contract.options::contains))
+    }
     val triggerLabel = stringResource(R.string.siren_action_trigger)
     val stopLabel = stringResource(R.string.siren_action_stop)
 
@@ -67,7 +70,7 @@ fun SirenControl(chip: LauncherChip, modifier: Modifier = Modifier) {
         if ("tone" in contract.actions && contract.options.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
             WheelPicker(
-                options = contract.options, selected = tone ?: contract.options.first(), onSelect = { tone = it },
+                options = contract.options, selected = tone ?: "", onSelect = { tone = it },
                 label = { it.replace('_', ' ').replaceFirstChar(Char::uppercase) },
                 accent = AppleColors.error, modifier = Modifier.fillMaxWidth(0.72f),
             )

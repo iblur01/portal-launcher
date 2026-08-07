@@ -1,9 +1,11 @@
 package com.iblu01.portallauncher.ui.components
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -21,7 +23,7 @@ import com.iblu01.portallauncher.ui.components.controls.WheelPicker
 import com.iblu01.portallauncher.ui.theme.AppleColors
 
 @Composable
-fun WaterHeaterControl(chip: LauncherChip) {
+fun WaterHeaterControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val entity = rememberEntity(chip.entityId)
     if (entity == null || entity.isUnavailable()) { PanelUnavailable(); return }
     val callService = LocalCallService.current
@@ -31,21 +33,24 @@ fun WaterHeaterControl(chip: LauncherChip) {
     var selectedMode by remember(entity.entityId, contract.selectedOption) { mutableStateOf(contract.selectedOption) }
     val canSetTemperature = "set_temperature" in contract.actions
 
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         if (canSetTemperature) {
-            TemperatureArcControl(
-                target = target, current = current,
-                valueRange = contract.min..contract.max, step = contract.step, unit = contract.unit.ifBlank { "°" },
-                onTargetChange = { target = contract.normalized(it) },
-                onCommit = { callService("water_heater", "set_temperature", entity.entityId, mapOf("temperature" to contract.normalized(target))) },
-                mode = if (entity.state == "off") ThermostatMode.OFF else ThermostatMode.HEAT,
-                activity = when (entity.attributes.optString("current_operation").lowercase()) {
-                    "off" -> ThermostatActivity.OFF
-                    "eco" -> ThermostatActivity.IDLE
-                    else -> ThermostatActivity.HEATING
-                },
-                modifier = Modifier.fillMaxWidth().height(240.dp),
-            )
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                val dialSize = minOf(maxWidth, maxHeight)
+                TemperatureArcControl(
+                    target = target, current = current,
+                    valueRange = contract.min..contract.max, step = contract.step, unit = contract.unit.ifBlank { "°" },
+                    onTargetChange = { target = contract.normalized(it) },
+                    onCommit = { callService("water_heater", "set_temperature", entity.entityId, mapOf("temperature" to contract.normalized(target))) },
+                    mode = if (entity.state == "off") ThermostatMode.OFF else ThermostatMode.HEAT,
+                    activity = when (entity.attributes.optString("current_operation").lowercase()) {
+                        "off" -> ThermostatActivity.OFF
+                        "eco" -> ThermostatActivity.IDLE
+                        else -> ThermostatActivity.HEATING
+                    },
+                    modifier = Modifier.size(dialSize),
+                )
+            }
             Spacer(Modifier.height(12.dp))
         }
         if ("set_operation_mode" in contract.actions && contract.options.isNotEmpty()) {

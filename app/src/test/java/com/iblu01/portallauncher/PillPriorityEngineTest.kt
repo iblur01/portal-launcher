@@ -43,6 +43,80 @@ class PillPriorityEngineTest {
         assertEquals("critical", result.first().state)
     }
 
+    @Test fun `motion is contextual and never joins the people group`() {
+        val motion = entity("binary_sensor.hall_motion", "on", "motion")
+        val person = entity("person.marie", "home")
+        val rules = listOf(
+            PillRule(motion.entityId, PillKind.GENERIC, "Couloir"),
+            PillRule(person.entityId, PillKind.PRESENCE, "Marie"),
+        )
+        val active = engine.select(rules, listOf(motion, person).associateBy { it.entityId })
+        assertEquals(setOf("binary_sensor.hall_motion", ""), active.map { it.entityId }.toSet())
+        assertEquals(setOf(PillKind.GENERIC, PillKind.PRESENCE), active.map { it.kind }.toSet())
+
+        val idleMotion = entity("binary_sensor.hall_motion", "off", "motion")
+        val idle = engine.select(rules, listOf(idleMotion, person).associateBy { it.entityId })
+        assertEquals(listOf(PillKind.PRESENCE), idle.map { it.kind })
+    }
+
+    @Test fun `stale motion presence rule is normalized on selection`() {
+        val motion = entity("binary_sensor.hall_motion", "on", "motion")
+        val staleRule = PillRule(motion.entityId, PillKind.PRESENCE, "Couloir")
+
+        val chip = engine.select(listOf(staleRule), mapOf(motion.entityId to motion)).single()
+
+        assertEquals(PillKind.GENERIC, chip.kind)
+        assertEquals(motion.entityId, chip.entityId)
+    }
+
+    @Test fun `binary battery appears only when HA reports low battery`() {
+        val low = entity("binary_sensor.remote_battery", "on", "battery")
+        val ok = entity("binary_sensor.lock_battery", "off", "battery")
+        val rules = listOf(
+            PillRule(low.entityId, PillKind.BATTERY, "Télécommande"),
+            PillRule(ok.entityId, PillKind.BATTERY, "Serrure"),
+        )
+        val chips = engine.select(rules, listOf(low, ok).associateBy { it.entityId })
+        assertEquals(listOf(low.entityId), chips.map { it.entityId })
+        assertEquals("critical", chips.single().state)
+    }
+
+    @Test fun `connectivity appears only when disconnected`() {
+        val online = entity("binary_sensor.router", "on", "connectivity")
+        val offline = entity("binary_sensor.gateway", "off", "connectivity")
+        val rules = listOf(
+            PillRule(online.entityId, PillKind.GENERIC, "Routeur"),
+            PillRule(offline.entityId, PillKind.GENERIC, "Passerelle"),
+        )
+        val chips = engine.select(rules, listOf(online, offline).associateBy { it.entityId })
+        assertEquals(listOf(offline.entityId), chips.map { it.entityId })
+        assertEquals("Déconnecté", chips.single().value)
+    }
+
+    @Test fun `problem and safety chips appear only during alerts`() {
+        val problem = entity("binary_sensor.boiler_problem", "on", "problem")
+        val safe = entity("binary_sensor.gas", "off", "gas")
+        val rules = listOf(
+            PillRule(problem.entityId, PillKind.SAFETY, "Chaudière"),
+            PillRule(safe.entityId, PillKind.SAFETY, "Gaz"),
+        )
+        val chips = engine.select(rules, listOf(problem, safe).associateBy { it.entityId })
+        assertEquals(listOf(problem.entityId), chips.map { it.entityId })
+    }
+
+    @Test fun `persisted dashboard style rules cannot bypass quick chip policy`() {
+        val entities = listOf(
+            entity("button.reboot", "unknown"),
+            entity("number.threshold", "42"),
+            entity("select.program", "eco"),
+            entity("camera.doorbell", "streaming"),
+            entity("sensor.last_seen", "2026-08-08T08:00:00Z", "timestamp"),
+            entity("sensor.wifi", "-51", "signal_strength"),
+        )
+        val rules = entities.map { PillRule(it.entityId, PillKind.GENERIC, it.name) }
+        assertTrue(engine.select(rules, entities.associateBy { it.entityId }).isEmpty())
+    }
+
     @Test fun `selection is limited to nine`() {
         val entities = (1..12).associate { i -> "sensor.task_$i" to entity("sensor.task_$i", "running") }
         val rules = entities.keys.map { PillRule(it, PillKind.APPLIANCE, it) }

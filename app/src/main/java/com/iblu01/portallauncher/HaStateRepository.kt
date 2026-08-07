@@ -55,6 +55,10 @@ class HaStateRepository(private val url: String, private val token: String) {
     /** entity_id -> area display name, resolved from the HA area/entity/device registries. */
     @Volatile var areaByEntity: Map<String, String> = emptyMap()
         private set
+    @Volatile var deviceIdByEntity: Map<String, String> = emptyMap()
+        private set
+    @Volatile var entityRegistryResolved: Boolean = false
+        private set
     private var areaNames: Map<String, String> = emptyMap()        // area_id -> name
     private var entityAreaId: Map<String, String?> = emptyMap()    // entity_id -> area_id
     private var entityDeviceId: Map<String, String?> = emptyMap()  // entity_id -> device_id
@@ -84,6 +88,8 @@ class HaStateRepository(private val url: String, private val token: String) {
                     weatherEntityId = weatherEntityId,
                     hourlyForecast = hourlyForecast,
                     dailyForecast = dailyForecast,
+                    deviceIdByEntity = deviceIdByEntity,
+                    entityRegistryResolved = entityRegistryResolved,
                 )
             )
         }
@@ -94,6 +100,9 @@ class HaStateRepository(private val url: String, private val token: String) {
         enabled = true
         if (token.isBlank()) { Log.w(TAG, "start skipped: token is blank"); return }
         if (socket != null) { Log.d(TAG, "start skipped: socket already active"); return }
+        entityRegistryResolved = false
+        deviceIdByEntity = emptyMap()
+        entityDeviceId = emptyMap()
         val wsUrl = url.trimEnd('/').replaceFirst("http://", "ws://").replaceFirst("https://", "wss://") + "/api/websocket"
         Log.i(TAG, "connecting to ${url.trimEnd('/')} (token present)")
         lastActivityAt = System.currentTimeMillis()
@@ -157,6 +166,7 @@ class HaStateRepository(private val url: String, private val token: String) {
             devMap[eid] = o.optString("device_id").takeIf { it.isNotBlank() && !o.isNull("device_id") }
         }
         entityAreaId = areaMap; entityDeviceId = devMap
+        deviceIdByEntity = devMap.mapNotNull { (entityId, deviceId) -> deviceId?.let { entityId to it } }.toMap()
     }
 
     private fun parseDeviceAreas(arr: JSONArray): Map<String, String?> {
@@ -221,12 +231,19 @@ class HaStateRepository(private val url: String, private val token: String) {
                             webSocket.send("{\"id\":$FORECAST_HOURLY_ID,\"type\":\"weather/subscribe_forecast\",\"forecast_type\":\"hourly\",\"entity_id\":\"$w\"}")
                             webSocket.send("{\"id\":$FORECAST_DAILY_ID,\"type\":\"weather/subscribe_forecast\",\"forecast_type\":\"daily\",\"entity_id\":\"$w\"}")
                         }
-                    } else if (id in 3..5 && msg.optBoolean("success")) {
-                        val result = msg.optJSONArray("result") ?: JSONArray()
+                    } else if (id in 3..5) {
+                        val success = msg.optBoolean("success")
+                        val result = if (success) msg.optJSONArray("result") ?: JSONArray() else JSONArray()
                         when (id) {
-                            3 -> areaNames = parseAreaNames(result)
-                            4 -> parseEntityRegistry(result)
-                            5 -> deviceAreaId = parseDeviceAreas(result)
+                            3 -> if (success) areaNames = parseAreaNames(result)
+                            4 -> {
+                                parseEntityRegistry(result)
+                                entityRegistryResolved = true
+                                // Wake consumers even when the registry is empty/forbidden: they
+                                // can now safely use the legacy fallback instead of racing id=4.
+                                notifyListeners()
+                            }
+                            5 -> if (success) deviceAreaId = parseDeviceAreas(result)
                         }
                         resolveAreas()
                     } else if (id == 6) {

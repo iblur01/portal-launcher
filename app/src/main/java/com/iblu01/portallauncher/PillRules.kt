@@ -173,19 +173,33 @@ object PillRuleCodec {
 object PillSupport {
     private val safetyClasses = setOf("smoke", "carbon_monoxide", "co", "gas", "moisture", "safety", "tamper", "problem")
     private val openingClasses = setOf("door", "window", "opening", "garage_door")
-    private val presenceClasses = setOf("motion", "occupancy", "presence", "moving", "vibration", "sound", "running")
-    private val diagnosticBinaryClasses = setOf("connectivity", "plug", "power", "battery", "battery_charging", "heat", "cold", "light")
+    /** Short-lived activity signals, deliberately distinct from people/location presence. */
+    private val activityClasses = setOf("motion", "occupancy", "presence", "moving", "vibration", "sound", "running")
+    /** Diagnostics useful as chips only while they report a fault. */
+    private val alertBinaryClasses = setOf("connectivity", "battery")
     private val airClasses = setOf("aqi", "carbon_dioxide", "co2", "carbon_monoxide", "co", "nitrogen_dioxide", "nitrogen_monoxide", "nitrous_oxide", "ozone", "pm1", "pm25", "pm4", "pm10", "radon", "sulphur_dioxide", "volatile_organic_compounds", "volatile_organic_compounds_parts")
-    private val genericSensorClasses = setOf("illuminance", "atmospheric_pressure", "pressure", "absolute_humidity", "moisture", "signal_strength", "water", "volume", "volume_flow_rate", "volume_storage", "duration", "timestamp", "uptime", "energy", "power", "current", "voltage")
+    private val energyClasses = setOf("energy", "power", "current", "voltage")
     private val applianceTokens = setOf("washer", "washing", "machine_a_laver", "dryer", "seche_linge", "dishwasher", "lave_vaisselle", "p2s", "printer", "imprimante")
     fun isSupported(e: HaEntity) = isPrimary(e)
+    fun isAllowedAsPersistedChip(rule: PillRule, e: HaEntity): Boolean {
+        if (e.domain in setOf("button", "input_button", "number", "input_number", "select", "input_select", "camera")) return false
+        if (e.domain == "sensor" && e.deviceClass in setOf(
+                "illuminance", "atmospheric_pressure", "pressure", "absolute_humidity", "moisture",
+                "signal_strength", "water", "volume", "volume_flow_rate", "volume_storage",
+                "duration", "timestamp", "uptime",
+            )) return false
+        if (e.domain == "binary_sensor" && e.deviceClass in setOf("plug", "power", "battery_charging", "heat", "cold", "light")) return false
+        // Existing appliance rules predate strict discovery and may use an integration-specific
+        // enum without a standard device class. Keep those quick controls working.
+        return isSupported(e) || rule.kind == PillKind.APPLIANCE
+    }
     private fun isPrimary(e: HaEntity): Boolean = when {
         e.domain in setOf("light", "media_player", "fan", "switch", "cover") -> true
         e.domain in setOf("lock", "vacuum", "timer", "climate", "alarm_control_panel") -> true
-        e.domain in setOf("scene", "script", "humidifier", "water_heater", "valve", "siren", "lawn_mower", "button", "number", "select", "input_button", "input_number", "input_select", "input_boolean", "camera") -> true
+        e.domain in setOf("scene", "script", "humidifier", "water_heater", "valve", "siren", "lawn_mower", "input_boolean") -> true
         e.domain in setOf("person", "device_tracker") -> true
-        e.domain == "binary_sensor" && e.deviceClass in (openingClasses + safetyClasses + presenceClasses + diagnosticBinaryClasses) -> true
-        e.domain == "sensor" && e.deviceClass in (airClasses + genericSensorClasses + setOf("temperature", "humidity", "battery")) -> true
+        e.domain == "binary_sensor" && e.deviceClass in (openingClasses + safetyClasses + activityClasses + alertBinaryClasses) -> true
+        e.domain == "sensor" && e.deviceClass in (airClasses + energyClasses + setOf("temperature", "humidity", "battery")) -> true
         // Only the appliance's MAIN state sensor is a primary pill; sub-sensors like
         // "_etat_du_cycle" get absorbed as related (see candidates()), not shown separately.
         e.domain == "sensor" && e.deviceClass == "enum" && applianceTokens.any { e.entityId.contains(it) } &&
@@ -209,17 +223,18 @@ object PillSupport {
         e.domain in setOf("switch", "input_boolean") -> PillKind.SWITCH
         e.domain == "cover" -> PillKind.COVER
         e.domain == "scene" || e.domain == "script" -> PillKind.SCENE
-        e.domain in setOf("person", "device_tracker") || e.deviceClass in presenceClasses -> PillKind.PRESENCE
+        e.domain in setOf("person", "device_tracker") -> PillKind.PRESENCE
+        e.domain == "binary_sensor" && e.deviceClass in activityClasses -> PillKind.GENERIC
         e.domain == "alarm_control_panel" || e.deviceClass in safetyClasses -> PillKind.SAFETY
         e.domain == "lock" || e.deviceClass == "lock" -> PillKind.LOCK
         e.deviceClass in openingClasses -> PillKind.OPENING
         e.domain == "vacuum" -> PillKind.VACUUM
-        e.domain == "timer" || e.deviceClass == "duration" -> PillKind.TIMER
+        e.domain == "timer" -> PillKind.TIMER
         e.deviceClass == "battery" -> PillKind.BATTERY
         e.deviceClass in airClasses -> PillKind.AIR
         e.domain == "climate" -> PillKind.THERMOSTAT
         e.deviceClass in setOf("temperature", "humidity") -> PillKind.CLIMATE
-        e.deviceClass in setOf("energy", "power", "current", "voltage") -> PillKind.ENERGY
+        e.deviceClass in energyClasses -> PillKind.ENERGY
         applianceTokens.any { e.entityId.contains(it) } -> PillKind.APPLIANCE
         else -> PillKind.GENERIC
     }
@@ -228,21 +243,32 @@ object PillSupport {
         listOf("_machine_state", "_etat_de_la_machine", "_state", "_contact", "_temperature", "_humidity", "_humidite", "_etat_de_l_impression").forEach { if (slug.endsWith(it)) slug = slug.removeSuffix(it) }
         return slug
     }
-    fun candidates(entities: List<HaEntity>): List<PillCandidate> {
+    fun candidates(
+        entities: List<HaEntity>,
+        deviceIdByEntity: Map<String, String> = emptyMap(),
+    ): List<PillCandidate> {
         val supported = entities.filter(::isPrimary)
-        val temperatureKeys = supported.filter { it.deviceClass == "temperature" }.map(::logicalKey).toSet()
         val relatedOnlyClasses = setOf("humidity", "battery", "timestamp", "duration")
         val primaries = supported.filterNot { entity ->
-            (entity.deviceClass == "humidity" && logicalKey(entity) in temperatureKeys) ||
-                (entity.deviceClass in relatedOnlyClasses && supported.any { owner ->
-                    owner.entityId != entity.entityId && owner.deviceClass !in relatedOnlyClasses &&
+            entity.deviceClass in relatedOnlyClasses && supported.any { owner ->
+                    if (owner.entityId == entity.entityId || owner.deviceClass in relatedOnlyClasses) return@any false
+                    val entityDevice = deviceIdByEntity[entity.entityId]
+                    val ownerDevice = deviceIdByEntity[owner.entityId]
+                    if (entityDevice != null) entityDevice == ownerDevice
+                    else ownerDevice == null &&
                         (entity.entityId.substringAfter('.').startsWith("${logicalKey(owner)}_") ||
                             logicalKey(owner).startsWith(entity.entityId.substringAfter('.') + "_"))
-                })
+                }
         }
         return primaries.map { primary ->
             val key = logicalKey(primary)
-            val related = entities.filter { e -> e.entityId != primary.entityId && (e.entityId.substringAfter('.').startsWith("${key}_") || key.startsWith(e.entityId.substringAfter('.') + "_")) }
+            val primaryDevice = deviceIdByEntity[primary.entityId]
+            val related = entities.filter { e ->
+                if (e.entityId == primary.entityId) return@filter false
+                if (primaryDevice != null) deviceIdByEntity[e.entityId] == primaryDevice
+                else deviceIdByEntity[e.entityId] == null &&
+                    (e.entityId.substringAfter('.').startsWith("${key}_") || key.startsWith(e.entityId.substringAfter('.') + "_"))
+            }
                 .filter { it.domain in setOf("sensor", "binary_sensor") }
             val label = primary.name
                 .replace(Regex(" (État de la machine|État de la tâche|Porte)$", RegexOption.IGNORE_CASE), "")

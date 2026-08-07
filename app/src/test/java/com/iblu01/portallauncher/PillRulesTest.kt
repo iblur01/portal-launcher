@@ -2,6 +2,7 @@ package com.iblu01.portallauncher
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -92,13 +93,11 @@ class PillRulesTest {
         assertEquals(PillKind.LIGHTS, PillSupport.kind(entity("light.salon", "on")))
     }
 
-    @Test fun `official controllable domains are discovered without name heuristics`() {
+    @Test fun `quick controllable domains are discovered without name heuristics`() {
         val expected = mapOf(
             "humidifier.x" to PillKind.HUMIDIFIER, "water_heater.x" to PillKind.WATER_HEATER,
             "valve.x" to PillKind.VALVE, "siren.x" to PillKind.SIREN,
-            "lawn_mower.x" to PillKind.LAWN_MOWER, "button.x" to PillKind.BUTTON,
-            "number.x" to PillKind.NUMBER, "select.x" to PillKind.SELECT,
-            "camera.x" to PillKind.CAMERA, "device_tracker.x" to PillKind.PRESENCE,
+            "lawn_mower.x" to PillKind.LAWN_MOWER, "device_tracker.x" to PillKind.PRESENCE,
         )
         expected.forEach { (id, kind) ->
             val e = entity(id, "on")
@@ -107,19 +106,64 @@ class PillRulesTest {
         }
     }
 
-    @Test fun `official binary sensor classes are discovered and classified`() {
+    @Test fun `activity sensors are distinct from people presence`() {
         listOf("motion", "occupancy", "presence", "moving", "vibration", "sound", "running").forEach {
-            assertEquals(PillKind.PRESENCE, PillSupport.kind(entity("binary_sensor.x", "on", it)))
+            assertEquals(PillKind.GENERIC, PillSupport.kind(entity("binary_sensor.x", "on", it)))
             assertTrue(PillSupport.isSupported(entity("binary_sensor.x", "on", it)))
         }
-        listOf("problem", "connectivity", "battery", "battery_charging", "plug", "power", "heat", "cold", "light").forEach {
+        assertEquals(PillKind.PRESENCE, PillSupport.kind(entity("person.x", "home")))
+        assertEquals(PillKind.PRESENCE, PillSupport.kind(entity("device_tracker.x", "home")))
+    }
+
+    @Test fun `only actionable binary alerts are chip candidates`() {
+        listOf("problem", "safety", "connectivity", "battery").forEach {
             assertTrue(it, PillSupport.isSupported(entity("binary_sensor.x", "on", it)))
+        }
+        listOf("battery_charging", "plug", "power", "heat", "cold", "light").forEach {
+            assertFalse(it, PillSupport.isSupported(entity("binary_sensor.x", "on", it)))
         }
     }
 
-    @Test fun `extended official sensor classes are discovered`() {
-        listOf("illuminance", "atmospheric_pressure", "co", "co2", "pm1", "pm4", "ozone", "radon", "signal_strength", "water", "volume_storage", "duration", "timestamp").forEach {
+    @Test fun `air and energy sensors remain available but passive diagnostics do not`() {
+        listOf("co", "co2", "pm1", "pm4", "ozone", "radon", "energy", "power", "current", "voltage").forEach {
             assertTrue(it, PillSupport.isSupported(entity("sensor.x", "1", it)))
         }
+        listOf("illuminance", "atmospheric_pressure", "signal_strength", "water", "volume_storage", "duration", "timestamp", "uptime").forEach {
+            assertFalse(it, PillSupport.isSupported(entity("sensor.x", "1", it)))
+        }
+    }
+
+    @Test fun `advanced controls are not permanent chip candidates`() {
+        listOf("button.x", "input_button.x", "number.x", "input_number.x", "select.x", "input_select.x", "camera.x").forEach {
+            assertFalse(it, PillSupport.isSupported(entity(it, "on")))
+        }
+    }
+
+    @Test fun `device registry links sensors whose names do not match`() {
+        val valve = entity("valve.main", "open")
+        val battery = entity("sensor.unrelated_name", "70", "battery")
+        val candidate = PillSupport.candidates(
+            listOf(valve, battery),
+            mapOf(valve.entityId to "device-1", battery.entityId to "device-1"),
+        ).single()
+        assertEquals(valve.entityId, candidate.primary.entityId)
+        assertEquals(listOf(battery.entityId), candidate.related.map { it.entityId })
+    }
+
+    @Test fun `device registry prevents similarly named devices from mixing`() {
+        val valve = entity("valve.garden", "open")
+        val battery = entity("sensor.garden_battery", "70", "battery")
+        val candidates = PillSupport.candidates(
+            listOf(valve, battery),
+            mapOf(valve.entityId to "device-1", battery.entityId to "device-2"),
+        )
+        assertTrue(candidates.first { it.primary == valve }.related.isEmpty())
+    }
+
+    @Test fun `entities absent from registry keep legacy fallback`() {
+        val lock = entity("lock.entry", "locked")
+        val battery = entity("sensor.entry_battery", "70", "battery")
+        val candidate = PillSupport.candidates(listOf(lock, battery)).single()
+        assertEquals(listOf(battery.entityId), candidate.related.map { it.entityId })
     }
 }

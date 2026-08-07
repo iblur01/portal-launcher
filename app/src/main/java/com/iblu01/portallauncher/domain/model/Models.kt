@@ -21,6 +21,8 @@ data class HaSnapshot(
     val weatherEntityId: String?,
     val hourlyForecast: List<ForecastPoint>,
     val dailyForecast: List<ForecastPoint>,
+    val deviceIdByEntity: Map<String, String> = emptyMap(),
+    val entityRegistryResolved: Boolean = false,
 )
 
 /**

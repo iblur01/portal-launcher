@@ -59,6 +59,8 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
     /** Latest raw HA states, for detail panels / settings that need entity attributes. */
     @Volatile var latestStates: Map<String, HaEntity> = emptyMap()
         private set
+    @Volatile var latestDeviceIds: Map<String, String> = emptyMap()
+        private set
 
     /** entity_id -> area display name, from the HA area registry. Empty until registries load. */
     @Volatile var lightAreas: Map<String, String> = emptyMap()
@@ -86,8 +88,9 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         // No select/media/temperature work here — that lives in snapshotFlow only.
         repo.addListener { states, _ ->
             latestStates = states
+            latestDeviceIds = repo.deviceIdByEntity
             lightAreas = repo.areaByEntity
-            autoInitGroups(prefs, states)
+            if (repo.entityRegistryResolved) autoInitGroups(prefs, states, repo.deviceIdByEntity)
             scheduleNotify()
         }
         activeRepo.value = repo   // publish AFTER wiring so snapshotFlow re-binds to a live repo
@@ -108,12 +111,12 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
      * this side-effect so it survives removing it from the transform path; guarded by the
      * persistent [Prefs.pillAutoGroupsInitialized] flag.
      */
-    private fun autoInitGroups(prefs: Prefs, states: Map<String, HaEntity>) {
+    private fun autoInitGroups(prefs: Prefs, states: Map<String, HaEntity>, deviceIds: Map<String, String>) {
         if (states.isEmpty() || prefs.pillAutoGroupsInitialized) return
         val existing = prefs.pillRules
         val existingIds = existing.map { it.entityId }.toSet()
         val autoKinds = setOf(PillKind.LIGHTS, PillKind.MEDIA, PillKind.PURIFIER, PillKind.SCENE, PillKind.PRESENCE, PillKind.ENERGY)
-        val additions = PillSupport.candidates(states.values.toList())
+        val additions = PillSupport.candidates(states.values.toList(), deviceIds)
             .filter { it.kind in autoKinds && it.primary.entityId !in existingIds }
             .map(PillSupport::defaultRule)
         prefs.pillRules = existing + additions
