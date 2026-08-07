@@ -66,7 +66,7 @@ fun ValveControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                     value = position, onValueChange = { position = contract.normalized(it) },
                     onValueChangeFinished = { callService("valve", "set_valve_position", entity.entityId, mapOf("position" to contract.normalized(it).roundToInt())) },
                     valueRange = 0f..100f, hapticSteps = 20, icon = Icons.Outlined.WaterDrop,
-                    label = { "${it.roundToInt()} %" }, accent = AppleColors.active,
+                    label = { "${it.roundToInt()} %" }, accent = AppleColors.accent,
                     modifier = Modifier.size(width, height),
                 )
             }
@@ -78,7 +78,7 @@ fun ValveControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 VerticalSwitch(
                     checked = entity.state.lowercase() in setOf("open", "opening"),
                     onCheckedChange = { callService("valve", if (it) "open_valve" else "close_valve", entity.entityId) },
-                    accent = AppleColors.active, icon = { if (it) Icons.Outlined.Plumbing else Icons.Outlined.Block },
+                    accent = AppleColors.accent, icon = { if (it) Icons.Outlined.Plumbing else Icons.Outlined.Block },
                     label = { if (it) openLabel else closeLabel },
                     modifier = Modifier.size(controlWidth, controlHeight),
                 )

@@ -208,10 +208,12 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(28.dp))
 
         CompositionLocalProvider(
-            LocalHaStates provides rememberFakePanelEntities(),
+            LocalHaStates provides fakeEntities,
             LocalAreas provides emptyMap(),
         ) {
             FakePanelLab(
+                chips = fakeChips,
+                media = fakeMedia,
                 selected = selectedFakePanel,
                 onSelect = { next -> selectedFakePanel = next.takeUnless { it.id == selectedFakePanel?.id } },
             )
@@ -627,54 +629,12 @@ fun PlaygroundScreen(onBack: () -> Unit) {
 
 /** Real side-panel routing fed by local fake HA entities, for interaction testing offline. */
 @Composable
-private fun FakePanelLab(selected: FakePanelSelection?, onSelect: (FakePanelSelection) -> Unit) {
-    val chips = remember {
-        listOf(
-            LauncherChip("lights_group", "light", "Lumières", "3 allumées", "active", details = listOf(
-                PillDetail("Salon", "72 %", "light.salon", true),
-                PillDetail("Cuisine", "Éteinte", "light.cuisine", false),
-            ), kind = PillKind.LIGHTS),
-            LauncherChip("purifier_group", "air", "Purificateur", "Auto · air bon", "active", entityId = "fan.purificateur", kind = PillKind.PURIFIER,
-                details = listOf(PillDetail("Filtre", "82 %"))),
-            LauncherChip("scenes_group", "scene", "Scènes", "4 ambiances", "ok", kind = PillKind.SCENE, details = listOf(
-                PillDetail("Soirée", "", "scene.soiree"), PillDetail("Lecture", "", "scene.lecture"),
-                PillDetail("Cinéma", "", "scene.cinema"), PillDetail("Tout éteindre", "", "script.tout_eteindre"),
-            )),
-            LauncherChip("lock_test", "lock", "Porte d’entrée", "Verrouillée", "ok", entityId = "lock.entree", kind = PillKind.LOCK),
-            LauncherChip("cover_test", "cover", "Volet salon", "64 %", "active", entityId = "cover.salon", kind = PillKind.COVER),
-            LauncherChip("thermostat_test", "temperature", "Thermostat", "21,5 °C", "active", entityId = "climate.salon", kind = PillKind.THERMOSTAT),
-            LauncherChip("vacuum_test", "vacuum", "Aspirateur", "Nettoyage", "active", entityId = "vacuum.romy", kind = PillKind.VACUUM, batteryPercent = 78),
-            LauncherChip("fan_test", "fan", "Ventilateur %", "40 %", "active", entityId = "fan.chambre", kind = PillKind.FAN),
-            LauncherChip("fan_on_off_test", "fan", "Ventilateur simple", "Allumé", "active", entityId = "fan.bureau", kind = PillKind.FAN),
-            LauncherChip("fan_modes_test", "fan", "Ventilateur 3 vitesses", "Niveau 2", "active", entityId = "fan.plafond", kind = PillKind.FAN),
-            LauncherChip("switch_test", "switch", "Prise TV", "Allumée", "active", entityId = "switch.tv", kind = PillKind.SWITCH),
-            LauncherChip("humidifier_test", "humidity", "Humidificateur", "55 %", "active", entityId = "humidifier.chambre", kind = PillKind.HUMIDIFIER),
-            LauncherChip("heater_test", "temperature", "Chauffe-eau", "55 °C", "active", entityId = "water_heater.ballon", kind = PillKind.WATER_HEATER),
-            LauncherChip("valve_test", "valve", "Vanne principale", "42 %", "active", entityId = "valve.eau", kind = PillKind.VALVE),
-            LauncherChip("siren_test", "shield", "Sirène", "Éteinte", "ok", entityId = "siren.alarme", kind = PillKind.SIREN),
-            LauncherChip("mower_test", "mower", "Tondeuse", "Sur la base", "ok", entityId = "lawn_mower.jardin", kind = PillKind.LAWN_MOWER),
-            LauncherChip("number_test", "number", "Seuil luminosité", "350 lx", "info", entityId = "number.seuil_lux", kind = PillKind.NUMBER),
-            LauncherChip("select_test", "select", "Programme", "Éco", "info", entityId = "select.programme", kind = PillKind.SELECT),
-            LauncherChip("button_test", "button", "Redémarrer passerelle", "Action", "info", entityId = "button.restart", kind = PillKind.BUTTON),
-            LauncherChip("alarm_test", "shield", "Alarme", "Désarmée", "info", entityId = "alarm_control_panel.maison", kind = PillKind.SAFETY),
-            LauncherChip("washer_test", "washer", "Machine à laver", "Rinçage", "active", entityId = "sensor.lave_linge_state", kind = PillKind.APPLIANCE,
-                progress = 0.62f, details = listOf(PillDetail("Cycle", "Coton"), PillDetail("Fin estimée", "14:35"), PillDetail("Essorage", "1 200 tr/min"))),
-            LauncherChip("air_group", "air", "Qualité de l’air", "Bonne · 620 ppm", "active", details = listOf(
-                PillDetail("CO₂", "620 ppm"), PillDetail("Humidité", "46 %"), PillDetail("PM2.5", "4 µg/m³"),
-            ), kind = PillKind.AIR),
-            LauncherChip("generic_test", "sensor", "Capteur balcon", "18,2 °C", "info", kind = PillKind.GENERIC,
-                details = listOf(PillDetail("Température", "18,2 °C"), PillDetail("Humidité", "61 %"))),
-            LauncherChip("media_group", "media", "Musique", "Midnight City", "active", entityId = "media_player.salon", kind = PillKind.MEDIA),
-        )
-    }
-    val fakeMedia = remember {
-        PlayingMedia(
-            entityId = "media_player.salon", title = "Midnight City", artist = "M83",
-            album = "Hurry Up, We're Dreaming", state = "playing", coverUrl = null,
-            volumePercent = 38, isMuted = false, playerNames = listOf("Salon"),
-            players = listOf(MediaPlayerVolume("media_player.salon", "Salon", 38, false)),
-        )
-    }
+private fun FakePanelLab(
+    chips: List<LauncherChip>,
+    media: PlayingMedia,
+    selected: FakePanelSelection?,
+    onSelect: (FakePanelSelection) -> Unit,
+) {
     SectionTitle(stringResource(R.string.playground_section_fake_panels))
     Text(stringResource(R.string.playground_fake_panels_hint), style = AppleTypography.bodySmall, color = AppleColors.secondary)
     Spacer(Modifier.height(14.dp))
@@ -733,7 +693,7 @@ private fun fakePanelChips(
             PillDetail(light.name, if (active) "${((light.attributes.optInt("brightness") / 255f) * 100).toInt()} %" else "Éteinte", id, active)
         }, kind = PillKind.LIGHTS, deviceState = if (lightsOn > 0) "on" else "off"),
         LauncherChip("purifier_group", "air", "Purificateur", if (purifier.state == "on") mode(purifier.entityId, "preset_mode").replaceFirstChar { it.uppercase() } else "Éteint", airState, entityId = purifier.entityId, kind = PillKind.PURIFIER,
-            details = listOf(PillDetail("CO₂", "$co2 ppm"), PillDetail("PM2.5", "$pm25 µg/m³"), PillDetail("Filtre", "82 %"))),
+            details = listOf(PillDetail("CO₂", "$co2 ppm"), PillDetail("PM2.5", "$pm25 µg/m³"), PillDetail("Filtre", "82 %")), deviceState = purifier.state),
         LauncherChip("scenes_group", "scene", "Scènes", "4 ambiances", "ok", kind = PillKind.SCENE, details = listOf(
             PillDetail("Soirée", "", "scene.soiree"), PillDetail("Lecture", "", "scene.lecture"), PillDetail("Cinéma", "", "scene.cinema"), PillDetail("Tout éteindre", "", "script.tout_eteindre"))),
         LauncherChip("lock_test", "lock", "Porte d’entrée", if (lock.state == "locked") "Verrouillée" else "Déverrouillée", if (lock.state == "locked") "ok" else "critical", entityId = lock.entityId, kind = PillKind.LOCK, deviceState = lock.state),
@@ -744,6 +704,14 @@ private fun fakePanelChips(
         LauncherChip("fan_on_off_test", "fan", "Ventilateur simple", if (fanSimple.state == "on") "Allumé" else "Éteint", if (fanSimple.state == "on") "active" else "ok", entityId = fanSimple.entityId, kind = PillKind.FAN, deviceState = fanSimple.state),
         LauncherChip("fan_modes_test", "fan", "Ventilateur 3 vitesses", if (fanModes.state == "on") "Niveau ${mode(fanModes.entityId, "preset_mode")}" else "Éteint", if (fanModes.state == "on") "active" else "ok", entityId = fanModes.entityId, kind = PillKind.FAN, deviceState = fanModes.state),
         LauncherChip("switch_test", "switch", "Prise TV", if (socket.state == "on") "Allumée" else "Éteinte", if (socket.state == "on") "active" else "ok", entityId = socket.entityId, kind = PillKind.SWITCH, deviceState = socket.state),
+        entity("humidifier.chambre").let { LauncherChip("humidifier_test", "humidity", it.name, "${it.attributes.optInt("humidity")} %", if (it.state == "on") "active" else "ok", entityId = it.entityId, kind = PillKind.HUMIDIFIER, deviceState = it.state) },
+        entity("water_heater.ballon").let { LauncherChip("heater_test", "temperature", it.name, "${it.attributes.optInt("temperature")} °C", if (it.state == "off") "ok" else "active", entityId = it.entityId, kind = PillKind.WATER_HEATER, deviceState = it.state) },
+        entity("valve.eau").let { LauncherChip("valve_test", "valve", it.name, "${it.attributes.optInt("current_valve_position")} %", if (it.state == "closed") "ok" else "active", entityId = it.entityId, kind = PillKind.VALVE, deviceState = it.state) },
+        entity("siren.alarme").let { LauncherChip("siren_test", "shield", it.name, if (it.state == "on") "Déclenchée" else "Éteinte", if (it.state == "on") "critical" else "ok", entityId = it.entityId, kind = PillKind.SIREN, deviceState = it.state) },
+        entity("lawn_mower.jardin").let { LauncherChip("mower_test", "mower", it.name, it.state.replaceFirstChar(Char::uppercase), if (it.state == "mowing") "active" else "ok", entityId = it.entityId, kind = PillKind.LAWN_MOWER, deviceState = it.state) },
+        entity("number.seuil_lux").let { LauncherChip("number_test", "number", it.name, "${it.state} lx", "info", entityId = it.entityId, kind = PillKind.NUMBER, deviceState = it.state) },
+        entity("select.programme").let { LauncherChip("select_test", "select", it.name, it.state.replaceFirstChar(Char::uppercase), "info", entityId = it.entityId, kind = PillKind.SELECT, deviceState = it.state) },
+        entity("button.restart").let { LauncherChip("button_test", "button", it.name, "Action", "info", entityId = it.entityId, kind = PillKind.BUTTON, deviceState = it.state) },
         LauncherChip("alarm_test", "shield", "Alarme", alarm.state.replace('_', ' ').replaceFirstChar { it.uppercase() }, if (alarm.state == "triggered") "critical" else if (alarm.state == "disarmed") "info" else "active", entityId = alarm.entityId, kind = PillKind.SAFETY, deviceState = alarm.state),
         LauncherChip("washer_test", "washer", "Machine à laver", "Rinçage", "active", entityId = "sensor.lave_linge_state", kind = PillKind.APPLIANCE, progress = 0.62f, details = listOf(PillDetail("Cycle", "Coton"), PillDetail("Fin estimée", "14:35"), PillDetail("Essorage", "1 200 tr/min"))),
         LauncherChip("air_group", "air", "Qualité de l’air", when (airState) { "critical" -> "Mauvaise"; "warning" -> "Moyenne"; else -> "Bonne" }, airState, details = listOf(PillDetail("CO₂", "$co2 ppm"), PillDetail("Humidité", "46 %"), PillDetail("PM2.5", "$pm25 µg/m³")), kind = PillKind.AIR),

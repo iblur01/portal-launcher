@@ -81,6 +81,7 @@ fun launcherChipAccent(chip: LauncherChip): Color = when {
     else -> when (chip.kind) {
         PillKind.LOCK -> if (chip.state.lowercase() in setOf("critical", "error")) AppleColors.error else AppleColors.lockAccent
         PillKind.FAN -> AppleColors.fanAccent
+        PillKind.VALVE -> AppleColors.accent
         PillKind.THERMOSTAT -> when (chip.deviceState?.lowercase()) {
             "heat" -> AppleColors.thermostatHeat
             "cool" -> AppleColors.thermostatCool
