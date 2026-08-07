@@ -25,6 +25,7 @@ fun LauncherChip.toPanelKind(): PanelKind = when {
     kind == PillKind.VACUUM -> PanelKind.VACUUM
     kind == PillKind.FAN -> PanelKind.FAN
     kind == PillKind.SWITCH -> PanelKind.SWITCH
+    kind == PillKind.APPLIANCE -> PanelKind.WASHER
     // alarm-vs-generic-safety split resolved here (was SidePanel.kt:179).
     kind == PillKind.SAFETY && entityId.startsWith("alarm_control_panel.") -> PanelKind.ALARM
     else -> PanelKind.GENERIC_DETAILS

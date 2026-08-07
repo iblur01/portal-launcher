@@ -58,6 +58,7 @@ import kotlin.math.roundToInt
  */
 sealed interface PanelContent {
     data class Media(val session: PlayingMedia) : PanelContent
+    data object MediaBrowser : PanelContent
     data class ChipActions(val chip: LauncherChip) : PanelContent
     data class Weather(val weather: WeatherUi) : PanelContent
 }
@@ -73,7 +74,7 @@ fun ChipActionsPanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val accent = stateColor(chip.state)
+    val accent = launcherChipAccent(chip)
     // Same large frosted card as the media player panel.
     Box(
         modifier = modifier
@@ -124,6 +125,7 @@ private fun ChipActionsContent(
         PanelKind.LOCK -> false // The lock control owns the translated state; avoid raw "locked".
         PanelKind.PURIFIER -> false // The mode selector already displays the active state.
         PanelKind.VACUUM -> false // The reusable vacuum status chip owns the active state.
+        PanelKind.WASHER -> false // The washer dial owns progress, phase and remaining time.
         PanelKind.COVER -> entity?.let {
             !it.supports(CoverFeature.SET_POSITION) || it.attributes.optInt("current_position", -1) !in 0..100
         } != false
@@ -194,6 +196,7 @@ private fun ChipActionsContent(
                 PanelKind.THERMOSTAT -> ThermostatControl(chip)
                 PanelKind.VACUUM -> Unit // Bounded branch above.
                 PanelKind.ALARM -> AlarmControl(chip)
+                PanelKind.WASHER -> WasherControl(chip)
                 // AIR_QUALITY is rendered full-screen upstream in ChipActionsPanel; MEDIA/WEATHER
                 // are separate PanelContent types and never reach the chip-actions router.
                 PanelKind.AIR_QUALITY, PanelKind.MEDIA, PanelKind.WEATHER,

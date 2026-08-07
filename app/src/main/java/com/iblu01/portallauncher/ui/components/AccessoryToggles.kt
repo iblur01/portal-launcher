@@ -95,7 +95,7 @@ fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(6.dp))
         Text(
-            if (fan.primaryControl is FanPrimaryControl.OnOff) if (fan.isOn) onLabel else offLabel else speedLabel,
+            if (!fan.isOn) offLabel else if (fan.primaryControl is FanPrimaryControl.OnOff) onLabel else speedLabel,
             style = AppleTypography.titleMedium.copy(fontSize = 17.sp),
             color = AppleColors.primary,
         )
@@ -120,7 +120,9 @@ fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
             }
             is FanPrimaryControl.Percentage -> {
                 VerticalFillSlider(
-                    value = control.value.toFloat(),
+                    // Some integrations retain their last percentage while reporting off/stopped.
+                    // The control must still look fully disabled in that state.
+                    value = if (fan.isOn) control.value.toFloat() else 0f,
                     onValueChange = {},
                     valueRange = 0f..100f,
                     accent = AppleColors.fanAccent,
@@ -134,10 +136,14 @@ fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 )
             }
             is FanPrimaryControl.Presets -> {
-                val options = listOf(FanModeOption.Off) + control.values.map(FanModeOption::Preset)
-                val selected = if (!fan.isOn) FanModeOption.Off else {
-                    FanModeOption.Preset(control.selected ?: control.values.first())
-                }
+                // Active speeds run top-to-bottom; the neutral off/stopped state always rests at
+                // the bottom, consistently with VerticalSwitch.
+                val activeValues = control.values
+                    .filterNot { it.lowercase() in setOf("off", "stopped", "stop", "éteint", "eteint") }
+                val options = activeValues.map(FanModeOption::Preset) + FanModeOption.Off
+                val selectedValue = control.selected?.takeIf(activeValues::contains) ?: activeValues.firstOrNull()
+                val selected = if (!fan.isOn || selectedValue == null) FanModeOption.Off
+                    else FanModeOption.Preset(selectedValue)
                 VerticalSegmentedSelector(
                     options = options,
                     selected = selected,
@@ -164,7 +170,7 @@ fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
         if (fan.supportsOscillation) {
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                PanelModeButton(stringResource(R.string.fan_oscillation_label), Icons.Outlined.Sync, fan.isOscillating) {
+                PanelModeButton(stringResource(R.string.fan_oscillation_label), Icons.Outlined.Sync, fan.isOn && fan.isOscillating) {
                     callService("fan", "oscillate", chip.entityId, mapOf("oscillating" to !fan.isOscillating))
                 }
             }

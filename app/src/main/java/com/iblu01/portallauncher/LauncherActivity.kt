@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher
 import com.iblu01.portallauncher.domain.model.PlayingMedia
+import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 
 import android.content.Intent
@@ -109,6 +110,7 @@ import com.iblu01.portallauncher.ui.components.PAGE_FIRST_APP
 import com.iblu01.portallauncher.ui.components.collapseFraction
 import com.iblu01.portallauncher.ui.components.rememberLauncherPagerState
 import com.iblu01.portallauncher.ui.components.MediaPlayerView
+import com.iblu01.portallauncher.ui.components.MediaDevicesPanel
 import com.iblu01.portallauncher.ui.components.PanelContent
 import com.iblu01.portallauncher.ui.components.PresenceIndicator
 import com.iblu01.portallauncher.ui.components.QuickActionsOverlay
@@ -572,6 +574,21 @@ private fun PortalLauncherApp(
     val chips = ui.chips
     val temperatures = ui.temperatures
     val mediaSessions = ui.mediaSessions
+    val mediaDevices = ui.latestStates.values.filter { it.domain == "media_player" }.map { entity ->
+        mediaSessions.firstOrNull { session -> session.players.any { it.entityId == entity.entityId } }
+            ?: PlayingMedia(
+                entityId = entity.entityId,
+                title = entity.attributes.optString("media_title").ifBlank { "Aucun média" },
+                artist = entity.name,
+                album = entity.attributes.optString("media_album_name").takeIf { it.isNotBlank() },
+                state = entity.state,
+                coverUrl = null,
+                volumePercent = (entity.attributes.optDouble("volume_level", 0.0) * 100).toInt(),
+                isMuted = entity.attributes.optBoolean("is_volume_muted", false),
+                playerNames = listOf(entity.name),
+                players = listOf(MediaPlayerVolume(entity.entityId, entity.name, (entity.attributes.optDouble("volume_level", 0.0) * 100).toInt(), entity.attributes.optBoolean("is_volume_muted", false))),
+            )
+    }.distinctBy { it.entityId }.sortedBy { it.playerNames.firstOrNull().orEmpty() }
     val haConnected = ui.connected
     val haLastUpdateAt = ui.lastUpdateAt
     // Media-selection state stays local (moves to the panel reducer at step 6).
@@ -579,6 +596,7 @@ private fun PortalLauncherApp(
     var secondaryMedia by remember { mutableStateOf(emptyList<PlayingMedia>()) }
     var displayedSecondaryMedia by remember { mutableStateOf(emptyList<PlayingMedia>()) }
     var selectedMediaEntityId by remember { mutableStateOf<String?>(null) }
+    var browsedMediaEntityId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(mediaSessions, selectedMediaEntityId) {
         val selected = mediaSessions.firstOrNull { session ->
             session.players.any { it.entityId == selectedMediaEntityId }
@@ -678,9 +696,13 @@ private fun PortalLauncherApp(
             session?.let { PanelContent.Media(it) }
         }
         is PanelRequest.Chip ->
-            if (req.panelKind == PanelKind.MEDIA) media?.let { PanelContent.Media(it) }
+            if (req.panelKind == PanelKind.MEDIA) PanelContent.MediaBrowser
             else panelChip?.let { PanelContent.ChipActions(it) }
         null -> null
+    }
+    LaunchedEffect(panel.request) {
+        val request = panel.request as? PanelRequest.Chip
+        if (request?.panelKind != PanelKind.MEDIA) browsedMediaEntityId = null
     }
     val isSplit = panelContent != null
     // Dropping an icon back onto an earlier page removes the growth page from under our feet.
@@ -795,6 +817,22 @@ private fun PortalLauncherApp(
                 weather = content.weather,
                 onDismiss = onPanelDismiss,
             )
+            PanelContent.MediaBrowser -> {
+                val selectedDevice = mediaDevices.firstOrNull { it.entityId == browsedMediaEntityId }
+                if (selectedDevice == null) {
+                    MediaDevicesPanel(mediaDevices, onSelect = { browsedMediaEntityId = it.entityId }, onDismiss = onPanelDismiss)
+                } else {
+                    MediaPlayerPanel(
+                        media = selectedDevice,
+                        secondaryMedia = emptyList(),
+                        prefs = prefs,
+                        mediaSessions = mediaDevices,
+                        onSelectSession = { browsedMediaEntityId = it },
+                        onDismiss = { browsedMediaEntityId = null },
+                        onSecondaryPlayPause = onSecondaryPlayPause,
+                    )
+                }
+            }
         }
     }
 

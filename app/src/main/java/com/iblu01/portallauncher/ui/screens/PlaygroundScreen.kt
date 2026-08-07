@@ -45,12 +45,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -126,6 +128,19 @@ fun PlaygroundScreen(onBack: () -> Unit) {
     )
     var accent by remember { mutableStateOf(accentSwatches.first().second) }
     var selectedFakePanel by remember { mutableStateOf<FakePanelSelection?>(null) }
+    val fakeEntities = rememberFakePanelEntities()
+    val fakeService = rememberFakeCallService(fakeEntities)
+    val fakeTracks = remember { listOf("Midnight City" to "M83", "Nightcall" to "Kavinsky", "Genesis" to "Grimes") }
+    var fakeTrackIndex by remember { mutableIntStateOf(0) }
+    var fakeMediaPlaying by remember { mutableStateOf(true) }
+    var fakeMediaVolume by remember { mutableIntStateOf(38) }
+    val fakeChips = fakePanelChips(fakeEntities, fakeMediaPlaying, fakeTracks[fakeTrackIndex].first)
+    val fakeMedia = PlayingMedia(
+        entityId = "media_player.salon", title = fakeTracks[fakeTrackIndex].first, artist = fakeTracks[fakeTrackIndex].second,
+        album = "Simulation locale", state = if (fakeMediaPlaying) "playing" else "paused", coverUrl = null,
+        volumePercent = fakeMediaVolume, isMuted = false, playerNames = listOf("Salon"),
+        players = listOf(MediaPlayerVolume("media_player.salon", "Salon", fakeMediaVolume, false)),
+    )
     val contentWidth by animateFloatAsState(
         targetValue = if (selectedFakePanel == null) 1f else 0.67f,
         animationSpec = tween(500),
@@ -193,6 +208,8 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(28.dp))
 
         FakePanelLab(
+            chips = fakeChips,
+            media = fakeMedia,
             selected = selectedFakePanel,
             onSelect = { next -> selectedFakePanel = next.takeUnless { it.id == selectedFakePanel?.id } },
         )
@@ -575,29 +592,25 @@ fun PlaygroundScreen(onBack: () -> Unit) {
     }
 
         selectedFakePanel?.let { selection ->
-            val entities = rememberFakePanelEntities()
-            val noOpService = remember {
-                object : CallService {
-                    override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) = Unit
-                }
-            }
             CompositionLocalProvider(
-                LocalCallService provides noOpService,
-                LocalHaStates provides entities,
+                LocalCallService provides fakeService,
+                LocalHaStates provides fakeEntities,
                 LocalAreas provides emptyMap(),
             ) {
                 when (selection) {
                     is FakePanelSelection.Chip -> ChipActionsPanel(
-                        chip = selection.chip,
+                        chip = fakeChips.firstOrNull { it.id == selection.id } ?: selection.chip,
                         onDismiss = { selectedFakePanel = null },
                         modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f),
                     )
                     is FakePanelSelection.Media -> MediaPlayerView(
-                        media = selection.media,
+                        media = fakeMedia,
                         secondaryMedia = emptyList(),
                         haToken = "",
-                        onPlayPause = {}, onPrevious = {}, onNext = {},
-                        onVolumeChange = { _, _ -> },
+                        onPlayPause = { fakeMediaPlaying = !fakeMediaPlaying },
+                        onPrevious = { fakeTrackIndex = (fakeTrackIndex - 1 + fakeTracks.size) % fakeTracks.size },
+                        onNext = { fakeTrackIndex = (fakeTrackIndex + 1) % fakeTracks.size },
+                        onVolumeChange = { _, volume -> fakeMediaVolume = volume.toInt().coerceIn(0, 100) },
                         onSecondaryPlayPause = {}, onSecondaryPrevious = {}, onSecondaryNext = {},
                         onSelectSecondary = {}, onSwipePlayer = {}, onJoinPlayer = {}, onUnjoinPlayer = {},
                         onDismiss = { selectedFakePanel = null },
@@ -611,46 +624,12 @@ fun PlaygroundScreen(onBack: () -> Unit) {
 
 /** Real side-panel routing fed by local fake HA entities, for interaction testing offline. */
 @Composable
-private fun FakePanelLab(selected: FakePanelSelection?, onSelect: (FakePanelSelection) -> Unit) {
-    val chips = remember {
-        listOf(
-            LauncherChip("lights_group", "light", "Lumières", "3 allumées", "active", details = listOf(
-                PillDetail("Salon", "72 %", "light.salon", true),
-                PillDetail("Cuisine", "Éteinte", "light.cuisine", false),
-            ), kind = PillKind.LIGHTS),
-            LauncherChip("purifier_group", "air", "Purificateur", "Auto · air bon", "active", entityId = "fan.purificateur", kind = PillKind.PURIFIER,
-                details = listOf(PillDetail("Filtre", "82 %"))),
-            LauncherChip("scenes_group", "scene", "Scènes", "4 ambiances", "ok", kind = PillKind.SCENE, details = listOf(
-                PillDetail("Soirée", "", "scene.soiree"), PillDetail("Lecture", "", "scene.lecture"),
-                PillDetail("Cinéma", "", "scene.cinema"), PillDetail("Tout éteindre", "", "script.tout_eteindre"),
-            )),
-            LauncherChip("lock_test", "lock", "Porte d’entrée", "Verrouillée", "ok", entityId = "lock.entree", kind = PillKind.LOCK),
-            LauncherChip("cover_test", "cover", "Volet salon", "64 %", "active", entityId = "cover.salon", kind = PillKind.COVER),
-            LauncherChip("thermostat_test", "temperature", "Thermostat", "21,5 °C", "active", entityId = "climate.salon", kind = PillKind.THERMOSTAT),
-            LauncherChip("vacuum_test", "vacuum", "Aspirateur", "Nettoyage", "active", entityId = "vacuum.romy", kind = PillKind.VACUUM, batteryPercent = 78),
-            LauncherChip("fan_test", "fan", "Ventilateur %", "40 %", "active", entityId = "fan.chambre", kind = PillKind.FAN),
-            LauncherChip("fan_on_off_test", "fan", "Ventilateur simple", "Allumé", "active", entityId = "fan.bureau", kind = PillKind.FAN),
-            LauncherChip("fan_modes_test", "fan", "Ventilateur 3 vitesses", "Niveau 2", "active", entityId = "fan.plafond", kind = PillKind.FAN),
-            LauncherChip("switch_test", "switch", "Prise TV", "Allumée", "active", entityId = "switch.tv", kind = PillKind.SWITCH),
-            LauncherChip("alarm_test", "shield", "Alarme", "Désarmée", "info", entityId = "alarm_control_panel.maison", kind = PillKind.SAFETY),
-            LauncherChip("washer_test", "washer", "Machine à laver", "Rinçage", "active", entityId = "sensor.lave_linge_state", kind = PillKind.APPLIANCE,
-                progress = 0.62f, details = listOf(PillDetail("Cycle", "Coton"), PillDetail("Fin estimée", "14:35"), PillDetail("Essorage", "1 200 tr/min"))),
-            LauncherChip("air_group", "air", "Qualité de l’air", "Bonne · 620 ppm", "active", details = listOf(
-                PillDetail("CO₂", "620 ppm"), PillDetail("Humidité", "46 %"), PillDetail("PM2.5", "4 µg/m³"),
-            ), kind = PillKind.AIR),
-            LauncherChip("generic_test", "sensor", "Capteur balcon", "18,2 °C", "info", kind = PillKind.GENERIC,
-                details = listOf(PillDetail("Température", "18,2 °C"), PillDetail("Humidité", "61 %"))),
-            LauncherChip("media_group", "media", "Musique", "Midnight City", "active", entityId = "media_player.salon", kind = PillKind.MEDIA),
-        )
-    }
-    val fakeMedia = remember {
-        PlayingMedia(
-            entityId = "media_player.salon", title = "Midnight City", artist = "M83",
-            album = "Hurry Up, We're Dreaming", state = "playing", coverUrl = null,
-            volumePercent = 38, isMuted = false, playerNames = listOf("Salon"),
-            players = listOf(MediaPlayerVolume("media_player.salon", "Salon", 38, false)),
-        )
-    }
+private fun FakePanelLab(
+    chips: List<LauncherChip>,
+    media: PlayingMedia,
+    selected: FakePanelSelection?,
+    onSelect: (FakePanelSelection) -> Unit,
+) {
     SectionTitle(stringResource(R.string.playground_section_fake_panels))
     Text(stringResource(R.string.playground_fake_panels_hint), style = AppleTypography.bodySmall, color = AppleColors.secondary)
     Spacer(Modifier.height(14.dp))
@@ -662,7 +641,7 @@ private fun FakePanelLab(selected: FakePanelSelection?, onSelect: (FakePanelSele
                         chip = chip,
                         selected = selected?.id == chip.id,
                         onClick = {
-                            onSelect(if (chip.id == "media_group") FakePanelSelection.Media(fakeMedia) else FakePanelSelection.Chip(chip))
+                            onSelect(if (chip.id == "media_group") FakePanelSelection.Media(media) else FakePanelSelection.Chip(chip))
                         },
                     )
                 }
@@ -672,8 +651,65 @@ private fun FakePanelLab(selected: FakePanelSelection?, onSelect: (FakePanelSele
 }
 
 @Composable
-private fun rememberFakePanelEntities(): Map<String, HaEntity> = remember {
-    listOf(
+private fun fakePanelChips(
+    entities: Map<String, HaEntity>,
+    mediaPlaying: Boolean,
+    mediaTitle: String,
+): List<LauncherChip> {
+    fun entity(id: String) = entities.getValue(id)
+    fun on(id: String) = entity(id).state.equals("on", true)
+    fun percent(id: String, key: String) = entity(id).attributes.optInt(key, 0).coerceIn(0, 100)
+    fun mode(id: String, key: String) = entity(id).attributes.optString(key)
+
+    val lights = listOf("light.salon", "light.cuisine")
+    val lightsOn = lights.count(::on)
+    val purifier = entity("fan.purificateur")
+    val co2 = entity("sensor.air_co2").state.toIntOrNull() ?: 0
+    val pm25 = entity("sensor.air_pm25").state.toIntOrNull() ?: 0
+    val airState = when {
+        co2 > 1_000 && pm25 > 25 -> "critical"
+        co2 > 1_000 || pm25 > 25 -> "warning"
+        else -> "active"
+    }
+    val climate = entity("climate.salon")
+    val climateTarget = climate.attributes.optDouble("temperature", 21.5)
+    val vacuum = entity("vacuum.romy")
+    val fanPercent = entity("fan.chambre")
+    val fanSimple = entity("fan.bureau")
+    val fanModes = entity("fan.plafond")
+    val cover = entity("cover.salon")
+    val lock = entity("lock.entree")
+    val socket = entity("switch.tv")
+    val alarm = entity("alarm_control_panel.maison")
+
+    return listOf(
+        LauncherChip("lights_group", "light", "Lumières", if (lightsOn == 0) "Éteintes" else "$lightsOn allumée${if (lightsOn > 1) "s" else ""}", if (lightsOn > 0) "active" else "ok", details = lights.map { id ->
+            val light = entity(id); val active = light.state == "on"
+            PillDetail(light.name, if (active) "${((light.attributes.optInt("brightness") / 255f) * 100).toInt()} %" else "Éteinte", id, active)
+        }, kind = PillKind.LIGHTS, deviceState = if (lightsOn > 0) "on" else "off"),
+        LauncherChip("purifier_group", "air", "Purificateur", if (purifier.state == "on") mode(purifier.entityId, "preset_mode").replaceFirstChar { it.uppercase() } else "Éteint", airState, entityId = purifier.entityId, kind = PillKind.PURIFIER,
+            details = listOf(PillDetail("CO₂", "$co2 ppm"), PillDetail("PM2.5", "$pm25 µg/m³"), PillDetail("Filtre", "82 %"))),
+        LauncherChip("scenes_group", "scene", "Scènes", "4 ambiances", "ok", kind = PillKind.SCENE, details = listOf(
+            PillDetail("Soirée", "", "scene.soiree"), PillDetail("Lecture", "", "scene.lecture"), PillDetail("Cinéma", "", "scene.cinema"), PillDetail("Tout éteindre", "", "script.tout_eteindre"))),
+        LauncherChip("lock_test", "lock", "Porte d’entrée", if (lock.state == "locked") "Verrouillée" else "Déverrouillée", if (lock.state == "locked") "ok" else "critical", entityId = lock.entityId, kind = PillKind.LOCK, deviceState = lock.state),
+        LauncherChip("cover_test", "cover", "Volet salon", "${percent(cover.entityId, "current_position")} %", if (cover.state == "closed") "ok" else "active", entityId = cover.entityId, kind = PillKind.COVER, deviceState = cover.state),
+        LauncherChip("thermostat_test", "temperature", "Thermostat", "${if (climateTarget % 1.0 == 0.0) climateTarget.toInt() else climateTarget} °C", if (climate.state == "off") "ok" else "active", entityId = climate.entityId, kind = PillKind.THERMOSTAT, deviceState = climate.state),
+        LauncherChip("vacuum_test", "vacuum", "Aspirateur", vacuum.state.replaceFirstChar { it.uppercase() }, if (vacuum.state in setOf("cleaning", "returning")) "active" else "ok", entityId = vacuum.entityId, kind = PillKind.VACUUM, batteryPercent = vacuum.attributes.optInt("battery_level"), deviceState = vacuum.state),
+        LauncherChip("fan_test", "fan", "Ventilateur %", if (fanPercent.state == "on") "${percent(fanPercent.entityId, "percentage")} %" else "Éteint", if (fanPercent.state == "on") "active" else "ok", entityId = fanPercent.entityId, kind = PillKind.FAN, deviceState = fanPercent.state),
+        LauncherChip("fan_on_off_test", "fan", "Ventilateur simple", if (fanSimple.state == "on") "Allumé" else "Éteint", if (fanSimple.state == "on") "active" else "ok", entityId = fanSimple.entityId, kind = PillKind.FAN, deviceState = fanSimple.state),
+        LauncherChip("fan_modes_test", "fan", "Ventilateur 3 vitesses", if (fanModes.state == "on") "Niveau ${mode(fanModes.entityId, "preset_mode")}" else "Éteint", if (fanModes.state == "on") "active" else "ok", entityId = fanModes.entityId, kind = PillKind.FAN, deviceState = fanModes.state),
+        LauncherChip("switch_test", "switch", "Prise TV", if (socket.state == "on") "Allumée" else "Éteinte", if (socket.state == "on") "active" else "ok", entityId = socket.entityId, kind = PillKind.SWITCH, deviceState = socket.state),
+        LauncherChip("alarm_test", "shield", "Alarme", alarm.state.replace('_', ' ').replaceFirstChar { it.uppercase() }, if (alarm.state == "triggered") "critical" else if (alarm.state == "disarmed") "info" else "active", entityId = alarm.entityId, kind = PillKind.SAFETY, deviceState = alarm.state),
+        LauncherChip("washer_test", "washer", "Machine à laver", "Rinçage", "active", entityId = "sensor.lave_linge_state", kind = PillKind.APPLIANCE, progress = 0.62f, details = listOf(PillDetail("Cycle", "Coton"), PillDetail("Fin estimée", "14:35"), PillDetail("Essorage", "1 200 tr/min"))),
+        LauncherChip("air_group", "air", "Qualité de l’air", when (airState) { "critical" -> "Mauvaise"; "warning" -> "Moyenne"; else -> "Bonne" }, airState, details = listOf(PillDetail("CO₂", "$co2 ppm"), PillDetail("Humidité", "46 %"), PillDetail("PM2.5", "$pm25 µg/m³")), kind = PillKind.AIR),
+        LauncherChip("generic_test", "sensor", "Capteur balcon", "18,2 °C", "info", kind = PillKind.GENERIC, details = listOf(PillDetail("Température", "18,2 °C"), PillDetail("Humidité", "61 %"))),
+        LauncherChip("media_group", "media", "Musique", mediaTitle, if (mediaPlaying) "active" else "ok", entityId = "media_player.salon", kind = PillKind.MEDIA, deviceState = if (mediaPlaying) "playing" else "paused"),
+    )
+}
+
+@Composable
+private fun rememberFakePanelEntities(): SnapshotStateMap<String, HaEntity> = remember {
+    mutableStateMapOf<String, HaEntity>().apply { putAll(listOf(
         fakeEntity("light.salon", "on", "Salon", "{\"brightness\":184,\"color_temp_kelvin\":3800,\"supported_color_modes\":[\"color_temp\"]}"),
         fakeEntity("light.cuisine", "off", "Cuisine", "{\"brightness\":0}"),
         fakeEntity("fan.purificateur", "on", "Purificateur", "{\"preset_mode\":\"auto\",\"preset_modes\":[\"auto\",\"sleep\",\"manual\",\"pet\"]}"),
@@ -688,8 +724,73 @@ private fun rememberFakePanelEntities(): Map<String, HaEntity> = remember {
         fakeEntity("fan.plafond", "on", "Ventilateur plafond", "{\"preset_mode\":\"2\",\"preset_modes\":[\"1\",\"2\",\"3\"],\"supported_features\":8}"),
         fakeEntity("switch.tv", "on", "Prise TV", "{}"),
         fakeEntity("alarm_control_panel.maison", "disarmed", "Alarme maison", "{\"code_format\":\"number\",\"code_arm_required\":false,\"supported_features\":15}"),
-        fakeEntity("sensor.lave_linge_state", "rinse", "Machine à laver", "{}"),
-    ).associateBy { it.entityId }
+        fakeEntity("sensor.lave_linge_state", "running", "Machine à laver", "{\"progress\":62,\"phase\":\"rinse\",\"remaining_time\":\"Reste 38 min\",\"program\":\"Coton\",\"temperature\":40,\"spin_speed\":1200}"),
+        fakeEntity("sensor.air_co2", "620", "CO₂", "{\"device_class\":\"carbon_dioxide\",\"unit_of_measurement\":\"ppm\"}"),
+        fakeEntity("sensor.air_pm25", "4", "PM2.5", "{\"device_class\":\"pm25\",\"unit_of_measurement\":\"µg/m³\"}"),
+    ).associateBy { it.entityId }) }
+}
+
+@Composable
+private fun rememberFakeCallService(entities: SnapshotStateMap<String, HaEntity>): CallService = remember(entities) {
+    object : CallService {
+        override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) {
+            val id = entityId ?: return
+            if (domain == "scene" || domain == "script") {
+                // Give scene buttons an immediately visible whole-home effect.
+                val cinema = id.contains("cinema")
+                listOf("light.salon", "light.cuisine").forEachIndexed { index, lightId ->
+                    val light = entities[lightId] ?: return@forEachIndexed
+                    val attrs = JSONObject(light.attributes.toString())
+                    val enabled = !id.contains("tout_eteindre") && (!cinema || index == 0)
+                    attrs.put("brightness", if (enabled) if (cinema) 54 else 190 else 0)
+                    entities[lightId] = HaEntity(lightId, if (enabled) "on" else "off", attrs, light.lastChanged)
+                }
+                return
+            }
+            val current = entities[id] ?: return
+            val attributes = JSONObject(current.attributes.toString())
+            fun replace(state: String = current.state, mutate: JSONObject.() -> Unit = {}) {
+                attributes.mutate()
+                entities[id] = HaEntity(id, state, attributes, current.lastChanged)
+            }
+            when (domain) {
+                "lock" -> replace(if (service == "lock") "locked" else "unlocked")
+                "switch", "light" -> when (service) {
+                    "turn_on" -> replace("on") { data?.forEach { (key, value) -> put(key, value) } }
+                    "turn_off" -> replace("off")
+                    "toggle" -> replace(if (current.state == "on") "off" else "on")
+                }
+                "fan" -> when (service) {
+                    "turn_on" -> replace("on")
+                    "turn_off" -> replace("off")
+                    "toggle" -> replace(if (current.state == "on") "off" else "on")
+                    "set_percentage" -> replace(if ((data?.get("percentage") as? Number)?.toInt() == 0) "off" else "on") { put("percentage", (data?.get("percentage") as? Number)?.toInt() ?: 0) }
+                    "set_preset_mode" -> replace("on") { put("preset_mode", data?.get("preset_mode")?.toString()) }
+                    "oscillate" -> replace { put("oscillating", data?.get("oscillating") as? Boolean ?: false) }
+                }
+                "cover" -> when (service) {
+                    "open_cover" -> replace("open") { put("current_position", 100) }
+                    "close_cover" -> replace("closed") { put("current_position", 0) }
+                    "set_cover_position" -> replace("open") { put("current_position", (data?.get("position") as? Number)?.toInt() ?: 0) }
+                    "stop_cover" -> replace("open")
+                }
+                "climate" -> when (service) {
+                    "set_hvac_mode" -> replace(data?.get("hvac_mode")?.toString() ?: current.state)
+                    "set_temperature" -> replace { data?.forEach { (key, value) -> put(key, value) } }
+                }
+                "vacuum" -> when (service) {
+                    "start" -> replace("cleaning")
+                    "pause" -> replace("paused")
+                    "stop" -> replace("idle")
+                    "return_to_base" -> replace("returning")
+                    "set_fan_speed" -> replace { put("fan_speed", data?.get("fan_speed")?.toString()) }
+                }
+                "alarm_control_panel" -> replace(when (service) {
+                    "alarm_disarm" -> "disarmed"; "alarm_arm_home" -> "armed_home"; "alarm_arm_night" -> "armed_night"; "alarm_trigger" -> "triggered"; else -> "armed_away"
+                })
+            }
+        }
+    }
 }
 
 private fun fakeEntity(id: String, state: String, name: String, attributes: String): HaEntity =

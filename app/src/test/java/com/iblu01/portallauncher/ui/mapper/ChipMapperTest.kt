@@ -41,6 +41,7 @@ class ChipMapperTest {
         assertEquals(PanelKind.VACUUM, chip(kind = PillKind.VACUUM).toPanelKind())
         assertEquals(PanelKind.FAN, chip(kind = PillKind.FAN).toPanelKind())
         assertEquals(PanelKind.SWITCH, chip(kind = PillKind.SWITCH).toPanelKind())
+        assertEquals(PanelKind.WASHER, chip(kind = PillKind.APPLIANCE).toPanelKind())
     }
 
     // --- alarm-vs-generic-safety split (was SidePanel.kt:179) ----------------------------------

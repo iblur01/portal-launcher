@@ -9,7 +9,7 @@ enum class PanelKind {
     // ex-groupes string-id
     LIGHTS, AIR_QUALITY, PURIFIER, SCENES, PRESENCE, ENERGY,
     // ex-PillKind
-    LOCK, COVER, THERMOSTAT, VACUUM, FAN, SWITCH, ALARM,
+    LOCK, COVER, THERMOSTAT, VACUUM, FAN, SWITCH, ALARM, WASHER,
     // universels
     GENERIC_DETAILS, MEDIA, WEATHER,
 }

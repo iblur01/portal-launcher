@@ -70,20 +70,29 @@ import com.iblu01.portallauncher.ui.theme.PortalTheme
 import com.iblu01.portallauncher.ui.theme.scaled
 import com.iblu01.portallauncher.ui.theme.stateColor
 
-@Composable
-fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Boolean = false, onClick: (() -> Unit)? = null, onLongPress: (() -> Unit)? = null) {
-    val entity = rememberEntity(chip.entityId)
-    val target = when (chip.kind) {
+private val NeutralDeviceStates = setOf(
+    "off", "stopped", "stop", "idle", "standby", "paused", "docked",
+    "disarmed", "éteint", "eteint", "arrêt", "arret",
+)
+
+/** One accent policy shared by pills and their panels. Inactive always wins over device colour. */
+fun launcherChipAccent(chip: LauncherChip): Color = when {
+    chip.deviceState?.trim()?.lowercase() in NeutralDeviceStates -> AppleColors.inactive
+    else -> when (chip.kind) {
         PillKind.LOCK -> if (chip.state.lowercase() in setOf("critical", "error")) AppleColors.error else AppleColors.lockAccent
         PillKind.FAN -> AppleColors.fanAccent
-        PillKind.THERMOSTAT -> when (entity?.state?.lowercase()) {
+        PillKind.THERMOSTAT -> when (chip.deviceState?.lowercase()) {
             "heat" -> AppleColors.thermostatHeat
             "cool" -> AppleColors.thermostatCool
-            "off" -> AppleColors.inactive
             else -> stateColor(chip.state)
         }
         else -> stateColor(chip.state)
     }
+}
+
+@Composable
+fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Boolean = false, onClick: (() -> Unit)? = null, onLongPress: (() -> Unit)? = null) {
+    val target = launcherChipAccent(chip)
     val accent by animateColorAsState(target, AppleMotion.spring(), label = "chipAccent")
     val animatedProgress by animateFloatAsState(chip.progress, AppleMotion.spring(), label = "chipProgress")
     // Selected chip: iOS-style — white fill, dark text, matching border.
