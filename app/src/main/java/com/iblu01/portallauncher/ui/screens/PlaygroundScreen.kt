@@ -110,6 +110,11 @@ private sealed interface FakePanelSelection {
     data class Media(val media: PlayingMedia) : FakePanelSelection { override val id = "media_group" }
 }
 
+private data class HaCapabilityGroup(
+    val title: String,
+    val chips: List<LauncherChip>,
+)
+
 /**
  * Dev-only gallery: every reusable control from
  * [com.iblu01.portallauncher.ui.components.controls], driven live by a single accent so the
@@ -135,6 +140,8 @@ fun PlaygroundScreen(onBack: () -> Unit) {
     var fakeMediaPlaying by remember { mutableStateOf(true) }
     var fakeMediaVolume by remember { mutableIntStateOf(38) }
     val fakeChips = fakePanelChips(fakeEntities, fakeMediaPlaying, fakeTracks[fakeTrackIndex].first)
+    val capabilityGroups = fakeCapabilityGroups(fakeEntities)
+    val allFakeChips = fakeChips + capabilityGroups.flatMap(HaCapabilityGroup::chips)
     val fakeMedia = PlayingMedia(
         entityId = "media_player.salon", title = fakeTracks[fakeTrackIndex].first, artist = fakeTracks[fakeTrackIndex].second,
         album = "Simulation locale", state = if (fakeMediaPlaying) "playing" else "paused", coverUrl = null,
@@ -216,6 +223,15 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                 media = fakeMedia,
                 selected = selectedFakePanel,
                 onSelect = { next -> selectedFakePanel = next.takeUnless { it.id == selectedFakePanel?.id } },
+            )
+            Spacer(Modifier.height(28.dp))
+            HaCapabilityLab(
+                groups = capabilityGroups,
+                selected = selectedFakePanel,
+                onSelect = { chip ->
+                    val next = FakePanelSelection.Chip(chip)
+                    selectedFakePanel = next.takeUnless { it.id == selectedFakePanel?.id }
+                },
             )
         }
 
@@ -604,7 +620,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
             ) {
                 when (selection) {
                     is FakePanelSelection.Chip -> ChipActionsPanel(
-                        chip = fakeChips.firstOrNull { it.id == selection.id } ?: selection.chip,
+                        chip = allFakeChips.firstOrNull { it.id == selection.id } ?: selection.chip,
                         onDismiss = { selectedFakePanel = null },
                         modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f),
                     )
@@ -653,6 +669,106 @@ private fun FakePanelLab(
             }
         }
     }
+}
+
+/** Matrix of HA capability combinations. Every chip routes through the production panel. */
+@Composable
+private fun HaCapabilityLab(
+    groups: List<HaCapabilityGroup>,
+    selected: FakePanelSelection?,
+    onSelect: (LauncherChip) -> Unit,
+) {
+    SectionTitle(stringResource(R.string.playground_section_ha_capabilities))
+    Text(
+        stringResource(R.string.playground_ha_capabilities_hint),
+        style = AppleTypography.bodySmall,
+        color = AppleColors.secondary,
+    )
+    Spacer(Modifier.height(16.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        groups.forEach { group ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(group.title, style = AppleTypography.titleMedium, color = AppleColors.primary)
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    group.chips.forEach { chip ->
+                        StatusChip(
+                            chip = chip,
+                            selected = selected?.id == chip.id,
+                            onClick = { onSelect(chip) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun fakeCapabilityGroups(entities: Map<String, HaEntity>): List<HaCapabilityGroup> {
+    fun chip(id: String, kind: PillKind, icon: String, capability: String): LauncherChip {
+        val entity = entities.getValue(id)
+        val state = when (kind) {
+            PillKind.SIREN -> if (entity.state == "on") "critical" else "ok"
+            else -> if (entity.state in setOf("on", "open", "opening", "mowing", "eco")) "active" else "ok"
+        }
+        return LauncherChip(
+            id = "cap_${id.replace('.', '_')}", icon = icon, label = entity.name, value = capability,
+            state = state, entityId = id, kind = kind, deviceState = entity.state,
+        )
+    }
+    return listOf(
+        HaCapabilityGroup(stringResource(R.string.playground_capability_cover), listOf(
+            chip("cover.salon", PillKind.COVER, "cover", stringResource(R.string.playground_capability_position_stop)),
+            chip("cover.simple", PillKind.COVER, "cover", stringResource(R.string.playground_capability_on_off)),
+            chip("cover.with_stop", PillKind.COVER, "cover", stringResource(R.string.playground_capability_three_actions)),
+        )),
+        HaCapabilityGroup(stringResource(R.string.playground_capability_fan), listOf(
+            chip("fan.bureau", PillKind.FAN, "fan", stringResource(R.string.playground_capability_on_off)),
+            chip("fan.chambre", PillKind.FAN, "fan", stringResource(R.string.playground_capability_percentage)),
+            chip("fan.plafond", PillKind.FAN, "fan", stringResource(R.string.playground_capability_presets)),
+            chip("fan.oscillant", PillKind.FAN, "fan", stringResource(R.string.playground_capability_percentage_oscillation)),
+        )),
+        HaCapabilityGroup(stringResource(R.string.playground_capability_climate), listOf(
+            chip("climate.salon", PillKind.THERMOSTAT, "temperature", stringResource(R.string.playground_capability_temperature_modes)),
+            chip("climate.range", PillKind.THERMOSTAT, "temperature", stringResource(R.string.playground_capability_temperature_range)),
+            chip("climate.modes_only", PillKind.THERMOSTAT, "temperature", stringResource(R.string.playground_capability_modes_only)),
+        )),
+        HaCapabilityGroup(stringResource(R.string.playground_capability_vacuum), listOf(
+            chip("vacuum.romy", PillKind.VACUUM, "vacuum", stringResource(R.string.playground_capability_suction_modes)),
+            chip("vacuum.full", PillKind.VACUUM, "vacuum", stringResource(R.string.playground_capability_pause_dock_locate)),
+            chip("vacuum.basic", PillKind.VACUUM, "vacuum", stringResource(R.string.playground_capability_start_only)),
+        )),
+        HaCapabilityGroup(stringResource(R.string.playground_capability_security), listOf(
+            chip("lock.entree", PillKind.LOCK, "lock", stringResource(R.string.playground_capability_lock_normal)),
+            chip("lock.jammed", PillKind.LOCK, "lock", stringResource(R.string.playground_capability_lock_jammed)),
+            chip("alarm_control_panel.maison", PillKind.SAFETY, "shield", stringResource(R.string.playground_capability_alarm_no_code)),
+            chip("alarm_control_panel.code", PillKind.SAFETY, "shield", stringResource(R.string.playground_capability_alarm_with_code)),
+        )),
+        HaCapabilityGroup(stringResource(R.string.playground_capability_humidifier), listOf(
+            chip("humidifier.chambre", PillKind.HUMIDIFIER, "humidity", stringResource(R.string.playground_capability_modes)),
+            chip("humidifier.simple", PillKind.HUMIDIFIER, "humidity", stringResource(R.string.playground_capability_on_off)),
+        )),
+        HaCapabilityGroup(stringResource(R.string.playground_capability_water_heater), listOf(
+            chip("water_heater.ballon", PillKind.WATER_HEATER, "temperature", stringResource(R.string.playground_capability_temperature_modes)),
+            chip("water_heater.simple", PillKind.WATER_HEATER, "temperature", stringResource(R.string.playground_capability_temperature_only)),
+        )),
+        HaCapabilityGroup(stringResource(R.string.playground_capability_valve), listOf(
+            chip("valve.eau", PillKind.VALVE, "valve", stringResource(R.string.playground_capability_position_stop)),
+            chip("valve.simple", PillKind.VALVE, "valve", stringResource(R.string.playground_capability_on_off)),
+            chip("valve.three_way", PillKind.VALVE, "valve", stringResource(R.string.playground_capability_three_actions)),
+        )),
+        HaCapabilityGroup(stringResource(R.string.playground_capability_siren), listOf(
+            chip("siren.alarme", PillKind.SIREN, "shield", stringResource(R.string.playground_capability_tones)),
+            chip("siren.simple", PillKind.SIREN, "shield", stringResource(R.string.playground_capability_on_off)),
+        )),
+        HaCapabilityGroup(stringResource(R.string.playground_capability_mower), listOf(
+            chip("lawn_mower.jardin", PillKind.LAWN_MOWER, "mower", stringResource(R.string.playground_capability_all_actions)),
+            chip("lawn_mower.simple", PillKind.LAWN_MOWER, "mower", stringResource(R.string.playground_capability_without_pause)),
+        )),
+    )
 }
 
 @Composable
@@ -704,11 +820,6 @@ private fun fakePanelChips(
         LauncherChip("fan_on_off_test", "fan", "Ventilateur simple", if (fanSimple.state == "on") "Allumé" else "Éteint", if (fanSimple.state == "on") "active" else "ok", entityId = fanSimple.entityId, kind = PillKind.FAN, deviceState = fanSimple.state),
         LauncherChip("fan_modes_test", "fan", "Ventilateur 3 vitesses", if (fanModes.state == "on") "Niveau ${mode(fanModes.entityId, "preset_mode")}" else "Éteint", if (fanModes.state == "on") "active" else "ok", entityId = fanModes.entityId, kind = PillKind.FAN, deviceState = fanModes.state),
         LauncherChip("switch_test", "switch", "Prise TV", if (socket.state == "on") "Allumée" else "Éteinte", if (socket.state == "on") "active" else "ok", entityId = socket.entityId, kind = PillKind.SWITCH, deviceState = socket.state),
-        entity("humidifier.chambre").let { LauncherChip("humidifier_test", "humidity", it.name, "${it.attributes.optInt("humidity")} %", if (it.state == "on") "active" else "ok", entityId = it.entityId, kind = PillKind.HUMIDIFIER, deviceState = it.state) },
-        entity("water_heater.ballon").let { LauncherChip("heater_test", "temperature", it.name, "${it.attributes.optInt("temperature")} °C", if (it.state == "off") "ok" else "active", entityId = it.entityId, kind = PillKind.WATER_HEATER, deviceState = it.state) },
-        entity("valve.eau").let { LauncherChip("valve_test", "valve", it.name, "${it.attributes.optInt("current_valve_position")} %", if (it.state == "closed") "ok" else "active", entityId = it.entityId, kind = PillKind.VALVE, deviceState = it.state) },
-        entity("siren.alarme").let { LauncherChip("siren_test", "shield", it.name, if (it.state == "on") "Déclenchée" else "Éteinte", if (it.state == "on") "critical" else "ok", entityId = it.entityId, kind = PillKind.SIREN, deviceState = it.state) },
-        entity("lawn_mower.jardin").let { LauncherChip("mower_test", "mower", it.name, it.state.replaceFirstChar(Char::uppercase), if (it.state == "mowing") "active" else "ok", entityId = it.entityId, kind = PillKind.LAWN_MOWER, deviceState = it.state) },
         LauncherChip("alarm_test", "shield", "Alarme", alarm.state.replace('_', ' ').replaceFirstChar { it.uppercase() }, if (alarm.state == "triggered") "critical" else if (alarm.state == "disarmed") "info" else "active", entityId = alarm.entityId, kind = PillKind.SAFETY, deviceState = alarm.state),
         LauncherChip("washer_test", "washer", "Machine à laver", "Rinçage", "active", entityId = "sensor.lave_linge_state", kind = PillKind.APPLIANCE, progress = 0.62f, details = listOf(PillDetail("Cycle", "Coton"), PillDetail("Fin estimée", "14:35"), PillDetail("Essorage", "1 200 tr/min"))),
         LauncherChip("air_group", "air", "Qualité de l’air", when (airState) { "critical" -> "Mauvaise"; "warning" -> "Moyenne"; else -> "Bonne" }, airState, details = listOf(PillDetail("CO₂", "$co2 ppm"), PillDetail("Humidité", "46 %"), PillDetail("PM2.5", "$pm25 µg/m³")), kind = PillKind.AIR),
@@ -726,19 +837,34 @@ private fun rememberFakePanelEntities(): SnapshotStateMap<String, HaEntity> = re
         fakeEntity("person.alex", "home", "Alex", "{}"),
         fakeEntity("sensor.house_power", "846", "Puissance maison", "{\"unit_of_measurement\":\"W\"}"),
         fakeEntity("lock.entree", "locked", "Porte d’entrée", "{}"),
+        fakeEntity("lock.jammed", "jammed", "Serrure bloquée", "{}"),
         fakeEntity("cover.salon", "open", "Volet salon", "{\"current_position\":64,\"supported_features\":15}"),
+        fakeEntity("cover.simple", "closed", "Volet simple", "{\"supported_features\":3}"),
+        fakeEntity("cover.with_stop", "open", "Volet avec arrêt", "{\"supported_features\":11}"),
         fakeEntity("climate.salon", "heat", "Thermostat", "{\"current_temperature\":20.8,\"temperature\":21.5,\"min_temp\":7,\"max_temp\":35,\"hvac_modes\":[\"off\",\"heat\",\"cool\",\"heat_cool\"]}"),
+        fakeEntity("climate.range", "heat_cool", "Thermostat double consigne", "{\"current_temperature\":22,\"target_temp_low\":19,\"target_temp_high\":25,\"min_temp\":7,\"max_temp\":35,\"target_temp_step\":0.5,\"hvac_modes\":[\"off\",\"heat_cool\"],\"supported_features\":2}"),
+        fakeEntity("climate.modes_only", "fan_only", "Thermostat sans consigne", "{\"current_temperature\":23,\"hvac_modes\":[\"off\",\"dry\",\"fan_only\"],\"supported_features\":0}"),
         fakeEntity("vacuum.romy", "cleaning", "Romy", "{\"battery_level\":78,\"fan_speed\":\"standard\",\"fan_speed_list\":[\"silent\",\"standard\",\"turbo\"]}"),
+        fakeEntity("vacuum.full", "cleaning", "Aspirateur complet", "{\"battery_level\":64,\"status\":\"Nettoyage\",\"fan_speed\":\"standard\",\"fan_speed_list\":[\"silent\",\"standard\",\"turbo\"],\"supported_features\":8732}"),
+        fakeEntity("vacuum.basic", "docked", "Aspirateur simple", "{\"status\":\"Sur la base\",\"supported_features\":8192}"),
         fakeEntity("fan.chambre", "on", "Ventilateur", "{\"percentage\":40,\"percentage_step\":10,\"supported_features\":1}"),
         fakeEntity("fan.bureau", "on", "Ventilateur bureau", "{}"),
         fakeEntity("fan.plafond", "on", "Ventilateur plafond", "{\"preset_mode\":\"2\",\"preset_modes\":[\"1\",\"2\",\"3\"],\"supported_features\":8}"),
+        fakeEntity("fan.oscillant", "on", "Ventilateur oscillant", "{\"percentage\":55,\"percentage_step\":5,\"oscillating\":true,\"supported_features\":3}"),
         fakeEntity("switch.tv", "on", "Prise TV", "{}"),
         fakeEntity("humidifier.chambre", "on", "Humidificateur", "{\"humidity\":55,\"current_humidity\":48,\"min_humidity\":30,\"max_humidity\":80,\"target_humidity_step\":5,\"mode\":\"auto\",\"available_modes\":[\"auto\",\"sleep\"],\"supported_features\":1}"),
+        fakeEntity("humidifier.simple", "off", "Humidificateur simple", "{\"humidity\":45,\"current_humidity\":51,\"min_humidity\":30,\"max_humidity\":80,\"target_humidity_step\":5,\"supported_features\":0}"),
         fakeEntity("water_heater.ballon", "eco", "Chauffe-eau", "{\"temperature\":55,\"current_temperature\":51,\"min_temp\":40,\"max_temp\":65,\"target_temperature_step\":1,\"current_operation\":\"eco\",\"operation_list\":[\"eco\",\"electric\",\"off\"],\"supported_features\":11}"),
+        fakeEntity("water_heater.simple", "heat", "Chauffe-eau simple", "{\"temperature\":52,\"current_temperature\":49,\"min_temp\":40,\"max_temp\":65,\"target_temperature_step\":1,\"supported_features\":1}"),
         fakeEntity("valve.eau", "open", "Vanne principale", "{\"current_valve_position\":42,\"reports_position\":true,\"supported_features\":15}"),
+        fakeEntity("valve.simple", "closed", "Vanne tout-ou-rien", "{\"supported_features\":3}"),
+        fakeEntity("valve.three_way", "open", "Vanne avec arrêt", "{\"supported_features\":11}"),
         fakeEntity("siren.alarme", "off", "Sirène", "{\"supported_features\":31,\"available_tones\":[\"alarm\",\"doorbell\"]}"),
+        fakeEntity("siren.simple", "off", "Sirène simple", "{\"supported_features\":0}"),
         fakeEntity("lawn_mower.jardin", "docked", "Tondeuse", "{\"supported_features\":7}"),
-        fakeEntity("alarm_control_panel.maison", "disarmed", "Alarme maison", "{\"code_format\":\"number\",\"code_arm_required\":false,\"supported_features\":15}"),
+        fakeEntity("lawn_mower.simple", "docked", "Tondeuse sans pause", "{\"supported_features\":5}"),
+        fakeEntity("alarm_control_panel.maison", "disarmed", "Alarme maison", "{\"supported_features\":15}"),
+        fakeEntity("alarm_control_panel.code", "armed_away", "Alarme avec code", "{\"code_format\":\"number\",\"code_arm_required\":true,\"supported_features\":7}"),
         fakeEntity("sensor.lave_linge_state", "running", "Machine à laver", "{\"progress\":62,\"phase\":\"rinse\",\"remaining_time\":\"Reste 38 min\",\"program\":\"Coton\",\"temperature\":40,\"spin_speed\":1200}"),
         fakeEntity("sensor.air_co2", "620", "CO₂", "{\"device_class\":\"carbon_dioxide\",\"unit_of_measurement\":\"ppm\"}"),
         fakeEntity("sensor.air_pm25", "4", "PM2.5", "{\"device_class\":\"pm25\",\"unit_of_measurement\":\"µg/m³\"}"),
@@ -800,6 +926,41 @@ private fun rememberFakeCallService(entities: SnapshotStateMap<String, HaEntity>
                     "return_to_base" -> replace("returning")
                     "set_fan_speed" -> replace { put("fan_speed", data?.get("fan_speed")?.toString()) }
                 }
+                "humidifier" -> when (service) {
+                    "turn_on" -> replace("on")
+                    "turn_off" -> replace("off")
+                    "set_humidity" -> replace { put("humidity", (data?.get("humidity") as? Number)?.toInt() ?: attributes.optInt("humidity")) }
+                    "set_mode" -> replace("on") { put("mode", data?.get("mode")?.toString()) }
+                }
+                "water_heater" -> when (service) {
+                    "turn_on" -> replace("on")
+                    "turn_off" -> replace("off")
+                    "set_temperature" -> replace { put("temperature", (data?.get("temperature") as? Number)?.toDouble() ?: attributes.optDouble("temperature")) }
+                    "set_operation_mode" -> {
+                        val mode = data?.get("operation_mode")?.toString() ?: current.state
+                        replace(mode) { put("current_operation", mode) }
+                    }
+                    "set_away_mode" -> replace { put("away_mode", data?.get("away_mode") ?: true) }
+                }
+                "valve" -> when (service) {
+                    "open_valve" -> replace("open") { if (has("current_valve_position")) put("current_valve_position", 100) }
+                    "close_valve" -> replace("closed") { if (has("current_valve_position")) put("current_valve_position", 0) }
+                    "stop_valve" -> replace("open")
+                    "set_valve_position" -> {
+                        val position = (data?.get("position") as? Number)?.toInt() ?: 0
+                        replace(if (position == 0) "closed" else "open") { put("current_valve_position", position) }
+                    }
+                }
+                "siren" -> when (service) {
+                    "turn_on" -> replace("on") { data?.forEach { (key, value) -> put(key, value) } }
+                    "turn_off" -> replace("off")
+                }
+                "lawn_mower" -> replace(when (service) {
+                    "start_mowing" -> "mowing"
+                    "pause" -> "paused"
+                    "dock" -> "docked"
+                    else -> current.state
+                })
                 "alarm_control_panel" -> replace(when (service) {
                     "alarm_disarm" -> "disarmed"; "alarm_arm_home" -> "armed_home"; "alarm_arm_night" -> "armed_night"; "alarm_trigger" -> "triggered"; else -> "armed_away"
                 })
