@@ -71,6 +71,8 @@ import coil.request.ImageRequest
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.PlayingMedia
+import com.iblu01.portallauncher.ui.components.controls.PortalThreeWayControl
+import com.iblu01.portallauncher.ui.components.controls.ThreeWayControlSize
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -282,16 +284,17 @@ fun MediaPlayerView(
                     ) {
                         Row(
                             modifier = Modifier
-                                .clip(AppleShapes.pill)
-                                .background(AppleColors.frostedFill, AppleShapes.pill)
-                                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
                                 .then(if (media.groupablePlayers.size > 1) Modifier.clickable { groupDialogVisible = true } else Modifier)
-                                .padding(horizontal = 14.dp, vertical = 7.dp),
+                                .padding(horizontal = 8.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(7.dp),
                         ) {
                             Box(Modifier.size(7.dp).background(if (isPlaying) AppleColors.active else AppleColors.warning, CircleShape))
-                            Text(sourceName, style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.secondary)
+                            Text(
+                                sourceName,
+                                style = AppleTypography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
+                                color = AppleColors.primary,
+                            )
                         }
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -305,25 +308,18 @@ fun MediaPlayerView(
                             }
                         }
 
-                        Row(
-                            modifier = Modifier
-                                .clip(AppleShapes.pill)
-                                .background(AppleColors.frostedFill, AppleShapes.pill)
-                                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = onPrevious, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_previous_track_desc), tint = AppleColors.primary, modifier = Modifier.size(22.dp))
-                            }
-                            IconButton(onClick = onPlayPause, modifier = Modifier.size(50.dp).background(Color.White, CircleShape)) {
-                                Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) stringResource(R.string.media_pause_desc) else stringResource(R.string.media_play_desc), tint = Color.Black, modifier = Modifier.size(28.dp))
-                            }
-                            IconButton(onClick = onNext, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.Filled.SkipNext, stringResource(R.string.media_next_track_desc), tint = AppleColors.primary, modifier = Modifier.size(22.dp))
-                            }
-                        }
+                        PortalThreeWayControl(
+                            leadingIcon = Icons.Filled.SkipPrevious,
+                            leadingContentDescription = stringResource(R.string.media_previous_track_desc),
+                            onLeadingClick = onPrevious,
+                            centerIcon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            centerContentDescription = if (isPlaying) stringResource(R.string.media_pause_desc) else stringResource(R.string.media_play_desc),
+                            onCenterClick = onPlayPause,
+                            trailingIcon = Icons.Filled.SkipNext,
+                            trailingContentDescription = stringResource(R.string.media_next_track_desc),
+                            onTrailingClick = onNext,
+                            size = ThreeWayControlSize.Compact,
+                        )
 
                         Row(
                             modifier = Modifier
@@ -345,14 +341,14 @@ fun MediaPlayerView(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(10.dp)
-                            .size(32.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(AppleColors.frostedFill)
                             .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
                             .clickable { onDismiss() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_close_player_desc), tint = AppleColors.secondary, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_close_player_desc), tint = AppleColors.primary, modifier = Modifier.size(24.dp))
                     }
                 }
             }
@@ -364,37 +360,21 @@ fun MediaPlayerView(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
-                ) {
-                    if (onDismiss != null) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(AppleColors.frostedFill)
-                                .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
-                                .clickable { onDismiss() },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_close_player_desc), tint = AppleColors.secondary, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .clip(AppleShapes.pill)
-                            .background(AppleColors.frostedFill, AppleShapes.pill)
-                            .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                            .then(if (media.groupablePlayers.size > 1) Modifier.clickable { groupDialogVisible = true } else Modifier)
-                            .padding(horizontal = 14.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    ) {
-                        Box(Modifier.size(7.dp).background(if (isPlaying) AppleColors.active else AppleColors.warning, CircleShape))
-                        Text(sourceName, style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.secondary)
-                    }
+                if (onDismiss != null) {
+                    PanelHeader(
+                        title = sourceName,
+                        onNavigation = onDismiss,
+                        navigationIcon = Icons.Filled.Close,
+                        navigationContentDescription = stringResource(R.string.media_close_player_desc),
+                        accent = if (isPlaying) AppleColors.active else AppleColors.warning,
+                        onTitleClick = if (media.groupablePlayers.size > 1) ({ groupDialogVisible = true }) else null,
+                    )
+                } else {
+                    Text(
+                        sourceName,
+                        style = AppleTypography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+                        color = AppleColors.primary,
+                    )
                 }
 
                 Box(
@@ -426,25 +406,17 @@ fun MediaPlayerView(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                Row(
-                    modifier = Modifier
-                        .clip(AppleShapes.pill)
-                        .background(AppleColors.frostedFill, AppleShapes.pill)
-                        .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onPrevious, modifier = Modifier.size(46.dp)) {
-                        Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_previous_track_desc), tint = AppleColors.primary, modifier = Modifier.size(26.dp))
-                    }
-                    IconButton(onClick = onPlayPause, modifier = Modifier.size(58.dp).background(Color.White, CircleShape)) {
-                        Icon(if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (isPlaying) stringResource(R.string.media_pause_desc) else stringResource(R.string.media_play_desc), tint = Color.Black, modifier = Modifier.size(32.dp))
-                    }
-                    IconButton(onClick = onNext, modifier = Modifier.size(46.dp)) {
-                        Icon(Icons.Filled.SkipNext, stringResource(R.string.media_next_track_desc), tint = AppleColors.primary, modifier = Modifier.size(26.dp))
-                    }
-                }
+                PortalThreeWayControl(
+                    leadingIcon = Icons.Filled.SkipPrevious,
+                    leadingContentDescription = stringResource(R.string.media_previous_track_desc),
+                    onLeadingClick = onPrevious,
+                    centerIcon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    centerContentDescription = if (isPlaying) stringResource(R.string.media_pause_desc) else stringResource(R.string.media_play_desc),
+                    onCenterClick = onPlayPause,
+                    trailingIcon = Icons.Filled.SkipNext,
+                    trailingContentDescription = stringResource(R.string.media_next_track_desc),
+                    onTrailingClick = onNext,
+                )
 
                 Row(
                     modifier = Modifier

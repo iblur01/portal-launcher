@@ -113,6 +113,60 @@ class PanelStateTest {
         assertEquals(chip("light.a"), s.request)
     }
 
+    private fun alarm(key: String = "alarm") = PanelRequest.Chip(key, PanelKind.ALARM)
+
+    @Test fun `alarm alert opens over a user panel`() {
+        val userOpen = PanelState(request = chip("light.a"), source = PanelSource.USER)
+        val s = reduce(userOpen, PanelEvent.AlarmAlert(alarm()))
+        assertEquals(alarm(), s.request)
+        assertEquals(PanelSource.ALERT, s.source)
+    }
+
+    @Test fun `media auto-open never clobbers an alert panel`() {
+        val alerting = PanelState(request = alarm(), source = PanelSource.ALERT)
+        val s = reduce(alerting, PanelEvent.MediaAutoOpen("m1"))
+        assertEquals(alarm(), s.request)
+    }
+
+    @Test fun `alarm cleared closes the alert panel`() {
+        val alerting = PanelState(request = alarm(), source = PanelSource.ALERT)
+        val s = reduce(alerting, PanelEvent.AlarmCleared)
+        assertNull(s.request)
+    }
+
+    @Test fun `alarm cleared leaves a user panel untouched`() {
+        val userOpen = PanelState(request = chip("light.a"), source = PanelSource.USER)
+        val s = reduce(userOpen, PanelEvent.AlarmCleared)
+        assertEquals(chip("light.a"), s.request)
+    }
+
+    @Test fun `dismissed alert does not reopen while the alarm keeps alerting`() {
+        var s = reduce(PanelState(), PanelEvent.AlarmAlert(alarm()))
+        s = reduce(s, PanelEvent.Dismiss)
+        assertNull(s.request)
+        assertEquals("alarm", s.dismissedAlertKey)
+        s = reduce(s, PanelEvent.AlarmAlert(alarm()))
+        assertNull(s.request)
+    }
+
+    @Test fun `alarm cleared rearms the alert`() {
+        var s = PanelState(dismissedAlertKey = "alarm")
+        s = reduce(s, PanelEvent.AlarmCleared)
+        assertNull(s.dismissedAlertKey)
+        s = reduce(s, PanelEvent.AlarmAlert(alarm()))
+        assertEquals(alarm(), s.request)
+    }
+
+    @Test fun `alert panel is reopened after the user navigates away and closes`() {
+        var s = reduce(PanelState(), PanelEvent.AlarmAlert(alarm()))
+        s = reduce(s, PanelEvent.OpenChip(chip("lock.b", PanelKind.LOCK)))
+        assertEquals(PanelSource.USER, s.source)
+        s = reduce(s, PanelEvent.Dismiss)                 // closing a chip, not the alert
+        assertNull(s.dismissedAlertKey)
+        s = reduce(s, PanelEvent.AlarmAlert(alarm()))
+        assertEquals(alarm(), s.request)
+    }
+
     @Test fun `interleave - user opens over auto media then dismiss`() {
         var s = reduce(PanelState(), PanelEvent.MediaAutoOpen("m1"))       // AUTO media
         s = reduce(s, PanelEvent.OpenChip(chip("lock.b", PanelKind.LOCK))) // USER replaces

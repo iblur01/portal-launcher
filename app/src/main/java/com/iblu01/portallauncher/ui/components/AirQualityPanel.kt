@@ -73,31 +73,12 @@ private fun statusColor(value: String): Color = when {
 
 @Composable
 private fun AirQualityHeader(onBack: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(36.dp)) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(AppleColors.frostedFill)
-                .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
-                .clickable { onBack() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Filled.ArrowBack,
-                contentDescription = stringResource(R.string.air_quality_back_desc),
-                tint = AppleColors.secondary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Text(
-            stringResource(R.string.air_quality_panel_title),
-            style = AppleTypography.labelSmall.copy(fontSize = 12.sp, letterSpacing = 1.sp),
-            color = AppleColors.tertiary,
-            modifier = Modifier.align(Alignment.Center),
-        )
-    }
+    PanelHeader(
+        title = stringResource(R.string.air_quality_panel_title),
+        onNavigation = onBack,
+        navigationIcon = Icons.Filled.ArrowBack,
+        navigationContentDescription = stringResource(R.string.air_quality_back_desc),
+    )
 }
 
 /** Centered status word with a soft colored glow — the emotional anchor of the panel. */

@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.0.5-beta
+
+### Added
+
+- **Entity contracts**: `ClimateEntityContract` and `FanEntityContract` — UI-neutral adapters that extract capabilities from Home Assistant entities. Climate handles all thermostat modes (heat, cool, auto, heat_cool, dry, fan_only) with target temp ranges. Fan maps to one of three control modes: on/off, percentage slider, or preset selector.
+- **`PortalThreeWayControl`**: reusable three-action capsule control (previous / center / next) shared between media player and covers, with compact and regular densities.
+- **`PortalVacuum`**: dedicated vacuum controls — large play/pause disk button, status chip, action chips (stop/dock/locate), room selection chips with toggles.
+- **`HorizontalSegmentedSelector`**: Apple Home-style horizontal picker with drag gesture, haptics, and animated floating capsule highlight.
+- **Alarm alert handling**: `PanelSource.ALERT` with highest priority — alarm chips surface immediately, `SleepScheduler.alarmHold` keeps screen on until disarmed, dismiss/rearm logic with per-alarm key.
+- **Battery display**: vacuum entities show battery percentage in `SidePanel` header and quick tiles, with color-coded indicators (red ≤10%, orange ≤20%).
+- **Domain-specific accent colors**: lock turquoise, fan blue, thermostat orange/blue.
+- **Playground screen**: interactive panel lab with 14 fake entities for testing all panel layouts.
+- **WallpaperPage** activated (was `.disabled`) with native Android wallpaper picker integration.
+- **System wallpaper mode**: new `"system"` background mode uses native `WallpaperService` with scroll offset protocol for live wallpaper parallax.
+- **Tests**: `PanelStateTest` (28+ reducer scenarios), `ClimateEntityContractTest`, `FanEntityContractTest`.
+
+### Changed
+
+- **All panel controls are now responsive**: sliders, switches, selectors, keypad use proportional scaling (`RoundedCornerShape(percent = 30)`, 96:240 viewport ratio, `contentScale`) instead of fixed dp values. Controls adapt to any screen size (wall tablet, phone).
+- **`PanelHeader`**: unified header component used by all panels — frosted navigation circle, optional icon + title, configurable accent, battery indicator.
+- **Light panel**: single `AdaptiveLightDetail` layout replaces separate portrait/landscape layouts. Smoother color presets (sunset, candle, soft pink, forest, lagoon, dusk, lavender, evening).
+- **Thermostat panel**: Canvas‑drawn arc replaced by `ClimateEntityContract` + `PortalThermostat`. Mode selection via `WheelPicker`. Optimistic UI with 5s timeout. Support for `heat_cool` range mode with dual handles.
+- **Cover panel**: three separate `GlassButton` replaced by single `PortalThreeWayControl` with labels. Slider viewport responsive.
+- **Vacuum panel**: `PanelModeButton` rows replaced by `VacuumRunButton` + `VacuumStatusChip` + `VacuumActionChips`. Speed selector via `WheelPicker`.
+- **Fan/Switch controls**: `BigCircleButton` replaced by responsive `VerticalSwitch` with optimistic UI. Fan uses `FanEntityContract` for mode‑appropriate controls (on/off switch, percentage slider, or preset selector).
+- **Alarm panel**: `AccessoryGrid` replaced by responsive `VerticalSegmentedSelector`. Added `DISABLED` arm state. Optimistic arming with 5s timeout. Keypad pulse animation during code verification.
+- **Lock panel**: accent changed to turquoise. Responsive viewport.
+- **Media player**: transport controls replaced by `PortalThreeWayControl`. Header uses `PanelHeader` with source title.
+- **WallpaperPage**: activated from `.disabled`; new "Choose Android wallpaper" picker integration.
+- **SettingsScreen**: new `WALLPAPER` page and navigation tile.
+- **styles.xml**: window background transparent with `windowShowWallpaper=true` for native wallpaper support.
+- **PRODUCT.md**: enriched with 7 design principles, Apple Home interaction reference, wall-panel usage personas.
+
+### Performance
+
+- `PortalWheelPicker`: only emits `onSelect` when scrolling stops (not on every item), reducing HA service calls.
+- Keypad: input disabled during loading state to prevent double-taps.
+
 ## 0.0.4-beta
 
 ### Added

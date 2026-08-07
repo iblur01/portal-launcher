@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.appwidget.AppWidgetManager
+import android.app.WallpaperManager
 import android.os.Environment
 import android.provider.Settings
 import android.view.MotionEvent
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -121,6 +123,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import androidx.compose.runtime.snapshotFlow
 
 @AndroidEntryPoint
 class LauncherActivity : ComponentActivity() {
@@ -147,6 +152,8 @@ class LauncherActivity : ComponentActivity() {
      * appears and coming back lands on the clock instead of where the icon was.
      */
     private var openingFromLauncher = false
+    /** True while an alarm is counting down / triggered: the screen must not lock under the keypad. */
+    private var alarmHold = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -186,6 +193,7 @@ class LauncherActivity : ComponentActivity() {
                     onAddWidget = ::addWidget,
                     onRemoveWidget = { widgets.release(it) },
                     keepPageAcrossPause = ::keepPageAcrossPause,
+                    onAlarmAlerting = ::onAlarmAlerting,
                 )
             }
         }
@@ -263,6 +271,9 @@ class LauncherActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // The hold lives in a process-wide object: leaving it set would keep the idle timeout off
+        // for good if the alarm is still alerting when the launcher goes away.
+        onAlarmAlerting(false)
         appList.stop()
         super.onDestroy()
     }
@@ -280,8 +291,19 @@ class LauncherActivity : ComponentActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
+    /**
+     * Alarm entry delay / triggered: hold the screen awake and suspend the idle timeout, so the
+     * disarm keypad the UI just forced open cannot be locked away before the code is typed.
+     */
+    private fun onAlarmAlerting(active: Boolean) {
+        if (alarmHold == active) return
+        alarmHold = active
+        SleepScheduler.setAlarmHold(this, active)
+        applyPowerPolicy()
+    }
+
     private fun applyPowerPolicy() {
-        if (prefs.powerMode == PowerMode.ALWAYS_ON || prefs.devKeepScreenOn) {
+        if (alarmHold || prefs.powerMode == PowerMode.ALWAYS_ON || prefs.devKeepScreenOn) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -328,6 +350,10 @@ class LauncherActivity : ComponentActivity() {
     }
 
     private fun setWallpaper() {
+        // The Android picker changes the system wallpaper, so switch Portal to the matching source
+        // before leaving. This also makes live wallpapers visible as soon as their preview applies.
+        prefs.backgroundMode = "system"
+        SettingsChangeBus.get().emit("backgroundMode")
         openFromLauncher(
             Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), getString(R.string.toast_choose_wallpaper))
         )
@@ -437,6 +463,7 @@ private fun PortalLauncherApp(
     onAddWidget: (WidgetOffer) -> Unit,
     onRemoveWidget: (Int) -> Unit,
     keepPageAcrossPause: () -> Boolean,
+    onAlarmAlerting: (Boolean) -> Unit,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var backgroundMode by remember { mutableStateOf(prefs.backgroundMode) }
@@ -470,6 +497,29 @@ private fun PortalLauncherApp(
         derivedStateOf { appPageCount(placedItems.value, spare = gridDrag.isDragging) }
     }
     val pagerState = rememberLauncherPagerState { appPages.value }
+
+    // Match Launcher3's wallpaper protocol: advertise the horizontal page step and continuously
+    // report the pager position. WallpaperService handles static and live wallpaper movement;
+    // failures are intentionally ignored because some fixed-wallpaper OEM implementations reject
+    // offsets even though displaying the wallpaper still works.
+    val hostView = LocalView.current
+    LaunchedEffect(hostView, pagerState, appPages.value, backgroundMode) {
+        if (backgroundMode != "system") return@LaunchedEffect
+        val manager = WallpaperManager.getInstance(hostView.context)
+        val pageCount = (PAGE_FIRST_APP + appPages.value).coerceAtLeast(1)
+        val xStep = if (pageCount > 1) 1f / (pageCount - 1) else 0f
+        runCatching { manager.setWallpaperOffsetSteps(xStep, 0f) }
+        snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }
+            .map { page ->
+                if (pageCount > 1) (page / (pageCount - 1)).coerceIn(0f, 1f) else 0.5f
+            }
+            .distinctUntilChanged()
+            .collect { x ->
+                hostView.windowToken?.let { token ->
+                    runCatching { manager.setWallpaperOffsets(token, x, 0.5f) }
+                }
+            }
+    }
 
     LaunchedEffect(Unit) {
         SettingsChangeBus.get().changes.collect { key ->
@@ -585,15 +635,23 @@ private fun PortalLauncherApp(
     val panelChip by vm.panelChip.collectAsStateWithLifecycle()
     val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
 
+    // Alarm entry delay / triggered: the VM forces the keypad panel up (PanelSource.ALERT); the
+    // Activity mirrors the flag onto the screen policy so nothing locks it away mid-countdown.
+    val alarmAlerting by vm.alarmAlerting.collectAsStateWithLifecycle()
+    LaunchedEffect(alarmAlerting) { onAlarmAlerting(alarmAlerting) }
+
     // Auto-return is for *user* state only: a USER panel, the expanded tray, the app overlay. An
     // AUTO (media) panel is the resting state while something plays, so it must not arm the timer.
     // Sitting on the apps page is user state too, exactly like the expanded tray: the wall panel
     // must fall back to the clock on its own.
     val onAppsPage = pagerState.currentPage != PAGE_CLOCK
     val userState = pillsExpanded || overlayVisible || onAppsPage || menuTarget != null || showHidden
-    LaunchedEffect(panel.request, panel.source, userState, resumed) {
+    // While an alarm is alerting the countdown is suspended outright: returning to the clock would
+    // take the disarm keypad off screen exactly when it is needed.
+    LaunchedEffect(panel.request, panel.source, userState, resumed, alarmAlerting) {
         val userPanelOpen = panel.request != null && panel.source == PanelSource.USER
-        if (resumed && (userPanelOpen || userState)) autoReturnTimer.start() else autoReturnTimer.stop()
+        if (resumed && !alarmAlerting && (userPanelOpen || userState)) autoReturnTimer.start()
+        else autoReturnTimer.stop()
     }
 
     LaunchedEffect(autoReturnState.shouldReturn) {
@@ -694,9 +752,14 @@ private fun PortalLauncherApp(
 
     // Only the media chip hides when its panel is open — other chips stay visible.
     val mediaChipId = if (panelContent is PanelContent.Media) "media_group" else null
-    // Placement (design §7) decides tray vs floating; the media chip hides while its panel is open.
+    // Presence only renders through the top-left ambient indicator. Energy stays available to the
+    // data layer but has no launcher pill; the media chip hides while its panel is open.
     val presenceChip = chips.firstOrNull { it.chipPlacement() == ChipPlacement.FLOATING }
-    val visibleChips = chips.filterNot { it.id == mediaChipId || it.chipPlacement() == ChipPlacement.FLOATING }
+    val visibleChips = chips.filterNot {
+        it.id == mediaChipId ||
+            it.chipPlacement() == ChipPlacement.FLOATING ||
+            it.kind == PillKind.ENERGY
+    }
     // The selected chip (its panel is open) gets a highlighted style in the tray.
     val selectedChipKey = (panel.request as? PanelRequest.Chip)?.key
 

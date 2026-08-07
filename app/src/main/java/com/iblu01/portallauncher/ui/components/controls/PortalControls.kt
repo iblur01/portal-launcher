@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -94,18 +96,8 @@ private fun valueOf(fraction: Float, range: ClosedFloatingPointRange<Float>): Fl
 fun percentLabel(value: Float, range: ClosedFloatingPointRange<Float> = 0f..1f): String =
     "${(fractionOf(value, range) * 100).roundToInt()} %"
 
-/** Outer corner radius of every pill-shaped control. */
-private val ControlCornerRadius: Dp = 26.dp
-
-/** Continuous-corner squircle used by the pill-shaped controls. */
-private val ControlSquircle: Shape = RoundedCornerShape(ControlCornerRadius)
-
-/**
- * Concentric-corner rule (Apple HIG): a shape nested inside another, [inset] away from its
- * edge, must round by `outer − inset` so the curves stay parallel. Never reuse the outer radius.
- */
-private fun innerCorner(inset: Dp): Shape =
-    RoundedCornerShape((ControlCornerRadius - inset).coerceAtLeast(0.dp))
+/** Control corners scale with the shortest axis instead of relying on a frozen dp radius. */
+private val VerticalSliderSquircle: Shape = RoundedCornerShape(percent = 30)
 
 /** Neutral tint for an "off"/disabled selection — used in place of the accent (iOS systemGray4). */
 val ControlNeutral: Color = Color(0xFFC7C7CC)
@@ -164,7 +156,7 @@ const val ControlAspectRatio: Float = 88f / 220f
 fun Modifier.controlSize(width: Dp = 88.dp): Modifier = this.width(width).aspectRatio(ControlAspectRatio)
 
 /** Most options a [VerticalSegmentedSelector] holds before it would grow uncomfortably tall. */
-const val MaxSegments: Int = 6
+const val MaxSegments: Int = 8
 
 /**
  * Height of one selector segment. Chosen so a 4-option selector matches the canonical control
@@ -205,7 +197,7 @@ fun VerticalFillSlider(
     icon: ImageVector? = null,
     label: ((Float) -> String)? = { percentLabel(it, valueRange) },
     contentLayout: ControlContentLayout = ControlContentLayout.Vertical,
-    shape: Shape = ControlSquircle,
+    shape: Shape = VerticalSliderSquircle,
     onValueChangeFinished: ((Float) -> Unit)? = null,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -290,18 +282,35 @@ fun VerticalFillSlider(
                 .background(fillColor.copy(alpha = if (enabled) 0.95f else 0.5f)),
         )
 
-        // Grip line, parked on the fill edge.
+        // Keep the grip slightly inside the coloured fill, like Apple's vertical controls,
+        // instead of letting it straddle the hard boundary between fill and track.
         val edgeFromTop = when (origin) {
             FillOrigin.BOTTOM -> trackHeight * (1f - animatedFraction)
             FillOrigin.TOP -> trackHeight * animatedFraction
         }
+        // All grip geometry follows the slider width, preserving the reference 88 dp control's
+        // proportions when the cover panel scales it up or down.
+        val gripInset = maxWidth * (8f / 88f)
+        val gripWidth = maxWidth * (30f / 88f)
+        val gripHeight = maxWidth * (4f / 88f)
+        val gripTopLimit = maxWidth * (8f / 88f)
+        val gripBottomClearance = maxWidth * (12f / 88f)
+        val gripCenterFromTop = when (origin) {
+            FillOrigin.BOTTOM -> edgeFromTop + gripInset
+            FillOrigin.TOP -> edgeFromTop - gripInset
+        }
         Box(
             Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = (edgeFromTop - 2.dp).coerceIn(8.dp, (trackHeight - 12.dp).coerceAtLeast(8.dp)))
+                .offset(
+                    y = (gripCenterFromTop - gripHeight / 2f).coerceIn(
+                        gripTopLimit,
+                        (trackHeight - gripBottomClearance).coerceAtLeast(gripTopLimit),
+                    ),
+                )
                 .graphicsLayer { scaleX = gripScale }
-                .width(30.dp)
-                .height(4.dp)
+                .width(gripWidth)
+                .height(gripHeight)
                 .clip(CircleShape)
                 .background(contentColorOn(fillColor).copy(alpha = 0.55f)),
         )
@@ -309,13 +318,18 @@ fun VerticalFillSlider(
         // Base caption (+ optional icon). Contrast follows whichever tone sits behind the base.
         val baseIsFilled = origin == FillOrigin.BOTTOM && targetFraction > 0.14f
         val captionColor = if (baseIsFilled) contentColorOn(fillColor) else AppleColors.secondary
-        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
+        val contentScale = (maxWidth / 88.dp).coerceAtLeast(0.75f)
+        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp * contentScale)) {
             ControlLabel(
                 icon = icon,
                 text = label?.invoke(valueOf(targetFraction, valueRange)),
                 color = captionColor,
-                textStyle = AppleTypography.bodySmall,
+                textStyle = AppleTypography.bodySmall.copy(
+                    fontSize = AppleTypography.bodySmall.fontSize * contentScale,
+                ),
                 layout = contentLayout,
+                iconSize = 18.dp * contentScale,
+                gap = 5.dp * contentScale,
             )
         }
     }
@@ -381,12 +395,11 @@ fun VerticalGradientSlider(
     icon: ((Float) -> ImageVector?)? = null,
     label: ((Float) -> String)? = { percentLabel(it, valueRange) },
     contentLayout: ControlContentLayout = ControlContentLayout.Vertical,
-    shape: Shape = ControlSquircle,
+    shape: Shape = VerticalSliderSquircle,
     thumbColor: ((Float) -> Color)? = null,
     onValueChangeFinished: ((Float) -> Unit)? = null,
 ) {
     require(colors.isNotEmpty()) { "VerticalGradientSlider needs at least one colour" }
-    val inset = 6.dp
     val haptic = LocalHapticFeedback.current
     val fraction = fractionOf(value, valueRange)
     var dragging by remember { mutableStateOf(false) }
@@ -457,9 +470,20 @@ fun VerticalGradientSlider(
             ),
     ) {
         // Thumb: inset from the track edge, rounded concentrically — same rule as the switch.
-        val thumbHeight = (maxHeight * 0.26f).coerceIn(44.dp, 64.dp)
+        val inset = maxWidth * (6f / 88f)
+        val thumbHeight = (maxWidth * (57f / 88f)).coerceAtMost((maxHeight - inset * 2).coerceAtLeast(0.dp))
         val travel = (maxHeight - thumbHeight - inset * 2).coerceAtLeast(0.dp)
-        val thumbShape = innerCorner(inset)
+        val outerRadius = maxWidth * 0.30f
+        val thumbRadius = minOf(
+            (outerRadius - inset).coerceAtLeast(0.dp),
+            (maxWidth - inset * 2) / 2,
+            thumbHeight / 2,
+        )
+        val thumbShape = RoundedCornerShape(thumbRadius)
+        val contentScale = minOf(
+            maxWidth / 88.dp,
+            thumbHeight / 57.dp,
+        ).coerceIn(0.65f, 1.5f)
         val contentColor = contentColorOn(markerColor)
         Box(
             Modifier
@@ -476,10 +500,13 @@ fun VerticalGradientSlider(
                 icon = icon?.invoke(currentValue),
                 text = label?.invoke(currentValue),
                 color = contentColor,
-                textStyle = AppleTypography.bodySmall,
+                textStyle = AppleTypography.bodySmall.copy(
+                    fontSize = AppleTypography.bodySmall.fontSize * contentScale,
+                ),
                 layout = contentLayout,
-                iconSize = 17.dp,
-                gap = 3.dp,
+                iconSize = 17.dp * contentScale,
+                gap = 3.dp * contentScale,
+                textModifier = Modifier.padding(horizontal = 5.dp * contentScale),
             )
         }
     }
@@ -498,7 +525,7 @@ fun VerticalColorTempSlider(
     maxKelvin: Int,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shape: Shape = ControlSquircle,
+    shape: Shape = VerticalSliderSquircle,
     onKelvinChangeFinished: ((Int) -> Unit)? = null,
 ) {
     val range = minKelvin.toFloat()..maxKelvin.toFloat()
@@ -533,9 +560,10 @@ fun VerticalColorTempSlider(
  * the accent. Works for any [T]; render each with [label] and an optional per-option [icon]
  * ([contentLayout] stacks it above or beside the text).
  *
- * Takes 2–6 options. Rather than squeezing them into a fixed footprint, the control keeps every
+ * Takes 1–8 options. Rather than squeezing them into a fixed footprint, the control keeps every
  * segment [segmentHeight] tall and grows downward — so the caller only sets its width; the height
- * follows the option count.
+ * follows the option count. Its outer radius follows the live width and the highlight radius is
+ * derived from it so both curves remain concentric; [cornerRadius] can override the outer radius.
  */
 @Composable
 fun <T> VerticalSegmentedSelector(
@@ -550,7 +578,7 @@ fun <T> VerticalSegmentedSelector(
     icon: (T) -> ImageVector? = { null },
     contentLayout: ControlContentLayout = ControlContentLayout.Vertical,
     enabled: Boolean = true,
-    shape: Shape = ControlSquircle,
+    cornerRadius: Dp? = null,
     segmentHeight: Dp = SegmentHeight,
     segmentPadding: Dp = 0.dp,
 ) {
@@ -570,12 +598,27 @@ fun <T> VerticalSegmentedSelector(
     val haptic = LocalHapticFeedback.current
 
     BoxWithConstraints(
-        modifier
-            // Self-sizing height: one segment per option. Caller controls width only.
-            .height(segmentHeight * options.size)
-            .clip(shape)
+        modifier = modifier.height(segmentHeight * options.size),
+    ) {
+        // By default the selector's corners scale with its live width. The moving highlight
+        // follows the concentric-corner rule: inner radius = outer radius - actual inset.
+        // A selected segment can be shorter than the selector is wide (notably with 5–6
+        // options). Keep the outer radius within half a segment so Compose never has to clamp
+        // the inner curve independently, which would break the parallel inset and appear to
+        // pinch against the container edge.
+        val radiusFromWidth = cornerRadius ?: maxWidth * 0.30f
+        val outerRadius = minOf(radiusFromWidth, segmentHeight / 2)
+        val outerShape = RoundedCornerShape(outerRadius)
+        val highlightShape = RoundedCornerShape(
+            (outerRadius - highlightInset).coerceAtLeast(0.dp),
+        )
+
+        BoxWithConstraints(
+            Modifier
+            .fillMaxSize()
+            .clip(outerShape)
             .background(AppleColors.frostedFill)
-            .border(0.5.dp, AppleColors.frostedBorder, shape)
+            .border(0.5.dp, AppleColors.frostedBorder, outerShape)
             .then(
                 if (!enabled) Modifier else Modifier.pointerInput(options) {
                     fun indexAt(y: Float) =
@@ -612,7 +655,7 @@ fun <T> VerticalSegmentedSelector(
                     )
                 },
             ),
-    ) {
+        ) {
         val segmentHeight = maxHeight / options.size
         val highlightOffset by animateDpAsState(
             segmentHeight * selectedIndex, AppleMotion.spring(), label = "segmentOffset",
@@ -626,16 +669,27 @@ fun <T> VerticalSegmentedSelector(
             tween(200), label = "segmentColor",
         )
 
-        val iconGap = 5.dp
-        val iconSize = 18.dp
+        val measuredContentScale = minOf(
+            maxWidth / 88.dp,
+            segmentHeight / 55.dp,
+        )
+        // Multi-option labels should grow more slowly than the control itself: preserve the
+        // spatial hierarchy and leave breathing room around the moving highlight.
+        val contentScale = (1f + (measuredContentScale - 1f) * 0.45f).coerceIn(0.8f, 1.2f)
+        val iconGap = 5.dp * contentScale
+        val iconSize = 18.dp * contentScale
+        val scaledTextPadding = textPadding * contentScale
         val labels = options.map(label)
         val anyHorizontalIcon = contentLayout == ControlContentLayout.Horizontal && options.any { icon(it) != null }
         val density = LocalDensity.current
         val measurer = rememberTextMeasurer()
-        val fittedStyle = remember(labels, maxWidth, anyHorizontalIcon, density) {
+        val fittedStyle = remember(labels, maxWidth, anyHorizontalIcon, density, contentScale) {
             // Measure at the selected weight (SemiBold) so the bold row never overflows.
-            val base = AppleTypography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
-            val reserved = textPadding * 2 + if (anyHorizontalIcon) iconSize + iconGap else 0.dp
+            val base = AppleTypography.bodyLarge.copy(
+                fontSize = AppleTypography.bodyLarge.fontSize * contentScale,
+                fontWeight = FontWeight.SemiBold,
+            )
+            val reserved = scaledTextPadding * 2 + if (anyHorizontalIcon) iconSize + iconGap else 0.dp
             val availablePx = with(density) { (maxWidth - reserved).toPx() }
             val widest = labels.maxOfOrNull {
                 measurer.measure(it, base, maxLines = 1, softWrap = false).size.width
@@ -652,7 +706,7 @@ fun <T> VerticalSegmentedSelector(
                 .fillMaxWidth()
                 .height(segmentHeight)
                 .padding(highlightInset)
-                .clip(innerCorner(highlightInset))
+                .clip(highlightShape)
                 .background(highlightColor.copy(alpha = if (enabled) 1f else 0.4f)),
         )
 
@@ -683,7 +737,7 @@ fun <T> VerticalSegmentedSelector(
                         // Keep the stacked icon+text clear of the moving highlight's top/bottom
                         // edges. Horizontal spacing is handled by textPadding below.
                         modifier = Modifier.padding(vertical = stackClearance),
-                        textModifier = Modifier.padding(horizontal = textPadding),
+                        textModifier = Modifier.padding(horizontal = scaledTextPadding),
                     )
 
                     // Hairline divider below this row, hidden when it touches the highlight.
@@ -699,6 +753,164 @@ fun <T> VerticalSegmentedSelector(
                                     AppleColors.quaternary.copy(alpha = if (dividerVisible) 1f else 0f),
                                 ),
                         )
+                    }
+                }
+            }
+        }
+        }
+    }
+}
+
+/**
+ * Compact Apple Home-style mode picker. Options share one quiet capsule; the selected option is
+ * the only raised surface, so the control reads as one choice instead of a row of unrelated
+ * buttons. Backend-specific values and labels remain the caller's responsibility.
+ */
+@Composable
+fun <T> HorizontalSegmentedSelector(
+    options: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    label: (T) -> String,
+    modifier: Modifier = Modifier,
+    icon: (T) -> ImageVector? = { null },
+    accent: Color = AppleColors.accent,
+    neutralColor: Color = ControlNeutral,
+    isNeutral: (T) -> Boolean = { false },
+    contentLayout: ControlContentLayout = ControlContentLayout.Vertical,
+    enabled: Boolean = true,
+    cornerRadius: Dp? = null,
+    controlHeight: Dp = 62.dp,
+) {
+    require(options.size in 1..MaxSegments) {
+        "HorizontalSegmentedSelector takes 1–$MaxSegments options, got ${options.size}"
+    }
+    var dragIndex by remember { mutableStateOf<Int?>(null) }
+    val selectedIndex = (dragIndex ?: options.indexOf(selected)).coerceAtLeast(0)
+    val highlightInset = 4.dp
+    val haptic = LocalHapticFeedback.current
+
+    BoxWithConstraints(
+        modifier = modifier
+            .height(controlHeight),
+    ) {
+        val segmentWidth = maxWidth / options.size
+        val radiusFromHeight = cornerRadius ?: maxHeight * 0.30f
+        val outerRadius = minOf(radiusFromHeight, segmentWidth / 2)
+        val outerShape = RoundedCornerShape(outerRadius)
+        val highlightShape = RoundedCornerShape(
+            (outerRadius - highlightInset).coerceAtLeast(0.dp),
+        )
+        val highlightOffset by animateDpAsState(
+            segmentWidth * selectedIndex, AppleMotion.spring(), label = "horizontalSegmentOffset",
+        )
+        val effectiveSelection = options[selectedIndex]
+        val contentScale = minOf(
+            maxHeight / 62.dp,
+            segmentWidth / 88.dp,
+        ).coerceIn(0.65f, 1.5f)
+        val highlightColor by animateColorAsState(
+            when {
+                !enabled -> AppleColors.inactive
+                isNeutral(effectiveSelection) -> neutralColor
+                else -> accent
+            },
+            tween(200), label = "horizontalSegmentColor",
+        )
+
+        Box(
+            Modifier
+            .fillMaxSize()
+            .clip(outerShape)
+            .background(AppleColors.frostedFill)
+            .border(0.5.dp, AppleColors.frostedBorder, outerShape)
+            .then(
+                if (!enabled) Modifier else Modifier.pointerInput(options) {
+                    fun indexAt(x: Float) =
+                        (x / (size.width.toFloat() / options.size)).toInt().coerceIn(0, options.lastIndex)
+                    detectTapGestures { onSelect(options[indexAt(it.x)]) }
+                },
+            )
+            .then(
+                if (!enabled) Modifier else Modifier.pointerInput(options) {
+                    fun indexAt(x: Float) =
+                        (x / (size.width.toFloat() / options.size)).toInt().coerceIn(0, options.lastIndex)
+                    var emitted = -1
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            emitted = indexAt(it.x)
+                            dragIndex = emitted
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
+                        onHorizontalDrag = { change, _ ->
+                            val index = indexAt(change.position.x)
+                            if (index != emitted) {
+                                emitted = index
+                                dragIndex = index
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        },
+                        onDragEnd = {
+                            if (emitted >= 0) onSelect(options[emitted])
+                            dragIndex = null
+                        },
+                        onDragCancel = { dragIndex = null },
+                    )
+                },
+            ),
+        ) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = highlightOffset)
+                    .width(segmentWidth)
+                    .fillMaxHeight()
+                    .padding(highlightInset)
+                    .clip(highlightShape)
+                    .background(highlightColor.copy(alpha = if (enabled) 1f else 0.4f)),
+            )
+
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                options.forEachIndexed { index, option ->
+                    val active = index == selectedIndex
+                    val content by animateColorAsState(
+                        if (active) contentColorOn(highlightColor) else AppleColors.secondary,
+                        tween(180), label = "horizontalSegmentContent",
+                    )
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .semantics { contentDescription = label(option) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ControlLabel(
+                            icon = icon(option),
+                            text = label(option),
+                            color = content,
+                            textStyle = AppleTypography.labelSmall.copy(
+                                fontSize = 10.sp * contentScale,
+                                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                            ),
+                            layout = contentLayout,
+                            iconSize = 19.dp * contentScale,
+                            gap = 2.dp * contentScale,
+                            textModifier = Modifier.padding(horizontal = 6.dp * contentScale),
+                        )
+
+                        if (index < options.lastIndex) {
+                            val dividerVisible = index != selectedIndex && index + 1 != selectedIndex
+                            Box(
+                                Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(vertical = 14.dp * contentScale)
+                                    .width(0.5.dp)
+                                    .fillMaxHeight()
+                                    .background(
+                                        AppleColors.quaternary.copy(alpha = if (dividerVisible) 1f else 0f),
+                                    ),
+                            )
+                        }
                     }
                 }
             }
@@ -728,7 +940,7 @@ fun VerticalSwitch(
     label: (Boolean) -> String? = { null },
     contentLayout: ControlContentLayout = ControlContentLayout.Vertical,
     enabled: Boolean = true,
-    shape: Shape = ControlSquircle,
+    shape: Shape = VerticalSliderSquircle,
 ) {
     val inset = 6.dp
     val haptic = LocalHapticFeedback.current
@@ -793,7 +1005,20 @@ fun VerticalSwitch(
             dragFraction ?: restingFraction, AppleMotion.spring(), label = "switchFraction",
         )
         val fraction = dragFraction ?: settledFraction
-        val thumbShape = innerCorner(inset)
+        val outerRadius = maxWidth * 0.30f
+        val thumbRadius = minOf(
+            (outerRadius - inset).coerceAtLeast(0.dp),
+            thumbWidth / 2,
+            thumbHeight / 2,
+        )
+        val thumbShape = RoundedCornerShape(thumbRadius)
+        // Scale the thumb content from the canonical 88 × 220 control. Width and height both
+        // participate so compact or unusually proportioned switches cannot overflow.
+        val contentScale = minOf(
+            maxWidth / 88.dp,
+            thumbWidth / 76.dp,
+            thumbHeight / 110.dp,
+        ).coerceIn(0.55f, 1.5f)
         Box(
             Modifier
                 .align(Alignment.TopCenter)
@@ -809,9 +1034,13 @@ fun VerticalSwitch(
                 icon = icon(effectiveChecked),
                 text = label(effectiveChecked),
                 color = contentColorOn(thumbColor),
-                textStyle = AppleTypography.labelSmall,
+                textStyle = AppleTypography.labelSmall.copy(
+                    fontSize = AppleTypography.labelSmall.fontSize * contentScale,
+                ),
                 layout = contentLayout,
-                iconSize = 20.dp,
+                iconSize = 20.dp * contentScale,
+                gap = 5.dp * contentScale,
+                textModifier = Modifier.padding(horizontal = 6.dp * contentScale),
             )
         }
     }

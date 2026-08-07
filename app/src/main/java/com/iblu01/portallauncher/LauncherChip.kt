@@ -22,4 +22,6 @@ data class LauncherChip(
     val details: List<PillDetail> = emptyList(),
     /** Accessory kind, drives per-accessory tap behaviour and which control panel opens. */
     val kind: PillKind = PillKind.GENERIC,
+    /** Battery percentage resolved from the entity itself or one of its related HA sensors. */
+    val batteryPercent: Int? = null,
 )

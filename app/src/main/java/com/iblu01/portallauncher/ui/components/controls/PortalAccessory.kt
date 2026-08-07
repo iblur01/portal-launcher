@@ -40,12 +40,8 @@ import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.R
 import androidx.compose.ui.res.stringResource
 
-/**
- * HomeKit accessory-tile radius. Tuned to Apple's Home app: a rounded rectangle that is neither
- * pill nor square. Keep it here so every tile (and the grid) shares the exact same curvature.
- */
-private val AccessoryCorner: Dp = 19.dp
-private val AccessoryShape: Shape = RoundedCornerShape(AccessoryCorner)
+/** HomeKit tile corners scale with the tile's shortest axis. */
+private val AccessoryShape: Shape = RoundedCornerShape(percent = 30)
 
 /**
  * A single HomeKit-style accessory tile: an icon on the left, name and an optional status line.
@@ -70,6 +66,7 @@ fun AccessoryTile(
     height: Dp = 66.dp,
     onLongPress: (() -> Unit)? = null,
 ) {
+    val contentScale = (height / 66.dp).coerceIn(0.7f, 1.5f)
     val background by animateColorAsState(
         when {
             !enabled -> AppleColors.frostedFill
@@ -106,15 +103,15 @@ fun AccessoryTile(
                 if (enabled) Modifier.appleClickable({ onToggle(!on) }, onLongPress)
                 else Modifier,
             )
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 12.dp * contentScale),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(38.dp)) {
+        Box(Modifier.size(38.dp * contentScale)) {
             Box(
                 Modifier.matchParentSize().clip(CircleShape).background(iconCircle, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(icon, null, tint = iconTint, modifier = Modifier.size(21.dp))
+                Icon(icon, null, tint = iconTint, modifier = Modifier.size(21.dp * contentScale))
             }
             // Alert badge rides above the circle's top-right, protruding onto the tile.
             if (warning) {
@@ -124,16 +121,18 @@ fun AccessoryTile(
                     tint = onContent,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 5.dp, y = (-5).dp)
-                        .size(16.dp),
+                        .offset(x = 5.dp * contentScale, y = (-5).dp * contentScale)
+                        .size(16.dp * contentScale),
                 )
             }
         }
-        Spacer(Modifier.width(11.dp))
+        Spacer(Modifier.width(11.dp * contentScale))
         Column {
             Text(
                 title,
-                style = AppleTypography.titleMedium.copy(fontSize = 18.sp),
+                style = AppleTypography.titleMedium.copy(
+                    fontSize = 18.sp * contentScale,
+                ),
                 fontWeight = if (on && enabled) FontWeight.Bold else FontWeight.Normal,
                 color = titleColor,
                 maxLines = 1,
@@ -142,7 +141,9 @@ fun AccessoryTile(
             if (subtitle != null) {
                 Text(
                     subtitle,
-                    style = AppleTypography.bodySmall,
+                    style = AppleTypography.bodySmall.copy(
+                        fontSize = AppleTypography.bodySmall.fontSize * contentScale,
+                    ),
                     fontWeight = FontWeight.Normal,
                     color = subtitleColor,
                     maxLines = 1,

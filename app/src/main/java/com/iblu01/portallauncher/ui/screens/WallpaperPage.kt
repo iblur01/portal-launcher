@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher.ui.screens
 
+import android.app.WallpaperManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -34,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.Prefs
 import com.iblu01.portallauncher.R
@@ -72,6 +74,7 @@ internal fun WallpaperPage(
     onBgModeChange: (String) -> Unit,
     bgOverlayOpacity: Float,
     onOpenOpacityPreview: () -> Unit,
+    onOpenSystemWallpaperPicker: () -> Unit,
     onBack: () -> Unit,
     showBack: Boolean = true,
 ) {
@@ -196,6 +199,13 @@ internal fun WallpaperPage(
             showBack = showBack,
         )
 
+        Text(
+            text = stringResource(R.string.settings_wallpaper_sources_hint),
+            style = AppleTypography.bodyLarge,
+            color = AppleColors.secondary,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+
         WallpaperSourceGrid(
             bgMode = bgMode,
             hasPhoto = hasPhoto,
@@ -206,6 +216,15 @@ internal fun WallpaperPage(
                 if (mode == BG_CUSTOM && !hasPhoto) picker.launch("image/*") else onBgModeChange(mode)
             },
         )
+
+        if (bgMode == "system") {
+            SettingsSection(title = stringResource(R.string.settings_wallpaper_android_section)) {
+                SettingsRow(
+                    label = stringResource(R.string.settings_wallpaper_android_change),
+                    onClick = onOpenSystemWallpaperPicker,
+                )
+            }
+        }
 
         if (bgMode == BG_CUSTOM || hasPhoto) {
             SettingsSection(title = stringResource(R.string.bg_mode_custom)) {
@@ -369,7 +388,7 @@ internal fun WallpaperPage(
 
 private const val BG_CUSTOM = "custom"
 
-/** The four sources, each shown as what it will actually put behind the apps. */
+/** The wallpaper sources, each shown as what it will actually put behind the apps. */
 @Composable
 private fun WallpaperSourceGrid(
     bgMode: String,
@@ -407,7 +426,24 @@ private fun WallpaperSourceGrid(
 
 @Composable
 private fun SourcePreview(mode: String, hasPhoto: Boolean, wallpaperVersion: Int) {
+    val context = LocalContext.current
     when {
+        mode == "system" -> {
+            val drawable = remember(context, wallpaperVersion) {
+                runCatching { WallpaperManager.getInstance(context).drawable }.getOrNull()
+            }
+            if (drawable == null) {
+                PlaceholderPreview { }
+            } else {
+                AsyncImage(
+                    model = drawable,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
         mode == BG_CUSTOM && !hasPhoto -> PlaceholderPreview {
             Icon(
                 Icons.Outlined.AccountCircle,

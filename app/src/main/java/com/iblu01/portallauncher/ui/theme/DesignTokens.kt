@@ -42,6 +42,10 @@ object AppleColors {
 
     // Accent
     val accent = Color(0xFF0A84FF)       // iOS blue
+    val lockAccent = Color(0xFF00C8BE)
+    val fanAccent = Color(0xFF64D1FC)
+    val thermostatCool = Color(0xFF33AEE0)
+    val thermostatHeat = Color(0xFFFE9709)
 
     // State indicators
     val active = Color(0xFF30D158)       // iOS green

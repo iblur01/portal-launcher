@@ -58,15 +58,12 @@ fun WeatherPanel(weather: WeatherUi, onDismiss: () -> Unit, modifier: Modifier =
             Column(
                 Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp).verticalScroll(rememberScrollState()),
             ) {
-                Box(Modifier.fillMaxWidth().height(36.dp)) {
-                    Box(
-                        Modifier.align(Alignment.CenterStart).size(36.dp).clip(CircleShape)
-                            .background(AppleColors.frostedFill).border(0.5.dp, AppleColors.frostedBorder, CircleShape)
-                            .appleClickable(onDismiss),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Filled.Close, stringResource(R.string.weather_close_desc), tint = AppleColors.secondary, modifier = Modifier.size(18.dp)) }
-                    Text(stringResource(R.string.weather_panel_title), style = AppleTypography.titleMedium.copy(fontSize = 15.sp), color = AppleColors.secondary, modifier = Modifier.align(Alignment.Center))
-                }
+                PanelHeader(
+                    title = stringResource(R.string.weather_panel_title),
+                    onNavigation = onDismiss,
+                    navigationIcon = Icons.Filled.Close,
+                    navigationContentDescription = stringResource(R.string.weather_close_desc),
+                )
 
                 Spacer(Modifier.height(18.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {

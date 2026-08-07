@@ -3,6 +3,10 @@ package com.iblu01.portallauncher.ui.components.controls
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +15,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -42,12 +48,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.R
 import androidx.compose.ui.res.stringResource
+import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /** iOS lock-screen letter groups shown under each digit. */
@@ -80,6 +89,7 @@ fun PinKeypad(
     error: Boolean = false,
     onErrorConsumed: () -> Unit = {},
     enabled: Boolean = true,
+    loading: Boolean = false,
     showLetters: Boolean = true,
     haptics: Boolean = true,
     onCancel: (() -> Unit)? = null,
@@ -89,6 +99,7 @@ fun PinKeypad(
     var code by remember { mutableStateOf("") }
     var errored by remember { mutableStateOf(false) }
     val shake = remember { Animatable(0f) }
+    val inputEnabled = enabled && !loading
 
     fun tick() { if (haptics) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
 
@@ -114,7 +125,7 @@ fun PinKeypad(
         }
     }
     val press: (String) -> Unit = press@{ key ->
-        if (!enabled) return@press
+        if (!inputEnabled) return@press
         when (key) {
             "back" -> if (code.isNotEmpty()) { tick(); code = code.dropLast(1) }
             "ok" -> submit()
@@ -131,10 +142,15 @@ fun PinKeypad(
         }
     }
 
-    Column(
+    BoxWithConstraints(
         modifier
             .fillMaxWidth()
             .then(if (!enabled) Modifier.alpha(0.35f) else Modifier),
+    ) {
+        val keyDiameter = ((maxWidth - 40.dp) / 3).coerceIn(48.dp, 74.dp)
+        val contentScale = (keyDiameter / 74.dp).coerceIn(0.65f, 1f)
+        Column(
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (title != null) {
@@ -143,28 +159,46 @@ fun PinKeypad(
                 style = AppleTypography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = AppleColors.primary,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(4.dp * contentScale))
         }
         if (subtitle != null) {
             Text(subtitle, style = AppleTypography.bodySmall, color = AppleColors.secondary)
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(4.dp * contentScale))
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp * contentScale))
 
         // Entry dots, riding the shake.
         val dotCount = if (fixed) codeLength else code.length.coerceAtLeast(1)
         val filledColor by animateColorAsState(
             if (errored) AppleColors.error else dotColor, tween(120), label = "dotFill",
         )
+        val loadingTransition = rememberInfiniteTransition(label = "keypadLoading")
+        val loadingPhase by loadingTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = dotCount.toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(dotCount * 180, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "keypadLoadingPhase",
+        )
         Row(
             modifier = Modifier.offset { IntOffset(shake.value.roundToInt(), 0) },
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp * contentScale),
         ) {
             repeat(dotCount) { i ->
                 val on = i < code.length
+                val directDistance = abs(loadingPhase - i)
+                val pulseDistance = min(directDistance, dotCount - directDistance)
+                val pulse = if (loading) (1f - pulseDistance).coerceIn(0f, 1f) else 0f
                 Box(
                     Modifier
-                        .size(13.dp)
+                        .size(13.dp * contentScale)
+                        .graphicsLayer {
+                            scaleX = 1f + pulse * 0.28f
+                            scaleY = 1f + pulse * 0.28f
+                            alpha = if (loading) 0.55f + pulse * 0.45f else 1f
+                        }
                         .clip(CircleShape)
                         .then(
                             if (on) Modifier.background(filledColor, CircleShape)
@@ -173,7 +207,7 @@ fun PinKeypad(
                 )
             }
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(24.dp * contentScale))
 
         // Keys. Bottom row depends on the mode.
         val bottomRow = when {
@@ -187,23 +221,24 @@ fun PinKeypad(
             bottomRow,
         )
         rows.forEachIndexed { index, row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp * contentScale)) {
                 row.forEach { key ->
                     KeypadKey(
                         key = key,
                         accent = accent,
                         showLetters = showLetters,
-                        enabled = enabled && (key != "ok" || code.isNotEmpty()),
+                        diameter = keyDiameter,
+                        enabled = inputEnabled && (key != "ok" || code.isNotEmpty()),
                         onClick = { press(key) },
                     )
                 }
             }
-            if (index < rows.lastIndex) Spacer(Modifier.height(16.dp))
+            if (index < rows.lastIndex) Spacer(Modifier.height(16.dp * contentScale))
         }
 
         // Variable length spends its bottom row on ⌫ / ✓, so cancelling gets its own line.
         if (!fixed && onCancel != null) {
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(14.dp * contentScale))
             Text(
                 stringResource(R.string.keypad_cancel),
                 style = AppleTypography.bodyLarge,
@@ -213,11 +248,13 @@ fun PinKeypad(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
+                        enabled = inputEnabled,
                         onClick = onCancel,
                     )
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp * contentScale, vertical = 8.dp * contentScale),
             )
         }
+    }
     }
 }
 
@@ -226,10 +263,11 @@ private fun KeypadKey(
     key: String,
     accent: Color,
     showLetters: Boolean,
+    diameter: Dp,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val diameter = 74.dp
+    val contentScale = (diameter / 74.dp).coerceIn(0.65f, 1f)
 
     // "cancel" / empty slots stay the grid's size but carry no circle.
     if (key.isEmpty()) {
@@ -249,7 +287,7 @@ private fun KeypadKey(
                         indication = null,
                         onClick = onClick,
                     )
-                    .padding(8.dp),
+                    .padding(8.dp * contentScale),
             )
         }
         return
@@ -285,15 +323,18 @@ private fun KeypadKey(
         contentAlignment = Alignment.Center,
     ) {
         when (key) {
-            "back" -> Icon(Icons.Outlined.Backspace, null, tint = AppleColors.secondary, modifier = Modifier.size(26.dp))
-            "ok" -> Icon(Icons.Outlined.Check, null, tint = if (enabled) accent else AppleColors.tertiary, modifier = Modifier.size(28.dp))
+            "back" -> Icon(Icons.Outlined.Backspace, null, tint = AppleColors.secondary, modifier = Modifier.size(26.dp * contentScale))
+            "ok" -> Icon(Icons.Outlined.Check, null, tint = if (enabled) accent else AppleColors.tertiary, modifier = Modifier.size(28.dp * contentScale))
             else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(key, style = AppleTypography.titleLarge.copy(fontSize = 30.sp, fontWeight = FontWeight.Normal), color = AppleColors.primary)
+                Text(key, style = AppleTypography.titleLarge.copy(fontSize = 30.sp * contentScale, fontWeight = FontWeight.Normal), color = AppleColors.primary)
                 val letters = KeypadLetters[key.firstOrNull()]
                 if (showLetters && letters != null) {
                     Text(
                         letters,
-                        style = AppleTypography.labelSmall.copy(fontSize = 9.sp, letterSpacing = 1.5.sp),
+                        style = AppleTypography.labelSmall.copy(
+                            fontSize = 9.sp * contentScale,
+                            letterSpacing = 1.5.sp * contentScale,
+                        ),
                         color = AppleColors.tertiary,
                     )
                 }

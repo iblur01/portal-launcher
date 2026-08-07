@@ -42,6 +42,7 @@ internal val unsplashUrls = listOf(
 )
 
 val backgroundModes = listOf(
+    "system" to R.string.bg_mode_system,
     "neutral" to R.string.bg_mode_neutral,
     "nature" to R.string.bg_mode_nature,
     "custom" to R.string.bg_mode_custom,
@@ -51,6 +52,9 @@ val backgroundModes = listOf(
 @Composable
 fun AmbientBackground(mode: String, wallpaperVersion: Int = 0, modifier: Modifier = Modifier) {
     when (mode) {
+        // Android draws its wallpaper (including live wallpapers) in the layer exposed by the
+        // activity's windowShowWallpaper flag. Drawing nothing here is the native launcher path.
+        "system" -> Box(modifier)
         "nature" -> UnsplashCycling(modifier)
         "custom" -> CustomWallpaper(modifier, wallpaperVersion)
         "immich" -> ImmichBackground(modifier)

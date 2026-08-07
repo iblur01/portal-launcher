@@ -2,11 +2,12 @@ package com.iblu01.portallauncher.ui.components.controls
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,26 +22,33 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import kotlin.math.atan2
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import java.util.Locale
 
 /** Thermostat operating mode. [HEAT_COOL] is Apple's "Auto" — a low/high range with two handles. */
-enum class ThermostatMode { OFF, HEAT, COOL, HEAT_COOL }
+enum class ThermostatMode { OFF, HEAT, COOL, AUTO, HEAT_COOL }
+
+/** Optional backend-reported activity. Null lets the generic control infer it from temperatures. */
+enum class ThermostatActivity { OFF, IDLE, HEATING, COOLING }
 
 // The C-shaped track: a 270° sweep starting bottom-left, leaving a gap at the bottom.
 private const val ARC_START = 135f
@@ -60,6 +68,7 @@ private const val ARC_SWEEP = 270f
 @Composable
 fun ThermostatArc(
     mode: ThermostatMode,
+    activity: ThermostatActivity? = null,
     target: Float,
     onTargetChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
@@ -70,16 +79,14 @@ fun ThermostatArc(
     step: Float = 1f,
     current: Float? = null,
     unit: String = "°",
-    heatColor: Color = Color(0xFFFF9F0A),
-    coolColor: Color = Color(0xFF0A84FF),
+    heatColor: Color = AppleColors.thermostatHeat,
+    coolColor: Color = AppleColors.thermostatCool,
     trackColor: Color = Color.White.copy(alpha = 0.13f),
     onCommit: () -> Unit = {},
 ) {
     val haptic = LocalHapticFeedback.current
-    val strokeDp = 26.dp
-    val handleDp = 18.dp
     val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1e-3f)
-    val minGap = step.coerceAtLeast(1f)
+    val minGap = step.coerceAtLeast(0.1f)
 
     fun toFrac(v: Float) = ((v - valueRange.start) / span).coerceIn(0f, 1f)
     fun toValue(frac: Float): Float {
@@ -87,18 +94,25 @@ fun ThermostatArc(
         return (((raw - valueRange.start) / step).roundToInt() * step + valueRange.start)
             .coerceIn(valueRange.start, valueRange.endInclusive)
     }
+    fun displayValue(value: Float): String = if (abs(value - value.roundToInt()) < 0.01f) {
+        value.roundToInt().toString()
+    } else {
+        String.format(Locale.getDefault(), "%.1f", value)
+    }
 
     // Live status derived from the room temperature vs the setpoint(s).
-    val heating = current != null && when (mode) {
+    val inferredHeating = current != null && when (mode) {
         ThermostatMode.HEAT -> current < target
         ThermostatMode.HEAT_COOL -> current < lowTarget
         else -> false
     }
-    val cooling = current != null && when (mode) {
+    val inferredCooling = current != null && when (mode) {
         ThermostatMode.COOL -> current > target
         ThermostatMode.HEAT_COOL -> current > highTarget
         else -> false
     }
+    val heating = activity?.let { it == ThermostatActivity.HEATING } ?: inferredHeating
+    val cooling = activity?.let { it == ThermostatActivity.COOLING } ?: inferredCooling
     // Setpoint reached: the system is calling for nothing → dim the fill a touch.
     val settled = mode != ThermostatMode.OFF && current != null && !heating && !cooling
     val fillAlpha = if (settled) 0.4f else 1f
@@ -113,7 +127,10 @@ fun ThermostatArc(
     val onRange by rememberUpdatedState(onRangeChange)
     val onCommitState by rememberUpdatedState(onCommit)
 
-    Box(modifier) {
+    BoxWithConstraints(modifier) {
+        val contentScale = (minOf(maxWidth, maxHeight) / 300.dp).coerceIn(0.65f, 1.35f)
+        val strokeDp = 26.dp * contentScale
+        val handleDp = 18.dp * contentScale
         Canvas(
             Modifier
                 .fillMaxSize()
@@ -136,7 +153,7 @@ fun ThermostatArc(
                     fun apply(handle: Int, frac: Float) {
                         val v = toValue(frac)
                         when (mode) {
-                            ThermostatMode.HEAT, ThermostatMode.COOL -> onTarget(v)
+                            ThermostatMode.HEAT, ThermostatMode.COOL, ThermostatMode.AUTO -> onTarget(v)
                             ThermostatMode.HEAT_COOL ->
                                 if (handle == 0) onRange(min(v, highState - minGap), highState)
                                 else onRange(lowState, max(v, lowState + minGap))
@@ -164,7 +181,7 @@ fun ThermostatArc(
             val strokePx = strokeDp.toPx()
             val handlePx = handleDp.toPx()
             val center = Offset(size.width / 2f, size.height / 2f)
-            val radius = min(size.width, size.height) / 2f - max(handlePx, strokePx / 2f) - 2.dp.toPx()
+            val radius = min(size.width, size.height) / 2f - max(handlePx, strokePx / 2f) - (2.dp * contentScale).toPx()
             val arcTopLeft = Offset(center.x - radius, center.y - radius)
             val arcSize = Size(radius * 2f, radius * 2f)
 
@@ -192,6 +209,7 @@ fun ThermostatArc(
             when (mode) {
                 ThermostatMode.HEAT -> segment(0f, toFrac(target), heatColor.copy(alpha = fillAlpha), StrokeCap.Round)
                 ThermostatMode.COOL -> segment(toFrac(target), 1f, coolColor.copy(alpha = fillAlpha), StrokeCap.Round)
+                ThermostatMode.AUTO -> segment(0f, toFrac(target), AppleColors.active.copy(alpha = fillAlpha), StrokeCap.Round)
                 ThermostatMode.HEAT_COOL -> {
                     val fl = toFrac(lowTarget)
                     val fh = toFrac(highTarget)
@@ -207,16 +225,20 @@ fun ThermostatArc(
             }
 
             // Live-temperature marker.
-            current?.let { drawCircle(AppleColors.primary.copy(alpha = 0.85f), 4.dp.toPx(), pointAt(toFrac(it))) }
+            current?.let { drawCircle(AppleColors.primary.copy(alpha = 0.85f), (4.dp * contentScale).toPx(), pointAt(toFrac(it))) }
 
             // Handles.
             fun handle(frac: Float) {
                 val p = pointAt(frac)
-                drawCircle(Color.Black.copy(alpha = 0.22f), handlePx + 3.dp.toPx(), p + Offset(0f, 2.5.dp.toPx()))
+                drawCircle(
+                    Color.Black.copy(alpha = 0.22f),
+                    handlePx + (3.dp * contentScale).toPx(),
+                    p + Offset(0f, (2.5.dp * contentScale).toPx()),
+                )
                 drawCircle(Color.White, handlePx, p)
             }
             when (mode) {
-                ThermostatMode.HEAT, ThermostatMode.COOL -> handle(toFrac(target))
+                ThermostatMode.HEAT, ThermostatMode.COOL, ThermostatMode.AUTO -> handle(toFrac(target))
                 ThermostatMode.HEAT_COOL -> { handle(toFrac(lowTarget)); handle(toFrac(highTarget)) }
                 ThermostatMode.OFF -> Unit
             }
@@ -227,10 +249,10 @@ fun ThermostatArc(
         val statusColor: Color
         when {
             mode == ThermostatMode.OFF -> { statusText = null; statusColor = AppleColors.secondary }
-            heating -> { statusText = "Chauffage en cours"; statusColor = heatColor }
-            cooling -> { statusText = "Refroidissement en cours"; statusColor = coolColor }
-            settled -> { statusText = "Température atteinte"; statusColor = AppleColors.secondary }
-            mode == ThermostatMode.HEAT_COOL -> { statusText = "MAINTENIR ENTRE"; statusColor = AppleColors.tertiary }
+            heating -> { statusText = stringResource(R.string.thermostat_status_heating); statusColor = heatColor }
+            cooling -> { statusText = stringResource(R.string.thermostat_status_cooling); statusColor = coolColor }
+            settled -> { statusText = stringResource(R.string.thermostat_status_reached); statusColor = AppleColors.secondary }
+            mode == ThermostatMode.HEAT_COOL -> { statusText = stringResource(R.string.thermostat_status_hold_between); statusColor = AppleColors.tertiary }
             else -> { statusText = null; statusColor = AppleColors.tertiary }
         }
 
@@ -241,46 +263,60 @@ fun ThermostatArc(
             if (statusText != null) {
                 Text(
                     statusText,
-                    style = AppleTypography.labelSmall.copy(letterSpacing = 1.2.sp),
+                    modifier = Modifier.fillMaxWidth(0.58f),
+                    style = AppleTypography.labelSmall.copy(
+                        fontSize = 10.sp * contentScale,
+                    ),
                     color = statusColor,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(10.dp * contentScale))
             }
             when (mode) {
                 ThermostatMode.OFF -> Text(
-                    "Éteint",
-                    style = AppleTypography.headlineLarge,
+                    stringResource(R.string.hvac_mode_off),
+                    style = AppleTypography.headlineLarge.copy(
+                        fontSize = AppleTypography.headlineLarge.fontSize * contentScale,
+                    ),
                     color = AppleColors.secondary,
                 )
                 ThermostatMode.HEAT_COOL -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${lowTarget.roundToInt()}",
-                        style = AppleTypography.displayLarge.copy(fontSize = 60.sp, fontWeight = FontWeight.Medium),
+                        displayValue(lowTarget),
+                        style = AppleTypography.displayLarge.copy(fontSize = 52.sp * contentScale, fontWeight = FontWeight.Medium),
                         color = AppleColors.primary,
                     )
                     Text(
                         "  –  ",
-                        style = AppleTypography.displayLarge.copy(fontSize = 44.sp),
+                        style = AppleTypography.displayLarge.copy(fontSize = 44.sp * contentScale),
                         color = AppleColors.tertiary,
                     )
                     Text(
-                        "${highTarget.roundToInt()}",
-                        style = AppleTypography.displayLarge.copy(fontSize = 60.sp, fontWeight = FontWeight.Medium),
+                        displayValue(highTarget),
+                        style = AppleTypography.displayLarge.copy(fontSize = 52.sp * contentScale, fontWeight = FontWeight.Medium),
                         color = AppleColors.primary,
                     )
                 }
                 else -> Text(
-                    "${target.roundToInt()}$unit",
-                    style = AppleTypography.displayLarge.copy(fontSize = 76.sp, fontWeight = FontWeight.Medium),
+                    "${displayValue(target)}$unit",
+                    // Keep a consistent optical gutter between wide decimal values and the dial.
+                    // Integer setpoints can stay slightly larger without approaching the arc.
+                    style = AppleTypography.displayLarge.copy(
+                        fontSize = (if (abs(target - target.roundToInt()) < 0.01f) 70.sp else 62.sp) * contentScale,
+                        fontWeight = FontWeight.Medium,
+                    ),
                     color = AppleColors.primary,
                 )
             }
             // Room temperature, when known.
             if (current != null && mode != ThermostatMode.OFF) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(10.dp * contentScale))
                 Text(
-                    "Pièce · ${current.roundToInt()}$unit",
-                    style = AppleTypography.bodyLarge,
+                    stringResource(R.string.thermostat_room_temperature_format, displayValue(current), unit),
+                    style = AppleTypography.bodyLarge.copy(
+                        fontSize = AppleTypography.bodyLarge.fontSize * contentScale,
+                    ),
                     color = AppleColors.secondary,
                 )
             }
