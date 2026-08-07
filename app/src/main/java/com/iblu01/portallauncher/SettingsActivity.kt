@@ -154,6 +154,20 @@ class SettingsActivity : ComponentActivity() {
 
         override fun onSetBackgroundMode(mode: String) {
             prefs.backgroundMode = mode
+            SettingsChangeBus.get().emit("backgroundMode")
+        }
+
+        override fun onOpenSystemWallpaperPicker() {
+            prefs.backgroundMode = "system"
+            SettingsChangeBus.get().emit("backgroundMode")
+            runCatching {
+                startActivity(Intent.createChooser(
+                    Intent(Intent.ACTION_SET_WALLPAPER),
+                    getString(R.string.toast_choose_wallpaper),
+                ))
+            }.onFailure {
+                Toast.makeText(this@SettingsActivity, R.string.toast_cannot_open_wallpaper_picker, Toast.LENGTH_SHORT).show()
+            }
         }
 
         override fun onOpenOpacityPreview() {

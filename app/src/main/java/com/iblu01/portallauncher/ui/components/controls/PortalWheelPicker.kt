@@ -53,6 +53,7 @@ fun <T> WheelPicker(
     itemHeight: Dp = 40.dp,
     accent: Color = AppleColors.primary,
 ) {
+    val contentScale = (itemHeight / 40.dp).coerceIn(0.7f, 1.5f)
     val rows = (visibleCount.coerceIn(3, 9)).let { if (it % 2 == 0) it + 1 else it }
     val edge = rows / 2
     val initialIndex = options.indexOf(selected).coerceAtLeast(0)
@@ -68,8 +69,10 @@ fun <T> WheelPicker(
             info.visibleItemsInfo.minByOrNull { abs((it.offset + it.size / 2f) - mid) }?.index ?: initialIndex
         }
     }
-    LaunchedEffect(centeredIndex) {
-        options.getOrNull(centeredIndex)?.let(onSelect)
+    LaunchedEffect(centeredIndex, state.isScrollInProgress) {
+        // Commit only once the wheel settles; scrolling across several rows must not emit one
+        // backend action per transiently centered option.
+        if (!state.isScrollInProgress) options.getOrNull(centeredIndex)?.let(onSelect)
     }
 
     LazyColumn(
@@ -101,7 +104,7 @@ fun <T> WheelPicker(
                         scaleX = s; scaleY = s
                         cameraDistance = 12f * density
                     }
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(percent = 30))
                     .then(if (isCentered) Modifier.background(Color.White.copy(alpha = 0.08f)) else Modifier)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -112,6 +115,7 @@ fun <T> WheelPicker(
                 Text(
                     label(option),
                     style = AppleTypography.titleLarge.copy(
+                        fontSize = AppleTypography.titleLarge.fontSize * contentScale,
                         fontWeight = if (isCentered) FontWeight.SemiBold else FontWeight.Normal,
                     ),
                     color = textColor,

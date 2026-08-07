@@ -188,6 +188,7 @@
     <string name="header_settings_content_desc">Settings</string>
     <string name="auto_return_pill_label">Auto close</string>
     <string name="auto_return_cancel_desc">Cancel</string>
+    <string name="bg_mode_system">Android wallpaper</string>
     <string name="bg_mode_neutral">Neutral</string>
     <string name="bg_mode_nature">Nature (Unsplash)</string>
     <string name="bg_mode_custom">Custom photo</string>
@@ -316,13 +317,18 @@
     <string name="cover_button_close">Close</string>
 
     <!-- ===== THERMOSTAT PANEL ===== -->
-    <string name="thermostat_current_temp_format">current %1$s</string>
     <string name="hvac_mode_off">Off</string>
     <string name="hvac_mode_heat">Heating</string>
     <string name="hvac_mode_cool">Cooling</string>
     <string name="hvac_mode_auto">Auto</string>
     <string name="hvac_mode_dry">Dry</string>
     <string name="hvac_mode_fan_only">Fan only</string>
+    <string name="thermostat_status_heating">Heating</string>
+    <string name="thermostat_status_cooling">Cooling</string>
+    <string name="thermostat_status_reached">Temperature reached</string>
+    <string name="thermostat_status_hold_between">HOLD BETWEEN</string>
+    <string name="thermostat_room_temperature">Room temperature</string>
+    <string name="thermostat_room_temperature_format">Room · %1$s%2$s</string>
 
     <!-- ===== VACUUM PANEL ===== -->
     <string name="vacuum_button_start">Start</string>
@@ -394,6 +400,8 @@
     <string name="playground_subtitle">Control test bench</string>
     <string name="playground_accent_color_label">Accent color</string>
     <string name="playground_section_vertical_slider">Vertical slider</string>
+    <string name="playground_section_fake_panels">Interactive panel lab</string>
+    <string name="playground_fake_panels_hint">Tap a fake device to open its real side panel. Actions stay local and never reach Home Assistant.</string>
     <string name="playground_slider_from_bottom">From bottom</string>
     <string name="playground_slider_from_top">From top</string>
     <string name="playground_slider_disabled">Disabled</string>
@@ -407,6 +415,7 @@
     <string name="playground_selector_auto">Auto</string>
     <string name="playground_selector_manual">Manual</string>
     <string name="playground_selector_icon_stacked">Stacked icon</string>
+    <string name="playground_selector_horizontal">Horizontal selector</string>
     <string name="playground_presence_home">At home</string>
     <string name="playground_presence_away">Away</string>
     <string name="playground_presence_off">Disabled</string>
@@ -455,6 +464,7 @@
     <string name="toast_app_not_found_label_format">App not found: %1$s</string>
     <string name="toast_cannot_open_app_format">Could not open %1$s</string>
     <string name="toast_choose_wallpaper">Choose wallpaper</string>
+    <string name="toast_cannot_open_wallpaper_picker">No wallpaper picker is available on this device</string>
     <string name="toast_permissions_ok">Permissions OK</string>
     <string name="toast_shortcut_added_format">Shortcut added: %1$s</string>
 
@@ -878,4 +888,7 @@
     <string name="settings_wallpaper_replace_photo">Replace the photo</string>
     <string name="settings_wallpaper_photo_missing">No photo chosen yet</string>
     <string name="settings_wallpaper_photo_error">This image could not be read. Try another one.</string>
+    <string name="settings_wallpaper_android_section">ANDROID</string>
+    <string name="settings_wallpaper_android_change">Choose another Android wallpaper</string>
+    <string name="settings_wallpaper_sources_hint">Choose the atmosphere shown behind your clock and apps.</string>
 </resources>

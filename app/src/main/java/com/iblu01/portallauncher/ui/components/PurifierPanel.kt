@@ -1,11 +1,12 @@
 package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoMode
 import androidx.compose.material.icons.outlined.Bedtime
@@ -38,7 +39,7 @@ private enum class PurifierMode(val preset: String?, val labelRes: Int, val icon
 }
 
 @Composable
-fun PurifierActions(chip: LauncherChip) {
+fun PurifierActions(chip: LauncherChip, modifier: Modifier = Modifier) {
     val callService = LocalCallService.current
     val entity = rememberEntity(chip.entityId)
     val running = entity?.state?.equals("on", true) == true
@@ -69,29 +70,39 @@ fun PurifierActions(chip: LauncherChip) {
         PurifierMode.OFF to stringResource(R.string.purifier_mode_off),
     )
 
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        VerticalSegmentedSelector(
-            options = PurifierMode.entries.toList(),
-            selected = optimisticMode ?: currentMode,
-            onSelect = { mode ->
-                if (mode != currentMode) {
-                    optimisticMode = mode
-                    if (mode == PurifierMode.OFF) {
-                        callService("fan", "turn_off", chip.entityId)
-                    } else {
-                        callService("fan", "set_preset_mode", chip.entityId, mapOf("preset_mode" to mode.preset!!))
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        val options = PurifierMode.entries.toList()
+        BoxWithConstraints(
+            // Match the alarm selector's responsive 96:240 viewport.
+            modifier = Modifier.fillMaxWidth(0.54f).weight(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            val widthToHeightRatio = 96f / 240f
+            val selectorHeight = minOf(maxHeight, maxWidth / widthToHeightRatio)
+            val selectorWidth = selectorHeight * widthToHeightRatio
+            VerticalSegmentedSelector(
+                options = options,
+                selected = optimisticMode ?: currentMode,
+                onSelect = { mode ->
+                    if (mode != currentMode) {
+                        optimisticMode = mode
+                        if (mode == PurifierMode.OFF) {
+                            callService("fan", "turn_off", chip.entityId)
+                        } else {
+                            callService("fan", "set_preset_mode", chip.entityId, mapOf("preset_mode" to mode.preset!!))
+                        }
                     }
-                }
-            },
-            label = { purifierLabels[it]!! },
-            icon = { it.icon },
-            accent = AppleColors.active,
-            isNeutral = { it == PurifierMode.OFF },
-            enabled = entity != null,
-            segmentHeight = 66.dp,
-            segmentPadding = 4.dp,
-            modifier = Modifier.width(88.dp),
-        )
+                },
+                label = { purifierLabels[it]!! },
+                icon = { it.icon },
+                accent = AppleColors.active,
+                isNeutral = { it == PurifierMode.OFF },
+                enabled = entity != null,
+                segmentHeight = selectorHeight / options.size,
+                segmentPadding = 4.dp,
+                modifier = Modifier.size(selectorWidth, selectorHeight),
+            )
+        }
         if (chip.details.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

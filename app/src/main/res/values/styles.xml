@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.PortalLauncher" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/black</item>
+        <!--
+            A home activity must let Android's WallpaperService own the layer behind its window.
+            Opaque in-app backgrounds still cover it; the "system" mode deliberately stays
+            transparent so static, live and OEM wallpapers all render through the native path.
+        -->
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowShowWallpaper">true</item>
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#64B5F6</item>
     </style>

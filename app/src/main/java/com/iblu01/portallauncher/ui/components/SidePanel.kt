@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -117,70 +118,32 @@ private fun ChipActionsContent(
 ) {
     val entity = rememberEntity(chip.entityId)
     val batteryPercent = chip.batteryPercent ?: entity?.headerBatteryPercent()
-    val showHeadlineValue = chip.toPanelKind() != PanelKind.COVER ||
-        entity?.let { !it.supports(CoverFeature.SET_POSITION) || it.attributes.optInt("current_position", -1) !in 0..100 } != false
+    val showHeadlineValue = when (chip.toPanelKind()) {
+        PanelKind.THERMOSTAT -> false // The dial owns the target and room temperatures.
+        PanelKind.SWITCH -> false // The switch thumb already carries the on/off state.
+        PanelKind.LOCK -> false // The lock control owns the translated state; avoid raw "locked".
+        PanelKind.PURIFIER -> false // The mode selector already displays the active state.
+        PanelKind.VACUUM -> false // The reusable vacuum status chip owns the active state.
+        PanelKind.COVER -> entity?.let {
+            !it.supports(CoverFeature.SET_POSITION) || it.attributes.optInt("current_position", -1) !in 0..100
+        } != false
+        else -> true
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 24.dp.scaled(), vertical = 20.dp.scaled()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.fillMaxWidth().height(36.dp.scaled())) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .size(36.dp.scaled())
-                    .clip(CircleShape)
-                    .background(AppleColors.frostedFill)
-                    .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
-                    .clickable { onDismiss() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = stringResource(R.string.side_panel_close_desc),
-                    tint = AppleColors.secondary,
-                    modifier = Modifier.size(18.dp.scaled()),
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .clip(AppleShapes.pill)
-                    .background(AppleColors.frostedFill, AppleShapes.pill)
-                    .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                    .padding(horizontal = 14.dp.scaled(), vertical = 7.dp.scaled()),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(7.dp.scaled()),
-            ) {
-                Icon(launcherIcon(chip.icon), null, tint = accent, modifier = Modifier.size(16.dp.scaled()))
-                Text(
-                    chip.label,
-                    style = AppleTypography.bodySmall.copy(fontSize = 13.sp.scaled()),
-                    color = AppleColors.secondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (batteryPercent != null) {
-                    val batteryColor = when {
-                        batteryPercent <= 10 -> AppleColors.error
-                        batteryPercent <= 20 -> AppleColors.warning
-                        else -> AppleColors.secondary
-                    }
-                    Icon(
-                        Icons.Filled.BatteryFull,
-                        contentDescription = stringResource(R.string.side_panel_battery_desc, batteryPercent),
-                        tint = batteryColor,
-                        modifier = Modifier.size(14.dp.scaled()),
-                    )
-                    Text(
-                        stringResource(R.string.side_panel_battery_value, batteryPercent),
-                        style = AppleTypography.bodySmall.copy(fontSize = 12.sp.scaled()),
-                        color = batteryColor,
-                    )
-                }
-            }
-        }
+        PanelHeader(
+            title = chip.label,
+            onNavigation = onDismiss,
+            navigationIcon = Icons.Filled.Close,
+            navigationContentDescription = stringResource(R.string.side_panel_close_desc),
+            titleIcon = launcherIcon(chip.icon),
+            accent = accent,
+            batteryPercent = batteryPercent,
+        )
 
         Spacer(Modifier.height(if (showHeadlineValue) 14.dp.scaled() else 8.dp.scaled()))
         if (showHeadlineValue) {
@@ -197,10 +160,18 @@ private fun ChipActionsContent(
         // Center the control block vertically in the remaining space; it still scrolls if a
         // panel's content is taller than the panel (keypads, long detail lists).
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (chip.toPanelKind() == PanelKind.COVER) {
-                // Covers need finite width and height constraints so their slider can choose the
-                // largest size that fits while preserving its aspect ratio.
-                CoverControl(chip, Modifier.fillMaxSize())
+            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.PURIFIER, PanelKind.VACUUM)) {
+                // Vertical controls need finite panel constraints so they can fill the available
+                // height while preserving the same proportions as lights and covers.
+                when (chip.toPanelKind()) {
+                    PanelKind.COVER -> CoverControl(chip, Modifier.fillMaxSize())
+                    PanelKind.FAN -> FanControl(chip, Modifier.fillMaxSize())
+                    PanelKind.SWITCH -> SwitchControl(chip, Modifier.fillMaxSize())
+                    PanelKind.LOCK -> LockControl(chip, Modifier.fillMaxSize())
+                    PanelKind.PURIFIER -> PurifierActions(chip, Modifier.fillMaxSize())
+                    PanelKind.VACUUM -> VacuumControl(chip, Modifier.fillMaxSize())
+                    else -> Unit
+                }
             } else {
                 Column(
                     modifier = Modifier
@@ -214,16 +185,14 @@ private fun ChipActionsContent(
                     // catch-all `else` — every PanelKind is handled explicitly.
                     when (chip.toPanelKind()) {
                 PanelKind.LIGHTS -> LightsActions(chip, onOpenLight)
-                PanelKind.PURIFIER -> PurifierActions(chip)
+                PanelKind.PURIFIER -> Unit // Bounded branch above.
                 PanelKind.SCENES -> ScenesActions(chip)
                 PanelKind.PRESENCE -> PresenceActions(chip)
                 PanelKind.ENERGY -> EnergyActions(chip)
-                PanelKind.LOCK -> LockControl(chip)
-                PanelKind.COVER -> Unit // Rendered in the bounded branch above.
+                PanelKind.LOCK -> Unit // Bounded branch above.
+                PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH -> Unit // Bounded branch above.
                 PanelKind.THERMOSTAT -> ThermostatControl(chip)
-                PanelKind.VACUUM -> VacuumControl(chip)
-                PanelKind.FAN -> FanControl(chip)
-                PanelKind.SWITCH -> SwitchControl(chip)
+                PanelKind.VACUUM -> Unit // Bounded branch above.
                 PanelKind.ALARM -> AlarmControl(chip)
                 // AIR_QUALITY is rendered full-screen upstream in ChipActionsPanel; MEDIA/WEATHER
                 // are separate PanelContent types and never reach the chip-actions router.
@@ -232,6 +201,88 @@ private fun ChipActionsContent(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Large, background-free header shared by full panels and nested panel pages. */
+@Composable
+internal fun PanelHeader(
+    title: String,
+    onNavigation: () -> Unit,
+    navigationIcon: ImageVector,
+    navigationContentDescription: String,
+    modifier: Modifier = Modifier,
+    titleIcon: ImageVector? = null,
+    accent: Color = AppleColors.primary,
+    batteryPercent: Int? = null,
+    onTitleClick: (() -> Unit)? = null,
+) {
+    val batteryColor = when {
+        batteryPercent == null -> AppleColors.secondary
+        batteryPercent <= 10 -> AppleColors.error
+        batteryPercent <= 20 -> AppleColors.warning
+        else -> AppleColors.secondary
+    }
+    Row(
+        modifier = modifier.fillMaxWidth().height(52.dp.scaled()),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp.scaled())
+                .clip(CircleShape)
+                .background(AppleColors.frostedFill)
+                .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
+                .clickable(onClick = onNavigation),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                navigationIcon,
+                contentDescription = navigationContentDescription,
+                tint = AppleColors.primary,
+                modifier = Modifier.size(24.dp.scaled()),
+            )
+        }
+        Spacer(Modifier.size(14.dp.scaled()))
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .then(if (onTitleClick != null) Modifier.clickable(onClick = onTitleClick) else Modifier),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (titleIcon != null) {
+                Icon(titleIcon, null, tint = accent, modifier = Modifier.size(23.dp.scaled()))
+                Spacer(Modifier.size(9.dp.scaled()))
+            }
+            Text(
+                title,
+                style = AppleTypography.titleLarge.copy(
+                    fontSize = 22.sp.scaled(),
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = AppleColors.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (batteryPercent != null) {
+            Spacer(Modifier.size(10.dp.scaled()))
+            Icon(
+                Icons.Filled.BatteryFull,
+                contentDescription = stringResource(R.string.side_panel_battery_desc, batteryPercent),
+                tint = batteryColor,
+                modifier = Modifier.size(17.dp.scaled()),
+            )
+            Spacer(Modifier.size(4.dp.scaled()))
+            Text(
+                stringResource(R.string.side_panel_battery_value, batteryPercent),
+                style = AppleTypography.bodySmall.copy(
+                    fontSize = 13.sp.scaled(),
+                    fontWeight = FontWeight.Medium,
+                ),
+                color = batteryColor,
+            )
         }
     }
 }

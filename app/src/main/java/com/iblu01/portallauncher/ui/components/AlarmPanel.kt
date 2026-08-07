@@ -28,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -107,10 +106,6 @@ fun AlarmControl(chip: LauncherChip) {
                         val widthToHeightRatio = 96f / 240f
                         val selectorWidth = maxWidth
                         val selectorHeight = selectorWidth / widthToHeightRatio
-                        // The cover slider rounds by 30% of its width. Derive both selector
-                        // radii from that same live width and keep the inset highlight concentric.
-                        val outerRadius = selectorWidth * 0.30f
-                        val highlightInset = 5.dp
                         VerticalSegmentedSelector(
                             options = options,
                             selected = optimisticMode ?: confirmedMode,
@@ -130,10 +125,6 @@ fun AlarmControl(chip: LauncherChip) {
                             icon = { it.icon },
                             accent = AppleColors.active,
                             isNeutral = { it == ArmOption.DISABLED },
-                            shape = RoundedCornerShape(outerRadius),
-                            highlightShape = RoundedCornerShape(
-                                (outerRadius - highlightInset).coerceAtLeast(0.dp),
-                            ),
                             segmentHeight = selectorHeight / options.size,
                             segmentPadding = 4.dp,
                             modifier = Modifier.size(selectorWidth, selectorHeight),

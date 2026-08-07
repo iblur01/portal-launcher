@@ -1,10 +1,7 @@
 package com.iblu01.portallauncher.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,77 +9,74 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Air
-import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.theme.AppleColors
-import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.R
 import androidx.compose.ui.res.stringResource
+import com.iblu01.portallauncher.ui.components.controls.VerticalSwitch
+import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
+import com.iblu01.portallauncher.ui.components.controls.VerticalSegmentedSelector
+import com.iblu01.portallauncher.ui.components.controls.ControlContentLayout
 
-/**
- * The big round HomeKit-style accessory button used by simple on/off accessories
- * (lock, switch, fan). Tap toggles; colour and glyph reflect the live state.
- */
-@Composable
-fun BigCircleButton(
-    active: Boolean,
-    color: Color,
-    icon: ImageVector,
-    caption: String,
-    onClick: () -> Unit,
-) {
-    val bg by animateColorAsState(color.copy(alpha = if (active) 0.22f else 0.08f), AppleMotion.spring(), label = "bigBtnBg")
-    val tint by animateColorAsState(if (active) color else AppleColors.secondary, AppleMotion.spring(), label = "bigBtnTint")
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .size(156.dp)
-                .clip(CircleShape)
-                .background(bg, CircleShape)
-                .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
-                .appleClickable(onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = tint, modifier = Modifier.size(66.dp))
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(caption, style = AppleTypography.titleMedium.copy(fontSize = 17.sp), color = AppleColors.primary)
-    }
+private sealed interface FanModeOption {
+    data object Off : FanModeOption
+    data class Preset(val value: String) : FanModeOption
 }
 
 @Composable
-fun SwitchControl(chip: LauncherChip) {
+fun SwitchControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val callService = LocalCallService.current
     val entity = rememberEntity(chip.entityId)
     if (entity == null || entity.isUnavailable()) { PanelUnavailable(); return }
     val on = entity.state.equals("on", true)
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(6.dp))
-        BigCircleButton(on, AppleColors.active, Icons.Outlined.PowerSettingsNew, if (on) stringResource(R.string.switch_state_on) else stringResource(R.string.switch_state_off)) {
-            callService("switch", "toggle", chip.entityId)
+    var pending by remember(chip.entityId) { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(on, pending) {
+        val expected = pending ?: return@LaunchedEffect
+        if (on == expected) pending = null else {
+            kotlinx.coroutines.delay(5_000)
+            if (pending == expected && on != expected) pending = null
+        }
+    }
+    val displayedOn = pending ?: on
+    val onLabel = stringResource(R.string.switch_state_on)
+    val offLabel = stringResource(R.string.switch_state_off)
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxWidth(0.54f).weight(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            val ratio = 96f / 240f
+            val controlHeight = minOf(maxHeight, maxWidth / ratio)
+            val controlWidth = controlHeight * ratio
+            VerticalSwitch(
+                checked = displayedOn,
+                onCheckedChange = { wanted ->
+                    if (wanted != displayedOn) {
+                        pending = wanted
+                        callService("switch", if (wanted) "turn_on" else "turn_off", chip.entityId)
+                    }
+                },
+                accent = AppleColors.active,
+                label = { enabled -> if (enabled) onLabel else offLabel },
+                modifier = Modifier.size(controlWidth, controlHeight),
+            )
         }
         Spacer(Modifier.height(20.dp))
         chip.details.forEach { PanelDetailRow(it) }
@@ -90,40 +84,88 @@ fun SwitchControl(chip: LauncherChip) {
 }
 
 @Composable
-fun FanControl(chip: LauncherChip) {
+fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val callService = LocalCallService.current
     val entity = rememberEntity(chip.entityId)
     if (entity == null || entity.isUnavailable()) { PanelUnavailable(); return }
-    val on = entity.state.equals("on", true)
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    val fan = entity.toFanContract()
+    val onLabel = stringResource(R.string.fan_state_on)
+    val offLabel = stringResource(R.string.fan_state_off)
+    val speedLabel = stringResource(R.string.fan_speed_label)
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(6.dp))
-        BigCircleButton(on, AppleColors.accent, Icons.Outlined.Air, if (on) stringResource(R.string.fan_state_on) else stringResource(R.string.fan_state_off)) {
-            callService("fan", "toggle", chip.entityId)
+        Text(
+            if (fan.primaryControl is FanPrimaryControl.OnOff) if (fan.isOn) onLabel else offLabel else speedLabel,
+            style = AppleTypography.titleMedium.copy(fontSize = 17.sp),
+            color = AppleColors.primary,
+        )
+        Spacer(Modifier.height(12.dp))
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxWidth(0.54f).weight(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            val ratio = 96f / 240f
+            val controlHeight = minOf(maxHeight, maxWidth / ratio)
+            val controlWidth = controlHeight * ratio
+        when (val control = fan.primaryControl) {
+            FanPrimaryControl.OnOff -> {
+                VerticalSwitch(
+                    checked = fan.isOn,
+                    onCheckedChange = { wanted -> callService("fan", if (wanted) "turn_on" else "turn_off", chip.entityId) },
+                    accent = AppleColors.fanAccent,
+                    icon = { Icons.Outlined.Air },
+                    label = { if (it) onLabel else offLabel },
+                    modifier = Modifier.size(controlWidth, controlHeight),
+                )
+            }
+            is FanPrimaryControl.Percentage -> {
+                VerticalFillSlider(
+                    value = control.value.toFloat(),
+                    onValueChange = {},
+                    valueRange = 0f..100f,
+                    accent = AppleColors.fanAccent,
+                    hapticSteps = (100 / control.step).coerceAtLeast(1),
+                    icon = Icons.Outlined.Air,
+                    label = { "${it.toInt()} %" },
+                    onValueChangeFinished = { value ->
+                        callService("fan", "set_percentage", chip.entityId, mapOf("percentage" to value.toInt()))
+                    },
+                    modifier = Modifier.size(controlWidth, controlHeight),
+                )
+            }
+            is FanPrimaryControl.Presets -> {
+                val options = listOf(FanModeOption.Off) + control.values.map(FanModeOption::Preset)
+                val selected = if (!fan.isOn) FanModeOption.Off else {
+                    FanModeOption.Preset(control.selected ?: control.values.first())
+                }
+                VerticalSegmentedSelector(
+                    options = options,
+                    selected = selected,
+                    onSelect = { option -> when (option) {
+                        FanModeOption.Off -> callService("fan", "turn_off", chip.entityId)
+                        is FanModeOption.Preset -> callService("fan", "set_preset_mode", chip.entityId, mapOf("preset_mode" to option.value))
+                    } },
+                    label = { option -> when (option) {
+                        FanModeOption.Off -> offLabel
+                        is FanModeOption.Preset -> option.value.replace('_', ' ').replaceFirstChar { it.uppercase() }
+                    } },
+                    icon = { option -> if (option == FanModeOption.Off) null else Icons.Outlined.Air },
+                    accent = AppleColors.fanAccent,
+                    isNeutral = { it == FanModeOption.Off },
+                    contentLayout = ControlContentLayout.Horizontal,
+                    segmentHeight = controlHeight / options.size,
+                    modifier = Modifier.width(controlWidth),
+                )
+            }
+        }
         }
         Spacer(Modifier.height(20.dp))
 
-        if (entity.supports(FanFeature.SET_SPEED)) {
-            val committed = entity.attributes.optInt("percentage", 0)
-            var slider by remember(committed) { mutableFloatStateOf(committed.toFloat()) }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.fan_speed_label), style = AppleTypography.bodyLarge, color = AppleColors.secondary, modifier = Modifier.weight(1f))
-                Text("${slider.toInt()}%", style = AppleTypography.bodyLarge, color = AppleColors.primary)
-            }
-            Slider(
-                value = slider,
-                onValueChange = { slider = it },
-                onValueChangeFinished = { callService("fan", "set_percentage", chip.entityId, mapOf("percentage" to slider.toInt())) },
-                valueRange = 0f..100f,
-                colors = SliderDefaults.colors(thumbColor = AppleColors.accent, activeTrackColor = AppleColors.accent),
-            )
-        }
-
-        if (entity.supports(FanFeature.OSCILLATE)) {
-            val oscillating = entity.attributes.optBoolean("oscillating", false)
+        if (fan.supportsOscillation) {
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                PanelModeButton(stringResource(R.string.fan_oscillation_label), Icons.Outlined.Sync, oscillating) {
-                    callService("fan", "oscillate", chip.entityId, mapOf("oscillating" to !oscillating))
+                PanelModeButton(stringResource(R.string.fan_oscillation_label), Icons.Outlined.Sync, fan.isOscillating) {
+                    callService("fan", "oscillate", chip.entityId, mapOf("oscillating" to !fan.isOscillating))
                 }
             }
         }

@@ -284,16 +284,17 @@ fun MediaPlayerView(
                     ) {
                         Row(
                             modifier = Modifier
-                                .clip(AppleShapes.pill)
-                                .background(AppleColors.frostedFill, AppleShapes.pill)
-                                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
                                 .then(if (media.groupablePlayers.size > 1) Modifier.clickable { groupDialogVisible = true } else Modifier)
-                                .padding(horizontal = 14.dp, vertical = 7.dp),
+                                .padding(horizontal = 8.dp, vertical = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(7.dp),
                         ) {
                             Box(Modifier.size(7.dp).background(if (isPlaying) AppleColors.active else AppleColors.warning, CircleShape))
-                            Text(sourceName, style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.secondary)
+                            Text(
+                                sourceName,
+                                style = AppleTypography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
+                                color = AppleColors.primary,
+                            )
                         }
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -340,14 +341,14 @@ fun MediaPlayerView(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(10.dp)
-                            .size(32.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(AppleColors.frostedFill)
                             .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
                             .clickable { onDismiss() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_close_player_desc), tint = AppleColors.secondary, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_close_player_desc), tint = AppleColors.primary, modifier = Modifier.size(24.dp))
                     }
                 }
             }
@@ -359,37 +360,21 @@ fun MediaPlayerView(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
-                ) {
-                    if (onDismiss != null) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(AppleColors.frostedFill)
-                                .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
-                                .clickable { onDismiss() },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_close_player_desc), tint = AppleColors.secondary, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .clip(AppleShapes.pill)
-                            .background(AppleColors.frostedFill, AppleShapes.pill)
-                            .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                            .then(if (media.groupablePlayers.size > 1) Modifier.clickable { groupDialogVisible = true } else Modifier)
-                            .padding(horizontal = 14.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    ) {
-                        Box(Modifier.size(7.dp).background(if (isPlaying) AppleColors.active else AppleColors.warning, CircleShape))
-                        Text(sourceName, style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.secondary)
-                    }
+                if (onDismiss != null) {
+                    PanelHeader(
+                        title = sourceName,
+                        onNavigation = onDismiss,
+                        navigationIcon = Icons.Filled.Close,
+                        navigationContentDescription = stringResource(R.string.media_close_player_desc),
+                        accent = if (isPlaying) AppleColors.active else AppleColors.warning,
+                        onTitleClick = if (media.groupablePlayers.size > 1) ({ groupDialogVisible = true }) else null,
+                    )
+                } else {
+                    Text(
+                        sourceName,
+                        style = AppleTypography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+                        color = AppleColors.primary,
+                    )
                 }
 
                 Box(

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
@@ -41,6 +44,7 @@ import androidx.compose.material.icons.outlined.Weekend
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -55,11 +59,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.R
+import com.iblu01.portallauncher.HaEntity
+import com.iblu01.portallauncher.LauncherChip
+import com.iblu01.portallauncher.PillKind
+import com.iblu01.portallauncher.domain.model.PillDetail
+import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
+import com.iblu01.portallauncher.domain.model.PlayingMedia
+import com.iblu01.portallauncher.ui.CallService
+import com.iblu01.portallauncher.ui.LocalAreas
+import com.iblu01.portallauncher.ui.LocalCallService
+import com.iblu01.portallauncher.ui.LocalHaStates
+import com.iblu01.portallauncher.ui.components.ChipActionsPanel
+import com.iblu01.portallauncher.ui.components.MediaPlayerView
+import com.iblu01.portallauncher.ui.components.StatusChip
+import com.iblu01.portallauncher.ui.components.launcherIcon
 import com.iblu01.portallauncher.ui.components.appleClickable
 import com.iblu01.portallauncher.ui.components.controls.AccessoryGrid
 import com.iblu01.portallauncher.ui.components.controls.AccessoryItem
 import com.iblu01.portallauncher.ui.components.controls.ControlContentLayout
 import com.iblu01.portallauncher.ui.components.controls.FillOrigin
+import com.iblu01.portallauncher.ui.components.controls.HorizontalSegmentedSelector
 import com.iblu01.portallauncher.ui.components.controls.PinKeypad
 import com.iblu01.portallauncher.ui.components.controls.PortalThreeWayControl
 import com.iblu01.portallauncher.ui.components.controls.ThermostatArc
@@ -77,10 +96,17 @@ import com.iblu01.portallauncher.ui.components.controls.VerticalSegmentedSelecto
 import com.iblu01.portallauncher.ui.components.controls.VerticalSwitch
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import org.json.JSONObject
 
 /** Named accents so adaptivity is obvious at a glance. */
 
 private enum class Presence { HOME, AWAY, OFF }
+
+private sealed interface FakePanelSelection {
+    val id: String
+    data class Chip(val chip: LauncherChip) : FakePanelSelection { override val id = chip.id }
+    data class Media(val media: PlayingMedia) : FakePanelSelection { override val id = "media_group" }
+}
 
 /**
  * Dev-only gallery: every reusable control from
@@ -99,11 +125,18 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         stringResource(R.string.playground_swatch_gray) to Color(0xFFD8D8DA),
     )
     var accent by remember { mutableStateOf(accentSwatches.first().second) }
+    var selectedFakePanel by remember { mutableStateOf<FakePanelSelection?>(null) }
+    val contentWidth by animateFloatAsState(
+        targetValue = if (selectedFakePanel == null) 1f else 0.67f,
+        animationSpec = tween(500),
+        label = "playgroundPanelWidth",
+    )
 
+    Box(Modifier.fillMaxSize().background(AppleColors.background)) {
     Column(
         Modifier
-            .fillMaxSize()
-            .background(AppleColors.background)
+            .fillMaxHeight()
+            .fillMaxWidth(contentWidth)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
@@ -156,6 +189,13 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                 }
             }
         }
+
+        Spacer(Modifier.height(28.dp))
+
+        FakePanelLab(
+            selected = selectedFakePanel,
+            onSelect = { next -> selectedFakePanel = next.takeUnless { it.id == selectedFakePanel?.id } },
+        )
 
         Spacer(Modifier.height(28.dp))
 
@@ -304,6 +344,35 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                 )
             }
         }
+        Spacer(Modifier.height(16.dp))
+        var horizontalSelection by remember { mutableStateOf(Presence.HOME) }
+        val horizontalHomeLabel = stringResource(R.string.playground_presence_home)
+        val horizontalAwayLabel = stringResource(R.string.playground_presence_away)
+        val horizontalOffLabel = stringResource(R.string.playground_presence_off)
+        LabeledControl(stringResource(R.string.playground_selector_horizontal)) {
+            HorizontalSegmentedSelector(
+                options = Presence.entries.toList(),
+                selected = horizontalSelection,
+                onSelect = { horizontalSelection = it },
+                label = {
+                    when (it) {
+                        Presence.HOME -> horizontalHomeLabel
+                        Presence.AWAY -> horizontalAwayLabel
+                        Presence.OFF -> horizontalOffLabel
+                    }
+                },
+                icon = {
+                    when (it) {
+                        Presence.HOME -> Icons.Filled.Home
+                        Presence.AWAY -> Icons.Filled.DirectionsRun
+                        Presence.OFF -> Icons.Filled.Block
+                    }
+                },
+                accent = accent,
+                isNeutral = { it == Presence.OFF },
+                modifier = Modifier.width(280.dp),
+            )
+        }
 
         Spacer(Modifier.height(28.dp))
 
@@ -392,7 +461,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
             label = {
                 when (it) {
                     ThermostatMode.OFF -> thermoOffLabel; ThermostatMode.COOL -> thermoCoolLabel
-                    ThermostatMode.HEAT -> thermoHeatLabel; ThermostatMode.HEAT_COOL -> thermoAutoLabel
+                    ThermostatMode.HEAT -> thermoHeatLabel; ThermostatMode.AUTO, ThermostatMode.HEAT_COOL -> thermoAutoLabel
                 }
             },
             accent = accent,
@@ -504,7 +573,127 @@ fun PlaygroundScreen(onBack: () -> Unit) {
 
         Spacer(Modifier.height(40.dp))
     }
+
+        selectedFakePanel?.let { selection ->
+            val entities = rememberFakePanelEntities()
+            val noOpService = remember {
+                object : CallService {
+                    override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) = Unit
+                }
+            }
+            CompositionLocalProvider(
+                LocalCallService provides noOpService,
+                LocalHaStates provides entities,
+                LocalAreas provides emptyMap(),
+            ) {
+                when (selection) {
+                    is FakePanelSelection.Chip -> ChipActionsPanel(
+                        chip = selection.chip,
+                        onDismiss = { selectedFakePanel = null },
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f),
+                    )
+                    is FakePanelSelection.Media -> MediaPlayerView(
+                        media = selection.media,
+                        secondaryMedia = emptyList(),
+                        haToken = "",
+                        onPlayPause = {}, onPrevious = {}, onNext = {},
+                        onVolumeChange = { _, _ -> },
+                        onSecondaryPlayPause = {}, onSecondaryPrevious = {}, onSecondaryNext = {},
+                        onSelectSecondary = {}, onSwipePlayer = {}, onJoinPlayer = {}, onUnjoinPlayer = {},
+                        onDismiss = { selectedFakePanel = null },
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f),
+                    )
+                }
+            }
+        }
+    }
 }
+
+/** Real side-panel routing fed by local fake HA entities, for interaction testing offline. */
+@Composable
+private fun FakePanelLab(selected: FakePanelSelection?, onSelect: (FakePanelSelection) -> Unit) {
+    val chips = remember {
+        listOf(
+            LauncherChip("lights_group", "light", "Lumières", "3 allumées", "active", details = listOf(
+                PillDetail("Salon", "72 %", "light.salon", true),
+                PillDetail("Cuisine", "Éteinte", "light.cuisine", false),
+            ), kind = PillKind.LIGHTS),
+            LauncherChip("purifier_group", "air", "Purificateur", "Auto · air bon", "active", entityId = "fan.purificateur", kind = PillKind.PURIFIER,
+                details = listOf(PillDetail("Filtre", "82 %"))),
+            LauncherChip("scenes_group", "scene", "Scènes", "4 ambiances", "ok", kind = PillKind.SCENE, details = listOf(
+                PillDetail("Soirée", "", "scene.soiree"), PillDetail("Lecture", "", "scene.lecture"),
+                PillDetail("Cinéma", "", "scene.cinema"), PillDetail("Tout éteindre", "", "script.tout_eteindre"),
+            )),
+            LauncherChip("lock_test", "lock", "Porte d’entrée", "Verrouillée", "ok", entityId = "lock.entree", kind = PillKind.LOCK),
+            LauncherChip("cover_test", "cover", "Volet salon", "64 %", "active", entityId = "cover.salon", kind = PillKind.COVER),
+            LauncherChip("thermostat_test", "temperature", "Thermostat", "21,5 °C", "active", entityId = "climate.salon", kind = PillKind.THERMOSTAT),
+            LauncherChip("vacuum_test", "vacuum", "Aspirateur", "Nettoyage", "active", entityId = "vacuum.romy", kind = PillKind.VACUUM, batteryPercent = 78),
+            LauncherChip("fan_test", "fan", "Ventilateur %", "40 %", "active", entityId = "fan.chambre", kind = PillKind.FAN),
+            LauncherChip("fan_on_off_test", "fan", "Ventilateur simple", "Allumé", "active", entityId = "fan.bureau", kind = PillKind.FAN),
+            LauncherChip("fan_modes_test", "fan", "Ventilateur 3 vitesses", "Niveau 2", "active", entityId = "fan.plafond", kind = PillKind.FAN),
+            LauncherChip("switch_test", "switch", "Prise TV", "Allumée", "active", entityId = "switch.tv", kind = PillKind.SWITCH),
+            LauncherChip("alarm_test", "shield", "Alarme", "Désarmée", "info", entityId = "alarm_control_panel.maison", kind = PillKind.SAFETY),
+            LauncherChip("washer_test", "washer", "Machine à laver", "Rinçage", "active", entityId = "sensor.lave_linge_state", kind = PillKind.APPLIANCE,
+                progress = 0.62f, details = listOf(PillDetail("Cycle", "Coton"), PillDetail("Fin estimée", "14:35"), PillDetail("Essorage", "1 200 tr/min"))),
+            LauncherChip("air_group", "air", "Qualité de l’air", "Bonne · 620 ppm", "active", details = listOf(
+                PillDetail("CO₂", "620 ppm"), PillDetail("Humidité", "46 %"), PillDetail("PM2.5", "4 µg/m³"),
+            ), kind = PillKind.AIR),
+            LauncherChip("generic_test", "sensor", "Capteur balcon", "18,2 °C", "info", kind = PillKind.GENERIC,
+                details = listOf(PillDetail("Température", "18,2 °C"), PillDetail("Humidité", "61 %"))),
+            LauncherChip("media_group", "media", "Musique", "Midnight City", "active", entityId = "media_player.salon", kind = PillKind.MEDIA),
+        )
+    }
+    val fakeMedia = remember {
+        PlayingMedia(
+            entityId = "media_player.salon", title = "Midnight City", artist = "M83",
+            album = "Hurry Up, We're Dreaming", state = "playing", coverUrl = null,
+            volumePercent = 38, isMuted = false, playerNames = listOf("Salon"),
+            players = listOf(MediaPlayerVolume("media_player.salon", "Salon", 38, false)),
+        )
+    }
+    SectionTitle(stringResource(R.string.playground_section_fake_panels))
+    Text(stringResource(R.string.playground_fake_panels_hint), style = AppleTypography.bodySmall, color = AppleColors.secondary)
+    Spacer(Modifier.height(14.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        chips.chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)) {
+                row.forEach { chip ->
+                    StatusChip(
+                        chip = chip,
+                        selected = selected?.id == chip.id,
+                        onClick = {
+                            onSelect(if (chip.id == "media_group") FakePanelSelection.Media(fakeMedia) else FakePanelSelection.Chip(chip))
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberFakePanelEntities(): Map<String, HaEntity> = remember {
+    listOf(
+        fakeEntity("light.salon", "on", "Salon", "{\"brightness\":184,\"color_temp_kelvin\":3800,\"supported_color_modes\":[\"color_temp\"]}"),
+        fakeEntity("light.cuisine", "off", "Cuisine", "{\"brightness\":0}"),
+        fakeEntity("fan.purificateur", "on", "Purificateur", "{\"preset_mode\":\"auto\",\"preset_modes\":[\"auto\",\"sleep\",\"manual\",\"pet\"]}"),
+        fakeEntity("person.alex", "home", "Alex", "{}"),
+        fakeEntity("sensor.house_power", "846", "Puissance maison", "{\"unit_of_measurement\":\"W\"}"),
+        fakeEntity("lock.entree", "locked", "Porte d’entrée", "{}"),
+        fakeEntity("cover.salon", "open", "Volet salon", "{\"current_position\":64,\"supported_features\":15}"),
+        fakeEntity("climate.salon", "heat", "Thermostat", "{\"current_temperature\":20.8,\"temperature\":21.5,\"min_temp\":7,\"max_temp\":35,\"hvac_modes\":[\"off\",\"heat\",\"cool\",\"heat_cool\"]}"),
+        fakeEntity("vacuum.romy", "cleaning", "Romy", "{\"battery_level\":78,\"fan_speed\":\"standard\",\"fan_speed_list\":[\"silent\",\"standard\",\"turbo\"]}"),
+        fakeEntity("fan.chambre", "on", "Ventilateur", "{\"percentage\":40,\"percentage_step\":10,\"supported_features\":1}"),
+        fakeEntity("fan.bureau", "on", "Ventilateur bureau", "{}"),
+        fakeEntity("fan.plafond", "on", "Ventilateur plafond", "{\"preset_mode\":\"2\",\"preset_modes\":[\"1\",\"2\",\"3\"],\"supported_features\":8}"),
+        fakeEntity("switch.tv", "on", "Prise TV", "{}"),
+        fakeEntity("alarm_control_panel.maison", "disarmed", "Alarme maison", "{\"code_format\":\"number\",\"code_arm_required\":false,\"supported_features\":15}"),
+        fakeEntity("sensor.lave_linge_state", "rinse", "Machine à laver", "{}"),
+    ).associateBy { it.entityId }
+}
+
+private fun fakeEntity(id: String, state: String, name: String, attributes: String): HaEntity =
+    HaEntity(id, state, JSONObject(attributes).put("friendly_name", name))
 
 @Composable
 private fun SectionTitle(text: String) {

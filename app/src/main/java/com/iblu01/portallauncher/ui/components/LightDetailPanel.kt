@@ -232,26 +232,12 @@ fun LightDetailContent(detail: PillDetail, onBack: () -> Unit) {
 
 @Composable
 private fun DetailHeader(label: String, onBack: () -> Unit) {
-    var pressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (pressed) AppleMotion.PRESS_SCALE else 1f, AppleMotion.spring(), label = "backScale")
-    Box(Modifier.fillMaxWidth().height(40.dp)) {
-        Box(
-            Modifier.align(Alignment.CenterStart).scale(scale).size(40.dp).clip(CircleShape)
-                .background(AppleColors.frostedFill).border(0.5.dp, AppleColors.frostedBorder, CircleShape)
-                .pointerInput(onBack) {
-                    detectTapGestures(onPress = { pressed = true; tryAwaitRelease(); pressed = false }, onTap = { onBack() })
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour aux lumières", tint = AppleColors.primary, modifier = Modifier.size(19.dp))
-        }
-        Text(
-            label, style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.secondary,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.Center).clip(AppleShapes.pill).background(AppleColors.frostedFill)
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill).padding(horizontal = 14.dp, vertical = 7.dp),
-        )
-    }
+    PanelHeader(
+        title = label,
+        onNavigation = onBack,
+        navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
+        navigationContentDescription = "Retour aux lumières",
+    )
 }
 
 @Composable

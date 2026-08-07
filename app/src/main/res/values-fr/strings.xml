@@ -183,6 +183,7 @@
     <string name="header_settings_content_desc">Réglages</string>
     <string name="auto_return_pill_label">Fermeture auto</string>
     <string name="auto_return_cancel_desc">Annuler</string>
+    <string name="bg_mode_system">Fond d’écran Android</string>
     <string name="bg_mode_neutral">Neutre</string>
     <string name="bg_mode_nature">Nature (Unsplash)</string>
     <string name="bg_mode_custom">Photo perso</string>
@@ -311,13 +312,18 @@
     <string name="cover_button_close">Fermer</string>
 
     <!-- ===== THERMOSTAT PANEL ===== -->
-    <string name="thermostat_current_temp_format">actuel %1$s</string>
     <string name="hvac_mode_off">Éteint</string>
     <string name="hvac_mode_heat">Chauffe</string>
     <string name="hvac_mode_cool">Froid</string>
     <string name="hvac_mode_auto">Auto</string>
     <string name="hvac_mode_dry">Sec</string>
     <string name="hvac_mode_fan_only">Ventil.</string>
+    <string name="thermostat_status_heating">Chauffage en cours</string>
+    <string name="thermostat_status_cooling">Refroidissement en cours</string>
+    <string name="thermostat_status_reached">Température atteinte</string>
+    <string name="thermostat_status_hold_between">MAINTENIR ENTRE</string>
+    <string name="thermostat_room_temperature">Température ambiante</string>
+    <string name="thermostat_room_temperature_format">Pièce · %1$s%2$s</string>
 
     <!-- ===== VACUUM PANEL ===== -->
     <string name="vacuum_button_start">Démarrer</string>
@@ -389,6 +395,8 @@
     <string name="playground_subtitle">Banc d\'essai des contrôles</string>
     <string name="playground_accent_color_label">Couleur d\'accent</string>
     <string name="playground_section_vertical_slider">Curseur vertical</string>
+    <string name="playground_section_fake_panels">Laboratoire de panneaux</string>
+    <string name="playground_fake_panels_hint">Touchez un faux appareil pour ouvrir son vrai panneau latéral. Les actions restent locales et ne contactent jamais Home Assistant.</string>
     <string name="playground_slider_from_bottom">Depuis le bas</string>
     <string name="playground_slider_from_top">Depuis le haut</string>
     <string name="playground_slider_disabled">Désactivé</string>
@@ -402,6 +410,7 @@
     <string name="playground_selector_auto">Auto</string>
     <string name="playground_selector_manual">Manuel</string>
     <string name="playground_selector_icon_stacked">Icône empilée</string>
+    <string name="playground_selector_horizontal">Sélecteur horizontal</string>
     <string name="playground_presence_home">Au domicile</string>
     <string name="playground_presence_away">Absent</string>
     <string name="playground_presence_off">Désactivée</string>
@@ -450,6 +459,7 @@
     <string name="toast_app_not_found_label_format">Application introuvable : %1$s</string>
     <string name="toast_cannot_open_app_format">Impossible d\'ouvrir %1$s</string>
     <string name="toast_choose_wallpaper">Choisir un fond d\'écran</string>
+    <string name="toast_cannot_open_wallpaper_picker">Aucun sélecteur de fond d’écran n’est disponible sur cet appareil</string>
     <string name="toast_permissions_ok">Permissions OK</string>
     <string name="toast_shortcut_added_format">Raccourci ajouté : %1$s</string>
 
@@ -873,4 +883,7 @@
     <string name="settings_wallpaper_replace_photo">Remplacer la photo</string>
     <string name="settings_wallpaper_photo_missing">Aucune photo choisie</string>
     <string name="settings_wallpaper_photo_error">Cette image n\'a pas pu être lue. Essayez-en une autre.</string>
+    <string name="settings_wallpaper_android_section">ANDROID</string>
+    <string name="settings_wallpaper_android_change">Choisir un autre fond d’écran Android</string>
+    <string name="settings_wallpaper_sources_hint">Choisissez l’ambiance affichée derrière l’horloge et les apps.</string>
 </resources>

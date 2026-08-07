@@ -41,6 +41,15 @@ import androidx.compose.ui.res.stringResource
 /** A room the robot knows about. [icon] is optional. */
 data class VacuumRoom(val id: String, val name: String, val icon: ImageVector? = null)
 
+/** Secondary vacuum command rendered by [VacuumActionChips]. */
+data class VacuumAction(
+    val id: String,
+    val label: String,
+    val icon: ImageVector,
+    val active: Boolean = false,
+    val onClick: () -> Unit,
+)
+
 /** Cleaning mode, à la Roborock / iOS Home. */
 enum class VacuumMode { VACUUM, VACUUM_AND_MOP, VACUUM_THEN_MOP, MOP }
 
@@ -108,6 +117,44 @@ fun VacuumStatusChip(
             style = AppleTypography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = if (prominent) AppleColors.primary else AppleColors.secondary,
         )
+    }
+}
+
+/** Reusable secondary command strip for stop, dock, locate and integration-specific actions. */
+@Composable
+fun VacuumActionChips(
+    actions: List<VacuumAction>,
+    modifier: Modifier = Modifier,
+    accent: Color = AppleColors.accent,
+) {
+    Row(
+        modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        actions.forEach { action ->
+            val background = if (action.active) accent else AppleColors.frostedFill
+            val content = if (action.active) contentColorOn(accent) else AppleColors.secondary
+            Row(
+                Modifier
+                    .clip(AppleShapes.pill)
+                    .background(background, AppleShapes.pill)
+                    .border(0.5.dp, if (action.active) accent else AppleColors.frostedBorder, AppleShapes.pill)
+                    .appleClickable(action.onClick)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Icon(action.icon, null, tint = content, modifier = Modifier.size(18.dp))
+                Text(
+                    action.label,
+                    style = AppleTypography.bodyLarge.copy(
+                        fontWeight = if (action.active) FontWeight.SemiBold else FontWeight.Normal,
+                    ),
+                    color = content,
+                )
+            }
+        }
     }
 }
 

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.AlertDialog
@@ -149,13 +150,14 @@ interface SettingsCallbacks {
     fun onConnectionEdited()
     fun onGrantPermissions()
     fun onSetBackgroundMode(mode: String)
+    fun onOpenSystemWallpaperPicker()
     fun onOpenOpacityPreview()
     fun onOpenClockTheme()
     fun onLoadPillEntities()
     fun onSetPillEnabled(candidates: List<PillCandidate>, enabled: Boolean)
 }
 
-private enum class SettingsPage { MAIN, HOME, PILLS, APPLICATION, DEVELOPER, INFORMATION }
+private enum class SettingsPage { MAIN, HOME, PILLS, WALLPAPER, APPLICATION, DEVELOPER, INFORMATION }
 private enum class UpdateState { IDLE, CHECKING, UP_TO_DATE, DOWNLOADING, ERROR }
 
 /** Best-effort host extraction used to pre-fill the MQTT broker from the HA address. */
@@ -368,6 +370,16 @@ fun SettingsScreen(
                 onBack = { currentPage = SettingsPage.MAIN },
                 showBack = showBack,
             )
+            SettingsPage.WALLPAPER -> WallpaperPage(
+                prefs = prefs,
+                bgMode = bgMode,
+                onBgModeChange = { bgMode = it; callbacks.onSetBackgroundMode(it) },
+                bgOverlayOpacity = bgOverlayOpacity,
+                onOpenOpacityPreview = callbacks::onOpenOpacityPreview,
+                onOpenSystemWallpaperPicker = callbacks::onOpenSystemWallpaperPicker,
+                onBack = { currentPage = SettingsPage.MAIN },
+                showBack = showBack,
+            )
             SettingsPage.PILLS -> PillsSettingsPage(
                 uiState = uiState,
                 onRefresh = callbacks::onLoadPillEntities,
@@ -404,6 +416,7 @@ fun SettingsScreen(
                     val sidebarItems = listOf(
                         Triple(SettingsPage.HOME, Icons.Outlined.Home, stringResource(R.string.settings_tile_home_title)),
                         Triple(SettingsPage.PILLS, Icons.Outlined.Dashboard, stringResource(R.string.settings_tile_pills_title)),
+                        Triple(SettingsPage.WALLPAPER, Icons.Outlined.Wallpaper, stringResource(R.string.settings_tile_wallpaper_title)),
                         Triple(SettingsPage.APPLICATION, Icons.Outlined.Settings, stringResource(R.string.settings_tile_app_title)),
                         Triple(SettingsPage.DEVELOPER, Icons.Outlined.Build, stringResource(R.string.settings_tile_dev_title)),
                         Triple(SettingsPage.INFORMATION, Icons.Outlined.Info, stringResource(R.string.settings_tile_info_title)),
@@ -457,6 +470,7 @@ private fun MainPage(homeSubtitle: String, onNavigate: (SettingsPage) -> Unit) {
     val tiles = listOf(
         TileDef(SettingsPage.HOME, Icons.Outlined.Home, stringResource(R.string.settings_tile_home_title), homeSubtitle),
         TileDef(SettingsPage.PILLS, Icons.Outlined.Dashboard, stringResource(R.string.settings_tile_pills_title), stringResource(R.string.settings_tile_pills_subtitle)),
+        TileDef(SettingsPage.WALLPAPER, Icons.Outlined.Wallpaper, stringResource(R.string.settings_tile_wallpaper_title), stringResource(R.string.settings_tile_wallpaper_subtitle)),
         TileDef(SettingsPage.APPLICATION, Icons.Outlined.Settings, stringResource(R.string.settings_tile_app_title), stringResource(R.string.settings_tile_app_subtitle)),
         TileDef(SettingsPage.DEVELOPER, Icons.Outlined.Build, stringResource(R.string.settings_tile_dev_title), stringResource(R.string.settings_tile_dev_subtitle)),
         TileDef(SettingsPage.INFORMATION, Icons.Outlined.Info, stringResource(R.string.settings_tile_info_title), stringResource(R.string.settings_tile_info_subtitle)),
@@ -679,22 +693,9 @@ private fun AppPage(
             )
         }
 
-        SettingsSection(title = stringResource(R.string.settings_app_section_wallpaper)) {
-            backgroundModes.forEach { (key, label) ->
-                SettingsRow(label = stringResource(label), value = if (key == bgMode) "✓" else "", onClick = { onBgModeChange(key) })
-                if (key != backgroundModes.last().first) SettingsDivider()
-            }
-            if (bgMode != "neutral") {
-                SettingsDivider()
-                SettingsRow(
-                    label = stringResource(R.string.settings_app_label_overlay_opacity),
-                    value = "${(bgOverlayOpacity * 100).toInt()} %",
-                    onClick = onOpenOpacityPreview,
-                )
-            }
-        }
-
-        if (bgMode == "immich") {
+        // Wallpaper owns its own top-level settings destination. Keep the legacy Immich editor
+        // unreachable here until its remaining state is fully moved out of this composable.
+        if (false && bgMode == "immich") {
             SettingsSection(title = stringResource(R.string.settings_immich_section)) {
                 SettingsTextField(
                     label = stringResource(R.string.settings_immich_url),
@@ -925,7 +926,7 @@ private fun SessionClassificationDialog(
 }
 
 @Composable
-private fun ImmichAlbumPickerDialog(
+internal fun ImmichAlbumPickerDialog(
     albums: List<PhotoAlbum>,
     selected: Set<String>,
     onDismiss: () -> Unit,
@@ -987,7 +988,7 @@ private fun ImmichAlbumPickerDialog(
 }
 
 @Composable
-private fun IntPresetDialog(
+internal fun IntPresetDialog(
     title: String,
     values: List<Int>,
     suffix: String,
@@ -1197,4 +1198,3 @@ private fun InformationPage(
         }
     }
 }
-

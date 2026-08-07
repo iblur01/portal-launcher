@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.appwidget.AppWidgetManager
+import android.app.WallpaperManager
 import android.os.Environment
 import android.provider.Settings
 import android.view.MotionEvent
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -121,6 +123,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import androidx.compose.runtime.snapshotFlow
 
 @AndroidEntryPoint
 class LauncherActivity : ComponentActivity() {
@@ -345,6 +350,10 @@ class LauncherActivity : ComponentActivity() {
     }
 
     private fun setWallpaper() {
+        // The Android picker changes the system wallpaper, so switch Portal to the matching source
+        // before leaving. This also makes live wallpapers visible as soon as their preview applies.
+        prefs.backgroundMode = "system"
+        SettingsChangeBus.get().emit("backgroundMode")
         openFromLauncher(
             Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), getString(R.string.toast_choose_wallpaper))
         )
@@ -488,6 +497,29 @@ private fun PortalLauncherApp(
         derivedStateOf { appPageCount(placedItems.value, spare = gridDrag.isDragging) }
     }
     val pagerState = rememberLauncherPagerState { appPages.value }
+
+    // Match Launcher3's wallpaper protocol: advertise the horizontal page step and continuously
+    // report the pager position. WallpaperService handles static and live wallpaper movement;
+    // failures are intentionally ignored because some fixed-wallpaper OEM implementations reject
+    // offsets even though displaying the wallpaper still works.
+    val hostView = LocalView.current
+    LaunchedEffect(hostView, pagerState, appPages.value, backgroundMode) {
+        if (backgroundMode != "system") return@LaunchedEffect
+        val manager = WallpaperManager.getInstance(hostView.context)
+        val pageCount = (PAGE_FIRST_APP + appPages.value).coerceAtLeast(1)
+        val xStep = if (pageCount > 1) 1f / (pageCount - 1) else 0f
+        runCatching { manager.setWallpaperOffsetSteps(xStep, 0f) }
+        snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }
+            .map { page ->
+                if (pageCount > 1) (page / (pageCount - 1)).coerceIn(0f, 1f) else 0.5f
+            }
+            .distinctUntilChanged()
+            .collect { x ->
+                hostView.windowToken?.let { token ->
+                    runCatching { manager.setWallpaperOffsets(token, x, 0.5f) }
+                }
+            }
+    }
 
     LaunchedEffect(Unit) {
         SettingsChangeBus.get().changes.collect { key ->
@@ -720,9 +752,14 @@ private fun PortalLauncherApp(
 
     // Only the media chip hides when its panel is open — other chips stay visible.
     val mediaChipId = if (panelContent is PanelContent.Media) "media_group" else null
-    // Placement (design §7) decides tray vs floating; the media chip hides while its panel is open.
+    // Presence only renders through the top-left ambient indicator. Energy stays available to the
+    // data layer but has no launcher pill; the media chip hides while its panel is open.
     val presenceChip = chips.firstOrNull { it.chipPlacement() == ChipPlacement.FLOATING }
-    val visibleChips = chips.filterNot { it.id == mediaChipId || it.chipPlacement() == ChipPlacement.FLOATING }
+    val visibleChips = chips.filterNot {
+        it.id == mediaChipId ||
+            it.chipPlacement() == ChipPlacement.FLOATING ||
+            it.kind == PillKind.ENERGY
+    }
     // The selected chip (its panel is open) gets a highlighted style in the tray.
     val selectedChipKey = (panel.request as? PanelRequest.Chip)?.key
 
