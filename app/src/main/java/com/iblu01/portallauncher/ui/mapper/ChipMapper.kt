@@ -31,8 +31,6 @@ fun LauncherChip.toPanelKind(): PanelKind = when {
     kind == PillKind.VALVE -> PanelKind.VALVE
     kind == PillKind.SIREN -> PanelKind.SIREN
     kind == PillKind.LAWN_MOWER -> PanelKind.LAWN_MOWER
-    kind in setOf(PillKind.BUTTON, PillKind.NUMBER, PillKind.SELECT) -> PanelKind.ENTITY_CONTROL
-    kind == PillKind.CAMERA -> PanelKind.CAMERA
     // alarm-vs-generic-safety split resolved here (was SidePanel.kt:179).
     kind == PillKind.SAFETY && entityId.startsWith("alarm_control_panel.") -> PanelKind.ALARM
     else -> PanelKind.GENERIC_DETAILS

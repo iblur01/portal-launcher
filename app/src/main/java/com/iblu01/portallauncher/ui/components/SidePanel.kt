@@ -127,7 +127,7 @@ private fun ChipActionsContent(
         PanelKind.VACUUM -> false // The reusable vacuum status chip owns the active state.
         PanelKind.WASHER -> false // The washer dial owns progress, phase and remaining time.
         PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
-        PanelKind.LAWN_MOWER, PanelKind.ENTITY_CONTROL, PanelKind.CAMERA -> false
+        PanelKind.LAWN_MOWER -> false
         PanelKind.COVER -> entity?.let {
             !it.supports(CoverFeature.SET_POSITION) || it.attributes.optInt("current_position", -1) !in 0..100
         } != false
@@ -206,7 +206,6 @@ private fun ChipActionsContent(
                 PanelKind.WASHER -> WasherControl(chip)
                 PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
                 PanelKind.LAWN_MOWER -> Unit // Bounded branch above.
-                PanelKind.ENTITY_CONTROL, PanelKind.CAMERA -> GenericHaEntityControl(chip)
                 // AIR_QUALITY is rendered full-screen upstream in ChipActionsPanel; MEDIA/WEATHER
                 // are separate PanelContent types and never reach the chip-actions router.
                 PanelKind.AIR_QUALITY, PanelKind.MEDIA, PanelKind.WEATHER,

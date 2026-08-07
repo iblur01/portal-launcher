@@ -355,7 +355,6 @@ class PillPriorityEngine(private val context: Context) {
             PillKind.VALVE -> { visual = if (s == "closed") "ok" else "active"; score = if (s == "closed") 8 else rule.kind.basePriority }
             PillKind.SIREN -> { visual = if (s == "on") "critical" else "ok"; score = if (s == "on") 92 else 8 }
             PillKind.LAWN_MOWER -> { visual = if (s in setOf("mowing", "returning")) "active" else if (s == "error") "critical" else "ok" }
-            PillKind.BUTTON, PillKind.NUMBER, PillKind.SELECT, PillKind.CAMERA -> { visual = if (s == "on" || s == "streaming" || s == "recording") "active" else "info" }
             PillKind.LIGHTS, PillKind.MEDIA, PillKind.PURIFIER, PillKind.CLIMATE, PillKind.SCENE, PillKind.PRESENCE -> visible = false
             PillKind.GENERIC -> when {
                 e.domain == "binary_sensor" && e.deviceClass == "connectivity" -> {

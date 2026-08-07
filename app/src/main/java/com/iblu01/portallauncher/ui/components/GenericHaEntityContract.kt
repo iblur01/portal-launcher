@@ -37,12 +37,6 @@ fun HaEntity.toGenericControlContract(): GenericHaEntityContract {
         if (attributes.has(key)) attributes.optDouble(key).takeUnless(Double::isNaN)?.toFloat() else null
     }
     return when (domain) {
-        "number", "input_number" -> GenericHaEntityContract(domain, state.toFloatOrNull(),
-            number("min") ?: 0f, number("max") ?: 100f, number("step") ?: 1f,
-            attributes.optString("unit_of_measurement"), actions = listOf("set_value"))
-        "select", "input_select" -> GenericHaEntityContract(domain, options = options("options"),
-            selectedOption = state, actions = listOf("select_option"))
-        "button", "input_button" -> GenericHaEntityContract(domain, actions = listOf("press"))
         "humidifier" -> GenericHaEntityContract(domain, number("humidity", "target_humidity"),
             number("min_humidity") ?: 0f, number("max_humidity") ?: 100f,
             number("target_humidity_step") ?: 1f, "%", options("available_modes"),
@@ -59,7 +53,6 @@ fun HaEntity.toGenericControlContract(): GenericHaEntityContract {
             selectedOption = attributes.optString("tone").takeIf(String::isNotBlank),
             actions = buildList { add("turn_on"); add("turn_off"); if (features and SirenFeature.TONES != 0) add("tone"); if (features and SirenFeature.DURATION != 0) add("duration"); if (features and SirenFeature.VOLUME_SET != 0) add("volume_level") })
         "lawn_mower" -> GenericHaEntityContract(domain, actions = buildList { if (features and LawnMowerFeature.START_MOWING != 0) add("start_mowing"); if (features and LawnMowerFeature.PAUSE != 0) add("pause"); if (features and LawnMowerFeature.DOCK != 0) add("dock") })
-        "camera" -> GenericHaEntityContract(domain, actions = buildList { if (features and 1 != 0) { add("turn_on"); add("turn_off") }; if (features and 2 != 0) add("stream") })
         else -> GenericHaEntityContract(domain)
     }
 }

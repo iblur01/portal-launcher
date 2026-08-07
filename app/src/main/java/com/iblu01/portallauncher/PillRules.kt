@@ -28,10 +28,6 @@ enum class PillKind(val label: String, val icon: String, val basePriority: Int) 
     VALVE("Vanne", "valve", 30),
     SIREN("Sirène", "shield", 45),
     LAWN_MOWER("Robot tondeuse", "mower", 28),
-    BUTTON("Action", "button", 12),
-    NUMBER("Réglage", "number", 12),
-    SELECT("Mode", "select", 12),
-    CAMERA("Caméra", "camera", 22),
     GENERIC("Information", "sensor", 15),
 }
 
@@ -86,9 +82,9 @@ data class PillRule(
  * families, so the settings page doesn't expose HA jargon to the user.
  */
 enum class PillFamily(val label: String, val kinds: Set<PillKind>) {
-    SECURITY("Sécurité & accès", setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING, PillKind.SIREN, PillKind.CAMERA)),
+    SECURITY("Sécurité & accès", setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING, PillKind.SIREN)),
     COMFORT("Confort & air", setOf(PillKind.CLIMATE, PillKind.THERMOSTAT, PillKind.AIR, PillKind.PURIFIER, PillKind.FAN, PillKind.COVER, PillKind.HUMIDIFIER, PillKind.WATER_HEATER)),
-    APPLIANCES("Appareils & énergie", setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.ENERGY, PillKind.BATTERY, PillKind.VALVE, PillKind.LAWN_MOWER, PillKind.BUTTON, PillKind.NUMBER, PillKind.SELECT)),
+    APPLIANCES("Appareils & énergie", setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.ENERGY, PillKind.BATTERY, PillKind.VALVE, PillKind.LAWN_MOWER)),
     LIGHTS_SCENES("Lumières & scènes", setOf(PillKind.LIGHTS, PillKind.SCENE)),
     MEDIA("Médias", setOf(PillKind.MEDIA)),
     HOME("Maison & présence", setOf(PillKind.PRESENCE, PillKind.TIMER, PillKind.GENERIC));
@@ -216,10 +212,6 @@ object PillSupport {
         e.domain == "valve" -> PillKind.VALVE
         e.domain == "siren" -> PillKind.SIREN
         e.domain == "lawn_mower" -> PillKind.LAWN_MOWER
-        e.domain in setOf("button", "input_button") -> PillKind.BUTTON
-        e.domain in setOf("number", "input_number") -> PillKind.NUMBER
-        e.domain in setOf("select", "input_select") -> PillKind.SELECT
-        e.domain == "camera" -> PillKind.CAMERA
         e.domain in setOf("switch", "input_boolean") -> PillKind.SWITCH
         e.domain == "cover" -> PillKind.COVER
         e.domain == "scene" || e.domain == "script" -> PillKind.SCENE
