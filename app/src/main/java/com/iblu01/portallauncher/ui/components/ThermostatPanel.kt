@@ -28,7 +28,6 @@ import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.components.controls.ControlNeutral
-import com.iblu01.portallauncher.ui.components.controls.ThermostatArc
 import com.iblu01.portallauncher.ui.components.controls.ThermostatActivity
 import com.iblu01.portallauncher.ui.components.controls.ThermostatMode
 import com.iblu01.portallauncher.ui.components.controls.WheelPicker
@@ -84,7 +83,7 @@ fun ThermostatControl(chip: LauncherChip) {
 
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         if (climate.hasTemperatureControl && displayedMode !in setOf("dry", "fan_only")) {
-            ThermostatArc(
+            TemperatureArcControl(
                 mode = dialMode,
                 activity = activity,
                 target = target,

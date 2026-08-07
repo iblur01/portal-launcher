@@ -49,6 +49,9 @@ fun PortalThreeWayControl(
     leadingLabel: String? = null,
     trailingLabel: String? = null,
     size: ThreeWayControlSize = ThreeWayControlSize.Regular,
+    leadingEnabled: Boolean = true,
+    centerEnabled: Boolean = true,
+    trailingEnabled: Boolean = true,
 ) {
     val metrics = when (size) {
         ThreeWayControlSize.Compact -> ThreeWayMetrics(
@@ -77,9 +80,11 @@ fun PortalThreeWayControl(
             onClick = onLeadingClick,
             buttonSize = metrics.sideButton,
             iconSize = metrics.sideIcon,
+            enabled = leadingEnabled,
         )
         IconButton(
             onClick = onCenterClick,
+            enabled = centerEnabled,
             modifier = Modifier
                 .size(metrics.centerButton)
                 .background(Color.White, CircleShape),
@@ -98,6 +103,7 @@ fun PortalThreeWayControl(
             onClick = onTrailingClick,
             buttonSize = metrics.sideButton,
             iconSize = metrics.sideIcon,
+            enabled = trailingEnabled,
         )
     }
 }
@@ -110,8 +116,9 @@ private fun SideAction(
     onClick: () -> Unit,
     buttonSize: Dp,
     iconSize: Dp,
+    enabled: Boolean,
 ) {
-    IconButton(onClick = onClick, modifier = Modifier.size(buttonSize)) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(buttonSize)) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy((-2).dp),
@@ -119,7 +126,7 @@ private fun SideAction(
             Icon(
                 icon,
                 contentDescription = contentDescription,
-                tint = AppleColors.primary,
+                tint = if (enabled) AppleColors.primary else AppleColors.tertiary,
                 modifier = Modifier.size(iconSize),
             )
             if (label != null) {

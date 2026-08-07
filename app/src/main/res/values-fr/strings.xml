@@ -324,6 +324,17 @@
     <string name="thermostat_status_hold_between">MAINTENIR ENTRE</string>
     <string name="thermostat_room_temperature">Température ambiante</string>
     <string name="thermostat_room_temperature_format">Pièce · %1$s%2$s</string>
+    <string name="valve_state_open">Ouverte</string>
+    <string name="valve_state_closed">Fermée</string>
+    <string name="valve_state_opening">Ouverture…</string>
+    <string name="valve_state_closing">Fermeture…</string>
+    <string name="valve_action_open">Ouvrir</string>
+    <string name="valve_action_stop">Arrêter</string>
+    <string name="valve_action_close">Fermer</string>
+    <string name="siren_state_active">Sirène déclenchée</string>
+    <string name="siren_state_inactive">Sirène prête</string>
+    <string name="siren_action_trigger">Déclencher</string>
+    <string name="siren_action_stop">Arrêter</string>
 
     <!-- ===== VACUUM PANEL ===== -->
     <string name="vacuum_button_start">Démarrer</string>

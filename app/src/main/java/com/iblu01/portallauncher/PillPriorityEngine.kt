@@ -334,6 +334,11 @@ class PillPriorityEngine(private val context: Context) {
             }
             PillKind.SWITCH -> { val on = s == "on"; score = if (on) rule.kind.basePriority else 6; visual = if (on) "active" else "ok" }
             PillKind.FAN -> { val on = s == "on"; score = if (on) rule.kind.basePriority else 5; visual = if (on) "active" else "ok" }
+            PillKind.HUMIDIFIER, PillKind.WATER_HEATER -> { visual = if (s == "off") "ok" else "active" }
+            PillKind.VALVE -> { visual = if (s == "closed") "ok" else "active"; score = if (s == "closed") 8 else rule.kind.basePriority }
+            PillKind.SIREN -> { visual = if (s == "on") "critical" else "ok"; score = if (s == "on") 92 else 8 }
+            PillKind.LAWN_MOWER -> { visual = if (s in setOf("mowing", "returning")) "active" else if (s == "error") "critical" else "ok" }
+            PillKind.BUTTON, PillKind.NUMBER, PillKind.SELECT, PillKind.CAMERA -> { visual = if (s == "on" || s == "streaming" || s == "recording") "active" else "info" }
             PillKind.LIGHTS, PillKind.MEDIA, PillKind.PURIFIER, PillKind.CLIMATE, PillKind.SCENE, PillKind.PRESENCE -> visible = false
             PillKind.GENERIC -> visible = s !in inactive
         }

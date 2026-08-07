@@ -70,7 +70,7 @@ fun SwitchControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 onCheckedChange = { wanted ->
                     if (wanted != displayedOn) {
                         pending = wanted
-                        callService("switch", if (wanted) "turn_on" else "turn_off", chip.entityId)
+                        callService(entity.domain, if (wanted) "turn_on" else "turn_off", chip.entityId)
                     }
                 },
                 accent = AppleColors.active,

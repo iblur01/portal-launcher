@@ -91,4 +91,35 @@ class PillRulesTest {
         assertTrue(PillSupport.isSupported(entity("light.salon", "on")))
         assertEquals(PillKind.LIGHTS, PillSupport.kind(entity("light.salon", "on")))
     }
+
+    @Test fun `official controllable domains are discovered without name heuristics`() {
+        val expected = mapOf(
+            "humidifier.x" to PillKind.HUMIDIFIER, "water_heater.x" to PillKind.WATER_HEATER,
+            "valve.x" to PillKind.VALVE, "siren.x" to PillKind.SIREN,
+            "lawn_mower.x" to PillKind.LAWN_MOWER, "button.x" to PillKind.BUTTON,
+            "number.x" to PillKind.NUMBER, "select.x" to PillKind.SELECT,
+            "camera.x" to PillKind.CAMERA, "device_tracker.x" to PillKind.PRESENCE,
+        )
+        expected.forEach { (id, kind) ->
+            val e = entity(id, "on")
+            assertTrue(id, PillSupport.isSupported(e))
+            assertEquals(id, kind, PillSupport.kind(e))
+        }
+    }
+
+    @Test fun `official binary sensor classes are discovered and classified`() {
+        listOf("motion", "occupancy", "presence", "moving", "vibration", "sound", "running").forEach {
+            assertEquals(PillKind.PRESENCE, PillSupport.kind(entity("binary_sensor.x", "on", it)))
+            assertTrue(PillSupport.isSupported(entity("binary_sensor.x", "on", it)))
+        }
+        listOf("problem", "connectivity", "battery", "battery_charging", "plug", "power", "heat", "cold", "light").forEach {
+            assertTrue(it, PillSupport.isSupported(entity("binary_sensor.x", "on", it)))
+        }
+    }
+
+    @Test fun `extended official sensor classes are discovered`() {
+        listOf("illuminance", "atmospheric_pressure", "co", "co2", "pm1", "pm4", "ozone", "radon", "signal_strength", "water", "volume_storage", "duration", "timestamp").forEach {
+            assertTrue(it, PillSupport.isSupported(entity("sensor.x", "1", it)))
+        }
+    }
 }

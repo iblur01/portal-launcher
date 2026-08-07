@@ -329,6 +329,17 @@
     <string name="thermostat_status_hold_between">HOLD BETWEEN</string>
     <string name="thermostat_room_temperature">Room temperature</string>
     <string name="thermostat_room_temperature_format">Room · %1$s%2$s</string>
+    <string name="valve_state_open">Open</string>
+    <string name="valve_state_closed">Closed</string>
+    <string name="valve_state_opening">Opening…</string>
+    <string name="valve_state_closing">Closing…</string>
+    <string name="valve_action_open">Open</string>
+    <string name="valve_action_stop">Stop</string>
+    <string name="valve_action_close">Close</string>
+    <string name="siren_state_active">Siren sounding</string>
+    <string name="siren_state_inactive">Siren ready</string>
+    <string name="siren_action_trigger">Trigger</string>
+    <string name="siren_action_stop">Stop</string>
 
     <!-- ===== VACUUM PANEL ===== -->
     <string name="vacuum_button_start">Start</string>

@@ -26,6 +26,13 @@ fun LauncherChip.toPanelKind(): PanelKind = when {
     kind == PillKind.FAN -> PanelKind.FAN
     kind == PillKind.SWITCH -> PanelKind.SWITCH
     kind == PillKind.APPLIANCE -> PanelKind.WASHER
+    kind == PillKind.HUMIDIFIER -> PanelKind.HUMIDIFIER
+    kind == PillKind.WATER_HEATER -> PanelKind.WATER_HEATER
+    kind == PillKind.VALVE -> PanelKind.VALVE
+    kind == PillKind.SIREN -> PanelKind.SIREN
+    kind == PillKind.LAWN_MOWER -> PanelKind.LAWN_MOWER
+    kind in setOf(PillKind.BUTTON, PillKind.NUMBER, PillKind.SELECT) -> PanelKind.ENTITY_CONTROL
+    kind == PillKind.CAMERA -> PanelKind.CAMERA
     // alarm-vs-generic-safety split resolved here (was SidePanel.kt:179).
     kind == PillKind.SAFETY && entityId.startsWith("alarm_control_panel.") -> PanelKind.ALARM
     else -> PanelKind.GENERIC_DETAILS
@@ -36,7 +43,7 @@ fun LauncherChip.toPanelKind(): PanelKind = when {
  * its panel. Long-press always opens (handled at the call site via [toPanelKind]).
  */
 fun LauncherChip.toChipAction(): ChipAction = when (kind) {
-    PillKind.SWITCH -> ChipAction.ServiceToggle("switch", "toggle")
+    PillKind.SWITCH -> ChipAction.ServiceToggle(if (entityId.startsWith("input_boolean.")) "input_boolean" else "switch", "toggle")
     PillKind.FAN -> ChipAction.ServiceToggle("fan", "toggle")
     else -> ChipAction.OpenPanel(toPanelKind())
 }
