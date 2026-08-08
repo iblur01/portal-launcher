@@ -108,6 +108,21 @@ class HaIconPackStoreTest {
     }
 
     @Test
+    fun `the access token only travels to Home Assistant itself`() {
+        val ha = "http://192.168.1.87:8123"
+        assertTrue(HaIconPackStore.isSameOrigin("$ha/hacsfiles/custom-brand-icons.js?v=1", ha))
+        assertTrue(HaIconPackStore.isSameOrigin("http://192.168.1.87:8123/local/x.js", "$ha/"))
+
+        // A Lovelace resource is an arbitrary URL from the user's dashboard. None of these is the
+        // same Home Assistant, and a long-lived token must not reach any of them.
+        assertFalse("another host", HaIconPackStore.isSameOrigin("https://cdn.jsdelivr.net/x.js", ha))
+        assertFalse("another port", HaIconPackStore.isSameOrigin("http://192.168.1.87:9999/x.js", ha))
+        assertFalse("another scheme", HaIconPackStore.isSameOrigin("https://192.168.1.87:8123/x.js", ha))
+        assertFalse("no host at all", HaIconPackStore.isSameOrigin("/hacsfiles/x.js", ha))
+        assertFalse("unparseable", HaIconPackStore.isSameOrigin("http://[bad", ha))
+    }
+
+    @Test
     fun `an unchanged module list drops nothing`() {
         writeMiss(IconRef("hue", "ensis"))
         store.invalidateForModules(listOf(brandIcons, someCard))

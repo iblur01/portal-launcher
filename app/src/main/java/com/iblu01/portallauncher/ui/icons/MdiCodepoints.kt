@@ -1,6 +1,7 @@
 package com.iblu01.portallauncher.ui.icons
 
 import android.content.Context
+import android.util.LruCache
 import android.util.Log
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -12,8 +13,8 @@ import java.nio.channels.FileChannel
  * The index is a sorted fixed-width table read **by binary search straight out of the APK**, not a
  * `HashMap`: a screen uses a few dozen icons, and holding all 7447 names on the heap for that would
  * cost roughly a megabyte on wall panels that do not have one to spare. A lookup is ~13 positional
- * reads against a page-cached file, and only resolved glyphs are memoised — including the misses,
- * so an unknown name is never searched twice.
+ * reads against a page-cached file, and only the names actually drawn are memoised — misses
+ * included, so an unknown name is not searched again.
  *
  * The asset must stay uncompressed in the APK (`noCompress += "mdi"` in build.gradle.kts);
  * `openFd` is what makes seeking possible, and it throws on a deflated entry.
@@ -27,7 +28,13 @@ object MdiCodepoints {
     /** Name field + a 3-byte big-endian codepoint (MDI lives in plane 15, up to U+F1D17). */
     private const val RECORD_BYTES = NAME_BYTES + 3
 
-    private val memo = HashMap<String, String?>()
+    /**
+     * Recently resolved glyphs, misses included — [MISS] stands in for "MDI has no such icon", which
+     * an `LruCache` cannot hold as null. Bounded, because an unbounded memo would drift back into
+     * exactly the resident table this whole design exists to avoid.
+     */
+    private val memo = LruCache<String, String>(256)
+    private const val MISS = ""
     private var channel: FileChannel? = null
     private var baseOffset = 0L
     private var recordCount = 0
@@ -52,9 +59,9 @@ object MdiCodepoints {
     /** The font glyph for `name` (a surrogate pair), or null when MDI has no icon by that name. */
     @Synchronized
     fun glyph(context: Context, name: String): String? {
-        if (memo.containsKey(name)) return memo[name]
+        memo.get(name)?.let { return it.takeIf { cached -> cached != MISS } }
         val glyph = lookup(context, name)
-        memo[name] = glyph
+        memo.put(name, glyph ?: MISS)
         return glyph
     }
 

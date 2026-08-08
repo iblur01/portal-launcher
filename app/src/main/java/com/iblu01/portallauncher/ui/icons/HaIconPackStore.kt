@@ -176,13 +176,8 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
             url.startsWith("http://", true) || url.startsWith("https://", true) -> url
             else -> baseUrl.trimEnd('/') + "/" + url.trimStart('/')
         }
-        // The token only ever goes to Home Assistant itself. A Lovelace resource may point at an
-        // external CDN, and a long-lived HA token must not be handed to a third-party host.
-        val sameHost = runCatching {
-            URI(absolute).host.equals(URI(baseUrl).host, ignoreCase = true)
-        }.getOrDefault(false)
         val request = Request.Builder().url(absolute)
-            .apply { if (sameHost && token.isNotBlank()) header("Authorization", "Bearer $token") }
+            .apply { if (isSameOrigin(absolute, baseUrl) && token.isNotBlank()) header("Authorization", "Bearer $token") }
             .build()
 
         var written = 0
@@ -203,8 +198,11 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
                         overflowed = read > MAX_MODULE_BYTES
                         !overflowed
                     }
-                written = IconPackParser.extract(lines, names) { name, width, height, path ->
+                // Counted per icon rather than from the return value: a stream that dies mid-module
+                // throws past the return, and whatever already reached the disk still counts.
+                IconPackParser.extract(lines, names) { name, width, height, path ->
                     write(namespace, name, width, height, path)
+                    written++
                 }
                 if (overflowed) {
                     Log.w(TAG, "icon pack exceeded $MAX_MODULE_BYTES bytes; giving up on $absolute")
@@ -219,7 +217,15 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
         val file = file(IconRef(namespace, name))
         runCatching {
             file.parentFile?.mkdirs()
-            file.writeText("$width $height\n$path")
+            // Written aside and renamed into place: [cached] runs on the composition thread and
+            // would otherwise be able to read a half-written file, throw, and delete the entry —
+            // costing a re-download of the whole module for one icon.
+            val temp = File(file.parentFile, "${file.name}.tmp")
+            temp.writeText("$width $height\n$path")
+            if (!temp.renameTo(file)) {
+                temp.delete()
+                error("rename failed")
+            }
         }.onFailure { Log.w(TAG, "cannot cache $namespace:$name", it) }
     }
 
@@ -251,8 +257,25 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
         }.onFailure { Log.w(TAG, "cannot persist icon pack routes", it) }
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "HaIconPackStore"
+
+        /**
+         * Whether [url] points at the same Home Assistant as [baseUrl], and may therefore carry the
+         * access token.
+         *
+         * A Lovelace resource is an arbitrary URL out of the user's dashboard config — it can point
+         * at a CDN, or at another service on the same machine. Comparing hosts alone would hand a
+         * long-lived HA token to whatever listens on a different port, so scheme and port count too.
+         */
+        internal fun isSameOrigin(url: String, baseUrl: String): Boolean = runCatching {
+            val a = URI(url)
+            val b = URI(baseUrl)
+            fun port(u: URI) = if (u.port != -1) u.port else if (u.scheme.equals("https", true)) 443 else 80
+            a.host != null && a.host.equals(b.host, ignoreCase = true) &&
+                a.scheme.equals(b.scheme, ignoreCase = true) &&
+                port(a) == port(b)
+        }.getOrDefault(false)
         const val CALL_TIMEOUT_S = 60L
         /** Refuse to stream more than this from one module; a runaway resource is not an icon set. */
         const val MAX_MODULE_BYTES = 24L * 1024 * 1024

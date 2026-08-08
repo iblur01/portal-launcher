@@ -14,6 +14,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -60,7 +65,17 @@ fun HaIcon(
             // sp is scaled by the user's font setting; an icon is not text, so divide it back out
             // to land on exactly `size` pixels.
             val fontSize = (size.value * MDI_GLYPH_SCALE / density.fontScale).sp
-            Box(modifier.size(size), contentAlignment = Alignment.Center) {
+            // A glyph carries no description of its own, so the one the caller gave has to be put
+            // back by hand — otherwise this branch is silently less accessible than the vector one.
+            val described = if (contentDescription != null) {
+                modifier.semantics {
+                    this.contentDescription = contentDescription
+                    this.role = Role.Image
+                }
+            } else {
+                modifier.clearAndSetSemantics { }
+            }
+            Box(described.size(size), contentAlignment = Alignment.Center) {
                 Text(
                     text = glyph,
                     color = tint,

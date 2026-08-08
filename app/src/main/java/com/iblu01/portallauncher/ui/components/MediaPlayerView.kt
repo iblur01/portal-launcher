@@ -76,6 +76,8 @@ import com.iblu01.portallauncher.ui.components.controls.PortalThreeWayControl
 import com.iblu01.portallauncher.ui.components.controls.ThreeWayControlSize
 import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
 import com.iblu01.portallauncher.ui.components.controls.controlSize
+import com.iblu01.portallauncher.ui.icons.HaIcon
+import com.iblu01.portallauncher.ui.icons.IconRef
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -285,6 +287,14 @@ fun MediaPlayerView(
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier.fillMaxSize()
                                             )
+                                        } else if (!media.hasMedia) {
+                                            HaIcon(
+                                                ref = IconRef(IconRef.MDI, "home-assistant"),
+                                                contentDescription = stringResource(R.string.media_home_assistant_logo_desc),
+                                                tint = Color(0xFF18BCF2),
+                                                size = 64.dp,
+                                                fallback = Icons.Outlined.MusicNote,
+                                            )
                                         } else {
                                             Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(64.dp))
                         }
@@ -400,6 +410,14 @@ fun MediaPlayerView(
                 ) {
                         if (imageRequest != null) {
                             AsyncImage(model = imageRequest, imageLoader = imageLoader, contentDescription = stringResource(R.string.media_cover_desc_format, media.title), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        } else if (!media.hasMedia) {
+                            HaIcon(
+                                ref = IconRef(IconRef.MDI, "home-assistant"),
+                                contentDescription = stringResource(R.string.media_home_assistant_logo_desc),
+                                tint = Color(0xFF18BCF2),
+                                size = 82.dp,
+                                fallback = Icons.Outlined.MusicNote,
+                            )
                         } else {
                             Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(82.dp))
                     }

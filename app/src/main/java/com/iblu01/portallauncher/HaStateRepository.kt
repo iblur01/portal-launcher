@@ -39,6 +39,8 @@ class HaStateRepository(appContext: Context, private val url: String, private va
 
     /** Custom icon-set modules registered in the frontend, from `lovelace/resources`. */
     @Volatile private var iconResourceUrls: List<String> = emptyList()
+    /** Set while a pack scan is queued or running, so an event burst collapses into one pass. */
+    private val iconSyncPending = java.util.concurrent.atomic.AtomicBoolean(false)
     /** Icon-pack downloads run here so socket callbacks never touch the network or the disk. */
     @Volatile private var iconExecutor = newIconExecutor()
     private fun newIconExecutor() = Executors.newSingleThreadExecutor { r ->
@@ -199,14 +201,22 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         val store = HaIcons.packs ?: return
         val urls = iconResourceUrls
         if (urls.isEmpty()) return
-        iconExecutor.execute {
-            val snapshot = synchronized(states) { states.values.toList() }
-            val wanted = snapshot.mapNotNullTo(mutableSetOf<IconRef>()) {
-                HaIcons.resolver.refFor(it)?.takeUnless { ref -> ref.isMdi }
+        // A burst of state changes must not queue a burst of scans: each one walks every entity and
+        // stats the cache, and one pending pass already covers whatever the burst produced.
+        if (!iconSyncPending.compareAndSet(false, true)) return
+        // Racy by nature — stop() can shut the executor down between the check and the submit — so
+        // the rejection is swallowed rather than thrown at the socket thread mid-message.
+        runCatching {
+            iconExecutor.execute {
+                iconSyncPending.set(false)
+                val snapshot = synchronized(states) { states.values.toList() }
+                val wanted = snapshot.mapNotNullTo(mutableSetOf<IconRef>()) {
+                    HaIcons.resolver.refFor(it)?.takeUnless { ref -> ref.isMdi }
+                }
+                Log.i(TAG, "custom icon refs in use: ${wanted.size}")
+                if (store.sync(url, token, urls, wanted)) HaIcons.onPackCacheChanged()
             }
-            Log.i(TAG, "custom icon refs in use: ${wanted.size}")
-            if (store.sync(url, token, urls, wanted)) HaIcons.onPackCacheChanged()
-        }
+        }.onFailure { iconSyncPending.set(false) }
     }
 
     private fun parseDeviceAreas(arr: JSONArray): Map<String, String?> {

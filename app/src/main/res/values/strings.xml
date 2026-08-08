@@ -256,6 +256,7 @@
     <string name="media_source_many_format">%1$s + %2$d others</string>
     <string name="media_cover_desc_format">Cover of %1$s</string>
     <string name="media_no_cover_desc">No cover</string>
+    <string name="media_home_assistant_logo_desc">Home Assistant</string>
     <string name="media_previous_track_desc">Previous track</string>
     <string name="media_pause_desc">Pause</string>
     <string name="media_play_desc">Play</string>

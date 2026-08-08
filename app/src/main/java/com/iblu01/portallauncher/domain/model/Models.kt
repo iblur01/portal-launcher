@@ -89,4 +89,5 @@ data class PlayingMedia(
     val players: List<MediaPlayerVolume> = emptyList(),
     val groupablePlayers: List<MediaPlayerVolume> = emptyList(),
     val groupMemberIds: List<String> = emptyList(),
+    val hasMedia: Boolean = true,
 )

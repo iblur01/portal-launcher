@@ -18,9 +18,14 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -587,6 +592,7 @@ private fun PortalLauncherApp(
                 isMuted = entity.attributes.optBoolean("is_volume_muted", false),
                 playerNames = listOf(entity.name),
                 players = listOf(MediaPlayerVolume(entity.entityId, entity.name, (entity.attributes.optDouble("volume_level", 0.0) * 100).toInt(), entity.attributes.optBoolean("is_volume_muted", false))),
+                hasMedia = false,
             )
     }.distinctBy { it.entityId }.sortedBy { it.playerNames.firstOrNull().orEmpty() }
     val haConnected = ui.connected
@@ -699,6 +705,17 @@ private fun PortalLauncherApp(
             if (req.panelKind == PanelKind.MEDIA) PanelContent.MediaBrowser
             else panelChip?.let { PanelContent.ChipActions(it) }
         null -> null
+    }
+    // AnimatedVisibility keeps its subtree for the exit transition, but panelContent itself becomes
+    // null as soon as the reducer dismisses it. Retain the last payload just long enough for the
+    // full-sized panel to slide back into the screen edge instead of vanishing on the first frame.
+    var retainedPanelContent by remember { mutableStateOf<PanelContent?>(null) }
+    LaunchedEffect(panelContent) {
+        if (panelContent != null) retainedPanelContent = panelContent
+        else {
+            delay(500)
+            retainedPanelContent = null
+        }
     }
     LaunchedEffect(panel.request) {
         val request = panel.request as? PanelRequest.Chip
@@ -998,34 +1015,45 @@ private fun PortalLauncherApp(
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val landscape = maxWidth > maxHeight
                 if (landscape) {
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .fillMaxWidth(leftWidthFraction)
-                        ) { clockScreen() }
-                        if (leftWidthFraction < 1.0f && panelContent != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth()
-                            ) { sidePanel(panelContent) }
-                        }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .fillMaxHeight()
+                            .fillMaxWidth(leftWidthFraction)
+                    ) { clockScreen() }
+
+                    // Keep the panel at its final size throughout the transition. Animating the
+                    // Row allocation used to measure it from almost-zero to one third of the
+                    // screen, which visibly squashed every dynamic control inside it.
+                    AnimatedVisibility(
+                        visible = panelContent != null,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .fillMaxWidth(0.33f),
+                        enter = slideInHorizontally(tween(500)) { width -> width },
+                        exit = slideOutHorizontally(tween(500)) { width -> width },
+                    ) {
+                        (panelContent ?: retainedPanelContent)?.let { sidePanel(it) }
                     }
                 } else {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(topHeightFraction)
-                        ) { clockScreen() }
-                        if (topHeightFraction < 1.0f && panelContent != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight()
-                            ) { sidePanel(panelContent) }
-                        }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .fillMaxHeight(topHeightFraction)
+                    ) { clockScreen() }
+
+                    AnimatedVisibility(
+                        visible = panelContent != null,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.33f),
+                        enter = slideInVertically(tween(500)) { height -> height },
+                        exit = slideOutVertically(tween(500)) { height -> height },
+                    ) {
+                        (panelContent ?: retainedPanelContent)?.let { sidePanel(it) }
                     }
                 }
             }
