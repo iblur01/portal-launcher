@@ -204,6 +204,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
             val wanted = snapshot.mapNotNullTo(mutableSetOf<IconRef>()) {
                 HaIcons.resolver.refFor(it)?.takeUnless { ref -> ref.isMdi }
             }
+            Log.i(TAG, "custom icon refs in use: ${wanted.size}")
             if (store.sync(url, token, urls, wanted)) HaIcons.revision++
         }
     }
@@ -276,7 +277,9 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                         webSocket.send("{\"id\":$RESOURCES_ID,\"type\":\"lovelace/resources\"}")
                     } else if (id == ICONS_ID) {
                         if (msg.optBoolean("success")) {
-                            HaIcons.resolver.componentIcons = msg.optJSONObject("result")?.optJSONObject("resources")
+                            val resources = msg.optJSONObject("result")?.optJSONObject("resources")
+                            HaIcons.resolver.componentIcons = resources
+                            Log.i(TAG, "component icons: ${resources?.length() ?: 0} domains")
                             notifyListeners()
                             syncIconPacks()
                         } else Log.w(TAG, "frontend/get_icons failed: ${msg.optJSONObject("error")}")
@@ -285,6 +288,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                         // icon namespaces simply stay unresolved and fall back, which is fine.
                         if (msg.optBoolean("success")) {
                             iconResourceUrls = parseIconResources(msg.optJSONArray("result") ?: JSONArray())
+                            Log.i(TAG, "frontend modules available for icon sets: ${iconResourceUrls.size}")
                             syncIconPacks()
                         } else Log.i(TAG, "lovelace/resources unavailable; custom icon sets disabled")
                     } else if (id in 3..5) {

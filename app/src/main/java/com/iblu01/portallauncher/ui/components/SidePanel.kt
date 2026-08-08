@@ -145,6 +145,7 @@ private fun ChipActionsContent(
             navigationIcon = Icons.Filled.Close,
             navigationContentDescription = stringResource(R.string.side_panel_close_desc),
             titleIcon = launcherIcon(chip.icon),
+            titleEntityId = chip.entityId,
             accent = accent,
             batteryPercent = batteryPercent,
         )
@@ -226,6 +227,8 @@ internal fun PanelHeader(
     navigationContentDescription: String,
     modifier: Modifier = Modifier,
     titleIcon: ImageVector? = null,
+    /** When the panel is about one entity, its Home Assistant icon replaces [titleIcon]. */
+    titleEntityId: String? = null,
     accent: Color = AppleColors.primary,
     batteryPercent: Int? = null,
     onTitleClick: (() -> Unit)? = null,
@@ -264,7 +267,11 @@ internal fun PanelHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (titleIcon != null) {
-                Icon(titleIcon, null, tint = accent, modifier = Modifier.size(23.dp.scaled()))
+                if (!titleEntityId.isNullOrBlank()) {
+                    HaEntityIcon(titleEntityId, null, accent, 23.dp.scaled(), titleIcon)
+                } else {
+                    Icon(titleIcon, null, tint = accent, modifier = Modifier.size(23.dp.scaled()))
+                }
                 Spacer(Modifier.size(9.dp.scaled()))
             }
             Text(

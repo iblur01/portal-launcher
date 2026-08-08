@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.PillKind
+import com.iblu01.portallauncher.ui.icons.HaIcon
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -162,9 +163,30 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
     }
 }
 
+/**
+ * Whether this chip should show its entity's Home Assistant icon rather than a launcher glyph, so
+ * a device customised on the dashboard looks the same here.
+ *
+ * Two chips keep their own glyph. A group chip aggregates many entities and has no single icon to
+ * borrow. The washer's glyph animates through wash phases, which no static icon can express — lock
+ * and fan lose nothing by deferring, since HA varies those by state itself.
+ *
+ * Even when this returns true the HA icon may not resolve, and the launcher glyph still wins; this
+ * only decides whether it is worth asking.
+ */
+internal fun LauncherChip.defersToHaIcon(): Boolean = entityId.isNotBlank() && icon != "washer"
+
 @Composable
 private fun ChipGlyph(chip: LauncherChip, accent: Color, iconSize: Dp = 26.dp.scaled()) {
     val modifier = Modifier.size(iconSize)
+
+    val haRef = if (chip.defersToHaIcon()) rememberHaIconRef(chip.entityId) else null
+    if (haRef != null) {
+        HaIcon(haRef, null, accent, iconSize, launcherIcon(chip.icon))
+        return
+    }
+
+    // Nothing from HA: fall back to the launcher's own glyphs, bespoke ones included.
     when (chip.icon) {
         "washer" -> WasherGlyph(chip.value, accent, modifier)
         "air" -> AirGlyph(chip.state, accent, modifier)
@@ -172,14 +194,7 @@ private fun ChipGlyph(chip: LauncherChip, accent: Color, iconSize: Dp = 26.dp.sc
             val icon = if (chip.state == "error") Icons.Outlined.LockOpen else Icons.Outlined.Lock
             Icon(icon, null, tint = accent, modifier = modifier)
         }
-        // Group chips (lights, media, openings…) aggregate many entities and keep the launcher's own
-        // glyph; a chip backed by a single entity shows that entity's Home Assistant icon instead,
-        // so a customised device looks the same here as on the dashboard.
-        else -> if (chip.entityId.isNotBlank()) {
-            HaEntityIcon(chip.entityId, null, accent, iconSize, launcherIcon(chip.icon))
-        } else {
-            Icon(launcherIcon(chip.icon), null, tint = accent, modifier = modifier)
-        }
+        else -> Icon(launcherIcon(chip.icon), null, tint = accent, modifier = modifier)
     }
 }
 

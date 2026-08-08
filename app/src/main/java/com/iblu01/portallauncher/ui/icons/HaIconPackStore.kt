@@ -80,6 +80,7 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
     @Synchronized
     fun sync(baseUrl: String, token: String, resourceUrls: List<String>, wanted: Set<IconRef>): Boolean {
         val missing = wanted.filter { isPending(it) }
+        Log.i(TAG, "sync: ${missing.size} of ${wanted.size} refs uncached, ${resourceUrls.size} modules to search")
         if (missing.isEmpty() || resourceUrls.isEmpty()) return false
         loadRoutes()
         var changed = false
@@ -89,6 +90,7 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
             for (url in candidates(namespace, resourceUrls)) {
                 if (names.isEmpty()) break
                 val result = harvest(baseUrl, token, url, namespace, names)
+                if (result.written > 0) Log.i(TAG, "sync: cached ${result.written} $namespace: icons from $url")
                 if (!result.fetched) continue
                 scannedAny = true
                 if (result.written > 0) {

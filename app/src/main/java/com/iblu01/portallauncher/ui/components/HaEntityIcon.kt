@@ -7,6 +7,18 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import com.iblu01.portallauncher.ui.icons.HaIcon
 import com.iblu01.portallauncher.ui.icons.HaIcons
+import com.iblu01.portallauncher.ui.icons.IconRef
+
+/**
+ * The icon Home Assistant would use for [entityId], or null when it has nothing to say — no such
+ * entity, or an icon the resolver cannot make sense of.
+ *
+ * Exposed separately from [HaEntityIcon] so a call site with its own bespoke glyph can ask first
+ * and keep that glyph when HA offers nothing, instead of collapsing to a static fallback.
+ */
+@Composable
+fun rememberHaIconRef(entityId: String): IconRef? =
+    rememberEntity(entityId)?.let { HaIcons.resolver.refFor(it) }
 
 /**
  * Draws the icon Home Assistant shows for [entityId] — the user's own `mdi:`/`phu:`/`hue:` choice
@@ -25,7 +37,5 @@ fun HaEntityIcon(
     fallback: ImageVector,
     modifier: Modifier = Modifier,
 ) {
-    val entity = rememberEntity(entityId)
-    val ref = entity?.let { HaIcons.resolver.refFor(it) }
-    HaIcon(ref, contentDescription, tint, size, fallback, modifier)
+    HaIcon(rememberHaIconRef(entityId), contentDescription, tint, size, fallback, modifier)
 }
