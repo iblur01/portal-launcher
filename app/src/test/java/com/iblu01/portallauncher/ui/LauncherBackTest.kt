@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher.ui
 
+import com.iblu01.portallauncher.ui.components.PageIdentity
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -43,5 +44,21 @@ class LauncherBackTest {
             BackAction.Nothing,
             backAction(itemMenuOpen = false, hiddenListOpen = false, quickActionsOpen = false, userPanelOpen = false, onClockPage = true),
         )
+    }
+
+    @Test
+    fun `Maison and every app page return to the logical main accueil`() {
+        fun action(page: PageIdentity) = backAction(
+            itemMenuOpen = false,
+            hiddenListOpen = false,
+            quickActionsOpen = false,
+            userPanelOpen = false,
+            currentPage = page,
+        )
+
+        assertEquals(BackAction.GoToClockPage, action(PageIdentity.House))
+        assertEquals(BackAction.GoToClockPage, action(PageIdentity.Apps(0)))
+        assertEquals(BackAction.GoToClockPage, action(PageIdentity.Apps(4)))
+        assertEquals(BackAction.Nothing, action(PageIdentity.Clock))
     }
 }

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Keep existing -->
-    <string name="app_name">Portal Launcher</string>
+    <string name="app_name" translatable="false">Portal Launcher</string>
     <string name="accessibility_label">Portal Launcher Screen Control</string>
-    <string name="accessibility_description">Permet a Portal Launcher d\'eteindre l\'ecran sur commande Home Assistant. Le service ne lit pas le contenu de l\'ecran.</string>
+    <string name="accessibility_description">Allows Portal Launcher to turn off the screen on a Home Assistant command. The service does not read screen content.</string>
 
     <!-- ===== SETUP WIZARD ===== -->
     <string name="setup_welcome_title">Welcome</string>
@@ -165,6 +165,52 @@
     <string name="pills_extra_battery">battery</string>
     <string name="pills_extra_cycle">cycle</string>
     <string name="pills_extra_completion">est. finish</string>
+    <string name="pills_settings_sections_title">CUSTOMISATION</string>
+    <string name="pills_settings_launcher_home">Home screen</string>
+    <string name="pills_settings_launcher_home_description">The first three positions are always visible. The next six appear under See more. Alerts may temporarily take precedence without changing this order.</string>
+    <string name="pills_settings_house_page">House page</string>
+    <string name="pills_settings_available_devices">Available devices</string>
+    <string name="pills_settings_pinned_count">Pinned: %1$d</string>
+    <string name="pills_enabled">Enabled</string>
+    <string name="pills_disabled">Disabled</string>
+    <string name="pills_settings_primary_slots">PRIMARY · 3 POSITIONS</string>
+    <string name="pills_settings_secondary_slots">SECONDARY · 6 POSITIONS</string>
+    <string name="pills_settings_overflow">HOUSE FAVOURITES OVERFLOW</string>
+    <string name="pills_settings_automatic_slot">Automatic</string>
+    <string name="pills_pin">Pin</string>
+    <string name="pills_unpin">Unpin</string>
+    <string name="pills_unavailable">Unavailable</string>
+    <string name="pills_stale">Offline</string>
+    <string name="pills_stale_state">Offline — last state: %1$s</string>
+    <string name="pills_enable_before_pin">Enable to pin</string>
+    <string name="pills_not_available_to_pin">No available member: this group cannot be pinned</string>
+    <string name="pills_move_first">Move first</string>
+    <string name="pills_move_before">Move before</string>
+    <string name="pills_move_after">Move after</string>
+    <string name="pills_move_last">Move last</string>
+    <string name="pills_house_activation">ACTIVATION</string>
+    <string name="pills_house_enable">Show the House page</string>
+    <string name="pills_house_sections">SECTIONS · VISIBILITY AND ORDER</string>
+    <string name="pills_house_section_position">Position %1$d</string>
+    <string name="pills_house_automatic_groups">AUTOMATIC GROUPS</string>
+    <string name="pills_house_automatic_groups_hint">Room and type membership comes from Home Assistant and cannot be changed here.</string>
+    <string name="pills_section_favorites">Favourites</string>
+    <string name="pills_section_areas">Rooms</string>
+    <string name="pills_manual_groups">MY GROUPS</string>
+    <string name="pills_manual_create">Create a group</string>
+    <string name="pills_manual_empty">No manual group yet. Empty groups remain editable here and are hidden from the House page.</string>
+    <string name="pills_manual_member_count">Members: %1$d</string>
+    <string name="pills_group_member_count">%1$s members</string>
+    <string name="pills_devices_description">Enable compatible devices and pin them even when they are not currently in the nine home positions. Unavailable devices can be unpinned but not newly pinned.</string>
+    <string name="pills_manual_identity">GROUP</string>
+    <string name="pills_manual_name">Name</string>
+    <string name="pills_pin_group">Pin this group</string>
+    <string name="pills_manual_members">MEMBERS</string>
+    <string name="pills_manual_delete">Delete group</string>
+    <string name="pills_manual_delete_title">Delete “%1$s”?</string>
+    <string name="pills_manual_delete_description">The devices are not deleted or disabled. This only removes the local manual group.</string>
+    <string name="pills_manual_save">Save</string>
+    <string name="pills_manual_move_to_group">Move to another group</string>
 
     <!-- ===== CLOCK THEME EDITOR ===== -->
     <string name="clock_theme_label_font">Font</string>

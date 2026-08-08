@@ -810,8 +810,6 @@ private fun fakePanelChips(
         }, kind = PillKind.LIGHTS, deviceState = if (lightsOn > 0) "on" else "off"),
         LauncherChip("purifier_group", "air", "Purificateur", if (purifier.state == "on") mode(purifier.entityId, "preset_mode").replaceFirstChar { it.uppercase() } else "Éteint", airState, entityId = purifier.entityId, kind = PillKind.PURIFIER,
             details = listOf(PillDetail("CO₂", "$co2 ppm"), PillDetail("PM2.5", "$pm25 µg/m³"), PillDetail("Filtre", "82 %")), deviceState = purifier.state),
-        LauncherChip("scenes_group", "scene", "Scènes", "4 ambiances", "ok", kind = PillKind.SCENE, details = listOf(
-            PillDetail("Soirée", "", "scene.soiree"), PillDetail("Lecture", "", "scene.lecture"), PillDetail("Cinéma", "", "scene.cinema"), PillDetail("Tout éteindre", "", "script.tout_eteindre"))),
         LauncherChip("lock_test", "lock", "Porte d’entrée", if (lock.state == "locked") "Verrouillée" else "Déverrouillée", if (lock.state == "locked") "ok" else "critical", entityId = lock.entityId, kind = PillKind.LOCK, deviceState = lock.state),
         LauncherChip("cover_test", "cover", "Volet salon", "${percent(cover.entityId, "current_position")} %", if (cover.state == "closed") "ok" else "active", entityId = cover.entityId, kind = PillKind.COVER, deviceState = cover.state),
         LauncherChip("thermostat_test", "temperature", "Thermostat", "${if (climateTarget % 1.0 == 0.0) climateTarget.toInt() else climateTarget} °C", if (climate.state == "off") "ok" else "active", entityId = climate.entityId, kind = PillKind.THERMOSTAT, deviceState = climate.state),
@@ -822,8 +820,6 @@ private fun fakePanelChips(
         LauncherChip("switch_test", "switch", "Prise TV", if (socket.state == "on") "Allumée" else "Éteinte", if (socket.state == "on") "active" else "ok", entityId = socket.entityId, kind = PillKind.SWITCH, deviceState = socket.state),
         LauncherChip("alarm_test", "shield", "Alarme", alarm.state.replace('_', ' ').replaceFirstChar { it.uppercase() }, if (alarm.state == "triggered") "critical" else if (alarm.state == "disarmed") "info" else "active", entityId = alarm.entityId, kind = PillKind.SAFETY, deviceState = alarm.state),
         LauncherChip("washer_test", "washer", "Machine à laver", "Rinçage", "active", entityId = "sensor.lave_linge_state", kind = PillKind.APPLIANCE, progress = 0.62f, details = listOf(PillDetail("Cycle", "Coton"), PillDetail("Fin estimée", "14:35"), PillDetail("Essorage", "1 200 tr/min"))),
-        LauncherChip("air_group", "air", "Qualité de l’air", when (airState) { "critical" -> "Mauvaise"; "warning" -> "Moyenne"; else -> "Bonne" }, airState, details = listOf(PillDetail("CO₂", "$co2 ppm"), PillDetail("Humidité", "46 %"), PillDetail("PM2.5", "$pm25 µg/m³")), kind = PillKind.AIR),
-        LauncherChip("generic_test", "sensor", "Capteur balcon", "18,2 °C", "info", kind = PillKind.GENERIC, details = listOf(PillDetail("Température", "18,2 °C"), PillDetail("Humidité", "61 %"))),
         LauncherChip("media_group", "media", "Musique", mediaTitle, if (mediaPlaying) "active" else "ok", entityId = "media_player.salon", kind = PillKind.MEDIA, deviceState = if (mediaPlaying) "playing" else "paused"),
     )
 }

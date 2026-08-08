@@ -77,6 +77,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.LauncherChip
+import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.ui.CallService
 import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
@@ -121,7 +122,11 @@ private val colorModes = setOf("hs", "rgb", "xy", "rgbw", "rgbww")
 private enum class LightSliderMode { COLOR, COLOR_TEMPERATURE }
 
 @Composable
-fun LightDetailContent(detail: PillDetail, onBack: () -> Unit) {
+fun LightDetailContent(
+    detail: PillDetail,
+    onBack: () -> Unit,
+    closePanel: Boolean = false,
+) {
     val callService = LocalCallService.current
     val entity = LocalHaStates.current[detail.entityId]
     val attrs = entity?.attributes
@@ -171,7 +176,7 @@ fun LightDetailContent(detail: PillDetail, onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            DetailHeader(detail.label, onBack)
+            DetailHeader(detail.label, onBack, closePanel)
             if (!onOffOnly) {
                 Spacer(Modifier.height(16.dp))
 
@@ -231,14 +236,35 @@ fun LightDetailContent(detail: PillDetail, onBack: () -> Unit) {
 }
 
 @Composable
-private fun DetailHeader(label: String, onBack: () -> Unit) {
+private fun DetailHeader(label: String, onBack: () -> Unit, closePanel: Boolean = false) {
     PanelHeader(
         title = label,
         onNavigation = onBack,
-        navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-        navigationContentDescription = "Retour aux lumières",
+        navigationIcon = if (closePanel) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
+        navigationContentDescription = if (closePanel) {
+            stringResource(R.string.side_panel_close_desc)
+        } else {
+            "Retour aux lumières"
+        },
     )
 }
+
+/** A device light bypasses the redundant one-row browser and opens this detail immediately. */
+internal fun LauncherChip.individualLightDetailOrNull(): PillDetail? =
+    if (
+        kind == PillKind.LIGHTS &&
+        entityId.startsWith("light.") &&
+        ',' !in entityId
+    ) {
+        PillDetail(
+            label = label,
+            value = value,
+            entityId = entityId,
+            active = deviceState.equals("on", ignoreCase = true),
+        )
+    } else {
+        null
+    }
 
 @Composable
 private fun ColumnScope.AdaptiveLightDetail(
@@ -575,11 +601,15 @@ private fun lightRooms(chip: LauncherChip, areaOf: (String) -> String?): List<Pa
 @Composable
 fun LightsActions(chip: LauncherChip, onOpenLight: (PillDetail) -> Unit) {
     val areas = LocalAreas.current
-    val rooms = lightRooms(chip) { areas[it] }
+    // Group chips already carry one detail per light. Individual catalog pills intentionally do
+    // not duplicate themselves in `details`, so materialise their own actionable row here.
+    val lights = chip.details.ifEmpty { listOfNotNull(chip.individualLightDetailOrNull()) }
+    val actionableChip = chip.copy(details = lights)
+    val rooms = lightRooms(actionableChip) { areas[it] }
     // Fewer than two rooms (or registries not loaded yet): keep the plain flat list.
     if (rooms.size <= 1) {
-        chip.details.forEach { LightRow(it, onOpen = { onOpenLight(it) }) }
-        AllOffRow(chip.details, "Tout éteindre")
+        lights.forEach { LightRow(it, onOpen = { onOpenLight(it) }) }
+        AllOffRow(lights, "Tout éteindre")
         return
     }
 
@@ -587,7 +617,7 @@ fun LightsActions(chip: LauncherChip, onOpenLight: (PillDetail) -> Unit) {
     val current = selectedRoom?.let { name -> rooms.firstOrNull { it.first == name } }
     if (current == null) {
         RoomGrid(rooms, onSelect = { selectedRoom = it })
-        AllOffRow(chip.details, "Tout éteindre")
+        AllOffRow(lights, "Tout éteindre")
     } else {
         DetailHeader(current.first, onBack = { selectedRoom = null })
         Spacer(Modifier.height(12.dp))

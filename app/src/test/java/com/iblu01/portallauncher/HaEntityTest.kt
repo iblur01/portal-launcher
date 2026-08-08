@@ -50,4 +50,26 @@ class HaEntityTest {
         assertEquals(a, a.copy())
         assertNotEquals(a, a.copy(state = "off"))
     }
+
+    @Test fun `area resolver prefers entity assignment over device assignment`() {
+        assertEquals(
+            mapOf("light.kitchen" to "entity-area"),
+            resolveAreaIds(
+                entityAreaId = mapOf("light.kitchen" to "entity-area"),
+                entityDeviceId = mapOf("light.kitchen" to "device-1"),
+                deviceAreaId = mapOf("device-1" to "device-area"),
+            ),
+        )
+    }
+
+    @Test fun `area resolver falls back to device and omits unresolved entities`() {
+        assertEquals(
+            mapOf("light.kitchen" to "device-area"),
+            resolveAreaIds(
+                entityAreaId = mapOf("light.kitchen" to null, "switch.orphan" to null),
+                entityDeviceId = mapOf("light.kitchen" to "device-1", "switch.orphan" to null),
+                deviceAreaId = mapOf("device-1" to "device-area"),
+            ),
+        )
+    }
 }

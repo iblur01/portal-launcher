@@ -15,13 +15,17 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,14 +41,95 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** Pager index of the clock; every later index is an app page. */
+/** Physical index used by Maison whenever it is enabled. */
+const val PAGE_HOME = 0
+
+/**
+ * Legacy physical indices for the Maison-disabled layout.
+ *
+ * New code must use [LauncherPagerLayout.clockPage] and [LauncherPagerLayout.firstAppPage]: their
+ * physical values move by one when Maison is enabled.
+ */
 const val PAGE_CLOCK = 0
 const val PAGE_FIRST_APP = 1
+
+/** Logical identity of a launcher page, independent of its current physical pager index. */
+sealed interface PageIdentity {
+    data object House : PageIdentity
+    data object Clock : PageIdentity
+    data class Apps(val index: Int) : PageIdentity {
+        init {
+            require(index >= 0) { "An application page index cannot be negative" }
+        }
+    }
+}
+
+/** Child horizontal surfaces use this to yield their complete gesture from the parent pager. */
+val LocalLauncherPagerGestureLock = staticCompositionLocalOf<(Boolean) -> Unit> { {} }
+
+/**
+ * Pure mapping between logical pages and physical pager indices.
+ *
+ * Keeping this mapping in one value object prevents a Maison preference change from silently
+ * turning application page N into N-1 or N+1.
+ */
+data class LauncherPagerLayout(
+    val homePageEnabled: Boolean,
+    val appPageCount: Int,
+) {
+    init {
+        require(appPageCount >= 0) { "The application page count cannot be negative" }
+    }
+
+    val housePage: Int? = PAGE_HOME.takeIf { homePageEnabled }
+    val clockPage: Int = if (homePageEnabled) 1 else 0
+    val firstAppPage: Int = clockPage + 1
+    val pageCount: Int = firstAppPage + appPageCount
+
+    fun pageOf(identity: PageIdentity): Int? = when (identity) {
+        PageIdentity.House -> housePage
+        PageIdentity.Clock -> clockPage
+        is PageIdentity.Apps ->
+            (firstAppPage + identity.index).takeIf { identity.index < appPageCount }
+    }
+
+    fun identityOf(page: Int): PageIdentity? = when {
+        page !in 0 until pageCount -> null
+        homePageEnabled && page == housePage -> PageIdentity.House
+        page == clockPage -> PageIdentity.Clock
+        page >= firstAppPage -> PageIdentity.Apps(page - firstAppPage)
+        else -> null
+    }
+}
+
+/**
+ * Maps [currentPage] through its logical identity when the pager layout changes at runtime.
+ *
+ * Maison itself has no destination after it is disabled, so it falls back to the main accueil.
+ * An application page is preserved exactly when it still exists. If the application page count
+ * also shrank, the last remaining application page is used, or the clock when none remains.
+ */
+fun remapPage(
+    currentPage: Int,
+    previous: LauncherPagerLayout,
+    next: LauncherPagerLayout,
+): Int {
+    val identity = previous.identityOf(currentPage) ?: PageIdentity.Clock
+    next.pageOf(identity)?.let { return it }
+    return when (identity) {
+        PageIdentity.House,
+        PageIdentity.Clock -> next.clockPage
+        is PageIdentity.Apps ->
+            if (next.appPageCount > 0) next.firstAppPage + next.appPageCount - 1
+            else next.clockPage
+    }
+}
 
 /**
  * One flat pager holds the clock and every app page: `[clock, app 0, app 1, …]`.
@@ -57,12 +142,37 @@ const val PAGE_FIRST_APP = 1
 fun rememberLauncherPagerState(appPageCount: () -> Int): PagerState =
     rememberPagerState(initialPage = PAGE_CLOCK) { PAGE_FIRST_APP + appPageCount() }
 
+/** Maison-aware pager state. Its initial page is always the main accueil, never Maison. */
+@Composable
+fun rememberLauncherPagerState(
+    homePageEnabled: () -> Boolean,
+    appPageCount: () -> Int,
+): PagerState {
+    val initialLayout = LauncherPagerLayout(homePageEnabled(), appPageCount())
+    return rememberPagerState(initialPage = initialLayout.clockPage) {
+        LauncherPagerLayout(homePageEnabled(), appPageCount()).pageCount
+    }
+}
+
 /**
  * Continuous 0f..1f progress of the clock→apps swipe. Read this instead of `currentPage` so the
  * header shrink tracks the finger frame by frame, and stays collapsed across further app pages.
  */
 fun PagerState.collapseFraction(): Float =
     (currentPage + currentPageOffsetFraction).coerceIn(0f, 1f)
+
+/** Clock-header collapse measured relative to the logical accueil index. */
+fun PagerState.collapseFraction(layout: LauncherPagerLayout): Float =
+    (currentPage + currentPageOffsetFraction - layout.clockPage).coerceIn(0f, 1f)
+
+/**
+ * Alpha of the clock header. Maison owns its own header, so the clock header disappears to its
+ * left and fades in continuously during the Maison -> Accueil swipe.
+ */
+fun PagerState.clockHeaderAlpha(layout: LauncherPagerLayout): Float {
+    if (!layout.homePageEnabled) return 1f
+    return (currentPage + currentPageOffsetFraction - (layout.housePage ?: 0)).coerceIn(0f, 1f)
+}
 
 /**
  * Sends the pager back to the clock, from a scope that outlives the caller's effect.
@@ -76,9 +186,33 @@ fun returnToClockPage(scope: CoroutineScope, state: PagerState) {
     scope.launch { state.animateScrollToPage(PAGE_CLOCK) }
 }
 
+/** HOME, Back and auto-return all target the logical main accueil through this helper. */
+fun returnToClockPage(
+    scope: CoroutineScope,
+    state: PagerState,
+    layout: LauncherPagerLayout,
+) {
+    scope.launch { state.animateScrollToPage(layout.clockPage) }
+}
+
+/** Applies a hot layout change without animating through a different logical application page. */
+fun remapPagerPage(
+    scope: CoroutineScope,
+    state: PagerState,
+    currentPage: Int,
+    previous: LauncherPagerLayout,
+    next: LauncherPagerLayout,
+) {
+    scope.launch { state.scrollToPage(remapPage(currentPage, previous, next)) }
+}
+
 /** The app page index shown at pager index [pagerPage], or null for the clock. */
 fun appPageOf(pagerPage: Int): Int? =
     (pagerPage - PAGE_FIRST_APP).takeIf { it >= 0 }
+
+/** Maison-aware application page mapping. */
+fun appPageOf(pagerPage: Int, layout: LauncherPagerLayout): Int? =
+    (layout.identityOf(pagerPage) as? PageIdentity.Apps)?.index
 
 /**
  * The two-page launcher surface: the clock page and the apps grid, with the clock header pinned
@@ -108,16 +242,68 @@ fun LauncherPager(
     onHeaderTap: () -> Unit = {},
     /** Long-press on the (expanded) clock — the quick-actions menu. */
     onHeaderLongPress: () -> Unit = {},
+    /** Logical mapping for the current Maison preference and application page count. */
+    pageLayout: LauncherPagerLayout = LauncherPagerLayout(
+        homePageEnabled = false,
+        appPageCount = (state.pageCount - PAGE_FIRST_APP).coerceAtLeast(0),
+    ),
+    /** Maison page content. Required by callers whenever [pageLayout] enables Maison. */
+    housePage: @Composable (() -> Unit)? = null,
 ) {
+    require(!pageLayout.homePageEnabled || housePage != null) {
+        "housePage content is required when Maison is enabled"
+    }
     // Keep the rapidly changing pager offset out of composition. Consumers invoke this only from
     // layout or draw/layer blocks, which Compose can invalidate without rebuilding the subtree.
-    val collapse = remember(state) { { state.collapseFraction() } }
+    val collapse = remember(state, pageLayout) { { state.collapseFraction(pageLayout) } }
+    val clockHeaderAlpha = remember(state, pageLayout) { { state.clockHeaderAlpha(pageLayout) } }
+    val showClockHeader by remember(state, pageLayout) {
+        derivedStateOf { state.clockHeaderAlpha(pageLayout) > 0.01f }
+    }
     // This derived boolean changes only twice per complete swipe. It prevents the transparent
     // actions layer from intercepting clock taps without subscribing composition to every offset.
-    val showHeaderActions by remember(state) {
-        derivedStateOf { state.collapseFraction() > 0.01f }
+    val showHeaderActions by remember(state, pageLayout) {
+        derivedStateOf { state.collapseFraction(pageLayout) > 0.01f }
     }
     val edgePx = with(LocalDensity.current) { EDGE_FLIP_WIDTH.toPx() }
+    val childGestureScope = rememberCoroutineScope()
+    var childGestureStartPage by remember { mutableStateOf<Int?>(null) }
+    val childGestureLock = remember(state, childGestureScope) {
+        { active: Boolean ->
+            if (active) {
+                if (childGestureStartPage == null) childGestureStartPage = state.settledPage
+            } else {
+                val startPage = childGestureStartPage
+                childGestureStartPage = null
+                if (startPage != null && state.currentPage != startPage) {
+                    // HorizontalPager can observe the same pointer stream as a nested LazyRow on
+                    // API 28. Restore the page atomically at gesture end; the rail keeps its own
+                    // scroll, and the next gesture (header/edge) remains fully pager-enabled.
+                    childGestureScope.launch { state.scrollToPage(startPage) }
+                }
+            }
+        }
+    }
+
+    // Preserve the settled logical page across a live Maison toggle. PagerState owns only a
+    // physical Int and its page count can shrink before the next frame; retaining the identity is
+    // what prevents app page N from silently becoming N-1.
+    var previousLayout by remember(state) { mutableStateOf(pageLayout) }
+    var settledIdentity by remember(state) {
+        mutableStateOf(previousLayout.identityOf(state.settledPage) ?: PageIdentity.Clock)
+    }
+    LaunchedEffect(state, pageLayout) {
+        if (previousLayout != pageLayout) {
+            val previousPage = previousLayout.pageOf(settledIdentity) ?: previousLayout.clockPage
+            state.scrollToPage(remapPage(previousPage, previousLayout, pageLayout))
+            previousLayout = pageLayout
+        }
+        snapshotFlow { state.settledPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                settledIdentity = pageLayout.identityOf(page) ?: PageIdentity.Clock
+            }
+    }
 
     // Holding a dragged icon against a page edge flips pages, which is the only way to move an app
     // to another page — and, on the trailing empty page, to create one. User scrolling is off while
@@ -132,13 +318,17 @@ fun LauncherPager(
                 while (true) {
                     delay(EDGE_FLIP_DWELL_MS)
                     val target = (state.currentPage + direction)
-                        .coerceIn(PAGE_FIRST_APP, (state.pageCount - 1).coerceAtLeast(PAGE_FIRST_APP))
+                        .coerceIn(
+                            pageLayout.firstAppPage,
+                            (state.pageCount - 1).coerceAtLeast(pageLayout.firstAppPage),
+                        )
                     if (target == state.currentPage) break
                     state.animateScrollToPage(target)
                 }
             }
     }
 
+    CompositionLocalProvider(LocalLauncherPagerGestureLock provides childGestureLock) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -154,40 +344,53 @@ fun LauncherPager(
             // it started on, and disposing that page would drop the icon in mid-air.
             beyondViewportPageCount = if (dragging) state.pageCount else 1,
         ) { page ->
-            val appPageIndex = appPageOf(page)
+            val identity = pageLayout.identityOf(page)
             // The fade is passed as a lambda so each page reads it in its own draw phase: as a
             // value it would recompose every page on every frame of the swipe.
-            if (appPageIndex == null) clockPage() else appPage(appPageIndex) { state.collapseFraction() }
+            when (identity) {
+                PageIdentity.House -> housePage?.invoke()
+                PageIdentity.Clock -> clockPage()
+                is PageIdentity.Apps ->
+                    appPage(identity.index) { state.collapseFraction(pageLayout) }
+                null -> Unit
+            }
         }
 
         dragOverlay()
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                // Both pointer nodes sit OUTSIDE collapsingHeight on purpose. A pointer modifier
-                // placed after it would wrap the content, which is still measured at full height —
-                // and Compose does not clip hit-testing to the parent's bounds, so the invisible
-                // full-size clock band would swallow taps on the first rows of app icons.
-                .pagerDragForward(state, enabled = userScrollEnabled)
-                // Tap detection never consumes drags, so the drag forwarder above still wins past
-                // the touch slop. The guard is read at gesture time (not via the modifier chain) so
-                // nothing is swapped mid-drag.
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { if (state.collapseFraction() < 0.5f) onHeaderTap() },
-                        onLongPress = { if (state.collapseFraction() < 0.5f) onHeaderLongPress() },
-                    )
-                }
-                .collapsingHeight { headerHeight ->
-                    (headerHeight * headerScale(collapse())).roundToInt()
-                },
-            // The wrapper fills the width (so the whole clock band forwards drags), so the clock
-            // itself has to be centred here — it wraps its own width.
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            header(collapse)
+        if (showClockHeader) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = clockHeaderAlpha() }
+                    // Both pointer nodes sit OUTSIDE collapsingHeight on purpose. A pointer modifier
+                    // placed after it would wrap the content, which is still measured at full height —
+                    // and Compose does not clip hit-testing to the parent's bounds, so the invisible
+                    // full-size clock band would swallow taps on the first rows of app icons.
+                    .pagerDragForward(state, enabled = userScrollEnabled)
+                    // Tap detection never consumes drags, so the drag forwarder above still wins past
+                    // the touch slop. The guard is read at gesture time (not via the modifier chain) so
+                    // nothing is swapped mid-drag.
+                    .pointerInput(pageLayout) {
+                        detectTapGestures(
+                            onTap = {
+                                if (state.collapseFraction(pageLayout) < 0.5f) onHeaderTap()
+                            },
+                            onLongPress = {
+                                if (state.collapseFraction(pageLayout) < 0.5f) onHeaderLongPress()
+                            },
+                        )
+                    }
+                    .collapsingHeight { headerHeight ->
+                        (headerHeight * headerScale(collapse())).roundToInt()
+                    },
+                // The wrapper fills the width (so the whole clock band forwards drags), so the clock
+                // itself has to be centred here — it wraps its own width.
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                header(collapse)
+            }
         }
 
         // Top-right chrome. Gated on the collapse so the idle clock screen stays bare: these are
@@ -211,6 +414,7 @@ fun LauncherPager(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 10.dp),
         )
+    }
     }
 }
 

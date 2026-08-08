@@ -6,6 +6,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.iblu01.portallauncher.domain.home.HomePillPreferences
 import com.iblu01.portallauncher.session.SessionAllowlist
 import com.iblu01.portallauncher.session.SessionAllowlistCodec
 import com.iblu01.portallauncher.ui.theme.ClockFont
@@ -283,6 +284,77 @@ class Prefs(private val context: Context) {
         get() = PillRuleCodec.decode(sp.getString("pill_rules", "[]") ?: "[]")
         set(value) = sp.edit().putString("pill_rules", PillRuleCodec.encode(value)).apply()
 
+    /**
+     * Persistent Home-page layout, kept separate from live [LauncherChip] rendering models.
+     *
+     * Reading this property performs the one-time migration only when the key is genuinely
+     * absent. Invalid JSON falls back safely in memory and is deliberately left untouched so it
+     * can be inspected or recovered instead of being silently destroyed.
+     */
+    var homePillPreferences: HomePillPreferences
+        get() = synchronized(homePillPreferencesLock) { readHomePillPreferencesLocked() }
+        set(value) {
+            writeHomePillPreferences(value)
+        }
+
+    /** Atomically stores [value], returning false when its canonical JSON is already persisted. */
+    fun writeHomePillPreferences(value: HomePillPreferences): Boolean =
+        synchronized(homePillPreferencesLock) { writeHomePillPreferencesLocked(value) }
+
+    /**
+     * Serializes read-modify-write calls within the process and publishes one change at most.
+     * The transformed value (with the current schema version) is returned to simplify reducers.
+     */
+    fun updateHomePillPreferences(
+        transform: (HomePillPreferences) -> HomePillPreferences,
+    ): HomePillPreferences = synchronized(homePillPreferencesLock) {
+        val updated = transform(readHomePillPreferencesLocked()).copy(
+            schemaVersion = HomePillPreferencesCodec.CURRENT_SCHEMA_VERSION,
+        )
+        writeHomePillPreferencesLocked(updated)
+        updated
+    }
+
+    private fun readHomePillPreferencesLocked(): HomePillPreferences {
+        val raw = runCatching {
+            if (sp.contains(HOME_PILL_PREFERENCES_KEY)) {
+                sp.getString(HOME_PILL_PREFERENCES_KEY, null)
+            } else {
+                null
+            }
+        }.getOrElse {
+            Log.e("Prefs", "home pill preferences are not stored as JSON", it)
+            return HomePillPreferencesCodec.defaults()
+        }
+
+        if (raw == null) {
+            val migrated = HomePillPreferencesCodec.defaults()
+            // This editor changes only the new key: legacy pill_rules remain byte-for-byte intact.
+            sp.edit()
+                .putString(HOME_PILL_PREFERENCES_KEY, HomePillPreferencesCodec.encode(migrated))
+                .apply()
+            return migrated
+        }
+
+        return HomePillPreferencesCodec.decode(raw) ?: run {
+            Log.e("Prefs", "invalid home pill preferences; using defaults without overwriting source")
+            HomePillPreferencesCodec.defaults()
+        }
+    }
+
+    private fun writeHomePillPreferencesLocked(value: HomePillPreferences): Boolean {
+        val currentVersion = value.copy(
+            schemaVersion = HomePillPreferencesCodec.CURRENT_SCHEMA_VERSION,
+        )
+        val encoded = HomePillPreferencesCodec.encode(currentVersion)
+        val stored = runCatching { sp.getString(HOME_PILL_PREFERENCES_KEY, null) }.getOrNull()
+        if (stored == encoded) return false
+
+        sp.edit().putString(HOME_PILL_PREFERENCES_KEY, encoded).apply()
+        SettingsChangeBus.get().emit(HOME_PILL_PREFERENCES_CHANGE_KEY)
+        return true
+    }
+
     var pillAutoGroupsInitialized: Boolean
         get() = sp.getBoolean("pill_auto_groups_initialized", false)
         set(value) = sp.edit().putBoolean("pill_auto_groups_initialized", value).apply()
@@ -420,6 +492,9 @@ class Prefs(private val context: Context) {
 
     companion object {
         const val DEFAULT_HA_PACKAGE = "io.homeassistant.companion.android"
+        const val HOME_PILL_PREFERENCES_CHANGE_KEY = "homePillPreferences"
+        private const val HOME_PILL_PREFERENCES_KEY = "home_pill_preferences"
+        private val homePillPreferencesLock = Any()
 
         // Building EncryptedSharedPreferences spins up a Keystore MasterKey + Tink (heavy crypto,
         // reflection via sun.misc.Unsafe) — ~hundreds of ms. Prefs() is constructed all over,
@@ -427,21 +502,30 @@ class Prefs(private val context: Context) {
         // doing this per instance froze the main thread. Cache both stores process-wide (keyed by
         // the application context) so constructing a Prefs is effectively free after the first.
         @Volatile private var cachedPlain: SharedPreferences? = null
+        @Volatile private var cachedPlainContext: Context? = null
         @Volatile private var cachedSecure: SharedPreferences? = null
+        @Volatile private var cachedSecureContext: Context? = null
         @Volatile private var migrationDone = false
 
-        private fun plainPrefs(context: Context): SharedPreferences =
-            cachedPlain ?: synchronized(this) {
-                cachedPlain ?: context.applicationContext
-                    .getSharedPreferences("portal_launcher", Context.MODE_PRIVATE)
-                    .also { cachedPlain = it }
+        private fun plainPrefs(context: Context): SharedPreferences {
+            val app = context.applicationContext
+            if (cachedPlainContext === app) cachedPlain?.let { return it }
+            return synchronized(this) {
+                if (cachedPlainContext === app) cachedPlain?.let { return@synchronized it }
+                app.getSharedPreferences("portal_launcher", Context.MODE_PRIVATE).also {
+                    cachedPlainContext = app
+                    cachedPlain = it
+                }
             }
+        }
 
-        private fun securePrefs(context: Context): SharedPreferences =
-            cachedSecure ?: synchronized(this) {
-                cachedSecure ?: run {
-                    val app = context.applicationContext
-                    runCatching {
+        private fun securePrefs(context: Context): SharedPreferences {
+            val app = context.applicationContext
+            if (cachedSecureContext === app) cachedSecure?.let { return it }
+            return synchronized(this) {
+                if (cachedSecureContext === app) cachedSecure?.let { return@synchronized it }
+                run {
+                    val result = runCatching {
                         val key = MasterKey.Builder(app).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
                         EncryptedSharedPreferences.create(
                             app, "portal_launcher_secure", key,
@@ -451,9 +535,14 @@ class Prefs(private val context: Context) {
                     }.getOrElse {
                         Log.e("Prefs", "encrypted prefs unavailable; storing secrets in plain prefs", it)
                         plainPrefs(app)
-                    }.also { cachedSecure = it }
+                    }
+                    cachedSecureContext = app
+                    cachedSecure = result
+                    migrationDone = false
+                    result
                 }
             }
+        }
     }
 }
 

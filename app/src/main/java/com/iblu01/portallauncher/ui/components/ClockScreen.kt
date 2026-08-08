@@ -2,6 +2,8 @@ package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
@@ -21,7 +24,10 @@ import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -32,13 +38,28 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.R
+import com.iblu01.portallauncher.domain.home.HomeComposition
+import com.iblu01.portallauncher.domain.home.Availability
+import com.iblu01.portallauncher.domain.home.PillRef
+import com.iblu01.portallauncher.domain.home.ResolvedPill
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -229,10 +250,137 @@ fun ClockTray(
         verticalArrangement = Arrangement.spacedBy(8.dp.scaled()),
     ) {
         if (chips.size > 3) {
+            ClockTrayControls(
+                showExpand = chips.size > 3,
+                pillsExpanded = pillsExpanded,
+                onPillsExpandedChange = onPillsExpandedChange,
+            )
+        }
+        val visible = if (pillsExpanded) chips.take(9) else chips.take(3)
+        visible.chunked(3).forEach { rowChips ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp.scaled(), Alignment.CenterHorizontally)) {
+                rowChips.forEach { chip ->
+                    StatusChip(chip, selected = chip.id == selectedChipKey, onClick = { onChipClick(chip) }, onLongPress = { onChipLongPress(chip) })
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Maison-aware tray. The composition has already applied alert/pin/dynamic precedence; this
+ * composable only renders its primary and secondary projections and reports interaction intents.
+ */
+@Composable
+fun ClockTray(
+    composition: HomeComposition,
+    pinnedRefs: Set<PillRef>,
+    manualGroups: List<ManualGroupMenuOption>,
+    actions: HomePillActions,
+    pillsExpanded: Boolean,
+    onPillsExpandedChange: (Boolean) -> Unit,
+    selectedChipKey: String? = null,
+    modifier: Modifier = Modifier,
+) {
+    val allVisible = composition.primary + composition.secondary
+    var menuTargetKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val menuTarget = allVisible.firstOrNull { it.ref.stableKey == menuTargetKey }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp.scaled())
+            .padding(bottom = 36.dp.scaled()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp.scaled()),
+    ) {
+        if (composition.secondary.isNotEmpty()) {
+            ClockTrayControls(
+                showExpand = composition.secondary.isNotEmpty(),
+                pillsExpanded = pillsExpanded,
+                onPillsExpandedChange = onPillsExpandedChange,
+            )
+        }
+        val visible = if (pillsExpanded) {
+            composition.primary + composition.secondary.take(6)
+        } else {
+            composition.primary
+        }
+        visible.chunked(3).forEach { rowPills ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp.scaled(), Alignment.CenterHorizontally)) {
+                rowPills.forEach { pill ->
+                    val available = pill.availability == Availability.AVAILABLE
+                    StatusChip(
+                        chip = pill.chip,
+                        selected = pill.chip.id == selectedChipKey,
+                        // StatusChip installs its combined tap/long-press detector only when
+                        // onClick is non-null. A guarded no-op keeps long-press available on stale
+                        // pinned pills so they can still be unpinned while commands stay blocked.
+                        onClick = { if (available) actions.onOpen(pill) },
+                        onLongPress = { menuTargetKey = pill.ref.stableKey },
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .homePillReorderDrag(pill, actions)
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = trayPillAccessibilityLabel(pill, pill.ref in pinnedRefs)
+                                role = Role.Button
+                                if (available) {
+                                    onClick(label = "Ouvrir ${pill.chip.label}") {
+                                        actions.onOpen(pill)
+                                        true
+                                    }
+                                }
+                                onLongClick(label = "Actions pour ${pill.chip.label}") {
+                                    menuTargetKey = pill.ref.stableKey
+                                    true
+                                }
+                            }
+                            .onKeyEvent { event ->
+                                if (available && event.type == KeyEventType.KeyUp &&
+                                    event.key in setOf(Key.Enter, Key.DirectionCenter, Key.Spacebar)
+                                ) {
+                                    actions.onOpen(pill)
+                                    true
+                                } else false
+                            }
+                            .focusable(),
+                    )
+                }
+            }
+        }
+    }
+
+    HomePillContextMenu(
+        target = menuTarget,
+        isPinned = menuTarget?.ref in pinnedRefs,
+        manualGroups = manualGroups,
+        actions = actions,
+        onDismiss = { menuTargetKey = null },
+    )
+}
+
+@Composable
+private fun ClockTrayControls(
+    showExpand: Boolean,
+    pillsExpanded: Boolean,
+    onPillsExpandedChange: (Boolean) -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp.scaled()),
+    ) {
+        if (showExpand) {
             Row(
-                modifier = Modifier.clip(AppleShapes.pill)
-                    .appleClickable { onPillsExpandedChange(!pillsExpanded) }
-                    .padding(horizontal = 12.dp.scaled(), vertical = 3.dp.scaled()),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .height(48.dp.scaled())
+                    .clip(AppleShapes.pill)
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = if (pillsExpanded) "Réduire les pills" else "Développer les pills",
+                    ) { onPillsExpandedChange(!pillsExpanded) }
+                    .padding(horizontal = 12.dp.scaled()),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -247,15 +395,18 @@ fun ClockTray(
                 )
             }
         }
-        val visible = if (pillsExpanded) chips.take(9) else chips.take(3)
-        visible.chunked(3).forEach { rowChips ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp.scaled(), Alignment.CenterHorizontally)) {
-                rowChips.forEach { chip ->
-                    StatusChip(chip, selected = chip.id == selectedChipKey, onClick = { onChipClick(chip) }, onLongPress = { onChipLongPress(chip) })
-                }
-            }
-        }
     }
+}
+
+internal fun trayPillAccessibilityLabel(pill: ResolvedPill, pinned: Boolean): String = buildString {
+    append(pill.chip.label)
+    if (pill.chip.value.isNotBlank()) append(", ${pill.chip.value}")
+    append(", ${pill.ref.groupDescription()}")
+    if (pinned) append(", épinglé")
+    if (pill.alert != null || pill.chip.state.equals("critical", ignoreCase = true)) {
+        append(", alerte critique")
+    }
+    if (pill.availability == Availability.STALE) append(", données figées, commandes indisponibles")
 }
 
 @Composable

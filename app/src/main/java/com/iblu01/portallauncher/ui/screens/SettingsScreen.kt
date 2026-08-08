@@ -78,7 +78,9 @@ import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.PillRule
 import com.iblu01.portallauncher.PillCandidate
 import com.iblu01.portallauncher.AutoReturnUiState
+import com.iblu01.portallauncher.HomePillPreferencesCodec
 import com.iblu01.portallauncher.MqttBridgeService
+import com.iblu01.portallauncher.domain.home.HomePillPreferences
 import com.iblu01.portallauncher.session.AppClassification
 import com.iblu01.portallauncher.session.SessionAllowlist
 import com.iblu01.portallauncher.session.SessionAllowlistCodec
@@ -97,6 +99,8 @@ import com.iblu01.portallauncher.ui.components.SettingsTile
 import com.iblu01.portallauncher.ui.components.SettingsTextField
 import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.components.backgroundModes
+import com.iblu01.portallauncher.ui.settings.HomeSettingsAction
+import com.iblu01.portallauncher.ui.settings.SettingsPillCatalog
 import com.iblu01.portallauncher.ui.onboarding.OnboardingActivity
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -133,6 +137,8 @@ class SettingsUiState {
     var pillError by mutableStateOf<String?>(null)
     val pillCandidates = mutableStateListOf<PillCandidate>()
     val pillRules = mutableStateListOf<PillRule>()
+    var homePillPreferences by mutableStateOf<HomePillPreferences>(HomePillPreferencesCodec.defaults())
+    var settingsPillCatalog by mutableStateOf(SettingsPillCatalog(emptyList(), emptyList()))
     var haTest by mutableStateOf(ConnStatus.IDLE)
     var haTestMessage by mutableStateOf<String?>(null)
     var mqttTest by mutableStateOf(ConnStatus.IDLE)
@@ -155,6 +161,7 @@ interface SettingsCallbacks {
     fun onOpenClockTheme()
     fun onLoadPillEntities()
     fun onSetPillEnabled(candidates: List<PillCandidate>, enabled: Boolean)
+    fun onHomeSettingsAction(action: HomeSettingsAction)
 }
 
 private enum class SettingsPage { MAIN, HOME, PILLS, WALLPAPER, APPLICATION, DEVELOPER, INFORMATION }
@@ -382,8 +389,11 @@ fun SettingsScreen(
             )
             SettingsPage.PILLS -> PillsSettingsPage(
                 uiState = uiState,
+                homePreferences = uiState.homePillPreferences,
+                settingsCatalog = uiState.settingsPillCatalog,
                 onRefresh = callbacks::onLoadPillEntities,
                 onSetEnabled = callbacks::onSetPillEnabled,
+                onHomeAction = callbacks::onHomeSettingsAction,
                 onBack = { currentPage = SettingsPage.MAIN },
                 showBack = showBack,
             )

@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher.ui
 
+import com.iblu01.portallauncher.ui.components.PageIdentity
+
 /** What the back gesture should do, given what is open. */
 enum class BackAction {
     CloseItemMenu,
@@ -38,3 +40,25 @@ fun backAction(
     !onClockPage -> BackAction.GoToClockPage
     else -> BackAction.Nothing
 }
+
+/**
+ * Logical-page overload used by the Maison-aware pager.
+ *
+ * Both Maison and every application page return to the main accueil. Only [PageIdentity.Clock] is
+ * already the resting destination, so Back is consumed without changing pages there.
+ */
+fun backAction(
+    itemMenuOpen: Boolean,
+    hiddenListOpen: Boolean,
+    widgetPickerOpen: Boolean = false,
+    quickActionsOpen: Boolean,
+    userPanelOpen: Boolean,
+    currentPage: PageIdentity,
+): BackAction = backAction(
+    itemMenuOpen = itemMenuOpen,
+    hiddenListOpen = hiddenListOpen,
+    widgetPickerOpen = widgetPickerOpen,
+    quickActionsOpen = quickActionsOpen,
+    userPanelOpen = userPanelOpen,
+    onClockPage = currentPage == PageIdentity.Clock,
+)

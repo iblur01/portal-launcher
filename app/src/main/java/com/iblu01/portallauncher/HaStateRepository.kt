@@ -71,6 +71,12 @@ class HaStateRepository(appContext: Context, private val url: String, private va
     /** entity_id -> area display name, resolved from the HA area/entity/device registries. */
     @Volatile var areaByEntity: Map<String, String> = emptyMap()
         private set
+    /** entity_id -> stable area_id. Entity assignment wins, then the entity's device area. */
+    @Volatile var areaIdByEntity: Map<String, String> = emptyMap()
+        private set
+    /** Stable area_id -> current HA display name. Names are rendering metadata, never identity. */
+    @Volatile var areaNameById: Map<String, String> = emptyMap()
+        private set
     @Volatile var deviceIdByEntity: Map<String, String> = emptyMap()
         private set
     @Volatile var entityRegistryResolved: Boolean = false
@@ -106,6 +112,8 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                     dailyForecast = dailyForecast,
                     deviceIdByEntity = deviceIdByEntity,
                     entityRegistryResolved = entityRegistryResolved,
+                    areaIdByEntity = areaIdByEntity,
+                    areaNameById = areaNameById,
                 )
             )
         }
@@ -229,15 +237,21 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         return m
     }
 
-    /** Rebuild entity->area name once registries arrive; area on the entity wins, else its device's area. */
+    /** Rebuild stable ids and legacy display-name lookup from the same registry frame. */
     private fun resolveAreas() {
-        if (areaNames.isEmpty() || entityAreaId.isEmpty()) return
-        val resolved = entityAreaId.keys.mapNotNull { eid ->
-            val areaId = entityAreaId[eid] ?: entityDeviceId[eid]?.let { deviceAreaId[it] }
-            val name = areaId?.let { areaNames[it] } ?: return@mapNotNull null
-            eid to name
+        val resolvedIds = resolveAreaIds(entityAreaId, entityDeviceId, deviceAreaId)
+        val resolvedNames = resolvedIds.mapNotNull { (entityId, areaId) ->
+            areaNames[areaId]?.let { entityId to it }
         }.toMap()
-        if (resolved != areaByEntity) { areaByEntity = resolved; notifyListeners() }
+        val changed = resolvedIds != areaIdByEntity ||
+            areaNames != areaNameById ||
+            resolvedNames != areaByEntity
+        if (changed) {
+            areaIdByEntity = resolvedIds
+            areaNameById = areaNames
+            areaByEntity = resolvedNames
+            notifyListeners()
+        }
     }
 
     private fun parseState(o: JSONObject): HaEntity? {
@@ -410,3 +424,14 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         const val RESOURCES_ID = 10
     }
 }
+
+/** Pure registry resolver shared with tests: an entity-level area always overrides its device. */
+internal fun resolveAreaIds(
+    entityAreaId: Map<String, String?>,
+    entityDeviceId: Map<String, String?>,
+    deviceAreaId: Map<String, String?>,
+): Map<String, String> = entityAreaId.keys.mapNotNull { entityId ->
+    val areaId = entityAreaId[entityId]
+        ?: entityDeviceId[entityId]?.let(deviceAreaId::get)
+    areaId?.takeIf(String::isNotBlank)?.let { entityId to it }
+}.toMap()

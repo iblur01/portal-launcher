@@ -3,13 +3,12 @@ package com.iblu01.portallauncher.ui.mapper
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.ui.model.ChipAction
-import com.iblu01.portallauncher.ui.model.ChipPlacement
 import com.iblu01.portallauncher.ui.model.PanelKind
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Validates the chip → PanelKind / ChipAction / ChipPlacement routing rules (design §4/§7).
+ * Validates the chip → PanelKind / ChipAction routing rules (design §4/§7).
  * These are the rules that replaced the scattered `chip.id == "…"` / `chip.kind` branching.
  */
 class ChipMapperTest {
@@ -26,10 +25,10 @@ class ChipMapperTest {
         assertEquals(PanelKind.MEDIA, chip(id = "media_group").toPanelKind())
         assertEquals(PanelKind.LIGHTS, chip(id = "lights_group").toPanelKind())
         assertEquals(PanelKind.PURIFIER, chip(id = "purifier_group").toPanelKind())
-        assertEquals(PanelKind.SCENES, chip(id = "scenes_group").toPanelKind())
-        assertEquals(PanelKind.PRESENCE, chip(id = "presence_group").toPanelKind())
-        assertEquals(PanelKind.ENERGY, chip(id = "energy_group").toPanelKind())
-        assertEquals(PanelKind.AIR_QUALITY, chip(id = "air_group").toPanelKind())
+        assertEquals(PanelKind.GENERIC_DETAILS, chip(id = "scenes_group").toPanelKind())
+        assertEquals(PanelKind.GENERIC_DETAILS, chip(id = "presence_group").toPanelKind())
+        assertEquals(PanelKind.GENERIC_DETAILS, chip(id = "energy_group").toPanelKind())
+        assertEquals(PanelKind.GENERIC_DETAILS, chip(id = "air_group").toPanelKind())
     }
 
     // --- toPanelKind: PillKind ------------------------------------------------------------------
@@ -42,6 +41,9 @@ class ChipMapperTest {
         assertEquals(PanelKind.FAN, chip(kind = PillKind.FAN).toPanelKind())
         assertEquals(PanelKind.SWITCH, chip(kind = PillKind.SWITCH).toPanelKind())
         assertEquals(PanelKind.WASHER, chip(kind = PillKind.APPLIANCE).toPanelKind())
+        assertEquals(PanelKind.LIGHTS, chip(id = "light.kitchen", kind = PillKind.LIGHTS).toPanelKind())
+        assertEquals(PanelKind.MEDIA, chip(id = "media_player.living", kind = PillKind.MEDIA).toPanelKind())
+        assertEquals(PanelKind.PURIFIER, chip(id = "fan.purifier", kind = PillKind.PURIFIER).toPanelKind())
     }
 
     // --- alarm-vs-generic-safety split (was SidePanel.kt:179) ----------------------------------
@@ -71,8 +73,12 @@ class ChipMapperTest {
 
     // --- toChipAction ---------------------------------------------------------------------------
 
-    @Test fun `switch and fan tap toggle their service, not open a panel`() {
-        assertEquals(ChipAction.ServiceToggle("switch", "toggle"), chip(kind = PillKind.SWITCH).toChipAction())
+    @Test fun `switch opens its panel while fan retains direct toggle`() {
+        assertEquals(ChipAction.OpenPanel(PanelKind.SWITCH), chip(kind = PillKind.SWITCH).toChipAction())
+        assertEquals(
+            ChipAction.OpenPanel(PanelKind.SWITCH),
+            chip(kind = PillKind.SWITCH, entityId = "input_boolean.guest").toChipAction(),
+        )
         assertEquals(ChipAction.ServiceToggle("fan", "toggle"), chip(kind = PillKind.FAN).toChipAction())
     }
 
@@ -82,11 +88,4 @@ class ChipMapperTest {
         assertEquals(ChipAction.OpenPanel(PanelKind.LIGHTS), chip(id = "lights_group").toChipAction())
     }
 
-    // --- chipPlacement --------------------------------------------------------------------------
-
-    @Test fun `presence floats, everything else is tray`() {
-        assertEquals(ChipPlacement.FLOATING, chip(id = "presence_group").chipPlacement())
-        assertEquals(ChipPlacement.TRAY, chip(id = "lights_group").chipPlacement())
-        assertEquals(ChipPlacement.TRAY, chip(kind = PillKind.LOCK).chipPlacement())
-    }
 }

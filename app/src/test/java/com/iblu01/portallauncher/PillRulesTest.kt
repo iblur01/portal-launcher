@@ -20,11 +20,16 @@ class PillRulesTest {
 
     // --- PillFamily ---
 
-    @Test fun `every kind belongs to exactly one family`() {
-        PillKind.values().forEach { kind ->
+    @Test fun `every supported kind belongs to exactly one family`() {
+        val legacyUnsupported = setOf(
+            PillKind.AIR, PillKind.CLIMATE, PillKind.BATTERY,
+            PillKind.SCENE, PillKind.PRESENCE, PillKind.ENERGY,
+        )
+        PillKind.values().filterNot { it in legacyUnsupported }.forEach { kind ->
             val families = PillFamily.values().filter { kind in it.kinds }
             assertEquals("kind $kind should be in exactly one family", 1, families.size)
         }
+        legacyUnsupported.forEach { assertEquals(null, PillFamily.of(it)) }
     }
 
     @Test fun `family grouping matches plain-language buckets`() {
@@ -32,9 +37,8 @@ class PillRulesTest {
         assertEquals(PillFamily.SECURITY, PillFamily.of(PillKind.OPENING))
         assertEquals(PillFamily.COMFORT, PillFamily.of(PillKind.THERMOSTAT))
         assertEquals(PillFamily.APPLIANCES, PillFamily.of(PillKind.VACUUM))
-        assertEquals(PillFamily.LIGHTS_SCENES, PillFamily.of(PillKind.LIGHTS))
+        assertEquals(PillFamily.LIGHTS, PillFamily.of(PillKind.LIGHTS))
         assertEquals(PillFamily.MEDIA, PillFamily.of(PillKind.MEDIA))
-        assertEquals(PillFamily.HOME, PillFamily.of(PillKind.PRESENCE))
     }
 
     // --- friendlyEntityState ---
@@ -97,7 +101,7 @@ class PillRulesTest {
         val expected = mapOf(
             "humidifier.x" to PillKind.HUMIDIFIER, "water_heater.x" to PillKind.WATER_HEATER,
             "valve.x" to PillKind.VALVE, "siren.x" to PillKind.SIREN,
-            "lawn_mower.x" to PillKind.LAWN_MOWER, "device_tracker.x" to PillKind.PRESENCE,
+            "lawn_mower.x" to PillKind.LAWN_MOWER,
         )
         expected.forEach { (id, kind) ->
             val e = entity(id, "on")
@@ -106,30 +110,31 @@ class PillRulesTest {
         }
     }
 
-    @Test fun `activity sensors are distinct from people presence`() {
-        listOf("motion", "occupancy", "presence", "moving", "vibration", "sound", "running").forEach {
+    @Test fun `only movement and opening binary sensors are supported`() {
+        listOf("motion", "occupancy", "moving").forEach {
             assertEquals(PillKind.GENERIC, PillSupport.kind(entity("binary_sensor.x", "on", it)))
             assertTrue(PillSupport.isSupported(entity("binary_sensor.x", "on", it)))
         }
-        assertEquals(PillKind.PRESENCE, PillSupport.kind(entity("person.x", "home")))
-        assertEquals(PillKind.PRESENCE, PillSupport.kind(entity("device_tracker.x", "home")))
-    }
-
-    @Test fun `only actionable binary alerts are chip candidates`() {
-        listOf("problem", "safety", "connectivity", "battery").forEach {
+        listOf("door", "window", "opening", "garage_door").forEach {
+            assertEquals(PillKind.OPENING, PillSupport.kind(entity("binary_sensor.x", "on", it)))
             assertTrue(it, PillSupport.isSupported(entity("binary_sensor.x", "on", it)))
         }
-        listOf("battery_charging", "plug", "power", "heat", "cold", "light").forEach {
+        listOf("presence", "vibration", "sound", "running", "problem", "safety", "connectivity", "battery").forEach {
             assertFalse(it, PillSupport.isSupported(entity("binary_sensor.x", "on", it)))
         }
+        assertFalse(PillSupport.isSupported(entity("person.x", "home")))
+        assertFalse(PillSupport.isSupported(entity("device_tracker.x", "home")))
     }
 
-    @Test fun `air and energy sensors remain available but passive diagnostics do not`() {
-        listOf("co", "co2", "pm1", "pm4", "ozone", "radon", "energy", "power", "current", "voltage").forEach {
-            assertTrue(it, PillSupport.isSupported(entity("sensor.x", "1", it)))
-        }
-        listOf("illuminance", "atmospheric_pressure", "signal_strength", "water", "volume_storage", "duration", "timestamp", "uptime").forEach {
+    @Test fun `passive sensors scenes and location entities are not pill candidates`() {
+        listOf(
+            "co", "co2", "pm1", "pm4", "ozone", "radon", "energy", "power", "current",
+            "voltage", "temperature", "humidity", "battery", "illuminance", "signal_strength",
+        ).forEach {
             assertFalse(it, PillSupport.isSupported(entity("sensor.x", "1", it)))
+        }
+        listOf("scene.evening", "script.good_night", "person.alex", "device_tracker.phone").forEach {
+            assertFalse(it, PillSupport.isSupported(entity(it, "on")))
         }
     }
 

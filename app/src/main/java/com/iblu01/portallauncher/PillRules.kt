@@ -83,14 +83,15 @@ data class PillRule(
  */
 enum class PillFamily(val label: String, val kinds: Set<PillKind>) {
     SECURITY("Sécurité & accès", setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING, PillKind.SIREN)),
-    COMFORT("Confort & air", setOf(PillKind.CLIMATE, PillKind.THERMOSTAT, PillKind.AIR, PillKind.PURIFIER, PillKind.FAN, PillKind.COVER, PillKind.HUMIDIFIER, PillKind.WATER_HEATER)),
-    APPLIANCES("Appareils & énergie", setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.ENERGY, PillKind.BATTERY, PillKind.VALVE, PillKind.LAWN_MOWER)),
-    LIGHTS_SCENES("Lumières & scènes", setOf(PillKind.LIGHTS, PillKind.SCENE)),
+    COMFORT("Confort", setOf(PillKind.THERMOSTAT, PillKind.PURIFIER, PillKind.FAN, PillKind.COVER, PillKind.HUMIDIFIER, PillKind.WATER_HEATER)),
+    APPLIANCES("Appareils", setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.VALVE, PillKind.LAWN_MOWER)),
+    LIGHTS("Lumières", setOf(PillKind.LIGHTS)),
     MEDIA("Médias", setOf(PillKind.MEDIA)),
-    HOME("Maison & présence", setOf(PillKind.PRESENCE, PillKind.TIMER, PillKind.GENERIC));
+    HOME("Maison", setOf(PillKind.TIMER, PillKind.GENERIC));
 
     companion object {
-        fun of(kind: PillKind): PillFamily = values().first { kind in it.kinds }
+        /** Legacy codec kinds intentionally have no Settings family once their support is removed. */
+        fun of(kind: PillKind): PillFamily? = values().firstOrNull { kind in it.kinds }
     }
 }
 
@@ -167,14 +168,9 @@ object PillRuleCodec {
 }
 
 object PillSupport {
-    private val safetyClasses = setOf("smoke", "carbon_monoxide", "co", "gas", "moisture", "safety", "tamper", "problem")
     private val openingClasses = setOf("door", "window", "opening", "garage_door")
-    /** Short-lived activity signals, deliberately distinct from people/location presence. */
-    private val activityClasses = setOf("motion", "occupancy", "presence", "moving", "vibration", "sound", "running")
-    /** Diagnostics useful as chips only while they report a fault. */
-    private val alertBinaryClasses = setOf("connectivity", "battery")
-    private val airClasses = setOf("aqi", "carbon_dioxide", "co2", "carbon_monoxide", "co", "nitrogen_dioxide", "nitrogen_monoxide", "nitrous_oxide", "ozone", "pm1", "pm25", "pm4", "pm10", "radon", "sulphur_dioxide", "volatile_organic_compounds", "volatile_organic_compounds_parts")
-    private val energyClasses = setOf("energy", "power", "current", "voltage")
+    /** Only short-lived movement signals remain eligible; location/presence is intentionally out. */
+    private val motionClasses = setOf("motion", "occupancy", "moving")
     private val applianceTokens = setOf("washer", "washing", "machine_a_laver", "dryer", "seche_linge", "dishwasher", "lave_vaisselle", "p2s", "printer", "imprimante")
     fun isSupported(e: HaEntity) = isPrimary(e)
     fun isAllowedAsPersistedChip(rule: PillRule, e: HaEntity): Boolean {
@@ -192,10 +188,8 @@ object PillSupport {
     private fun isPrimary(e: HaEntity): Boolean = when {
         e.domain in setOf("light", "media_player", "fan", "switch", "cover") -> true
         e.domain in setOf("lock", "vacuum", "timer", "climate", "alarm_control_panel") -> true
-        e.domain in setOf("scene", "script", "humidifier", "water_heater", "valve", "siren", "lawn_mower", "input_boolean") -> true
-        e.domain in setOf("person", "device_tracker") -> true
-        e.domain == "binary_sensor" && e.deviceClass in (openingClasses + safetyClasses + activityClasses + alertBinaryClasses) -> true
-        e.domain == "sensor" && e.deviceClass in (airClasses + energyClasses + setOf("temperature", "humidity", "battery")) -> true
+        e.domain in setOf("humidifier", "water_heater", "valve", "siren", "lawn_mower", "input_boolean") -> true
+        e.domain == "binary_sensor" && e.deviceClass in (openingClasses + motionClasses) -> true
         // Only the appliance's MAIN state sensor is a primary pill; sub-sensors like
         // "_etat_du_cycle" get absorbed as related (see candidates()), not shown separately.
         e.domain == "sensor" && e.deviceClass == "enum" && applianceTokens.any { e.entityId.contains(it) } &&
@@ -214,19 +208,13 @@ object PillSupport {
         e.domain == "lawn_mower" -> PillKind.LAWN_MOWER
         e.domain in setOf("switch", "input_boolean") -> PillKind.SWITCH
         e.domain == "cover" -> PillKind.COVER
-        e.domain == "scene" || e.domain == "script" -> PillKind.SCENE
-        e.domain in setOf("person", "device_tracker") -> PillKind.PRESENCE
-        e.domain == "binary_sensor" && e.deviceClass in activityClasses -> PillKind.GENERIC
-        e.domain == "alarm_control_panel" || e.deviceClass in safetyClasses -> PillKind.SAFETY
+        e.domain == "binary_sensor" && e.deviceClass in motionClasses -> PillKind.GENERIC
+        e.domain == "alarm_control_panel" -> PillKind.SAFETY
         e.domain == "lock" || e.deviceClass == "lock" -> PillKind.LOCK
         e.deviceClass in openingClasses -> PillKind.OPENING
         e.domain == "vacuum" -> PillKind.VACUUM
         e.domain == "timer" -> PillKind.TIMER
-        e.deviceClass == "battery" -> PillKind.BATTERY
-        e.deviceClass in airClasses -> PillKind.AIR
         e.domain == "climate" -> PillKind.THERMOSTAT
-        e.deviceClass in setOf("temperature", "humidity") -> PillKind.CLIMATE
-        e.deviceClass in energyClasses -> PillKind.ENERGY
         applianceTokens.any { e.entityId.contains(it) } -> PillKind.APPLIANCE
         else -> PillKind.GENERIC
     }

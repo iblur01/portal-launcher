@@ -2,6 +2,10 @@ package com.iblu01.portallauncher.domain.model
 
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.LauncherChip
+import com.iblu01.portallauncher.domain.home.HomeComposition
+import com.iblu01.portallauncher.domain.home.HomePageModel
+import com.iblu01.portallauncher.domain.home.HomePillPreferences
+import com.iblu01.portallauncher.domain.home.PillCatalogSnapshot
 
 /**
  * Pure domain models — no Compose, no Android UI imports. Moved out of `MockContent.kt`
@@ -23,6 +27,10 @@ data class HaSnapshot(
     val dailyForecast: List<ForecastPoint>,
     val deviceIdByEntity: Map<String, String> = emptyMap(),
     val entityRegistryResolved: Boolean = false,
+    /** Stable HA area identity. Entity assignment wins over its device assignment. */
+    val areaIdByEntity: Map<String, String> = emptyMap(),
+    /** Display metadata kept separate from [areaIdByEntity] so names are never persisted. */
+    val areaNameById: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -42,6 +50,26 @@ data class PillSnapshot(
     val weatherEntityId: String?,
     val hourlyForecast: List<ForecastPoint>,
     val dailyForecast: List<ForecastPoint>,
+    /** Stable area metadata used by automatic groups; [areaByEntity] remains for legacy panels. */
+    val areaIdByEntity: Map<String, String> = emptyMap(),
+    val areaNameById: Map<String, String> = emptyMap(),
+    /** Complete, non-truncated live catalog. */
+    val catalog: PillCatalogSnapshot = PillCatalogSnapshot(
+        devices = emptyMap(),
+        groups = emptyMap(),
+        availability = emptyMap(),
+        dynamicCandidates = emptyList(),
+    ),
+    /** Exact preferences used for [homeComposition] and [homePage] in this atomic frame. */
+    val homePreferences: HomePillPreferences = HomePillPreferences(
+        schemaVersion = 1,
+        homePageEnabled = true,
+        pinnedOrder = emptyList(),
+        homeSections = emptyList(),
+        manualGroups = emptyList(),
+    ),
+    val homeComposition: HomeComposition = HomeComposition(emptyList(), emptyList(), emptyList()),
+    val homePage: HomePageModel = HomePageModel(emptyList(), hasCompatibleDevices = false),
 )
 
 // NOTE: a typed `ChipVisual` enum was considered here to replace the stringly-typed

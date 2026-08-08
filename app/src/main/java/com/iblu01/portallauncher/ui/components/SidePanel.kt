@@ -41,6 +41,7 @@ import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.domain.model.PlayingMedia
+import com.iblu01.portallauncher.domain.home.PillGroupSnapshot
 import com.iblu01.portallauncher.ui.mapper.toPanelKind
 import com.iblu01.portallauncher.ui.model.PanelKind
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -61,6 +62,11 @@ sealed interface PanelContent {
     data object MediaBrowser : PanelContent
     data class ChipActions(val chip: LauncherChip) : PanelContent
     data class Weather(val weather: WeatherUi) : PanelContent
+    data class Group(
+        val group: PillGroupSnapshot,
+        val selectedDevice: LauncherChip?,
+        val deviceRequested: Boolean,
+    ) : PanelContent
 }
 
 /**
@@ -73,6 +79,9 @@ fun ChipActionsPanel(
     chip: LauncherChip,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    navigationIcon: ImageVector = Icons.Filled.Close,
+    navigationContentDescription: String? = null,
+    onClose: (() -> Unit)? = null,
 ) {
     val accent = launcherChipAccent(chip)
     // Same large frosted card as the media player panel.
@@ -97,14 +106,25 @@ fun ChipActionsPanel(
                     )
                 )
             )
-            var lightDetail by remember(chip.id) { mutableStateOf<PillDetail?>(null) }
+            val directLightDetail = chip.individualLightDetailOrNull()
+            var lightDetail by remember(chip.id) { mutableStateOf(directLightDetail) }
             val detail = lightDetail
-            if (chip.toPanelKind() == PanelKind.AIR_QUALITY) {
-                AirQualityContent(chip = chip, onBack = onDismiss)
-            } else if (detail != null) {
-                LightDetailContent(detail = detail, onBack = { lightDetail = null })
+            if (detail != null) {
+                LightDetailContent(
+                    detail = detail,
+                    onBack = if (directLightDetail != null) onDismiss else fun() { lightDetail = null },
+                    closePanel = directLightDetail != null,
+                )
             } else {
-                ChipActionsContent(chip, accent, onDismiss, onOpenLight = { lightDetail = it })
+                ChipActionsContent(
+                    chip = chip,
+                    accent = accent,
+                    onDismiss = onDismiss,
+                    navigationIcon = navigationIcon,
+                    navigationContentDescription = navigationContentDescription,
+                    onClose = onClose,
+                    onOpenLight = { lightDetail = it },
+                )
             }
         }
     }
@@ -115,6 +135,9 @@ private fun ChipActionsContent(
     chip: LauncherChip,
     accent: Color,
     onDismiss: () -> Unit,
+    navigationIcon: ImageVector,
+    navigationContentDescription: String?,
+    onClose: (() -> Unit)?,
     onOpenLight: (PillDetail) -> Unit,
 ) {
     val entity = rememberEntity(chip.entityId)
@@ -142,12 +165,14 @@ private fun ChipActionsContent(
         PanelHeader(
             title = chip.label,
             onNavigation = onDismiss,
-            navigationIcon = Icons.Filled.Close,
-            navigationContentDescription = stringResource(R.string.side_panel_close_desc),
+            navigationIcon = navigationIcon,
+            navigationContentDescription = navigationContentDescription
+                ?: stringResource(R.string.side_panel_close_desc),
             titleIcon = launcherIcon(chip.icon),
             titleEntityId = chip.entityId,
             accent = accent,
             batteryPercent = batteryPercent,
+            onClose = onClose,
         )
 
         Spacer(Modifier.height(if (showHeadlineValue) 14.dp.scaled() else 8.dp.scaled()))
@@ -196,9 +221,6 @@ private fun ChipActionsContent(
                     when (chip.toPanelKind()) {
                 PanelKind.LIGHTS -> LightsActions(chip, onOpenLight)
                 PanelKind.PURIFIER -> Unit // Bounded branch above.
-                PanelKind.SCENES -> ScenesActions(chip)
-                PanelKind.PRESENCE -> PresenceActions(chip)
-                PanelKind.ENERGY -> EnergyActions(chip)
                 PanelKind.LOCK -> Unit // Bounded branch above.
                 PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH -> Unit // Bounded branch above.
                 PanelKind.THERMOSTAT -> ThermostatControl(chip)
@@ -207,10 +229,14 @@ private fun ChipActionsContent(
                 PanelKind.WASHER -> WasherControl(chip)
                 PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
                 PanelKind.LAWN_MOWER -> Unit // Bounded branch above.
-                // AIR_QUALITY is rendered full-screen upstream in ChipActionsPanel; MEDIA/WEATHER
-                // are separate PanelContent types and never reach the chip-actions router.
-                PanelKind.AIR_QUALITY, PanelKind.MEDIA, PanelKind.WEATHER,
-                PanelKind.GENERIC_DETAILS -> chip.details.forEach { PanelDetailRow(it) }
+                // Direct media pills are routed to MediaPlayerPanel upstream. A media member opened
+                // from a group can still reach this nested renderer, so retain a meaningful status
+                // row instead of presenting a completely empty panel.
+                PanelKind.MEDIA -> chip.details
+                    .ifEmpty { listOf(PillDetail("État", chip.value, chip.entityId)) }
+                    .forEach { PanelDetailRow(it) }
+                PanelKind.WEATHER, PanelKind.GENERIC_DETAILS ->
+                    chip.details.forEach { PanelDetailRow(it) }
                     }
                 }
             }
@@ -232,6 +258,8 @@ internal fun PanelHeader(
     accent: Color = AppleColors.primary,
     batteryPercent: Int? = null,
     onTitleClick: (() -> Unit)? = null,
+    /** Optional second action used by nested group pages: Back pops, Close dismisses the stack. */
+    onClose: (() -> Unit)? = null,
 ) {
     val batteryColor = when {
         batteryPercent == null -> AppleColors.secondary
@@ -302,6 +330,23 @@ internal fun PanelHeader(
                 ),
                 color = batteryColor,
             )
+        }
+        if (onClose != null) {
+            Spacer(Modifier.size(8.dp.scaled()))
+            Box(
+                modifier = Modifier
+                    .size(48.dp.scaled())
+                    .clip(CircleShape)
+                    .clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.side_panel_close_desc),
+                    tint = AppleColors.secondary,
+                    modifier = Modifier.size(22.dp.scaled()),
+                )
+            }
         }
     }
 }

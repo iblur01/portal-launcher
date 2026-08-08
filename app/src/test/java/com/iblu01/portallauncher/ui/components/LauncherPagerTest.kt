@@ -27,6 +27,7 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -228,5 +229,96 @@ class LauncherPagerTest {
         rule.onNodeWithTag("header").performClick()
         rule.waitForIdle()
         assertEquals("the collapsed clock must not launch HA from the app grid", 1, taps)
+    }
+
+    @Test
+    fun `logical pages map to explicit physical indices with and without Maison`() {
+        val withoutHouse = LauncherPagerLayout(homePageEnabled = false, appPageCount = 2)
+        assertNull(withoutHouse.pageOf(PageIdentity.House))
+        assertEquals(0, withoutHouse.pageOf(PageIdentity.Clock))
+        assertEquals(1, withoutHouse.pageOf(PageIdentity.Apps(0)))
+        assertEquals(2, withoutHouse.pageOf(PageIdentity.Apps(1)))
+        assertEquals(3, withoutHouse.pageCount)
+
+        val withHouse = LauncherPagerLayout(homePageEnabled = true, appPageCount = 2)
+        assertEquals(0, withHouse.pageOf(PageIdentity.House))
+        assertEquals(1, withHouse.pageOf(PageIdentity.Clock))
+        assertEquals(2, withHouse.pageOf(PageIdentity.Apps(0)))
+        assertEquals(3, withHouse.pageOf(PageIdentity.Apps(1)))
+        assertEquals(4, withHouse.pageCount)
+        assertEquals(PageIdentity.Apps(1), withHouse.identityOf(3))
+        assertNull(withHouse.identityOf(4))
+        assertEquals(1, appPageOf(3, withHouse))
+        assertNull(appPageOf(withHouse.clockPage, withHouse))
+    }
+
+    @Test
+    fun `hot Maison toggle remaps by identity and never shifts an app page`() {
+        val withoutHouse = LauncherPagerLayout(homePageEnabled = false, appPageCount = 3)
+        val withHouse = LauncherPagerLayout(homePageEnabled = true, appPageCount = 3)
+
+        assertEquals(
+            withHouse.pageOf(PageIdentity.Apps(1)),
+            remapPage(withoutHouse.pageOf(PageIdentity.Apps(1))!!, withoutHouse, withHouse),
+        )
+        assertEquals(
+            withoutHouse.pageOf(PageIdentity.Apps(1)),
+            remapPage(withHouse.pageOf(PageIdentity.Apps(1))!!, withHouse, withoutHouse),
+        )
+        assertEquals(
+            "disabling Maison while it is visible falls back to the main accueil",
+            withoutHouse.clockPage,
+            remapPage(withHouse.housePage!!, withHouse, withoutHouse),
+        )
+    }
+
+    @Test
+    fun `a removed app page falls back safely instead of producing an invalid index`() {
+        val previous = LauncherPagerLayout(homePageEnabled = true, appPageCount = 3)
+        val next = LauncherPagerLayout(homePageEnabled = false, appPageCount = 1)
+
+        assertEquals(
+            next.firstAppPage,
+            remapPage(previous.pageOf(PageIdentity.Apps(2))!!, previous, next),
+        )
+        assertEquals(
+            LauncherPagerLayout(false, 0).clockPage,
+            remapPage(
+                previous.pageOf(PageIdentity.Apps(2))!!,
+                previous,
+                LauncherPagerLayout(false, 0),
+            ),
+        )
+    }
+
+    @Test
+    fun `Maison is left of the initial clock and owns the header`() {
+        lateinit var state: PagerState
+        val layout = LauncherPagerLayout(homePageEnabled = true, appPageCount = 1)
+        rule.setContent {
+            state = rememberLauncherPagerState(
+                homePageEnabled = { true },
+                appPageCount = { 1 },
+            )
+            LauncherPager(
+                state = state,
+                userScrollEnabled = true,
+                pageLayout = layout,
+                header = { Box(Modifier.width(120.dp).height(HEADER_HEIGHT).testTag("header")) },
+                housePage = { Box(Modifier.fillMaxSize().testTag("housePage")) },
+                clockPage = { Box(Modifier.fillMaxSize().testTag("clockPage")) },
+                appPage = { _, _ -> Box(Modifier.fillMaxSize().testTag("appsPage")) },
+            )
+        }
+        rule.waitForIdle()
+
+        assertEquals("the logical accueil remains the initial page", layout.clockPage, state.currentPage)
+        rule.onNodeWithTag("clockPage").performTouchInput { swipeRight() }
+        rule.waitForIdle()
+
+        assertEquals(layout.housePage, state.currentPage)
+        rule.onNodeWithTag("housePage").performTouchInput { swipeLeft() }
+        rule.waitForIdle()
+        assertEquals(layout.clockPage, state.currentPage)
     }
 }

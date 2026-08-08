@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher.ui.screens
 
+import android.annotation.SuppressLint
 import android.app.WallpaperManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -425,11 +426,14 @@ private fun WallpaperSourceGrid(
 }
 
 @Composable
+@SuppressLint("MissingPermission")
 private fun SourcePreview(mode: String, hasPhoto: Boolean, wallpaperVersion: Int) {
     val context = LocalContext.current
     when {
         mode == "system" -> {
             val drawable = remember(context, wallpaperVersion) {
+                // Some Android builds restrict current-wallpaper reads. The preview is optional;
+                // SecurityException is contained and degrades to PlaceholderPreview below.
                 runCatching { WallpaperManager.getInstance(context).drawable }.getOrNull()
             }
             if (drawable == null) {

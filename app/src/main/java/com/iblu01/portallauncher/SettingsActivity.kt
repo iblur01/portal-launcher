@@ -19,6 +19,9 @@ import com.iblu01.portallauncher.ui.screens.SettingsCallbacks
 import com.iblu01.portallauncher.ui.screens.SettingsForm
 import com.iblu01.portallauncher.ui.screens.SettingsScreen
 import com.iblu01.portallauncher.ui.screens.SettingsUiState
+import com.iblu01.portallauncher.ui.settings.HomeSettingsAction
+import com.iblu01.portallauncher.ui.settings.HomeSettingsCatalogBuilder
+import com.iblu01.portallauncher.ui.settings.HomeSettingsReducer
 import com.iblu01.portallauncher.ui.theme.PortalTheme
 import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
@@ -35,6 +38,13 @@ class SettingsActivity : ComponentActivity() {
     @Inject lateinit var prefs: Prefs
     @Inject lateinit var pills: PillRepository
     private val uiState = SettingsUiState()
+    private var settingsCatalogConnected = false
+    private val pillListener = PillRepository.Listener {
+        runOnUiThread {
+            syncHomeSettingsFromRepository()
+            refreshPillSettingsCatalog()
+        }
+    }
 
     private val autoReturnTimer by lazy {
         AutoReturnTimer(lifecycleScope, prefs, onAutoReturn = { finish() })
@@ -50,6 +60,9 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         uiState.pillRules.addAll(prefs.pillRules)
+        uiState.homePillPreferences = prefs.homePillPreferences
+        syncHomeSettingsFromRepository()
+        refreshPillSettingsCatalog()
         savedMqttSignature = mqttSignature(prefs.brokerHost, prefs.brokerPort, prefs.username, prefs.password, prefs.deviceName)
 
         val apps = resolveInstalledApps()
@@ -79,11 +92,15 @@ class SettingsActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        syncHomeSettingsFromRepository()
+        refreshPillSettingsCatalog()
+        pills.addListener(pillListener)
         MqttBridgeService.start(this)
         autoReturnTimer.start()
     }
 
     override fun onPause() {
+        pills.removeListener(pillListener)
         autoReturnTimer.stop()
         super.onPause()
     }
@@ -186,15 +203,24 @@ class SettingsActivity : ComponentActivity() {
                 val entities = if (result.ok) parseHaEntities(result.body.orEmpty()) else emptyList()
                 runOnUiThread {
                     uiState.pillLoading = false
-                    val candidates = PillSupport.candidates(entities, pills.latestDeviceIds).sortedWith(compareBy({ it.kind.ordinal }, { it.label.lowercase() }))
-                    uiState.pillCandidates.clear()
-                    uiState.pillCandidates.addAll(candidates)
-                    val hydrated = uiState.pillRules.map { old ->
-                        candidates.firstOrNull { it.primary.entityId == old.entityId }?.let { candidate ->
-                            old.copy(kind = candidate.kind, label = candidate.label, relatedEntityIds = candidate.related.map { it.entityId })
-                        } ?: old
+                    settingsCatalogConnected = result.ok
+                    if (result.ok) {
+                        val candidates = PillSupport.candidates(entities, pills.latestDeviceIds).sortedWith(
+                            compareBy({ it.kind.ordinal }, { it.label.lowercase() }),
+                        )
+                        uiState.pillCandidates.clear()
+                        uiState.pillCandidates.addAll(candidates)
+                        val hydrated = uiState.pillRules.map { old ->
+                            candidates.firstOrNull { it.primary.entityId == old.entityId }?.let { candidate ->
+                                old.copy(kind = candidate.kind, label = candidate.label, relatedEntityIds = candidate.related.map { it.entityId })
+                            } ?: old
+                        }
+                        uiState.pillRules.clear()
+                        uiState.pillRules.addAll(hydrated)
+                        prefs.pillRules = hydrated
+                        SettingsChangeBus.get().emit("pillRules")
                     }
-                    uiState.pillRules.clear(); uiState.pillRules.addAll(hydrated); prefs.pillRules = hydrated
+                    refreshPillSettingsCatalog()
                     if (!result.ok) uiState.pillError = "Maison injoignable (code ${result.statusCode})"
                 }
             }.also { it.isDaemon = true }.start()
@@ -209,6 +235,40 @@ class SettingsActivity : ComponentActivity() {
             }
             uiState.pillRules.clear(); uiState.pillRules.addAll(rules)
             prefs.pillRules = rules
+            refreshPillSettingsCatalog()
+            SettingsChangeBus.get().emit("pillRules")
+        }
+
+        override fun onHomeSettingsAction(action: HomeSettingsAction) {
+            uiState.homePillPreferences = prefs.updateHomePillPreferences { current ->
+                HomeSettingsReducer.reduce(current, action)
+            }
+            refreshPillSettingsCatalog()
+        }
+    }
+
+    private fun refreshPillSettingsCatalog() {
+        uiState.settingsPillCatalog = HomeSettingsCatalogBuilder.build(
+            candidates = uiState.pillCandidates,
+            rules = uiState.pillRules,
+            areaIdByEntity = pills.latestAreaIdByEntity,
+            areaNameById = pills.latestAreaNameById,
+            connected = settingsCatalogConnected,
+        )
+    }
+
+    /** Resynchronizes mutable Settings state after edits performed from Launcher/Maison. */
+    private fun syncHomeSettingsFromRepository() {
+        val persistedRules = prefs.pillRules
+        uiState.pillRules.clear()
+        uiState.pillRules.addAll(persistedRules)
+        uiState.homePillPreferences = prefs.homePillPreferences
+        settingsCatalogConnected = pills.latestConnected
+        if (pills.latestStates.isNotEmpty()) {
+            val candidates = PillSupport.candidates(pills.latestStates.values.toList(), pills.latestDeviceIds)
+                .sortedWith(compareBy({ it.kind.ordinal }, { it.label.lowercase() }))
+            uiState.pillCandidates.clear()
+            uiState.pillCandidates.addAll(candidates)
         }
     }
 

@@ -7,6 +7,12 @@ import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.domain.model.PillSnapshot
 import com.iblu01.portallauncher.domain.model.PlayingMedia
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
+import com.iblu01.portallauncher.domain.home.Availability
+import com.iblu01.portallauncher.domain.home.HomeComposition
+import com.iblu01.portallauncher.domain.home.HomePageModel
+import com.iblu01.portallauncher.domain.home.HomePillPreferences
+import com.iblu01.portallauncher.domain.home.PillCatalogSnapshot
+import com.iblu01.portallauncher.domain.home.PillRef
 import kotlinx.coroutines.flow.Flow
 import com.iblu01.portallauncher.ui.mapper.toPanelKind
 import com.iblu01.portallauncher.ui.model.PanelKind
@@ -40,6 +46,20 @@ data class LauncherUiState(
     val latestStates: Map<String, HaEntity> = emptyMap(),
     /** entity_id -> area name, for the light rooms grouping. */
     val areaByEntity: Map<String, String> = emptyMap(),
+    val areaIdByEntity: Map<String, String> = emptyMap(),
+    val areaNameById: Map<String, String> = emptyMap(),
+    val catalog: PillCatalogSnapshot = PillCatalogSnapshot(
+        devices = emptyMap(), groups = emptyMap(), availability = emptyMap(), dynamicCandidates = emptyList(),
+    ),
+    val homePreferences: HomePillPreferences = HomePillPreferences(
+        schemaVersion = 1,
+        homePageEnabled = true,
+        pinnedOrder = emptyList(),
+        homeSections = emptyList(),
+        manualGroups = emptyList(),
+    ),
+    val homeComposition: HomeComposition = HomeComposition(emptyList(), emptyList(), emptyList()),
+    val homePage: HomePageModel = HomePageModel(emptyList(), hasCompatibleDevices = false),
 )
 
 /**
@@ -72,6 +92,7 @@ private fun LauncherUiState.alarmAlert(): PanelRequest.Chip? {
 class LauncherViewModel(
     snapshots: Flow<PillSnapshot>,
     private val callServiceFn: (domain: String, service: String, entityId: String?, data: Map<String, Any>?) -> Unit,
+    private val updateHomePreferencesFn: (((HomePillPreferences) -> HomePillPreferences) -> HomePillPreferences)? = null,
 ) : ViewModel() {
     val uiState: StateFlow<LauncherUiState> = snapshots
         .map { s ->
@@ -83,6 +104,12 @@ class LauncherViewModel(
                 lastUpdateAt = s.lastUpdateAt,
                 latestStates = s.latestStates,
                 areaByEntity = s.areaByEntity,
+                areaIdByEntity = s.areaIdByEntity,
+                areaNameById = s.areaNameById,
+                catalog = s.catalog,
+                homePreferences = s.homePreferences,
+                homeComposition = s.homeComposition,
+                homePage = s.homePage,
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherUiState())
@@ -110,7 +137,15 @@ class LauncherViewModel(
      * transform stays side-effect-free and correct on any dispatcher.
      */
     val panelChip: StateFlow<LauncherChip?> =
-        combine(uiState, _panel) { u, p -> (p.request as? PanelRequest.Chip)?.key to u.chips }
+        combine(uiState, _panel) { u, p ->
+            val key = when (val request = p.request) {
+                is PanelRequest.Chip -> request.key
+                is PanelRequest.Group -> request.device?.key
+                else -> null
+            }
+            val catalogChips = u.catalog.allResolved().map { it.chip }
+            key to (u.chips + catalogChips).distinctBy { it.id }
+        }
             .scan<Pair<String?, List<LauncherChip>>, LauncherChip?>(null) { last, (key, chips) ->
                 if (key == null) null else chips.firstOrNull { it.id == key } ?: last
             }
@@ -154,4 +189,45 @@ class LauncherViewModel(
 
     fun callService(domain: String, service: String, entityId: String?, data: Map<String, Any>? = null) =
         callServiceFn(domain, service, entityId, data)
+
+    /** General atomic preference reducer for the Maison/settings editors. */
+    fun updateHomePillPreferences(
+        transform: (HomePillPreferences) -> HomePillPreferences,
+    ): HomePillPreferences? = updateHomePreferencesFn?.invoke(transform)
+
+    /** Pins are persisted by stable identity; only a newly-added, currently available ref is valid. */
+    fun setPinned(ref: PillRef, pinned: Boolean): Boolean {
+        val current = uiState.value.homePreferences
+        val alreadyPinned = ref in current.pinnedOrder
+        if (pinned && !alreadyPinned && uiState.value.catalog.availability[ref] != Availability.AVAILABLE) {
+            return false
+        }
+        val updater = updateHomePreferencesFn ?: return false
+        updater { preferences ->
+            val without = preferences.pinnedOrder.filterNot { it == ref }
+            preferences.copy(pinnedOrder = if (pinned) without + ref else without)
+        }
+        return true
+    }
+
+    fun togglePinned(ref: PillRef): Boolean =
+        setPinned(ref, ref !in uiState.value.homePreferences.pinnedOrder)
+
+    /** Accessible/non-drag reorder path shared by Home and Settings. */
+    fun movePinned(ref: PillRef, targetIndex: Int): Boolean {
+        if (ref !in uiState.value.homePreferences.pinnedOrder) return false
+        val updater = updateHomePreferencesFn ?: return false
+        updater { preferences ->
+            val reordered = preferences.pinnedOrder.filterNot { it == ref }.toMutableList()
+            reordered.add(targetIndex.coerceIn(0, reordered.size), ref)
+            preferences.copy(pinnedOrder = reordered)
+        }
+        return true
+    }
+
+    fun setHomePageEnabled(enabled: Boolean): Boolean {
+        val updater = updateHomePreferencesFn ?: return false
+        updater { it.copy(homePageEnabled = enabled) }
+        return true
+    }
 }
