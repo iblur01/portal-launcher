@@ -76,6 +76,12 @@ private val NeutralDeviceStates = setOf(
     "disarmed", "éteint", "eteint", "arrêt", "arret",
 )
 
+private val SelectedChipContent = Color(0xFF1C1C1E)
+
+/** Neutral glyphs need a dark tint on the selected chip's white surface. */
+internal fun selectedChipAccent(accent: Color, selected: Boolean): Color =
+    if (selected && (accent == AppleColors.inactive || accent.alpha < 1f)) SelectedChipContent else accent
+
 /** One accent policy shared by pills and their panels. Inactive always wins over device colour. */
 fun launcherChipAccent(chip: LauncherChip): Color = when {
     chip.deviceState?.trim()?.lowercase() in NeutralDeviceStates -> AppleColors.inactive
@@ -94,11 +100,10 @@ fun launcherChipAccent(chip: LauncherChip): Color = when {
 
 @Composable
 fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Boolean = false, onClick: (() -> Unit)? = null, onLongPress: (() -> Unit)? = null) {
-    val target = launcherChipAccent(chip)
+    val target = selectedChipAccent(launcherChipAccent(chip), selected)
     val accent by animateColorAsState(target, AppleMotion.spring(), label = "chipAccent")
     val animatedProgress by animateFloatAsState(chip.progress, AppleMotion.spring(), label = "chipProgress")
     // Selected chip: iOS-style — white fill, dark text, matching border.
-    val selectedContent = Color(0xFF1C1C1E)
     val selectedSubtitle = Color(0xFF3C3C43).copy(alpha = 0.6f)
     val borderColor by animateColorAsState(if (selected) Color.White else AppleColors.frostedBorder, AppleMotion.spring(), label = "chipBorder")
     val fillColor by animateColorAsState(if (selected) Color.White else AppleColors.frostedFill, AppleMotion.spring(), label = "chipFill")
@@ -156,7 +161,7 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
             Text(
                 chip.value,
                 style = AppleTypography.titleLarge.copy(fontSize = AppleTypography.titleLarge.fontSize.scaled()),
-                color = if (selected) selectedContent else AppleColors.primary,
+                color = if (selected) SelectedChipContent else AppleColors.primary,
                 maxLines = 1,
             )
         }

@@ -1,6 +1,5 @@
 package com.iblu01.portallauncher.ui.icons
 
-import android.util.LruCache
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -34,12 +33,6 @@ private val MdiFontFamily = FontFamily(Font(R.font.mdi))
  * chasing it at every call site if the two ever need to look the same weight side by side.
  */
 private const val MDI_GLYPH_SCALE = 1f
-
-/**
- * Parsed custom-pack icons, keyed by reference. Bounded because a `PathParser` run per frame is
- * wasteful and an unbounded map of vectors is exactly the kind of thing that hurts on a wall panel.
- */
-private val packVectors = LruCache<String, ImageVector>(64)
 
 /**
  * Draws the icon Home Assistant would draw for an entity.
@@ -101,7 +94,7 @@ fun HaIcon(
 
 private fun packVector(ref: IconRef): ImageVector? {
     val key = ref.toString()
-    packVectors.get(key)?.let { return it }
+    HaIcons.packVectors.get(key)?.let { return it }
     val icon = HaIcons.packs?.cached(ref) ?: return null
     val vector = runCatching {
         ImageVector.Builder(
@@ -115,6 +108,6 @@ private fun packVector(ref: IconRef): ImageVector? {
             fill = SolidColor(Color.Black),
         ).build()
     }.getOrNull() ?: return null
-    packVectors.put(key, vector)
+    HaIcons.packVectors.put(key, vector)
     return vector
 }

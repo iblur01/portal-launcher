@@ -44,6 +44,8 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
      * writing it off wholesale would make `hue:` unresolvable forever.
      */
     private val barrenPairs = mutableSetOf<String>()
+    /** Identity of the module list the cache was built against; see [invalidateForModules]. */
+    private var modulesFingerprint: String? = null
     private var routesLoaded = false
 
     private fun file(ref: IconRef) = File(File(root, ref.namespace), "${ref.name}.path")
@@ -79,11 +81,15 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
      */
     @Synchronized
     fun sync(baseUrl: String, token: String, resourceUrls: List<String>, wanted: Set<IconRef>): Boolean {
+        if (resourceUrls.isEmpty()) return false
+        loadRoutes()
+        var changed = invalidateForModules(resourceUrls) > 0
         val missing = wanted.filter { isPending(it) }
         Log.i(TAG, "sync: ${missing.size} of ${wanted.size} refs uncached, ${resourceUrls.size} modules to search")
-        if (missing.isEmpty() || resourceUrls.isEmpty()) return false
-        loadRoutes()
-        var changed = false
+        if (missing.isEmpty()) {
+            if (changed) saveRoutes()
+            return changed
+        }
         for ((namespace, refs) in missing.groupBy { it.namespace }) {
             val names = refs.mapTo(mutableSetOf()) { it.name }
             var scannedAny = false
@@ -108,13 +114,50 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
         return changed
     }
 
-    /** Wipes the cache — e.g. when a pack's resource URL changes, which is how these packs version. */
-    @Synchronized
-    fun clear() {
-        runCatching { root.deleteRecursively() }
-        namespaceUrls.clear()
+    /**
+     * Drops cache entries that the current module list makes obsolete, and returns how many went.
+     *
+     * Two things go stale when Home Assistant's set of frontend modules changes, and both would
+     * otherwise be permanent:
+     *
+     *  - **Cached misses.** A reference no pack provided is stored as an empty file so a boot stays
+     *    offline. Install the pack that provides it and that verdict is simply wrong — and
+     *    [isPending] would never look again. Every miss is therefore re-opened.
+     *  - **Art from a pack that moved.** These packs version through their URL (`?hacstag=…`), so a
+     *    namespace whose provider is no longer in the list is showing icons from the old release.
+     *
+     * Resolved icons whose provider is unchanged are kept: a card update must not cost a re-download.
+     * The first run after install invalidates nothing — there is no prior cache to be stale.
+     */
+    internal fun invalidateForModules(resourceUrls: List<String>): Int {
+        loadRoutes()
+        val fingerprint = resourceUrls.sorted().joinToString("\n").hashCode().toString()
+        if (fingerprint == modulesFingerprint) return 0
+        val firstRun = modulesFingerprint == null
+        modulesFingerprint = fingerprint
+        // Persist the new baseline immediately. Recording it only alongside a download would leave
+        // every boot looking like the first one, and no module change would ever be noticed.
+        if (firstRun) {
+            saveRoutes()
+            return 0
+        }
+
         barrenPairs.clear()
-        routesLoaded = false
+        var dropped = 0
+        root.listFiles()?.forEach { dir ->
+            if (!dir.isDirectory) return@forEach
+            val providerMoved = namespaceUrls[dir.name]?.let { it !in resourceUrls } == true
+            dir.listFiles()?.forEach { entry ->
+                if (providerMoved || entry.length() == 0L) {
+                    entry.delete()
+                    dropped++
+                }
+            }
+            if (providerMoved) namespaceUrls.remove(dir.name)
+        }
+        Log.i(TAG, "icon modules changed; dropped $dropped stale cache entries")
+        saveRoutes()
+        return dropped
     }
 
     /** Known provider first, then anything that looks like an icon pack, then the rest. */
@@ -194,6 +237,7 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
         }
         val barren = json.optJSONArray("barren") ?: JSONArray()
         for (i in 0 until barren.length()) barrenPairs += barren.optString(i)
+        modulesFingerprint = json.optString("modules").takeIf { it.isNotBlank() }
     }
 
     private fun saveRoutes() {
@@ -202,6 +246,7 @@ class HaIconPackStore(context: Context, client: OkHttpClient) {
             val json = JSONObject()
                 .put("namespaces", JSONObject(namespaceUrls.toMap()))
                 .put("barren", JSONArray(barrenPairs.toList()))
+                .put("modules", modulesFingerprint)
             routesFile.writeText(json.toString())
         }.onFailure { Log.w(TAG, "cannot persist icon pack routes", it) }
     }

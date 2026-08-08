@@ -205,7 +205,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                 HaIcons.resolver.refFor(it)?.takeUnless { ref -> ref.isMdi }
             }
             Log.i(TAG, "custom icon refs in use: ${wanted.size}")
-            if (store.sync(url, token, urls, wanted)) HaIcons.revision++
+            if (store.sync(url, token, urls, wanted)) HaIcons.onPackCacheChanged()
         }
     }
 
