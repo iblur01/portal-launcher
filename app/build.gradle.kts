@@ -65,6 +65,13 @@ android {
         disable += "ExpiredTargetSdkVersion"
     }
 
+    androidResources {
+        // The MDI name->codepoint index is binary-searched in place with AssetManager.openFd(),
+        // which only works on a stored (non-deflated) APK entry. Compressing it would trade a
+        // 330 KB APK saving for a megabyte of permanently resident heap.
+        noCompress += "mdi"
+    }
+
     buildFeatures {
         compose = true
     }

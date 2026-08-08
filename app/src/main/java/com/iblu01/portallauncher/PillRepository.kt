@@ -83,7 +83,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         Log.i("PortalPills", "starting: ${prefs.pillRules.count { it.enabled }} enabled rules")
         activeRepo.value?.stop()
         repositoryConfig = requestedConfig
-        val repo = HaStateRepository(prefs.haUrl, prefs.haToken)
+        val repo = HaStateRepository(appContext, prefs.haUrl, prefs.haToken)
         // Lightweight listener: refresh the raw-state cache + one-time auto-init, then notify.
         // No select/media/temperature work here — that lives in snapshotFlow only.
         repo.addListener { states, _ ->

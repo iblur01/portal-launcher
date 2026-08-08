@@ -51,7 +51,9 @@ private fun MediaDeviceRow(device: PlayingMedia, onSelect: (PlayingMedia) -> Uni
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(Modifier.size(42.dp).background(accent.copy(alpha = 0.18f), androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.Speaker, null, tint = accent, modifier = Modifier.size(22.dp))
+            // A Sonos stays a Sonos: whatever icon the user picked in HA (`mdi:sonos`, `phu:sonos-arc`)
+            // is what the dashboard shows, so it is what this row shows.
+            HaEntityIcon(device.entityId, null, accent, 22.dp, Icons.Outlined.Speaker)
         }
         Column(Modifier.weight(1f)) {
             Text(device.playerNames.firstOrNull() ?: device.artist, style = AppleTypography.bodyLarge, color = AppleColors.primary, maxLines = 1)

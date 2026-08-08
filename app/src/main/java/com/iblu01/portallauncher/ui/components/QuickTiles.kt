@@ -172,7 +172,14 @@ private fun ChipGlyph(chip: LauncherChip, accent: Color, iconSize: Dp = 26.dp.sc
             val icon = if (chip.state == "error") Icons.Outlined.LockOpen else Icons.Outlined.Lock
             Icon(icon, null, tint = accent, modifier = modifier)
         }
-        else -> Icon(launcherIcon(chip.icon), null, tint = accent, modifier = modifier)
+        // Group chips (lights, media, openings…) aggregate many entities and keep the launcher's own
+        // glyph; a chip backed by a single entity shows that entity's Home Assistant icon instead,
+        // so a customised device looks the same here as on the dashboard.
+        else -> if (chip.entityId.isNotBlank()) {
+            HaEntityIcon(chip.entityId, null, accent, iconSize, launcherIcon(chip.icon))
+        } else {
+            Icon(launcherIcon(chip.icon), null, tint = accent, modifier = modifier)
+        }
     }
 }
 
