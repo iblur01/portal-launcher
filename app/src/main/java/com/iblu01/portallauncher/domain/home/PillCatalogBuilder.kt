@@ -18,6 +18,7 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
         rules: List<PillRule>,
         states: Map<String, HaEntity>,
         deviceIdByEntity: Map<String, String> = emptyMap(),
+        entityCategoryByEntity: Map<String, String> = emptyMap(),
         areaIdByEntity: Map<String, String> = emptyMap(),
         areaNameById: Map<String, String> = emptyMap(),
         manualGroups: List<ManualPillGroup> = emptyList(),
@@ -28,14 +29,20 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
         // discovered compatible devices must still be organizable from Maison/Settings. Only the
         // dynamic home ranking below is gated by an explicitly enabled persisted rule.
         val persistedRules = rules.distinctBy { it.entityId }
-        val disabledDeviceRefs = persistedRules.asSequence()
-            .filterNot(PillRule::enabled)
-            .mapTo(linkedSetOf()) { PillRef.Device(it.entityId) }
         val persistedIds = persistedRules.mapTo(hashSetOf()) { it.entityId }
-        val discoveredDefaults = PillSupport.candidates(states.values.toList(), deviceIdByEntity)
-            .map(PillSupport::defaultRule)
+        val allEntities = states.values.toList()
+        val discoveredDefaults = PillSupport.candidates(allEntities, deviceIdByEntity)
+            .map { candidate ->
+                PillSupport.defaultRule(
+                    candidate,
+                    PillSupport.isAutomaticallyEnabled(candidate, allEntities, deviceIdByEntity, entityCategoryByEntity),
+                )
+            }
             .filter { it.entityId !in persistedIds }
         val catalogRules = persistedRules + discoveredDefaults
+        val allDisabledDeviceRefs = catalogRules.asSequence()
+            .filterNot(PillRule::enabled)
+            .mapTo(linkedSetOf()) { PillRef.Device(it.entityId) }
         val enabledRules = persistedRules.filter { it.enabled }
         val availability = linkedMapOf<PillRef, Availability>()
         val resolvedDevices = linkedMapOf<PillRef.Device, ResolvedPill>()
@@ -118,7 +125,7 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
             availability = availability,
             dynamicCandidates = emptyList(),
             resolvedDevices = resolvedDevices,
-            disabledDeviceRefs = disabledDeviceRefs,
+            disabledDeviceRefs = allDisabledDeviceRefs,
         )
         val dynamic = dynamicCandidates(enabledRules, states, provisional, nowMs)
         return provisional.copy(dynamicCandidates = dynamic)

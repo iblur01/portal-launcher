@@ -172,6 +172,13 @@ object PillSupport {
     /** Only short-lived movement signals remain eligible; location/presence is intentionally out. */
     private val motionClasses = setOf("motion", "occupancy", "moving")
     private val applianceTokens = setOf("washer", "washing", "machine_a_laver", "dryer", "seche_linge", "dishwasher", "lave_vaisselle", "p2s", "printer", "imprimante")
+    private val auxiliarySwitchTokens = setOf(
+        "crossfade", "loudness", "autoplay", "auto_play", "tv_autoplay", "night_sound",
+        "surround", "dialog", "speech_enhancement", "mic_mute", "screen_timeout",
+        "volume_mute", "led", "indicator", "child_lock", "motor_reversal", "chirp",
+        "schedule", "bubble_soak", "carpet_boost", "dust_collect", "multi_floor",
+        "resume_clean", "tight_mop", "customized_clean", "permit_join",
+    )
     fun isSupported(e: HaEntity) = isPrimary(e)
     fun isAllowedAsPersistedChip(rule: PillRule, e: HaEntity): Boolean {
         if (e.domain in setOf("button", "input_button", "number", "input_number", "select", "input_select", "camera")) return false
@@ -257,5 +264,40 @@ object PillSupport {
             PillCandidate(primary, kind(primary), label, related)
         }.distinctBy { it.primary.entityId }
     }
-    fun defaultRule(c: PillCandidate) = PillRule(c.primary.entityId, c.kind, c.label, relatedEntityIds = c.related.map { it.entityId })
+
+    /**
+     * Conservative launcher default: expose the appliance, not every configuration toggle owned
+     * by it. Users can still enable any compatible entity explicitly from Settings.
+     */
+    fun isAutomaticallyEnabled(
+        candidate: PillCandidate,
+        entities: List<HaEntity>,
+        deviceIdByEntity: Map<String, String> = emptyMap(),
+        entityCategoryByEntity: Map<String, String> = emptyMap(),
+    ): Boolean {
+        val primary = candidate.primary
+        if (entityCategoryByEntity[primary.entityId] in setOf("config", "diagnostic")) return false
+        if (primary.domain !in setOf("switch", "input_boolean")) return true
+
+        val slug = primary.entityId.substringAfter('.').lowercase()
+        if (auxiliarySwitchTokens.any(slug::contains)) return false
+
+        val deviceId = deviceIdByEntity[primary.entityId] ?: return true
+        val siblings = entities.filter { it.entityId != primary.entityId && deviceIdByEntity[it.entityId] == deviceId }
+        val hasPrincipalOwner = siblings.any { sibling ->
+            sibling.domain in setOf(
+                "media_player", "vacuum", "camera", "fan", "humidifier", "climate", "cover",
+                "lock", "lawn_mower", "water_heater",
+            ) || (sibling.domain == "sensor" && sibling.deviceClass == "enum" && isPrimary(sibling))
+        }
+        return !hasPrincipalOwner
+    }
+
+    fun defaultRule(c: PillCandidate, enabled: Boolean = true) = PillRule(
+        c.primary.entityId,
+        c.kind,
+        c.label,
+        enabled = enabled,
+        relatedEntityIds = c.related.map { it.entityId },
+    )
 }

@@ -110,6 +110,44 @@ class PillRulesTest {
         }
     }
 
+    @Test fun `principal appliances stay automatic while their switches do not`() {
+        val vacuum = entity("vacuum.nicky", "docked")
+        val carpetBoost = entity("switch.nicky_carpet_boost", "on")
+        val candidates = PillSupport.candidates(
+            listOf(vacuum, carpetBoost),
+            mapOf(vacuum.entityId to "nicky", carpetBoost.entityId to "nicky"),
+        ).associateBy { it.primary.entityId }
+
+        assertTrue(PillSupport.isAutomaticallyEnabled(candidates.getValue(vacuum.entityId), listOf(vacuum, carpetBoost)))
+        assertFalse(PillSupport.isAutomaticallyEnabled(
+            candidates.getValue(carpetBoost.entityId),
+            listOf(vacuum, carpetBoost),
+            mapOf(vacuum.entityId to "nicky", carpetBoost.entityId to "nicky"),
+        ))
+    }
+
+    @Test fun `physical standalone outlet stays automatic`() {
+        val outlet = entity("switch.coffee_machine", "off", "outlet")
+        val candidate = PillSupport.candidates(listOf(outlet), mapOf(outlet.entityId to "plug-1")).single()
+        assertTrue(PillSupport.isAutomaticallyEnabled(candidate, listOf(outlet), mapOf(outlet.entityId to "plug-1")))
+    }
+
+    @Test fun `registry config and diagnostic entities are quiet by default`() {
+        val config = entity("switch.sonos_crossfade", "off")
+        val candidate = PillSupport.candidates(listOf(config)).single()
+        assertFalse(PillSupport.isAutomaticallyEnabled(
+            candidate,
+            listOf(config),
+            entityCategoryByEntity = mapOf(config.entityId to "config"),
+        ))
+    }
+
+    @Test fun `main washer state stays automatic`() {
+        val washer = entity("sensor.machine_a_laver_machine_state", "run", "enum")
+        val candidate = PillSupport.candidates(listOf(washer), mapOf(washer.entityId to "washer-1")).single()
+        assertTrue(PillSupport.isAutomaticallyEnabled(candidate, listOf(washer), mapOf(washer.entityId to "washer-1")))
+    }
+
     @Test fun `only movement and opening binary sensors are supported`() {
         listOf("motion", "occupancy", "moving").forEach {
             assertEquals(PillKind.GENERIC, PillSupport.kind(entity("binary_sensor.x", "on", it)))

@@ -79,6 +79,8 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         private set
     @Volatile var deviceIdByEntity: Map<String, String> = emptyMap()
         private set
+    @Volatile var entityCategoryByEntity: Map<String, String> = emptyMap()
+        private set
     @Volatile var entityRegistryResolved: Boolean = false
         private set
     private var areaNames: Map<String, String> = emptyMap()        // area_id -> name
@@ -111,6 +113,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                     hourlyForecast = hourlyForecast,
                     dailyForecast = dailyForecast,
                     deviceIdByEntity = deviceIdByEntity,
+                    entityCategoryByEntity = entityCategoryByEntity,
                     entityRegistryResolved = entityRegistryResolved,
                     areaIdByEntity = areaIdByEntity,
                     areaNameById = areaNameById,
@@ -184,14 +187,18 @@ class HaStateRepository(appContext: Context, private val url: String, private va
 
     private fun parseEntityRegistry(arr: JSONArray) {
         val areaMap = HashMap<String, String?>(); val devMap = HashMap<String, String?>()
+        val categoryMap = HashMap<String, String>()
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
             val eid = o.optString("entity_id"); if (eid.isBlank()) continue
             areaMap[eid] = o.optString("area_id").takeIf { it.isNotBlank() && !o.isNull("area_id") }
             devMap[eid] = o.optString("device_id").takeIf { it.isNotBlank() && !o.isNull("device_id") }
+            o.optString("entity_category").takeIf { it.isNotBlank() && !o.isNull("entity_category") }
+                ?.let { categoryMap[eid] = it }
         }
         entityAreaId = areaMap; entityDeviceId = devMap
         deviceIdByEntity = devMap.mapNotNull { (entityId, deviceId) -> deviceId?.let { entityId to it } }.toMap()
+        entityCategoryByEntity = categoryMap
     }
 
     /** JS-module resources only; a CSS or HTML resource can never register an icon set. */

@@ -26,6 +26,7 @@ data class HaSnapshot(
     val hourlyForecast: List<ForecastPoint>,
     val dailyForecast: List<ForecastPoint>,
     val deviceIdByEntity: Map<String, String> = emptyMap(),
+    val entityCategoryByEntity: Map<String, String> = emptyMap(),
     val entityRegistryResolved: Boolean = false,
     /** Stable HA area identity. Entity assignment wins over its device assignment. */
     val areaIdByEntity: Map<String, String> = emptyMap(),

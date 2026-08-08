@@ -359,6 +359,10 @@ class Prefs(private val context: Context) {
         get() = sp.getBoolean("pill_auto_groups_initialized", false)
         set(value) = sp.edit().putBoolean("pill_auto_groups_initialized", value).apply()
 
+    var pillNoisePolicyVersion: Int
+        get() = sp.getInt("pill_noise_policy_version", 0)
+        set(value) = sp.edit().putInt("pill_noise_policy_version", value).apply()
+
     var autoReturnEnabled: Boolean
         get() = sp.getBoolean("auto_return_enabled", true)
         set(value) = sp.edit().putBoolean("auto_return_enabled", value).apply()

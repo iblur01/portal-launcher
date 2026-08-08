@@ -115,7 +115,10 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
             lightAreas = repo.areaByEntity
             latestAreaIdByEntity = repo.areaIdByEntity
             latestAreaNameById = repo.areaNameById
-            if (repo.entityRegistryResolved) autoInitGroups(prefs, states, repo.deviceIdByEntity)
+            if (repo.entityRegistryResolved) {
+                migrateNoisePolicy(prefs, states, repo.deviceIdByEntity, repo.entityCategoryByEntity)
+                autoInitGroups(prefs, states, repo.deviceIdByEntity)
+            }
             scheduleNotify()
         }
         activeRepo.value = repo   // publish AFTER wiring so snapshotFlow re-binds to a live repo
@@ -190,6 +193,28 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         Log.i("PortalPills", "auto-enabled ${additions.size} light/media/purifier entities")
     }
 
+    private fun migrateNoisePolicy(
+        prefs: Prefs,
+        states: Map<String, HaEntity>,
+        deviceIds: Map<String, String>,
+        entityCategories: Map<String, String>,
+    ) {
+        if (prefs.pillNoisePolicyVersion >= 1 || states.isEmpty()) return
+        val entities = states.values.toList()
+        val candidates = PillSupport.candidates(entities, deviceIds).associateBy { it.primary.entityId }
+        val migrated = prefs.pillRules.map { rule ->
+            val candidate = candidates[rule.entityId] ?: return@map rule
+            rule.copy(
+                enabled = rule.enabled &&
+                    PillSupport.isAutomaticallyEnabled(candidate, entities, deviceIds, entityCategories),
+            )
+        }
+        prefs.pillRules = migrated
+        prefs.pillNoisePolicyVersion = 1
+        SettingsChangeBus.get().emit(PILL_RULES_CHANGE_KEY)
+        Log.i("PortalPills", "applied noise policy: ${migrated.count(PillRule::enabled)}/${migrated.size} enabled")
+    }
+
     /**
      * The single transform pipeline (Findings 6/7): raw [HaStateRepository.states] → selected chips
      * + rebuilt media + temperatures, on [Dispatchers.Default].
@@ -247,6 +272,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
                     rules = rules,
                     states = s.states,
                     deviceIdByEntity = s.deviceIdByEntity,
+                    entityCategoryByEntity = s.entityCategoryByEntity,
                     areaIdByEntity = s.areaIdByEntity,
                     areaNameById = s.areaNameById,
                     manualGroups = homePreferences.manualGroups,
