@@ -299,6 +299,15 @@ private fun ColumnScope.AdaptiveLightDetail(
                     onValueChangeFinished = onBrightnessCommit,
                     accent = trackColor,
                     icon = Icons.Filled.WbSunny,
+                    iconContent = { tint, size ->
+                        HaEntityIcon(
+                            entityId = entityId,
+                            contentDescription = null,
+                            tint = tint,
+                            size = size,
+                            fallback = Icons.Filled.WbSunny,
+                        )
+                    },
                     hapticSteps = 10,
                     modifier = Modifier.size(sliderWidth, sliderHeight),
                 )

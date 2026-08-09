@@ -123,7 +123,7 @@ data class OnboardingUiState(
     val gridPreset: GridPreset? = GridPreset.BALANCED,
     val gridManual: Boolean = false,
 
-    val backgroundMode: String = "neutral",
+    val backgroundMode: String = "system",
     val backgroundConfigured: Boolean = false,
 
     val haDiscovery: DiscoveryState = DiscoveryState.Idle,

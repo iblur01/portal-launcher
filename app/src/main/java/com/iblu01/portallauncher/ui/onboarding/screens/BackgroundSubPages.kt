@@ -3,8 +3,6 @@ package com.iblu01.portallauncher.ui.onboarding.screens
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,8 +50,6 @@ import com.iblu01.portallauncher.photo.PhotoSourceException
 import com.iblu01.portallauncher.photo.TransportPolicy
 import com.iblu01.portallauncher.photo.immich.ImmichPhotoSource
 import com.iblu01.portallauncher.ui.components.AmbientBackground
-import com.iblu01.portallauncher.ui.components.copyWallpaper
-import com.iblu01.portallauncher.ui.components.wallpaperFile
 import com.iblu01.portallauncher.ui.components.PillButton
 import com.iblu01.portallauncher.ui.components.SettingsDivider
 import com.iblu01.portallauncher.ui.components.SettingsSection
@@ -119,103 +115,6 @@ internal fun CalmSubPage(
                 label = stringResource(R.string.onb_bg_calm_preview_action),
                 onClick = { openOpacityPreview(context) },
             )
-        }
-    }
-}
-
-// --- Nature -------------------------------------------------------------------------------------
-
-@Composable
-internal fun NatureSubPage(
-    state: OnboardingUiState,
-    onBack: () -> Unit,
-    onValidate: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    BackgroundSubPage(
-        state = state,
-        title = stringResource(R.string.onb_bg_tile_nature),
-        description = stringResource(R.string.onb_bg_nature_desc),
-        onBack = onBack,
-        onValidate = onValidate,
-        modifier = modifier,
-    ) {
-        // The landscape list is private to DynamicBackground, so the preview is the real cycling
-        // background rather than a duplicated copy of its URLs.
-        WallpaperPreviewWithControls(
-            height = 220.dp,
-            preview = { AmbientBackground(BG_MODE_NATURE, modifier = Modifier.fillMaxSize()) },
-        ) {
-            NoticeText(stringResource(R.string.onb_bg_nature_warning_internet))
-        }
-    }
-}
-
-// --- My photo -----------------------------------------------------------------------------------
-
-@Composable
-internal fun PhotoSubPage(
-    state: OnboardingUiState,
-    wallpaperVersion: Int,
-    onWallpaperReplaced: () -> Unit,
-    onSetOpacity: (Float) -> Unit,
-    onBack: () -> Unit,
-    onValidate: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var opacity by remember { mutableFloatStateOf(readOverlayOpacity(context)) }
-    var hasPhoto by remember { mutableStateOf(wallpaperFile(context).exists()) }
-    var failed by remember { mutableStateOf(false) }
-
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            // A revoked or unreadable URI must fail quietly: the copy runs off the main thread and
-            // through a temporary file, so a half-written wallpaper can never replace a good one.
-            val copied = withContext(Dispatchers.IO) { copyWallpaper(context, uri) }
-            failed = !copied
-            if (copied) {
-                hasPhoto = true
-                onWallpaperReplaced()
-            }
-        }
-    }
-
-    BackgroundSubPage(
-        state = state,
-        title = stringResource(R.string.onb_bg_tile_my_photo),
-        description = stringResource(R.string.onb_bg_photo_desc),
-        onBack = onBack,
-        onValidate = onValidate.takeIf { hasPhoto },
-        modifier = modifier,
-    ) {
-        WallpaperPreviewWithControls(
-            overlay = opacity,
-            height = 220.dp,
-            preview = {
-                if (hasPhoto) {
-                    AmbientBackground(BG_MODE_PHOTO, wallpaperVersion, Modifier.fillMaxSize())
-                } else {
-                    AmbientBackground(BG_MODE_CALM, modifier = Modifier.fillMaxSize())
-                }
-            },
-        ) {
-            PillButton(
-                label = stringResource(R.string.onb_bg_photo_choose_action),
-                onClick = { picker.launch("image/*") },
-            )
-            if (failed) ErrorText(stringResource(R.string.onb_bg_photo_error_load))
-            if (hasPhoto) {
-                OpacitySlider(
-                    label = stringResource(R.string.onb_bg_photo_dim_label),
-                    value = opacity,
-                    onValueChange = { opacity = it },
-                    onCommit = { onSetOpacity(opacity) },
-                )
-                NoticeText(stringResource(R.string.onb_bg_photo_readability_hint))
-            }
         }
     }
 }

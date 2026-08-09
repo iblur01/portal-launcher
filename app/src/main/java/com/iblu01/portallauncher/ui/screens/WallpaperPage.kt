@@ -1,10 +1,5 @@
 package com.iblu01.portallauncher.ui.screens
 
-import android.annotation.SuppressLint
-import android.app.WallpaperManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,24 +14,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.material.icons.outlined.Android
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.Prefs
 import com.iblu01.portallauncher.R
@@ -46,27 +40,23 @@ import com.iblu01.portallauncher.photo.PhotoCoordinatorConfig
 import com.iblu01.portallauncher.photo.PhotoSourceException
 import com.iblu01.portallauncher.photo.TransportPolicy
 import com.iblu01.portallauncher.photo.immich.ImmichPhotoSource
-import com.iblu01.portallauncher.ui.components.AmbientBackground
 import com.iblu01.portallauncher.ui.components.SettingsDivider
 import com.iblu01.portallauncher.ui.components.SettingsRow
 import com.iblu01.portallauncher.ui.components.SettingsSection
 import com.iblu01.portallauncher.ui.components.SettingsSubPageHeader
 import com.iblu01.portallauncher.ui.components.SettingsTextField
 import com.iblu01.portallauncher.ui.components.SettingsToggle
-import com.iblu01.portallauncher.ui.components.backgroundModes
-import com.iblu01.portallauncher.ui.components.copyWallpaper
-import com.iblu01.portallauncher.ui.components.wallpaperFile
 import com.iblu01.portallauncher.ui.onboarding.components.ChoiceTile
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 /**
  * The wallpaper settings, split out of the application page: choosing what fills the screen is a
- * visual decision, so it is made on live previews of the four sources rather than on a list of
- * labels — and the Immich configuration lives next to the source that needs it.
+ * visual decision, so the page exposes only the three useful sources. Immich configuration lives
+ * next to the source that needs it.
  */
 @Composable
 internal fun WallpaperPage(
@@ -83,12 +73,6 @@ internal fun WallpaperPage(
     val scope = rememberCoroutineScope()
     val app = context.applicationContext as PortalApp
 
-    // Bumped when the custom photo is replaced so the preview re-reads the file instead of the
-    // image cache.
-    var wallpaperVersion by remember { mutableIntStateOf(0) }
-    var hasPhoto by remember { mutableStateOf(wallpaperFile(context).exists()) }
-    var photoFailed by remember { mutableStateOf(false) }
-
     var immichUrl by remember { mutableStateOf(prefs.immichUrl) }
     var immichKeyDraft by remember { mutableStateOf("") }
     var immichAlbumIds by remember { mutableStateOf(prefs.immichAlbumIds) }
@@ -104,19 +88,9 @@ internal fun WallpaperPage(
     var immichErrorCategory by remember { mutableStateOf<String?>(null) }
     var immichConnectedAlbumCount by remember { mutableStateOf<Int?>(null) }
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            // Copied off the main thread through a staging file: a revoked URI cannot destroy the
-            // wallpaper already in place.
-            val copied = withContext(Dispatchers.IO) { copyWallpaper(context, uri) }
-            photoFailed = !copied
-            if (copied) {
-                hasPhoto = true
-                wallpaperVersion++
-                onBgModeChange(BG_CUSTOM)
-            }
-        }
+    val selectedMode = bgMode.takeIf { mode -> wallpaperSettingsModes.any { it.key == mode } } ?: "system"
+    LaunchedEffect(bgMode) {
+        if (selectedMode != bgMode) onBgModeChange(selectedMode)
     }
 
     fun loadImmichAlbums(openPicker: Boolean) {
@@ -208,17 +182,11 @@ internal fun WallpaperPage(
         )
 
         WallpaperSourceGrid(
-            bgMode = bgMode,
-            hasPhoto = hasPhoto,
-            wallpaperVersion = wallpaperVersion,
-            onSelect = { mode ->
-                // Picking the custom source with nothing stored would show a black screen: send the
-                // user straight to the picker instead.
-                if (mode == BG_CUSTOM && !hasPhoto) picker.launch("image/*") else onBgModeChange(mode)
-            },
+            bgMode = selectedMode,
+            onSelect = onBgModeChange,
         )
 
-        if (bgMode == "system") {
+        if (selectedMode == "system") {
             SettingsSection(title = stringResource(R.string.settings_wallpaper_android_section)) {
                 SettingsRow(
                     label = stringResource(R.string.settings_wallpaper_android_change),
@@ -227,27 +195,7 @@ internal fun WallpaperPage(
             }
         }
 
-        if (bgMode == BG_CUSTOM || hasPhoto) {
-            SettingsSection(title = stringResource(R.string.bg_mode_custom)) {
-                SettingsRow(
-                    label = stringResource(
-                        if (hasPhoto) R.string.settings_wallpaper_replace_photo
-                        else R.string.settings_wallpaper_choose_photo
-                    ),
-                    onClick = { picker.launch("image/*") },
-                )
-                if (photoFailed) {
-                    Text(
-                        text = stringResource(R.string.settings_wallpaper_photo_error),
-                        style = AppleTypography.bodySmall,
-                        color = AppleColors.error,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
-            }
-        }
-
-        if (bgMode != "neutral") {
+        if (selectedMode != "neutral") {
             SettingsSection(title = stringResource(R.string.settings_wallpaper_section_readability)) {
                 SettingsRow(
                     label = stringResource(R.string.settings_app_label_overlay_opacity),
@@ -257,7 +205,7 @@ internal fun WallpaperPage(
             }
         }
 
-        if (bgMode == "immich") {
+        if (selectedMode == "immich") {
             SettingsSection(title = stringResource(R.string.settings_immich_section)) {
                 SettingsTextField(
                     label = stringResource(R.string.settings_immich_url),
@@ -379,7 +327,7 @@ internal fun WallpaperPage(
                         immichCadence = prefs.immichCadenceSeconds
                         immichErrorCategory = null
                         immichConnectedAlbumCount = null
-                        onBgModeChange("neutral")
+                        onBgModeChange("system")
                     },
                 )
             }
@@ -387,34 +335,37 @@ internal fun WallpaperPage(
     }
 }
 
-private const val BG_CUSTOM = "custom"
+private data class WallpaperSettingsMode(
+    val key: String,
+    val label: Int,
+    val icon: ImageVector? = null,
+)
 
-/** The wallpaper sources, each shown as what it will actually put behind the apps. */
+private val wallpaperSettingsModes = listOf(
+    WallpaperSettingsMode("system", R.string.bg_mode_system, Icons.Outlined.Android),
+    WallpaperSettingsMode("neutral", R.string.bg_mode_neutral, Icons.Outlined.DarkMode),
+    WallpaperSettingsMode("immich", R.string.bg_mode_immich, Icons.Outlined.Cloud),
+)
+
+/** The three wallpaper sources available from settings, kept deliberately compact. */
 @Composable
 private fun WallpaperSourceGrid(
     bgMode: String,
-    hasPhoto: Boolean,
-    wallpaperVersion: Int,
     onSelect: (String) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = if (maxWidth >= 300.dp) 2 else 1
-        val tileHeight = if (maxWidth >= 300.dp) 190.dp else 150.dp
+        val columns = if (maxWidth >= 480.dp) 3 else if (maxWidth >= 300.dp) 2 else 1
+        val tileHeight = 78.dp
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            backgroundModes.chunked(columns).forEach { row ->
+            wallpaperSettingsModes.chunked(columns).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { (key, label) ->
+                    row.forEach { mode ->
                         ChoiceTile(
-                            title = stringResource(label),
-                            selected = key == bgMode,
-                            onClick = { onSelect(key) },
-                            subtitle = if (key == BG_CUSTOM && !hasPhoto) {
-                                stringResource(R.string.settings_wallpaper_photo_missing)
-                            } else {
-                                null
-                            },
-                            previewFillsHeight = true,
-                            preview = { SourcePreview(key, hasPhoto, wallpaperVersion) },
+                            title = stringResource(mode.label),
+                            selected = mode.key == bgMode,
+                            onClick = { onSelect(mode.key) },
+                            icon = mode.icon,
+                            compact = true,
                             modifier = Modifier.weight(1f).height(tileHeight),
                         )
                     }
@@ -422,58 +373,5 @@ private fun WallpaperSourceGrid(
                 }
             }
         }
-    }
-}
-
-@Composable
-@SuppressLint("MissingPermission")
-private fun SourcePreview(mode: String, hasPhoto: Boolean, wallpaperVersion: Int) {
-    val context = LocalContext.current
-    when {
-        mode == "system" -> {
-            val drawable = remember(context, wallpaperVersion) {
-                // Some Android builds restrict current-wallpaper reads. The preview is optional;
-                // SecurityException is contained and degrades to PlaceholderPreview below.
-                runCatching { WallpaperManager.getInstance(context).drawable }.getOrNull()
-            }
-            if (drawable == null) {
-                PlaceholderPreview { }
-            } else {
-                AsyncImage(
-                    model = drawable,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
-
-        mode == BG_CUSTOM && !hasPhoto -> PlaceholderPreview {
-            Icon(
-                Icons.Outlined.AccountCircle,
-                contentDescription = null,
-                tint = AppleColors.secondary,
-                modifier = Modifier.size(44.dp),
-            )
-        }
-
-        mode == "immich" -> PlaceholderPreview {
-            Image(
-                painter = painterResource(R.drawable.immich_logo),
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(52.dp),
-            )
-        }
-
-        else -> AmbientBackground(mode, wallpaperVersion, Modifier.fillMaxSize())
-    }
-}
-
-@Composable
-private fun PlaceholderPreview(content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        AmbientBackground("neutral", modifier = Modifier.fillMaxSize())
-        content()
     }
 }

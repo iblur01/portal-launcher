@@ -234,7 +234,6 @@
     <string name="auto_return_cancel_desc">Annuler</string>
     <string name="bg_mode_system">Fond d’écran Android</string>
     <string name="bg_mode_neutral">Neutre</string>
-    <string name="bg_mode_nature">Nature (Unsplash)</string>
     <string name="bg_mode_custom">Photo perso</string>
     <string name="bg_mode_immich">Album Immich</string>
 
@@ -300,7 +299,7 @@
     <string name="media_source_many_format">%1$s + %2$d autres</string>
     <string name="media_cover_desc_format">Pochette de %1$s</string>
     <string name="media_no_cover_desc">Aucune pochette</string>
-    <string name="media_home_assistant_logo_desc">Home Assistant</string>
+    <string name="media_player_icon_desc_format">Lecteur multimédia %1$s</string>
     <string name="media_previous_track_desc">Titre précédent</string>
     <string name="media_pause_desc">Pause</string>
     <string name="media_play_desc">Lecture</string>
@@ -349,8 +348,26 @@
     <string name="alarm_mode_home">Présence</string>
     <string name="alarm_mode_night">Nuit</string>
     <string name="alarm_mode_vacation">Vacances</string>
+    <string name="alarm_mode_custom_bypass">Contournement</string>
     <string name="alarm_mode_off">Désactivée</string>
     <string name="alarm_disarm_button">Désarmer</string>
+    <string name="alarm_choose_mode_title">Choisir un mode d’armement</string>
+    <string name="alarm_disarmed_subtitle">L’alarme est actuellement désactivée</string>
+    <string name="alarm_no_modes_available">Aucun mode d’armement disponible</string>
+    <string name="alarm_code_to_arm_title">Armer · %1$s</string>
+    <string name="alarm_code_to_arm_subtitle">Confirmez ce mode avec votre code</string>
+    <string name="alarm_armed_title">Alarme active</string>
+    <string name="alarm_armed_subtitle">Entrez votre code pour désarmer</string>
+    <string name="alarm_armed_mode_format">Mode %1$s · entrez votre code pour désarmer</string>
+    <string name="alarm_arming_title">Armement en cours</string>
+    <string name="alarm_arming_subtitle">Le délai de sortie est lancé. Vous pouvez encore désarmer.</string>
+    <string name="alarm_pending_title">Événement détecté</string>
+    <string name="alarm_pending_subtitle">L’alarme va se déclencher. Entrez votre code maintenant.</string>
+    <string name="alarm_triggered_title">Alarme déclenchée</string>
+    <string name="alarm_triggered_subtitle">Un événement d’alarme est en cours. Entrez votre code pour l’arrêter.</string>
+    <string name="alarm_disarming_title">Désarmement…</string>
+    <string name="alarm_disarming_subtitle">En attente de la confirmation de Home Assistant</string>
+    <string name="alarm_event_title">État de l’alarme</string>
 
     <!-- ===== COVER PANEL (Blinds) ===== -->
     <string name="cover_state_open">Ouvert</string>
@@ -413,11 +430,22 @@
     <string name="fan_state_off">Arrêté</string>
     <string name="fan_speed_label">Vitesse</string>
     <string name="fan_oscillation_label">Oscillation</string>
+    <string name="fan_oscillation_off">Fixe</string>
+    <string name="fan_oscillation_on">Oscillation</string>
     <string name="purifier_mode_auto">Auto</string>
     <string name="purifier_mode_sleep">Nuit</string>
     <string name="purifier_mode_manual">Manuel</string>
     <string name="purifier_mode_pet">Animaux</string>
     <string name="purifier_mode_off">Arrêt</string>
+    <string name="purifier_air_quality">Qualité de l’air</string>
+    <string name="purifier_quality_good">Bonne</string>
+    <string name="purifier_quality_fair">Moyenne</string>
+    <string name="purifier_quality_poor">Mauvaise</string>
+    <string name="purifier_quality_unknown">Aucune mesure</string>
+    <string name="purifier_details_open">Afficher le détail de la qualité de l’air</string>
+    <string name="purifier_details_back">Retour aux commandes du purificateur</string>
+    <string name="purifier_details_title">Détails de l’air</string>
+    <string name="purifier_details_empty">Aucune mesure de l’air disponible</string>
 
     <!-- ===== ENERGY PANEL ===== -->
     <string name="energy_power_label">Puissance</string>
@@ -491,6 +519,16 @@
     <string name="playground_capability_lock_jammed">Bloquée</string>
     <string name="playground_capability_alarm_no_code">Alarme sans code</string>
     <string name="playground_capability_alarm_with_code">Alarme avec code</string>
+    <string name="playground_alarm_state_armed_away">Armée · absence</string>
+    <string name="playground_alarm_state_armed_home">Armée · présence</string>
+    <string name="playground_alarm_state_armed_night">Armée · nuit</string>
+    <string name="playground_alarm_state_armed_vacation">Armée · vacances</string>
+    <string name="playground_alarm_state_armed_custom_bypass">Armée · contournement</string>
+    <string name="playground_alarm_state_arming">Armement</string>
+    <string name="playground_alarm_state_pending">Événement détecté</string>
+    <string name="playground_alarm_state_triggered">Déclenchée</string>
+    <string name="playground_alarm_state_disarming">Désarmement</string>
+    <string name="playground_alarm_test_code_hint">Code de test : 1234</string>
     <string name="playground_slider_from_bottom">Depuis le bas</string>
     <string name="playground_slider_from_top">Depuis le haut</string>
     <string name="playground_slider_disabled">Désactivé</string>
@@ -749,15 +787,12 @@
     <string name="onb_bg_title">Choisissez votre ambiance</string>
     <string name="onb_bg_body">Le fond reste volontairement discret pour préserver la lisibilité de l\'heure et des informations importantes.</string>
     <string name="onb_bg_tile_calm">Calme</string>
-    <string name="onb_bg_tile_nature">Nature</string>
     <string name="onb_bg_tile_my_photo">Ma photo</string>
     <string name="onb_bg_tile_immich">Immich</string>
+    <string name="onb_bg_android_desc">Utiliser le fond d’écran statique ou animé d’Android.</string>
     <string name="onb_bg_calm_desc">Un dégradé sombre, entièrement hors ligne.</string>
     <string name="onb_bg_calm_opacity_label">Opacité de l\'interface</string>
     <string name="onb_bg_calm_preview_action">Aperçu plein écran</string>
-    <string name="onb_bg_nature_desc">Portal fait doucement défiler une sélection de paysages.</string>
-    <string name="onb_bg_nature_warning_internet">Cette option nécessite une connexion Internet.</string>
-    <string name="onb_bg_nature_auto_change_label">Changement automatique</string>
     <string name="onb_bg_photo_desc">Choisissez une image depuis cet appareil.</string>
     <string name="onb_bg_photo_choose_action">Choisir une image</string>
     <string name="onb_bg_photo_dim_label">Assombrissement</string>

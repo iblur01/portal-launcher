@@ -19,9 +19,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -301,9 +302,7 @@ private fun HomeRail(
 ) {
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
-    val railState: LazyListState = rememberSaveable(section.sectionId, saver = LazyListState.Saver) {
-        LazyListState()
-    }
+    val railState = rememberScrollState()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val widthDp = with(density) { maxWidth.toPx() / density.density }
         val availableRailHeight = min(configuration.screenHeightDp * 0.28f, 156f)
@@ -315,8 +314,8 @@ private fun HomeRail(
                 fontScale = density.fontScale,
             )
         }
-        val columns = remember(section.items, layout.rowCount) {
-            section.items.chunked(layout.rowCount)
+        val rows = remember(section.items, layout.rowCount) {
+            distributeHomeRailRows(section.items, layout.rowCount)
         }
 
         Box(
@@ -325,10 +324,11 @@ private fun HomeRail(
                 .testTag("homeRailRows:${section.sectionId}:${layout.rowCount}"),
         )
 
-        LazyRow(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusGroup()
+                .horizontalScroll(railState, enabled = userScrollEnabled)
                 .pointerInput(section.sectionId) {
                     awaitEachGesture {
                         awaitFirstDown(
@@ -345,18 +345,14 @@ private fun HomeRail(
                         }
                     }
                 }
+                .padding(end = 28.dp)
                 .testTag("homeRail:${section.sectionId}"),
-            state = railState,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(end = 28.dp),
-            userScrollEnabled = userScrollEnabled,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(
-                items = columns,
-                key = { column -> column.joinToString("|") { it.ref.stableKey } },
-            ) { column ->
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    column.forEach { pill ->
+            rows.forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    row.forEach { pill ->
+                        key(pill.ref.stableKey) {
                         HomeRailPill(
                             pill = pill,
                             sectionTitle = section.title,
@@ -365,11 +361,19 @@ private fun HomeRail(
                             actions = actions,
                             onLongPress = { onLongPress(pill) },
                         )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/** Keeps reading order column-major while each visual row packs its pills independently. */
+internal fun <T> distributeHomeRailRows(items: List<T>, rowCount: Int): List<List<T>> {
+    val safeRows = rowCount.coerceAtLeast(1)
+    return List(safeRows) { row -> items.filterIndexed { index, _ -> index % safeRows == row } }
+        .filter { it.isNotEmpty() }
 }
 
 @Composable

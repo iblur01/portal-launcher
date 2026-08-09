@@ -130,15 +130,21 @@ class PillPriorityEngine(private val context: Context) {
             state = airState, priority = if (running) 15 else 5,
             entityId = entity.entityId,
             deviceState = entity.state,
-            details = related.filter { 
-                it.deviceClass in setOf("pm25", "pm10", "volatile_organic_compounds", "aqi") || 
+            details = related.filter {
+                it.deviceClass in setOf("carbon_dioxide", "pm25", "pm10", "volatile_organic_compounds", "aqi") ||
                 it.entityId.contains("filtre") || 
                 it.entityId.contains("filter") || 
                 it.entityId.contains("tvoc") || 
                 it.entityId.contains("qualite_d_air") ||
                 it.entityId.contains("pm2_5")
             }
-                .map { PillDetail(it.name.replace(Regex("^${Regex.escape(rule.label)} ", RegexOption.IGNORE_CASE), ""), it.state + it.attributes.optString("unit_of_measurement")) },
+                .map {
+                    PillDetail(
+                        label = it.name.replace(Regex("^${Regex.escape(rule.label)} ", RegexOption.IGNORE_CASE), ""),
+                        value = it.state + it.attributes.optString("unit_of_measurement"),
+                        entityId = it.entityId,
+                    )
+                },
         )
     }
 

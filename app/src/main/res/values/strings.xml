@@ -236,7 +236,6 @@
     <string name="auto_return_cancel_desc">Cancel</string>
     <string name="bg_mode_system">Android wallpaper</string>
     <string name="bg_mode_neutral">Neutral</string>
-    <string name="bg_mode_nature">Nature (Unsplash)</string>
     <string name="bg_mode_custom">Custom photo</string>
     <string name="bg_mode_immich">Immich album</string>
 
@@ -302,7 +301,7 @@
     <string name="media_source_many_format">%1$s + %2$d others</string>
     <string name="media_cover_desc_format">Cover of %1$s</string>
     <string name="media_no_cover_desc">No cover</string>
-    <string name="media_home_assistant_logo_desc">Home Assistant</string>
+    <string name="media_player_icon_desc_format">%1$s media player</string>
     <string name="media_previous_track_desc">Previous track</string>
     <string name="media_pause_desc">Pause</string>
     <string name="media_play_desc">Play</string>
@@ -351,8 +350,26 @@
     <string name="alarm_mode_home">Home</string>
     <string name="alarm_mode_night">Night</string>
     <string name="alarm_mode_vacation">Vacation</string>
+    <string name="alarm_mode_custom_bypass">Custom bypass</string>
     <string name="alarm_mode_off">Disabled</string>
     <string name="alarm_disarm_button">Disarm</string>
+    <string name="alarm_choose_mode_title">Choose an arming mode</string>
+    <string name="alarm_disarmed_subtitle">The alarm is currently disabled</string>
+    <string name="alarm_no_modes_available">No arming mode is available</string>
+    <string name="alarm_code_to_arm_title">Arm · %1$s</string>
+    <string name="alarm_code_to_arm_subtitle">Confirm this mode with your code</string>
+    <string name="alarm_armed_title">Alarm active</string>
+    <string name="alarm_armed_subtitle">Enter your code to disarm</string>
+    <string name="alarm_armed_mode_format">%1$s mode · enter your code to disarm</string>
+    <string name="alarm_arming_title">Arming in progress</string>
+    <string name="alarm_arming_subtitle">Exit delay is running. You can still disarm.</string>
+    <string name="alarm_pending_title">Event detected</string>
+    <string name="alarm_pending_subtitle">The alarm will trigger shortly. Enter your code now.</string>
+    <string name="alarm_triggered_title">Alarm triggered</string>
+    <string name="alarm_triggered_subtitle">An alarm event is in progress. Enter your code to stop it.</string>
+    <string name="alarm_disarming_title">Disarming…</string>
+    <string name="alarm_disarming_subtitle">Waiting for confirmation from Home Assistant</string>
+    <string name="alarm_event_title">Alarm status</string>
 
     <!-- ===== COVER PANEL (Blinds) ===== -->
     <string name="cover_state_open">Open</string>
@@ -415,11 +432,22 @@
     <string name="fan_state_off">Stopped</string>
     <string name="fan_speed_label">Speed</string>
     <string name="fan_oscillation_label">Oscillation</string>
+    <string name="fan_oscillation_off">Fixed</string>
+    <string name="fan_oscillation_on">Oscillating</string>
     <string name="purifier_mode_auto">Auto</string>
     <string name="purifier_mode_sleep">Sleep</string>
     <string name="purifier_mode_manual">Manual</string>
     <string name="purifier_mode_pet">Pets</string>
     <string name="purifier_mode_off">Off</string>
+    <string name="purifier_air_quality">Air quality</string>
+    <string name="purifier_quality_good">Good</string>
+    <string name="purifier_quality_fair">Fair</string>
+    <string name="purifier_quality_poor">Poor</string>
+    <string name="purifier_quality_unknown">No reading</string>
+    <string name="purifier_details_open">Show air quality details</string>
+    <string name="purifier_details_back">Back to purifier controls</string>
+    <string name="purifier_details_title">Air details</string>
+    <string name="purifier_details_empty">No air measurement is available</string>
 
     <!-- ===== ENERGY PANEL ===== -->
     <string name="energy_power_label">Power</string>
@@ -493,6 +521,16 @@
     <string name="playground_capability_lock_jammed">Jammed</string>
     <string name="playground_capability_alarm_no_code">Alarm without code</string>
     <string name="playground_capability_alarm_with_code">Alarm with code</string>
+    <string name="playground_alarm_state_armed_away">Armed · away</string>
+    <string name="playground_alarm_state_armed_home">Armed · home</string>
+    <string name="playground_alarm_state_armed_night">Armed · night</string>
+    <string name="playground_alarm_state_armed_vacation">Armed · vacation</string>
+    <string name="playground_alarm_state_armed_custom_bypass">Armed · custom bypass</string>
+    <string name="playground_alarm_state_arming">Arming</string>
+    <string name="playground_alarm_state_pending">Event detected</string>
+    <string name="playground_alarm_state_triggered">Triggered</string>
+    <string name="playground_alarm_state_disarming">Disarming</string>
+    <string name="playground_alarm_test_code_hint">Test code: 1234</string>
     <string name="playground_slider_from_bottom">From bottom</string>
     <string name="playground_slider_from_top">From top</string>
     <string name="playground_slider_disabled">Disabled</string>
@@ -751,15 +789,12 @@
     <string name="onb_bg_title">Choose your mood</string>
     <string name="onb_bg_body">The background stays deliberately understated to keep the time and important information readable.</string>
     <string name="onb_bg_tile_calm">Calm</string>
-    <string name="onb_bg_tile_nature">Nature</string>
     <string name="onb_bg_tile_my_photo">My photo</string>
     <string name="onb_bg_tile_immich">Immich</string>
+    <string name="onb_bg_android_desc">Use Android’s static or live wallpaper.</string>
     <string name="onb_bg_calm_desc">A dark gradient, entirely offline.</string>
     <string name="onb_bg_calm_opacity_label">Interface opacity</string>
     <string name="onb_bg_calm_preview_action">Full-screen preview</string>
-    <string name="onb_bg_nature_desc">Portal gently cycles through a selection of landscapes.</string>
-    <string name="onb_bg_nature_warning_internet">This option requires an Internet connection.</string>
-    <string name="onb_bg_nature_auto_change_label">Automatic change</string>
     <string name="onb_bg_photo_desc">Choose an image from this device.</string>
     <string name="onb_bg_photo_choose_action">Choose an image</string>
     <string name="onb_bg_photo_dim_label">Dimming</string>

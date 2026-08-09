@@ -76,8 +76,6 @@ import com.iblu01.portallauncher.ui.components.controls.PortalThreeWayControl
 import com.iblu01.portallauncher.ui.components.controls.ThreeWayControlSize
 import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
 import com.iblu01.portallauncher.ui.components.controls.controlSize
-import com.iblu01.portallauncher.ui.icons.HaIcon
-import com.iblu01.portallauncher.ui.icons.IconRef
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -288,10 +286,10 @@ fun MediaPlayerView(
                                                 modifier = Modifier.fillMaxSize()
                                             )
                                         } else if (!media.hasMedia) {
-                                            HaIcon(
-                                                ref = IconRef(IconRef.MDI, "home-assistant"),
-                                                contentDescription = stringResource(R.string.media_home_assistant_logo_desc),
-                                                tint = Color(0xFF18BCF2),
+                                            HaEntityIcon(
+                                                entityId = media.entityId,
+                                                contentDescription = stringResource(R.string.media_player_icon_desc_format, sourceName),
+                                                tint = AppleColors.secondary,
                                                 size = 64.dp,
                                                 fallback = Icons.Outlined.MusicNote,
                                             )
@@ -313,6 +311,13 @@ fun MediaPlayerView(
                             horizontalArrangement = Arrangement.spacedBy(7.dp),
                         ) {
                             Box(Modifier.size(7.dp).background(if (isPlaying) AppleColors.active else AppleColors.warning, CircleShape))
+                            HaEntityIcon(
+                                entityId = media.entityId,
+                                contentDescription = null,
+                                tint = if (isPlaying) AppleColors.active else AppleColors.warning,
+                                size = 23.dp,
+                                fallback = Icons.Outlined.MusicNote,
+                            )
                             Text(
                                 sourceName,
                                 style = AppleTypography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
@@ -389,15 +394,29 @@ fun MediaPlayerView(
                         onNavigation = onDismiss,
                         navigationIcon = Icons.Filled.Close,
                         navigationContentDescription = stringResource(R.string.media_close_player_desc),
+                        titleIcon = Icons.Outlined.MusicNote,
+                        titleEntityId = media.entityId,
                         accent = if (isPlaying) AppleColors.active else AppleColors.warning,
                         onTitleClick = if (media.groupablePlayers.size > 1) ({ groupDialogVisible = true }) else null,
                     )
                 } else {
-                    Text(
-                        sourceName,
-                        style = AppleTypography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
-                        color = AppleColors.primary,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    ) {
+                        HaEntityIcon(
+                            entityId = media.entityId,
+                            contentDescription = null,
+                            tint = if (isPlaying) AppleColors.active else AppleColors.warning,
+                            size = 23.dp,
+                            fallback = Icons.Outlined.MusicNote,
+                        )
+                        Text(
+                            sourceName,
+                            style = AppleTypography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+                            color = AppleColors.primary,
+                        )
+                    }
                 }
 
                 Box(
@@ -411,10 +430,10 @@ fun MediaPlayerView(
                         if (imageRequest != null) {
                             AsyncImage(model = imageRequest, imageLoader = imageLoader, contentDescription = stringResource(R.string.media_cover_desc_format, media.title), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         } else if (!media.hasMedia) {
-                            HaIcon(
-                                ref = IconRef(IconRef.MDI, "home-assistant"),
-                                contentDescription = stringResource(R.string.media_home_assistant_logo_desc),
-                                tint = Color(0xFF18BCF2),
+                            HaEntityIcon(
+                                entityId = media.entityId,
+                                contentDescription = stringResource(R.string.media_player_icon_desc_format, sourceName),
+                                tint = AppleColors.secondary,
                                 size = 82.dp,
                                 fallback = Icons.Outlined.MusicNote,
                             )

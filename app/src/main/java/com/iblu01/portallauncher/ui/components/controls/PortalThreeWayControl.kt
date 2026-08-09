@@ -29,7 +29,7 @@ import com.iblu01.portallauncher.ui.theme.AppleTypography
 enum class ThreeWayControlSize { Compact, Regular }
 
 /**
- * Shared three-action capsule used by media playback and directional devices such as covers.
+ * Shared two/three-action capsule used by media playback and directional devices such as covers.
  *
  * This component owns presentation only: callers provide icons, accessible descriptions and
  * callbacks. Optional side labels create the cover variation without coupling it to a domain.
@@ -39,9 +39,9 @@ fun PortalThreeWayControl(
     leadingIcon: ImageVector,
     leadingContentDescription: String,
     onLeadingClick: () -> Unit,
-    centerIcon: ImageVector,
-    centerContentDescription: String,
-    onCenterClick: () -> Unit,
+    centerIcon: ImageVector?,
+    centerContentDescription: String?,
+    onCenterClick: (() -> Unit)?,
     trailingIcon: ImageVector,
     trailingContentDescription: String,
     onTrailingClick: () -> Unit,
@@ -82,19 +82,21 @@ fun PortalThreeWayControl(
             iconSize = metrics.sideIcon,
             enabled = leadingEnabled,
         )
-        IconButton(
-            onClick = onCenterClick,
-            enabled = centerEnabled,
-            modifier = Modifier
-                .size(metrics.centerButton)
-                .background(Color.White, CircleShape),
-        ) {
-            Icon(
-                centerIcon,
-                contentDescription = centerContentDescription,
-                tint = Color.Black,
-                modifier = Modifier.size(metrics.centerIcon),
-            )
+        if (centerIcon != null && centerContentDescription != null && onCenterClick != null) {
+            IconButton(
+                onClick = onCenterClick,
+                enabled = centerEnabled,
+                modifier = Modifier
+                    .size(metrics.centerButton)
+                    .background(Color.White, CircleShape),
+            ) {
+                Icon(
+                    centerIcon,
+                    contentDescription = centerContentDescription,
+                    tint = Color.Black,
+                    modifier = Modifier.size(metrics.centerIcon),
+                )
+            }
         }
         SideAction(
             icon = trailingIcon,

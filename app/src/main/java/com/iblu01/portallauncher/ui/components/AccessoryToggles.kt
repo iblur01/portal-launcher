@@ -1,13 +1,10 @@
 package com.iblu01.portallauncher.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -34,6 +31,7 @@ import com.iblu01.portallauncher.ui.components.controls.VerticalSwitch
 import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
 import com.iblu01.portallauncher.ui.components.controls.VerticalSegmentedSelector
 import com.iblu01.portallauncher.ui.components.controls.ControlContentLayout
+import com.iblu01.portallauncher.ui.components.controls.HorizontalSegmentedSelector
 
 private sealed interface FanModeOption {
     data object Off : FanModeOption
@@ -94,12 +92,14 @@ fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val speedLabel = stringResource(R.string.fan_speed_label)
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(6.dp))
-        Text(
-            if (!fan.isOn) offLabel else if (fan.primaryControl is FanPrimaryControl.OnOff) onLabel else speedLabel,
-            style = AppleTypography.titleMedium.copy(fontSize = 17.sp),
-            color = AppleColors.primary,
-        )
-        Spacer(Modifier.height(12.dp))
+        if (fan.primaryControl !is FanPrimaryControl.OnOff) {
+            Text(
+                if (!fan.isOn) offLabel else speedLabel,
+                style = AppleTypography.titleMedium.copy(fontSize = 17.sp),
+                color = AppleColors.primary,
+            )
+            Spacer(Modifier.height(12.dp))
+        }
         BoxWithConstraints(
             modifier = Modifier.fillMaxWidth(0.54f).weight(1f),
             contentAlignment = Alignment.Center,
@@ -169,11 +169,24 @@ fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
 
         if (fan.supportsOscillation) {
             Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                PanelModeButton(stringResource(R.string.fan_oscillation_label), Icons.Outlined.Sync, fan.isOn && fan.isOscillating) {
-                    callService("fan", "oscillate", chip.entityId, mapOf("oscillating" to !fan.isOscillating))
-                }
-            }
+            val fixedLabel = stringResource(R.string.fan_oscillation_off)
+            val oscillatingLabel = stringResource(R.string.fan_oscillation_on)
+            HorizontalSegmentedSelector(
+                options = listOf(false, true),
+                selected = fan.isOscillating,
+                onSelect = { oscillating ->
+                    if (oscillating != fan.isOscillating) {
+                        callService("fan", "oscillate", chip.entityId, mapOf("oscillating" to oscillating))
+                    }
+                },
+                label = { if (it) oscillatingLabel else fixedLabel },
+                icon = { if (it) Icons.Outlined.Sync else Icons.Outlined.Air },
+                accent = AppleColors.fanAccent,
+                isNeutral = { !it },
+                contentLayout = ControlContentLayout.Horizontal,
+                enabled = fan.isOn,
+                modifier = Modifier.fillMaxWidth(0.72f),
+            )
         }
 
         Spacer(Modifier.height(12.dp))

@@ -712,6 +712,12 @@ private fun fakeCapabilityGroups(entities: Map<String, HaEntity>): List<HaCapabi
         val entity = entities.getValue(id)
         val state = when (kind) {
             PillKind.SIREN -> if (entity.state == "on") "critical" else "ok"
+            PillKind.SAFETY -> when (entity.state) {
+                "triggered" -> "critical"
+                "pending", "arming" -> "warning"
+                "disarmed", "disarming" -> "ok"
+                else -> "active"
+            }
             else -> if (entity.state in setOf("on", "open", "opening", "mowing", "eco")) "active" else "ok"
         }
         return LauncherChip(
@@ -745,7 +751,16 @@ private fun fakeCapabilityGroups(entities: Map<String, HaEntity>): List<HaCapabi
             chip("lock.entree", PillKind.LOCK, "lock", stringResource(R.string.playground_capability_lock_normal)),
             chip("lock.jammed", PillKind.LOCK, "lock", stringResource(R.string.playground_capability_lock_jammed)),
             chip("alarm_control_panel.maison", PillKind.SAFETY, "shield", stringResource(R.string.playground_capability_alarm_no_code)),
-            chip("alarm_control_panel.code", PillKind.SAFETY, "shield", stringResource(R.string.playground_capability_alarm_with_code)),
+            chip("alarm_control_panel.code", PillKind.SAFETY, "shield", "${stringResource(R.string.playground_capability_alarm_with_code)} · ${stringResource(R.string.playground_alarm_test_code_hint)}"),
+            chip("alarm_control_panel.armed_away", PillKind.SAFETY, "shield", "${stringResource(R.string.playground_alarm_state_armed_away)} · ${stringResource(R.string.playground_alarm_test_code_hint)}"),
+            chip("alarm_control_panel.armed_home", PillKind.SAFETY, "shield", "${stringResource(R.string.playground_alarm_state_armed_home)} · ${stringResource(R.string.playground_alarm_test_code_hint)}"),
+            chip("alarm_control_panel.armed_night", PillKind.SAFETY, "shield", "${stringResource(R.string.playground_alarm_state_armed_night)} · ${stringResource(R.string.playground_alarm_test_code_hint)}"),
+            chip("alarm_control_panel.armed_vacation", PillKind.SAFETY, "shield", "${stringResource(R.string.playground_alarm_state_armed_vacation)} · ${stringResource(R.string.playground_alarm_test_code_hint)}"),
+            chip("alarm_control_panel.armed_custom_bypass", PillKind.SAFETY, "shield", "${stringResource(R.string.playground_alarm_state_armed_custom_bypass)} · ${stringResource(R.string.playground_alarm_test_code_hint)}"),
+            chip("alarm_control_panel.arming", PillKind.SAFETY, "shield", "${stringResource(R.string.playground_alarm_state_arming)} · ${stringResource(R.string.playground_alarm_test_code_hint)}"),
+            chip("alarm_control_panel.pending", PillKind.SAFETY, "shield", "${stringResource(R.string.playground_alarm_state_pending)} · ${stringResource(R.string.playground_alarm_test_code_hint)}"),
+            chip("alarm_control_panel.triggered", PillKind.SAFETY, "shield", "${stringResource(R.string.playground_alarm_state_triggered)} · ${stringResource(R.string.playground_alarm_test_code_hint)}"),
+            chip("alarm_control_panel.disarming", PillKind.SAFETY, "shield", stringResource(R.string.playground_alarm_state_disarming)),
         )),
         HaCapabilityGroup(stringResource(R.string.playground_capability_humidifier), listOf(
             chip("humidifier.chambre", PillKind.HUMIDIFIER, "humidity", stringResource(R.string.playground_capability_modes)),
@@ -809,7 +824,11 @@ private fun fakePanelChips(
             PillDetail(light.name, if (active) "${((light.attributes.optInt("brightness") / 255f) * 100).toInt()} %" else "Éteinte", id, active)
         }, kind = PillKind.LIGHTS, deviceState = if (lightsOn > 0) "on" else "off"),
         LauncherChip("purifier_group", "air", "Purificateur", if (purifier.state == "on") mode(purifier.entityId, "preset_mode").replaceFirstChar { it.uppercase() } else "Éteint", airState, entityId = purifier.entityId, kind = PillKind.PURIFIER,
-            details = listOf(PillDetail("CO₂", "$co2 ppm"), PillDetail("PM2.5", "$pm25 µg/m³"), PillDetail("Filtre", "82 %")), deviceState = purifier.state),
+            details = listOf(
+                PillDetail("CO₂", "$co2 ppm", "sensor.air_co2"),
+                PillDetail("PM2.5", "$pm25 µg/m³", "sensor.air_pm25"),
+                PillDetail("Filtre", "82 %", "sensor.air_filter"),
+            ), deviceState = purifier.state),
         LauncherChip("lock_test", "lock", "Porte d’entrée", if (lock.state == "locked") "Verrouillée" else "Déverrouillée", if (lock.state == "locked") "ok" else "critical", entityId = lock.entityId, kind = PillKind.LOCK, deviceState = lock.state),
         LauncherChip("cover_test", "cover", "Volet salon", "${percent(cover.entityId, "current_position")} %", if (cover.state == "closed") "ok" else "active", entityId = cover.entityId, kind = PillKind.COVER, deviceState = cover.state),
         LauncherChip("thermostat_test", "temperature", "Thermostat", "${if (climateTarget % 1.0 == 0.0) climateTarget.toInt() else climateTarget} °C", if (climate.state == "off") "ok" else "active", entityId = climate.entityId, kind = PillKind.THERMOSTAT, deviceState = climate.state),
@@ -859,11 +878,21 @@ private fun rememberFakePanelEntities(): SnapshotStateMap<String, HaEntity> = re
         fakeEntity("siren.simple", "off", "Sirène simple", "{\"supported_features\":0}"),
         fakeEntity("lawn_mower.jardin", "docked", "Tondeuse", "{\"supported_features\":7}"),
         fakeEntity("lawn_mower.simple", "docked", "Tondeuse sans pause", "{\"supported_features\":5}"),
-        fakeEntity("alarm_control_panel.maison", "disarmed", "Alarme maison", "{\"supported_features\":15}"),
-        fakeEntity("alarm_control_panel.code", "armed_away", "Alarme avec code", "{\"code_format\":\"number\",\"code_arm_required\":true,\"supported_features\":7}"),
+        fakeEntity("alarm_control_panel.maison", "disarmed", "Alarme sans code", "{\"supported_features\":63}"),
+        fakeEntity("alarm_control_panel.code", "disarmed", "Alarme avec code", "{\"code_format\":\"number\",\"code_arm_required\":true,\"supported_features\":63}"),
+        fakeAlarmState("armed_away", "Armée · absence"),
+        fakeAlarmState("armed_home", "Armée · présence"),
+        fakeAlarmState("armed_night", "Armée · nuit"),
+        fakeAlarmState("armed_vacation", "Armée · vacances"),
+        fakeAlarmState("armed_custom_bypass", "Armée · contournement"),
+        fakeAlarmState("arming", "Armement en cours"),
+        fakeAlarmState("pending", "Événement détecté"),
+        fakeAlarmState("triggered", "Alarme déclenchée"),
+        fakeAlarmState("disarming", "Désarmement en cours"),
         fakeEntity("sensor.lave_linge_state", "running", "Machine à laver", "{\"progress\":62,\"phase\":\"rinse\",\"remaining_time\":\"Reste 38 min\",\"program\":\"Coton\",\"temperature\":40,\"spin_speed\":1200}"),
         fakeEntity("sensor.air_co2", "620", "CO₂", "{\"device_class\":\"carbon_dioxide\",\"unit_of_measurement\":\"ppm\"}"),
         fakeEntity("sensor.air_pm25", "4", "PM2.5", "{\"device_class\":\"pm25\",\"unit_of_measurement\":\"µg/m³\"}"),
+        fakeEntity("sensor.air_filter", "82", "Filtre", "{\"unit_of_measurement\":\"%\"}"),
     ).associateBy { it.entityId }) }
 }
 
@@ -957,13 +986,33 @@ private fun rememberFakeCallService(entities: SnapshotStateMap<String, HaEntity>
                     "dock" -> "docked"
                     else -> current.state
                 })
-                "alarm_control_panel" -> replace(when (service) {
-                    "alarm_disarm" -> "disarmed"; "alarm_arm_home" -> "armed_home"; "alarm_arm_night" -> "armed_night"; "alarm_trigger" -> "triggered"; else -> "armed_away"
-                })
+                "alarm_control_panel" -> {
+                    // Every code-protected fixture accepts 1234. Any other entry intentionally
+                    // leaves the state unchanged so the production keypad's rejection animation
+                    // can be exercised in the Playground too.
+                    val protected = attributes.optString("code_format").isNotBlank()
+                    if (protected && data?.get("code")?.toString() != "1234") return
+                    replace(when (service) {
+                        "alarm_disarm" -> "disarmed"
+                        "alarm_arm_home" -> "armed_home"
+                        "alarm_arm_night" -> "armed_night"
+                        "alarm_arm_vacation" -> "armed_vacation"
+                        "alarm_arm_custom_bypass" -> "armed_custom_bypass"
+                        "alarm_trigger" -> "triggered"
+                        else -> "armed_away"
+                    })
+                }
             }
         }
     }
 }
+
+private fun fakeAlarmState(state: String, name: String): HaEntity = fakeEntity(
+    id = "alarm_control_panel.$state",
+    state = state,
+    name = name,
+    attributes = "{\"code_format\":\"number\",\"code_arm_required\":true,\"supported_features\":63}",
+)
 
 private fun fakeEntity(id: String, state: String, name: String, attributes: String): HaEntity =
     HaEntity(id, state, JSONObject(attributes).put("friendly_name", name))

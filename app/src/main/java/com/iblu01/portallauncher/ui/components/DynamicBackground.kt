@@ -7,58 +7,51 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import coil.compose.AsyncImage
-import coil.ImageLoader
-import coil.request.ImageRequest
-import android.util.Log
-import kotlinx.coroutines.delay
-import okhttp3.OkHttpClient
-import java.net.Proxy
-import java.util.concurrent.TimeUnit
-
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.R
-
-/**
- * The landscapes the "nature" background cycles through.
- *
- * Internal rather than private so the onboarding can show the same photos in its preview instead of
- * a second, invented set — the tile promises exactly what the launcher will display.
- */
-internal val unsplashUrls = listOf(
-    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80" to "Mer",
-    "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80" to "Montagne",
-    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&q=80" to "Forêt",
-    "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&q=80" to "Brume",
-    "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80" to "Nature",
-)
 
 val backgroundModes = listOf(
     "system" to R.string.bg_mode_system,
     "neutral" to R.string.bg_mode_neutral,
-    "nature" to R.string.bg_mode_nature,
-    "custom" to R.string.bg_mode_custom,
     "immich" to R.string.bg_mode_immich,
 )
 
 @Composable
 fun AmbientBackground(mode: String, wallpaperVersion: Int = 0, modifier: Modifier = Modifier) {
-    when (mode) {
-        // Android draws its wallpaper (including live wallpapers) in the layer exposed by the
-        // activity's windowShowWallpaper flag. Drawing nothing here is the native launcher path.
-        "system" -> Box(modifier)
-        "nature" -> UnsplashCycling(modifier)
-        "custom" -> CustomWallpaper(modifier, wallpaperVersion)
-        "immich" -> ImmichBackground(modifier)
-        else -> NeutralGradient(modifier)
+    AmbientBackground(mode, wallpaperVersion, overlayOpacity = 0f, modifier = modifier)
+}
+
+/** Draws the source and its readability veil as one indivisible, full-surface background. */
+@Composable
+fun AmbientBackground(
+    mode: String,
+    wallpaperVersion: Int = 0,
+    overlayOpacity: Float,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier) {
+        when (mode) {
+            // Android draws static and live wallpapers in the activity's wallpaper window layer.
+            "system" -> Box(Modifier.fillMaxSize())
+            "immich" -> ImmichBackground(Modifier.fillMaxSize())
+            else -> NeutralGradient(Modifier.fillMaxSize())
+        }
+        if (mode != "neutral" && overlayOpacity > 0f) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = overlayOpacity.coerceIn(0f, 1f))),
+            )
+        }
     }
 }
 
@@ -68,79 +61,10 @@ private fun NeutralGradient(modifier: Modifier = Modifier) {
         modifier.background(
             Brush.radialGradient(
                 colors = listOf(Color(0xFF1B2026), Color(0xFF05070A)),
-                radius = 1400f
-            )
-        )
+                radius = 1400f,
+            ),
+        ),
     )
-}
-
-@Composable
-private fun CustomWallpaper(modifier: Modifier = Modifier, wallpaperVersion: Int = 0) {
-    val context = LocalContext.current
-    // Re-created (not `remember { }`-cached) so a bump of wallpaperVersion forces a fresh
-    // file.exists()/lastModified() read, picking up a just-replaced photo.
-    val file = remember(wallpaperVersion) { java.io.File(context.filesDir, "wallpaper.jpg") }
-    if (file.exists()) {
-        val cacheKey = remember(wallpaperVersion, file.lastModified()) {
-            "wallpaper-${file.lastModified()}"
-        }
-        val request = remember(cacheKey) {
-            ImageRequest.Builder(context)
-                .data(file)
-                .memoryCacheKey(cacheKey)
-                .diskCacheKey(cacheKey)
-                .build()
-        }
-        AsyncImage(
-            model = request,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = modifier.fillMaxSize(),
-        )
-    } else {
-        NeutralGradient(modifier)
-    }
-}
-
-/** The image loader the landscapes use: no proxy, generous timeouts, long crossfade. */
-@Composable
-internal fun rememberWallpaperImageLoader(): ImageLoader {
-    val context = LocalContext.current
-    return remember(context) {
-        ImageLoader.Builder(context.applicationContext)
-            .okHttpClient {
-                OkHttpClient.Builder()
-                    .proxy(Proxy.NO_PROXY)
-                    .connectTimeout(10, TimeUnit.SECONDS)
-                    .readTimeout(20, TimeUnit.SECONDS)
-                    .build()
-            }
-            .crossfade(1_200)
-            .respectCacheHeaders(false)
-            .build()
-    }
-}
-
-@Composable
-private fun UnsplashCycling(modifier: Modifier = Modifier) {
-    val imageLoader = rememberWallpaperImageLoader()
-    val index by produceState(0) {
-        while (true) {
-            delay(30_000L)
-            value = (value + 1) % unsplashUrls.size
-        }
-    }
-    Crossfade(targetState = index, animationSpec = tween(2000), label = "bg") { i ->
-        val (url, _) = unsplashUrls[i]
-        AsyncImage(
-            model = url,
-            imageLoader = imageLoader,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            onError = { Log.w("PortalUnsplash", "Unable to load ${url.substringBefore('?')}: ${it.result.throwable.message}") },
-            modifier = modifier.fillMaxSize()
-        )
-    }
 }
 
 @Composable

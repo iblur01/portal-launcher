@@ -145,10 +145,12 @@ private fun ChipActionsContent(
     val showHeadlineValue = when (chip.toPanelKind()) {
         PanelKind.THERMOSTAT -> false // The dial owns the target and room temperatures.
         PanelKind.SWITCH -> false // The switch thumb already carries the on/off state.
+        PanelKind.FAN -> false // The switch/slider already owns running state and speed.
         PanelKind.LOCK -> false // The lock control owns the translated state; avoid raw "locked".
         PanelKind.PURIFIER -> false // The mode selector already displays the active state.
         PanelKind.VACUUM -> false // The reusable vacuum status chip owns the active state.
         PanelKind.WASHER -> false // The washer dial owns progress, phase and remaining time.
+        PanelKind.ALARM -> false // The alarm state machine owns live status and incident copy.
         PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
         PanelKind.LAWN_MOWER -> false
         PanelKind.COVER -> entity?.let {
@@ -190,7 +192,7 @@ private fun ChipActionsContent(
         // Center the control block vertically in the remaining space; it still scrolls if a
         // panel's content is taller than the panel (keypads, long detail lists).
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.PURIFIER, PanelKind.VACUUM, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
+            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.PURIFIER, PanelKind.THERMOSTAT, PanelKind.VACUUM, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
                 // Vertical controls need finite panel constraints so they can fill the available
                 // height while preserving the same proportions as lights and covers.
                 when (chip.toPanelKind()) {
@@ -199,6 +201,7 @@ private fun ChipActionsContent(
                     PanelKind.SWITCH -> SwitchControl(chip, Modifier.fillMaxSize())
                     PanelKind.LOCK -> LockControl(chip, Modifier.fillMaxSize())
                     PanelKind.PURIFIER -> PurifierActions(chip, Modifier.fillMaxSize())
+                    PanelKind.THERMOSTAT -> ThermostatControl(chip, Modifier.fillMaxSize())
                     PanelKind.VACUUM -> VacuumControl(chip, Modifier.fillMaxSize())
                     PanelKind.HUMIDIFIER -> GenericHaEntityControl(chip, Modifier.fillMaxSize())
                     PanelKind.WATER_HEATER -> WaterHeaterControl(chip, Modifier.fillMaxSize())
@@ -223,7 +226,7 @@ private fun ChipActionsContent(
                 PanelKind.PURIFIER -> Unit // Bounded branch above.
                 PanelKind.LOCK -> Unit // Bounded branch above.
                 PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH -> Unit // Bounded branch above.
-                PanelKind.THERMOSTAT -> ThermostatControl(chip)
+                PanelKind.THERMOSTAT -> Unit // Bounded branch above.
                 PanelKind.VACUUM -> Unit // Bounded branch above.
                 PanelKind.ALARM -> AlarmControl(chip)
                 PanelKind.WASHER -> WasherControl(chip)

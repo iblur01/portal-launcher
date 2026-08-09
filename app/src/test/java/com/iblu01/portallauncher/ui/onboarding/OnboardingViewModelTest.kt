@@ -91,10 +91,10 @@ class OnboardingViewModelTest {
     fun `choices are written as they are made, not at the end`() {
         val model = viewModel()
         model.selectGridPreset(GridPreset.MORE_APPS)
-        model.selectBackground("nature", configured = true)
+        model.selectBackground("system", configured = true)
 
         assertEquals(GridPreset.MORE_APPS.scale, prefs.gridScale, 0.001f)
-        assertEquals("nature", prefs.backgroundMode)
+        assertEquals("system", prefs.backgroundMode)
         assertFalse(prefs.onboardingCompleted)
     }
 
@@ -193,7 +193,7 @@ class OnboardingViewModelTest {
     fun `relaunching from the settings clears the progress but keeps every setting`() {
         val model = viewModel()
         model.selectGridPreset(GridPreset.LARGE_ICONS)
-        model.selectBackground("nature", configured = true)
+        model.selectBackground("system", configured = true)
         model.completeOnboarding()
 
         prefs.resetOnboarding() // what the settings row does, through OnboardingActivity
@@ -201,7 +201,7 @@ class OnboardingViewModelTest {
         assertFalse(prefs.onboardingCompleted)
         assertEquals(0, prefs.onboardingVersion)
         assertEquals(GridPreset.LARGE_ICONS.scale, prefs.gridScale, 0.001f)
-        assertEquals("nature", prefs.backgroundMode)
+        assertEquals("system", prefs.backgroundMode)
         assertEquals(OnboardingStep.WELCOME, viewModel().state.value.step)
     }
 

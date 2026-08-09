@@ -1011,16 +1011,9 @@ private fun PortalLauncherApp(
             AmbientBackground(
                 mode = backgroundMode,
                 wallpaperVersion = wallpaperVersion,
+                overlayOpacity = bgOverlayOpacity,
                 modifier = Modifier.fillMaxSize()
             )
-
-            if (backgroundMode != "neutral") {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = bgOverlayOpacity))
-                )
-            }
 
             // Swiping to the app grid dims the wallpaper further, so the icons keep their contrast
             // whatever the photo is. Alpha is read in the layer phase — no recomposition per frame.

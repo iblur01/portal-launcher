@@ -1,9 +1,13 @@
 package com.iblu01.portallauncher.ui.components
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.Air
@@ -11,6 +15,7 @@ import androidx.compose.material.icons.outlined.AutoMode
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,21 +27,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.R
-import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.components.controls.ControlNeutral
 import com.iblu01.portallauncher.ui.components.controls.ThermostatActivity
 import com.iblu01.portallauncher.ui.components.controls.ThermostatMode
 import com.iblu01.portallauncher.ui.components.controls.WheelPicker
 import com.iblu01.portallauncher.ui.theme.AppleColors
+import com.iblu01.portallauncher.ui.theme.AppleTypography
 import kotlin.math.roundToInt
 
 /** Home Assistant adapter around the reusable, backend-agnostic thermostat controls. */
 @Composable
-fun ThermostatControl(chip: LauncherChip) {
+fun ThermostatControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val callService = LocalCallService.current
     val entity = rememberEntity(chip.entityId)
     if (entity == null || entity.isUnavailable()) { PanelUnavailable(); return }
@@ -81,33 +88,51 @@ fun ThermostatControl(chip: LauncherChip) {
         else -> null
     }
 
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         if (climate.hasTemperatureControl && displayedMode !in setOf("dry", "fan_only")) {
-            TemperatureArcControl(
-                mode = dialMode,
-                activity = activity,
-                target = target,
-                onTargetChange = { target = it },
-                lowTarget = low,
-                highTarget = high,
-                onRangeChange = { nextLow, nextHigh -> low = nextLow; high = nextHigh },
-                valueRange = climate.minimumTemperature..climate.maximumTemperature,
-                step = climate.temperatureStep,
-                current = climate.currentTemperature,
-                unit = climate.temperatureUnit,
-                modifier = Modifier.fillMaxWidth().height(240.dp),
-                onCommit = {
-                    val data = if (usesRange) {
-                        mapOf("target_temp_low" to low, "target_temp_high" to high)
-                    } else {
-                        mapOf("temperature" to target)
-                    }
-                    callService("climate", "set_temperature", chip.entityId, data)
-                },
-            )
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                val dialSize = minOf(maxWidth, maxHeight)
+                TemperatureArcControl(
+                    mode = dialMode,
+                    activity = activity,
+                    target = target,
+                    onTargetChange = { target = it },
+                    lowTarget = low,
+                    highTarget = high,
+                    onRangeChange = { nextLow, nextHigh -> low = nextLow; high = nextHigh },
+                    valueRange = climate.minimumTemperature..climate.maximumTemperature,
+                    step = climate.temperatureStep,
+                    current = climate.currentTemperature,
+                    unit = climate.temperatureUnit,
+                    modifier = Modifier.size(dialSize),
+                    onCommit = {
+                        val data = if (usesRange) {
+                            mapOf("target_temp_low" to low, "target_temp_high" to high)
+                        } else {
+                            mapOf("temperature" to target)
+                        }
+                        callService("climate", "set_temperature", chip.entityId, data)
+                    },
+                )
+            }
             Spacer(Modifier.height(12.dp))
         } else if (climate.currentTemperature != null) {
-            PanelDetailRow(PillDetail(stringResource(R.string.thermostat_room_temperature), formatTemperature(climate.currentTemperature, climate.temperatureStep, climate.temperatureUnit)))
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    val formatted = formatTemperatureNumber(climate.currentTemperature, climate.temperatureStep)
+                    Text(
+                        formatted,
+                        style = AppleTypography.headlineLarge.copy(fontSize = 68.sp, fontWeight = FontWeight.Light),
+                        color = AppleColors.primary,
+                    )
+                    Text(
+                        climate.temperatureUnit,
+                        style = AppleTypography.headlineLarge.copy(fontSize = 28.sp, fontWeight = FontWeight.Light),
+                        color = AppleColors.secondary,
+                        modifier = Modifier.alignByBaseline(),
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
         }
 
@@ -151,7 +176,5 @@ private fun hvacModePresentation(mode: String): HvacModePresentation = when (mod
     else -> HvacModePresentation(null, Icons.Outlined.AutoMode)
 }
 
-private fun formatTemperature(value: Float, step: Float, unit: String): String {
-    val number = if (step < 1f) String.format("%.1f", value) else value.roundToInt().toString()
-    return "$number $unit"
-}
+private fun formatTemperatureNumber(value: Float, step: Float): String =
+    if (step < 1f) String.format("%.1f", value) else value.roundToInt().toString()

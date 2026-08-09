@@ -92,8 +92,13 @@ class Prefs(private val context: Context) {
         set(value) = sp.edit().putInt("screen_timeout_minutes", value.coerceIn(1, 240)).apply()
 
     var backgroundMode: String
-        get() = sp.getString("background_mode", "neutral") ?: "neutral"
-        set(value) = sp.edit().putString("background_mode", value).apply()
+        get() = sp.getString("background_mode", "system")
+            ?.takeIf { it in setOf("system", "neutral", "immich") }
+            ?: "system"
+        set(value) = sp.edit().putString(
+            "background_mode",
+            value.takeIf { it in setOf("system", "neutral", "immich") } ?: "system",
+        ).apply()
 
     /**
      * Language code ("en", "fr", …) or "" to follow the device's system language.

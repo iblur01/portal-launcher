@@ -38,5 +38,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity-alias>
+
+        <!-- Debug-only ADB entry point used by the Playground option in dev.sh. -->
+        <activity-alias
+            android:name=".PlaygroundDevTrigger"
+            android:targetActivity=".PlaygroundActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.iblu01.portallauncher.action.PLAYGROUND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

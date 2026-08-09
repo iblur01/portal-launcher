@@ -1,6 +1,7 @@
 package com.iblu01.portallauncher.ui.components.controls
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -84,6 +86,8 @@ fun PinKeypad(
     codeLength: Int = 4,
     title: String? = null,
     subtitle: String? = null,
+    /** Replaces [subtitle] with entered dots inside one fixed-height area, keeping keys still. */
+    mergeSubtitleWithEntry: Boolean = false,
     accent: Color = AppleColors.accent,
     dotColor: Color = AppleColors.primary,
     error: Boolean = false,
@@ -161,13 +165,9 @@ fun PinKeypad(
             )
             Spacer(Modifier.height(4.dp * contentScale))
         }
-        if (subtitle != null) {
-            Text(subtitle, style = AppleTypography.bodySmall, color = AppleColors.secondary)
-            Spacer(Modifier.height(4.dp * contentScale))
-        }
-        Spacer(Modifier.height(16.dp * contentScale))
-
-        // Entry dots, riding the shake.
+        // Entry dots, riding the shake. Variable-length keypads normally kept one empty outlined
+        // dot as a placeholder; alarm keypads instead merge their prompt into this exact area and
+        // swap it for real dots only after the first digit, without moving the keys below.
         val dotCount = if (fixed) codeLength else code.length.coerceAtLeast(1)
         val filledColor by animateColorAsState(
             if (errored) AppleColors.error else dotColor, tween(120), label = "dotFill",
@@ -182,30 +182,62 @@ fun PinKeypad(
             ),
             label = "keypadLoadingPhase",
         )
-        Row(
-            modifier = Modifier.offset { IntOffset(shake.value.roundToInt(), 0) },
-            horizontalArrangement = Arrangement.spacedBy(16.dp * contentScale),
-        ) {
-            repeat(dotCount) { i ->
-                val on = i < code.length
-                val directDistance = abs(loadingPhase - i)
-                val pulseDistance = min(directDistance, dotCount - directDistance)
-                val pulse = if (loading) (1f - pulseDistance).coerceIn(0f, 1f) else 0f
-                Box(
-                    Modifier
-                        .size(13.dp * contentScale)
-                        .graphicsLayer {
-                            scaleX = 1f + pulse * 0.28f
-                            scaleY = 1f + pulse * 0.28f
-                            alpha = if (loading) 0.55f + pulse * 0.45f else 1f
-                        }
-                        .clip(CircleShape)
-                        .then(
-                            if (on) Modifier.background(filledColor, CircleShape)
-                            else Modifier.border(1.5.dp, AppleColors.quaternary, CircleShape),
-                        ),
-                )
+        val dots: @Composable () -> Unit = {
+            Row(
+                modifier = Modifier.offset { IntOffset(shake.value.roundToInt(), 0) },
+                horizontalArrangement = Arrangement.spacedBy(16.dp * contentScale),
+            ) {
+                repeat(dotCount) { i ->
+                    val on = i < code.length
+                    val directDistance = abs(loadingPhase - i)
+                    val pulseDistance = min(directDistance, dotCount - directDistance)
+                    val pulse = if (loading) (1f - pulseDistance).coerceIn(0f, 1f) else 0f
+                    Box(
+                        Modifier
+                            .size(13.dp * contentScale)
+                            .graphicsLayer {
+                                scaleX = 1f + pulse * 0.28f
+                                scaleY = 1f + pulse * 0.28f
+                                alpha = if (loading) 0.55f + pulse * 0.45f else 1f
+                            }
+                            .clip(CircleShape)
+                            .then(
+                                if (on) Modifier.background(filledColor, CircleShape)
+                                else Modifier.border(1.5.dp, AppleColors.quaternary, CircleShape),
+                            ),
+                    )
+                }
             }
+        }
+
+        if (mergeSubtitleWithEntry && subtitle != null) {
+            Crossfade(
+                targetState = code.isEmpty(),
+                animationSpec = tween(120),
+                label = "keypadPromptToDots",
+                modifier = Modifier.fillMaxWidth().height(49.dp * contentScale),
+            ) { empty ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (empty) {
+                        Text(
+                            subtitle,
+                            style = AppleTypography.bodySmall,
+                            color = AppleColors.secondary,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            maxLines = 2,
+                        )
+                    } else {
+                        dots()
+                    }
+                }
+            }
+        } else {
+            if (subtitle != null) {
+                Text(subtitle, style = AppleTypography.bodySmall, color = AppleColors.secondary)
+                Spacer(Modifier.height(4.dp * contentScale))
+            }
+            Spacer(Modifier.height(16.dp * contentScale))
+            dots()
         }
         Spacer(Modifier.height(24.dp * contentScale))
 
