@@ -2,6 +2,7 @@ package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -101,8 +106,10 @@ fun WeatherPanel(
                                 modifier = Modifier.weight(0.38f),
                             )
                             Column(
-                                modifier = Modifier.weight(0.62f).fillMaxHeight()
-                                    .verticalScroll(rememberScrollState()),
+                                modifier = Modifier.weight(0.62f).fillMaxHeight().then(
+                                    if (disclosure.emphasizeSummary) Modifier
+                                    else Modifier.verticalScroll(rememberScrollState())
+                                ),
                                 verticalArrangement = Arrangement.spacedBy(sectionGap),
                             ) {
                                 WeatherForecastSections(weather, disclosure, compactRows = true)
@@ -138,6 +145,8 @@ private fun WeatherSummary(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
+            WeatherIcon(weather.glyph, Modifier.size(iconSize))
+            Spacer(Modifier.height(8.dp))
             Text(
                 weather.temp,
                 style = AppleTypography.displayLarge.copy(
@@ -146,8 +155,17 @@ private fun WeatherSummary(
                 ),
                 color = AppleColors.primary,
             )
-            Spacer(Modifier.height(12.dp))
-            WeatherIcon(weather.glyph, Modifier.size(iconSize))
+            weather.daily.firstOrNull()?.tempLow?.let { minimum ->
+                Text(
+                    stringResource(
+                        R.string.weather_today_range_format,
+                        minimum.roundToInt(),
+                        weather.daily.first().temp.roundToInt(),
+                    ),
+                    style = AppleTypography.bodyLarge.copy(fontSize = 17.sp),
+                    color = AppleColors.secondary,
+                )
+            }
         }
     } else {
         Row(
@@ -189,6 +207,10 @@ internal fun weatherDisclosureFor(widthDp: Float, heightDp: Float): WeatherDiscl
 
 @Composable
 private fun WeatherForecastSections(weather: WeatherUi, disclosure: WeatherDisclosure, compactRows: Boolean) {
+    if (disclosure.emphasizeSummary && weather.hourly.isNotEmpty() && weather.daily.isNotEmpty()) {
+        CompactForecastSwitcher(weather, disclosure)
+        return
+    }
     if (weather.hourly.isNotEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
@@ -216,12 +238,103 @@ private fun WeatherForecastSections(weather: WeatherUi, disclosure: WeatherDiscl
     }
 }
 
+private enum class ForecastPage { HOURLY, DAILY }
+
+@Composable
+private fun CompactForecastSwitcher(weather: WeatherUi, disclosure: WeatherDisclosure) {
+    var page by remember { mutableStateOf(ForecastPage.HOURLY) }
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.Start)
+                .clip(AppleShapes.pill)
+                .background(AppleColors.frostedFill)
+                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
+                .padding(3.dp),
+        ) {
+            ForecastPageButton(
+                label = stringResource(R.string.weather_tab_hourly),
+                selected = page == ForecastPage.HOURLY,
+                onClick = { page = ForecastPage.HOURLY },
+            )
+            ForecastPageButton(
+                label = stringResource(R.string.weather_tab_daily),
+                selected = page == ForecastPage.DAILY,
+                onClick = { page = ForecastPage.DAILY },
+            )
+        }
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            val visibleItems = when (page) {
+                ForecastPage.HOURLY -> disclosure.hourlyCount
+                ForecastPage.DAILY -> disclosure.dailyCount
+            }
+            val itemWidth = maxWidth / visibleItems
+            val itemHeight = maxHeight
+            Row(
+                modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                when (page) {
+                    ForecastPage.HOURLY -> weather.hourly.forEach { point ->
+                        Box(Modifier.size(width = itemWidth, height = itemHeight), contentAlignment = Alignment.Center) {
+                            HourTile(point, enlarged = true)
+                        }
+                    }
+                    ForecastPage.DAILY -> weather.daily.forEach { point ->
+                        Box(Modifier.size(width = itemWidth, height = itemHeight), contentAlignment = Alignment.Center) {
+                            DayTile(point)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForecastPageButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(AppleShapes.pill)
+            .background(if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = AppleTypography.labelSmall.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+            color = if (selected) AppleColors.primary else AppleColors.secondary,
+        )
+    }
+}
+
 @Composable
 private fun HourTile(p: ForecastPoint, enlarged: Boolean) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (enlarged) 7.dp else 6.dp)) {
         Text(forecastPointLabel(p.datetime, hourly = true), style = AppleTypography.bodySmall.copy(fontSize = if (enlarged) 14.sp else 12.sp), color = AppleColors.secondary)
         WeatherIcon(weatherGlyph(p.condition, night = false), Modifier.size(if (enlarged) 40.dp else 30.dp))
         Text("${p.temp.roundToInt()}°", style = AppleTypography.bodyLarge.copy(fontSize = if (enlarged) 20.sp else 17.sp), color = AppleColors.primary)
+    }
+}
+
+@Composable
+private fun DayTile(p: ForecastPoint) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            forecastPointLabel(p.datetime, hourly = false),
+            style = AppleTypography.bodyLarge.copy(fontSize = 18.sp),
+            color = AppleColors.primary,
+        )
+        WeatherIcon(weatherGlyph(p.condition, night = false), Modifier.size(54.dp))
+        Text(
+            p.tempLow?.let { "${p.temp.roundToInt()}° / ${it.roundToInt()}°" } ?: "${p.temp.roundToInt()}°",
+            style = AppleTypography.bodyLarge.copy(fontSize = 20.sp),
+            color = AppleColors.secondary,
+        )
     }
 }
 

@@ -293,6 +293,9 @@
     <string name="weather_panel_title">Météo</string>
     <string name="weather_section_hourly">PROCHAINES HEURES</string>
     <string name="weather_section_daily">PROCHAINS JOURS</string>
+    <string name="weather_tab_hourly">Heures</string>
+    <string name="weather_tab_daily">Jours</string>
+    <string name="weather_today_range_format">Min %1$d° · Max %2$d°</string>
 
     <!-- ===== AIR QUALITY PANEL ===== -->
     <string name="air_quality_back_desc">Retour</string>
