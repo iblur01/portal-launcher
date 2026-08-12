@@ -98,20 +98,19 @@
             android:exported="false"
             android:screenOrientation="fullSensor" />
 
-        <!--
-            ADB-only shortcut for panels without a practical keyboard. The shell holds DUMP, while
-            ordinary applications do not, so they cannot inject or replace Home Assistant secrets.
-        -->
-        <activity-alias
-            android:name=".ui.onboarding.HomeAssistantAdbTrigger"
-            android:targetActivity=".ui.onboarding.OnboardingActivity"
+        <!-- ADB-only, headless Home Assistant provisioning for keyboard-less panels. -->
+        <activity
+            android:name=".ui.onboarding.AdbHomeAssistantProvisioningActivity"
             android:exported="true"
-            android:permission="android.permission.DUMP">
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:permission="android.permission.DUMP"
+            android:theme="@style/Theme.PortalLauncher.Provisioning">
             <intent-filter>
                 <action android:name="com.iblu01.portallauncher.action.PROVISION_HOME_ASSISTANT" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-        </activity-alias>
+        </activity>
 
         <activity
             android:name=".PlaygroundActivity"

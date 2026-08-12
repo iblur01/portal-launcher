@@ -238,8 +238,7 @@ adb shell am start -a com.iblu01.portallauncher.action.ONBOARDING --ez reset tru
 
 The trigger is declared in the debug source set only, so release builds ship no exported entry point to it. `./dev.sh --onboarding` does the same after deploying.
 
-On any build, ADB can open the Home Assistant step with both fields prefilled. This is useful on
-wall panels without a keyboard:
+On any build, ADB can provision Home Assistant without showing or typing the token on the panel:
 
 ```sh
 adb shell am start \
@@ -248,10 +247,14 @@ adb shell am start \
   --es ha_token "YOUR_LONG_LIVED_ACCESS_TOKEN"
 ```
 
+The hidden activity tests both the API and the entity response before saving anything. On success,
+it stores the token through `EncryptedSharedPreferences`; on failure, it leaves the existing
+credentials unchanged. It then opens Portal directly when onboarding was already completed, or a
+clean onboarding otherwise. A toast and the `PortalProvisioning` logcat tag report the result.
+
 The entry point requires Android's privileged `DUMP` permission, which the ADB shell has but
-ordinary applications do not. The token is kept in memory until the connection test succeeds, then
-stored through `EncryptedSharedPreferences`. Be aware that the command can remain in the host
-computer's shell history; using a temporary shell or clearing that history avoids leaving a copy.
+ordinary applications do not. Be aware that the command can remain in the host computer's shell
+history; using a temporary shell or clearing that history avoids leaving a copy.
 
 The token is stored in `EncryptedSharedPreferences` and is never read back out by the config API.
 

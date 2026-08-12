@@ -52,16 +52,6 @@ class OnboardingActivity : ComponentActivity() {
             prefs.resetOnboarding()
         }
 
-        // ADB can prefill long credentials on keyboard-less panels. Keep them in ViewModel memory
-        // until the existing connection test succeeds; that path persists the token encrypted.
-        val provisionedUrl = intent?.getStringExtra(EXTRA_HA_URL)
-        val provisionedToken = intent?.getStringExtra(EXTRA_HA_TOKEN)
-        if (!provisionedUrl.isNullOrBlank() && !provisionedToken.isNullOrBlank()) {
-            viewModel.setHaUrl(provisionedUrl)
-            viewModel.setHaToken(provisionedToken)
-            viewModel.chooseManualHome()
-        }
-
         setContent {
             PortalTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
@@ -111,8 +101,6 @@ class OnboardingActivity : ComponentActivity() {
     companion object {
         /** Wipes the stored progress before showing the flow. Used by the dev trigger. */
         const val EXTRA_RESET = "reset"
-        const val EXTRA_HA_URL = "ha_url"
-        const val EXTRA_HA_TOKEN = "ha_token"
 
         /** Opens the assistant, optionally from scratch. */
         fun intent(context: Context, reset: Boolean = false): Intent =
