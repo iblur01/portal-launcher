@@ -30,7 +30,15 @@ class ClockScreenSizePolicyTest {
     fun `indoor range keeps a single degree symbol`() {
         assertEquals("18–22°", compactIndoorTemperature("18°", "22°"))
         assertEquals("21°", compactIndoorTemperature("21°", "21°"))
-        assertEquals("—", compactIndoorTemperature("—", "—"))
+        assertEquals(null, compactIndoorTemperature("—", "—"))
+        assertEquals("21°", compactIndoorTemperature("—", "21°"))
+    }
+
+    @Test
+    fun `missing compact temperatures are omitted instead of showing dashes`() {
+        assertEquals(null, compactOutdoorTemperature("—", "--°"))
+        assertEquals("14°", compactOutdoorTemperature("—", "14°"))
+        assertEquals("12°", compactOutdoorTemperature("12°", "14°"))
     }
 
     @Test

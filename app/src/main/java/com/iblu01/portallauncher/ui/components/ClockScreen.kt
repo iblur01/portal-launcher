@@ -201,6 +201,10 @@ fun ClockHeader(
     val compactDate by rememberClock("EEE d MMM")
     val compactScreen = rememberCompactClockScreen()
     val useCompactTemperatureHeader = connected && compactScreen
+    val compactTemperaturesAvailable = compactIndoorTemperature(
+        temperatures.indoorMin,
+        temperatures.indoorMax,
+    ) != null || compactOutdoorTemperature(temperatures.outdoor, weather.temp) != null
     Column(
         modifier = modifier
             .graphicsLayer {
@@ -215,7 +219,9 @@ fun ClockHeader(
         val timeWeight = FontWeight(clockTheme.weight)
         Row(
             modifier = Modifier.graphicsLayer { alpha = clockDetailAlpha(collapse()) },
-            horizontalArrangement = Arrangement.spacedBy(if (useCompactTemperatureHeader) 7.dp else 0.dp),
+            horizontalArrangement = Arrangement.spacedBy(
+                if (useCompactTemperatureHeader && compactTemperaturesAvailable) 7.dp else 0.dp,
+            ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -224,12 +230,12 @@ fun ClockHeader(
                 style = AppleTypography.titleMedium.copy(
                     fontFamily = clockFontFamily(clockTheme.font, FontWeight.Medium),
                     fontWeight = FontWeight.Medium,
-                    fontSize = if (useCompactTemperatureHeader) 13.sp else 20.sp,
-                    letterSpacing = if (useCompactTemperatureHeader) 1.2.sp else 2.3.sp,
+                    fontSize = if (useCompactTemperatureHeader) 15.sp else 20.sp,
+                    letterSpacing = if (useCompactTemperatureHeader) 1.35.sp else 2.3.sp,
                 ),
                 color = clockTheme.tint.color.copy(alpha = 0.7f),
             )
-            if (useCompactTemperatureHeader) {
+            if (useCompactTemperatureHeader && compactTemperaturesAvailable) {
                 Text("•", style = AppleTypography.bodySmall.copy(fontSize = 10.sp), color = AppleColors.secondary)
                 CompactTemperatures(temperatures = temperatures, weather = weather)
             }
@@ -287,47 +293,60 @@ fun ClockHeader(
 
 @Composable
 private fun CompactTemperatures(temperatures: TemperatureSummary, weather: WeatherUi) {
-    val indoorDescription = stringResource(
-        R.string.clock_indoor_temp_format,
-        temperatures.indoorMin,
-        temperatures.indoorMax,
-    )
-    val outdoorTemperature = temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp
-    val outdoorDescription = stringResource(R.string.clock_outdoor_temp_format, outdoorTemperature)
+    val indoorTemperature = compactIndoorTemperature(temperatures.indoorMin, temperatures.indoorMax)
+    val outdoorTemperature = compactOutdoorTemperature(temperatures.outdoor, weather.temp)
+    val indoorDescription = indoorTemperature?.let {
+        stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax)
+    }
+    val outdoorDescription = outdoorTemperature?.let {
+        stringResource(R.string.clock_outdoor_temp_format, it)
+    }
     Row(
         modifier = Modifier.semantics(mergeDescendants = true) {
-            contentDescription = "$indoorDescription, $outdoorDescription"
+            contentDescription = listOfNotNull(indoorDescription, outdoorDescription).joinToString(", ")
         },
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Home,
-            contentDescription = null,
-            tint = AppleColors.primary,
-            modifier = Modifier.size(11.dp),
-        )
-        Text(
-            compactIndoorTemperature(temperatures.indoorMin, temperatures.indoorMax),
-            style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
-            color = AppleColors.primary,
-            maxLines = 1,
-        )
-        WeatherIcon(weather.glyph, Modifier.size(14.dp))
-        Text(
-            outdoorTemperature,
-            style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
-            color = AppleColors.secondary,
-            maxLines = 1,
-        )
+        if (indoorTemperature != null) {
+            Icon(
+                imageVector = Icons.Outlined.Home,
+                contentDescription = null,
+                tint = AppleColors.primary,
+                modifier = Modifier.size(11.dp),
+            )
+            Text(
+                indoorTemperature,
+                style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
+                color = AppleColors.primary,
+                maxLines = 1,
+            )
+        }
+        if (outdoorTemperature != null) {
+            WeatherIcon(weather.glyph, Modifier.size(14.dp))
+            Text(
+                outdoorTemperature,
+                style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
+                color = AppleColors.secondary,
+                maxLines = 1,
+            )
+        }
     }
 }
 
-internal fun compactIndoorTemperature(minimum: String, maximum: String): String = when {
-    minimum == "—" && maximum == "—" -> "—"
+private fun isTemperatureAvailable(value: String): Boolean =
+    value.isNotBlank() && value !in setOf("—", "--", "—°", "--°")
+
+internal fun compactIndoorTemperature(minimum: String, maximum: String): String? = when {
+    !isTemperatureAvailable(minimum) && !isTemperatureAvailable(maximum) -> null
+    !isTemperatureAvailable(minimum) -> maximum
+    !isTemperatureAvailable(maximum) -> minimum
     minimum == maximum -> minimum
     else -> "${minimum.removeSuffix("°")}–$maximum"
 }
+
+internal fun compactOutdoorTemperature(outdoor: String, weather: String): String? =
+    outdoor.takeIf(::isTemperatureAvailable) ?: weather.takeIf(::isTemperatureAvailable)
 
 internal fun compactTrayItemLimit(compactScreen: Boolean, expanded: Boolean): Int = when {
     !expanded -> 3
