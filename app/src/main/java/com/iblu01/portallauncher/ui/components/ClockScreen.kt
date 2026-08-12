@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -280,20 +281,46 @@ fun ClockHeader(
 
 @Composable
 private fun CompactTemperatures(temperatures: TemperatureSummary, weather: WeatherUi) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+    val indoorDescription = stringResource(
+        R.string.clock_indoor_temp_format,
+        temperatures.indoorMin,
+        temperatures.indoorMax,
+    )
+    val outdoorTemperature = temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp
+    val outdoorDescription = stringResource(R.string.clock_outdoor_temp_format, outdoorTemperature)
+    Row(
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = "$indoorDescription, $outdoorDescription"
+        },
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Home,
+            contentDescription = null,
+            tint = AppleColors.primary,
+            modifier = Modifier.size(11.dp),
+        )
         Text(
-            stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax),
+            compactIndoorTemperature(temperatures.indoorMin, temperatures.indoorMax),
             style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
             color = AppleColors.primary,
             maxLines = 1,
         )
+        WeatherIcon(weather.glyph, Modifier.size(14.dp))
         Text(
-            stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp),
+            outdoorTemperature,
             style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
             color = AppleColors.secondary,
             maxLines = 1,
         )
     }
+}
+
+internal fun compactIndoorTemperature(minimum: String, maximum: String): String = when {
+    minimum == "—" && maximum == "—" -> "—"
+    minimum == maximum -> minimum
+    else -> "${minimum.removeSuffix("°")}–$maximum"
 }
 
 /** The bottom chip tray: the "voir plus" toggle plus up to 3 (collapsed) or 9 (expanded) chips. */

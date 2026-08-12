@@ -1,6 +1,7 @@
 package com.iblu01.portallauncher.ui.components
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,5 +19,12 @@ class ClockScreenSizePolicyTest {
     @Test
     fun `invalid physical metrics safely keep regular layout`() {
         assertFalse(isVerySmallScreen(widthPixels = 1080, heightPixels = 1920, xdpi = 0f, ydpi = 0f))
+    }
+
+    @Test
+    fun `indoor range keeps a single degree symbol`() {
+        assertEquals("18–22°", compactIndoorTemperature("18°", "22°"))
+        assertEquals("21°", compactIndoorTemperature("21°", "21°"))
+        assertEquals("—", compactIndoorTemperature("—", "—"))
     }
 }
