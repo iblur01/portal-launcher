@@ -43,6 +43,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -72,6 +73,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 @Composable
 fun ClockScreen(
@@ -149,6 +151,21 @@ private val COMPACT_DATE_LIFT = 28.dp
 internal fun clockDetailAlpha(collapse: Float): Float =
     (1f - collapse.coerceIn(0f, 1f) * 2f).coerceIn(0f, 1f)
 
+private const val VERY_SMALL_SCREEN_MAX_DIAGONAL_INCHES = 5f
+
+internal fun isVerySmallScreen(
+    widthPixels: Int,
+    heightPixels: Int,
+    xdpi: Float,
+    ydpi: Float,
+): Boolean {
+    if (widthPixels <= 0 || heightPixels <= 0 || xdpi <= 0f || ydpi <= 0f) return false
+    val widthInches = widthPixels / xdpi
+    val heightInches = heightPixels / ydpi
+    return sqrt(widthInches * widthInches + heightInches * heightInches) <=
+        VERY_SMALL_SCREEN_MAX_DIAGONAL_INCHES
+}
+
 /**
  * The clock block (date, time, weather pill, stale banner). Pinned above the pager, it shrinks
  * toward the top as [collapse] goes 0→1 so the apps grid gets the room back.
@@ -169,6 +186,14 @@ fun ClockHeader(
 ) {
     val time by rememberClock(if (clockTheme.format24h) "HH:mm" else "h:mm a")
     val date by rememberClock("EEEE d MMMM")
+    val compactDate by rememberClock("EEE d MMM")
+    val displayMetrics = LocalContext.current.resources.displayMetrics
+    val useCompactTemperatureHeader = connected && isVerySmallScreen(
+        widthPixels = displayMetrics.widthPixels,
+        heightPixels = displayMetrics.heightPixels,
+        xdpi = displayMetrics.xdpi,
+        ydpi = displayMetrics.ydpi,
+    )
     Column(
         modifier = modifier
             .graphicsLayer {
@@ -181,19 +206,27 @@ fun ClockHeader(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val timeWeight = FontWeight(clockTheme.weight)
-        Text(
-            text = titleCase(date).uppercase(Locale.getDefault()),
-            style = AppleTypography.titleMedium.copy(
-                fontFamily = clockFontFamily(clockTheme.font, FontWeight.Medium),
-                fontWeight = FontWeight.Medium,
-                fontSize = 20.sp,
-                letterSpacing = 2.3.sp,
-            ),
-            color = clockTheme.tint.color.copy(alpha = 0.7f),
-            // The compact launcher header only needs the time. Keep the node measured throughout
-            // the swipe, but fade its pixels in the layer phase to avoid text relayout per frame.
+        Row(
             modifier = Modifier.graphicsLayer { alpha = clockDetailAlpha(collapse()) },
-        )
+            horizontalArrangement = Arrangement.spacedBy(if (useCompactTemperatureHeader) 7.dp else 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = titleCase(if (useCompactTemperatureHeader) compactDate else date)
+                    .uppercase(Locale.getDefault()),
+                style = AppleTypography.titleMedium.copy(
+                    fontFamily = clockFontFamily(clockTheme.font, FontWeight.Medium),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = if (useCompactTemperatureHeader) 13.sp else 20.sp,
+                    letterSpacing = if (useCompactTemperatureHeader) 1.2.sp else 2.3.sp,
+                ),
+                color = clockTheme.tint.color.copy(alpha = 0.7f),
+            )
+            if (useCompactTemperatureHeader) {
+                Text("•", style = AppleTypography.bodySmall.copy(fontSize = 10.sp), color = AppleColors.secondary)
+                CompactTemperatures(temperatures = temperatures, weather = weather)
+            }
+        }
         Spacer(Modifier.height(4.dp * clockTheme.elementSpacing))
         Text(
             text = time,
@@ -219,20 +252,22 @@ fun ClockHeader(
         )
         // Keep these nodes composed throughout the gesture. Removing them when alpha reaches zero
         // causes a structural recomposition and a text remeasure exactly halfway through the swipe.
-        Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
-        Row(
-            modifier = Modifier
-                .graphicsLayer { alpha = clockDetailAlpha(collapse()) }
-                .clip(AppleShapes.pill)
-                .background(Color.White.copy(alpha = 0.15f), AppleShapes.pill)
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                .appleClickable(onWeatherClick)
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
-            Text(stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
+        if (connected && !useCompactTemperatureHeader) {
+            Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
+            Row(
+                modifier = Modifier
+                    .graphicsLayer { alpha = clockDetailAlpha(collapse()) }
+                    .clip(AppleShapes.pill)
+                    .background(Color.White.copy(alpha = 0.15f), AppleShapes.pill)
+                    .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
+                    .appleClickable(onWeatherClick)
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
+                Text(stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
+            }
         }
         if (!connected && lastUpdateAt > 0L) {
             Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
@@ -240,6 +275,24 @@ fun ClockHeader(
                 StaleBanner(lastUpdateAt = lastUpdateAt)
             }
         }
+    }
+}
+
+@Composable
+private fun CompactTemperatures(temperatures: TemperatureSummary, weather: WeatherUi) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax),
+            style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
+            color = AppleColors.primary,
+            maxLines = 1,
+        )
+        Text(
+            stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp),
+            style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
+            color = AppleColors.secondary,
+            maxLines = 1,
+        )
     }
 }
 
