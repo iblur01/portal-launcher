@@ -591,7 +591,7 @@ private fun ClockScreenPreview() {
     PortalTheme {
         ClockScreen(
             backgroundMode = "neutral",
-            weather = WeatherUi(temp = "21°", indoorTemp = "18°", city = "Nantes", condition = "Nuageux", glyph = WeatherGlyph()),
+            weather = WeatherUi(temp = "21°", indoorTemp = "18°", city = "Nantes", condition = "Nuageux", glyph = WeatherGlyph("partly-cloudy-day")),
             temperatures = TemperatureSummary("18°", "22°", "21°"),
             chips = listOf(
                 LauncherChip("washer", "washer", "Machine", "Rinçage", "active"),

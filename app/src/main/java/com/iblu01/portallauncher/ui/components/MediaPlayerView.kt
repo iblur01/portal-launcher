@@ -84,6 +84,15 @@ import java.net.Proxy
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
+internal data class MediaDisclosure(val showAlbum: Boolean, val secondaryPlayerCount: Int)
+
+/** Keeps primary playback controls while shedding secondary detail as usable height shrinks. */
+internal fun mediaDisclosureFor(widthDp: Float, heightDp: Float): MediaDisclosure = when {
+    heightDp <= 420f -> MediaDisclosure(showAlbum = false, secondaryPlayerCount = 1)
+    heightDp <= 560f || widthDp <= 480f -> MediaDisclosure(showAlbum = false, secondaryPlayerCount = 2)
+    else -> MediaDisclosure(showAlbum = true, secondaryPlayerCount = 2)
+}
+
 @Composable
 fun MediaPlayerView(
     media: PlayingMedia,
@@ -173,6 +182,7 @@ fun MediaPlayerView(
         }
         val availableWidthPx = with(LocalDensity.current) { availableWidth.toPx() }
         val wide = availableWidth > availableHeight
+        val mediaDisclosure = mediaDisclosureFor(availableWidth.value, availableHeight.value)
         val mainPlayer: @Composable () -> Unit = {
         Box(
             modifier = Modifier.fillMaxSize()
@@ -348,7 +358,7 @@ fun MediaPlayerView(
                         ) {
                             Text(media.title, style = AppleTypography.headlineLarge.copy(fontWeight = FontWeight.Bold, fontSize = titleFontSize), color = AppleColors.primary, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                             Text(media.artist, style = AppleTypography.titleMedium.copy(fontSize = artistFontSize), color = AppleColors.primary.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                            media.album?.takeIf { it.isNotBlank() }?.let { album ->
+                            media.album?.takeIf { mediaDisclosure.showAlbum && it.isNotBlank() }?.let { album ->
                                 Text(album, style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.secondary.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                             }
                         }
@@ -466,7 +476,7 @@ fun MediaPlayerView(
                 ) {
                     Text(media.title, style = AppleTypography.headlineLarge.copy(fontWeight = FontWeight.Bold, fontSize = 26.sp), color = AppleColors.primary, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                     Text(media.artist, style = AppleTypography.titleMedium.copy(fontSize = 17.sp), color = AppleColors.primary.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                    media.album?.takeIf { it.isNotBlank() }?.let { album ->
+                    media.album?.takeIf { mediaDisclosure.showAlbum && it.isNotBlank() }?.let { album ->
                         Text(album, style = AppleTypography.bodySmall, color = AppleColors.secondary.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                     }
                 }
@@ -512,7 +522,7 @@ fun MediaPlayerView(
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    secondaryMedia.take(2).forEach { session ->
+                    secondaryMedia.take(mediaDisclosure.secondaryPlayerCount).forEach { session ->
                         MiniMediaPlayerVertical(
                             media = session,
                             haToken = haToken,
@@ -524,9 +534,9 @@ fun MediaPlayerView(
                             modifier = Modifier.weight(1f),
                         )
                     }
-                    if (secondaryMedia.size > 2) {
+                    if (secondaryMedia.size > mediaDisclosure.secondaryPlayerCount) {
                         Text(
-                            stringResource(R.string.media_secondary_more_format, secondaryMedia.size - 2),
+                            stringResource(R.string.media_secondary_more_format, secondaryMedia.size - mediaDisclosure.secondaryPlayerCount),
                             style = AppleTypography.bodySmall,
                             color = AppleColors.secondary,
                             modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -537,7 +547,7 @@ fun MediaPlayerView(
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(panelInset), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f)) { mainPlayer() }
-                secondaryMedia.take(2).forEach { session ->
+                secondaryMedia.take(mediaDisclosure.secondaryPlayerCount).forEach { session ->
                     MiniMediaPlayer(
                         media = session,
                         haToken = haToken,
@@ -548,9 +558,9 @@ fun MediaPlayerView(
                         onSelect = { onSelectSecondary(session) },
                     )
                 }
-                if (secondaryMedia.size > 2) {
+                if (secondaryMedia.size > mediaDisclosure.secondaryPlayerCount) {
                     Text(
-                        stringResource(R.string.media_secondary_more_active_format, secondaryMedia.size - 2),
+                        stringResource(R.string.media_secondary_more_active_format, secondaryMedia.size - mediaDisclosure.secondaryPlayerCount),
                         style = AppleTypography.bodySmall,
                         color = AppleColors.secondary,
                     )

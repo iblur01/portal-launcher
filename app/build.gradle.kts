@@ -127,6 +127,7 @@ dependencies {
     testImplementation(libs.json)
 
     implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
 
     // MAD architecture: structured concurrency + StateFlow/ViewModel + immutable collections.
     implementation(libs.coroutines.android)

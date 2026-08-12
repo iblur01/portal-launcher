@@ -76,6 +76,7 @@ fun WeatherPanel(
                 val sectionGap = (shortEdge * 0.045f).coerceIn(14.dp, 30.dp)
                 val summaryIconSize = (shortEdge * 0.18f).coerceIn(56.dp, 104.dp)
                 val temperatureSize = (shortEdge.value * 0.13f).coerceIn(42f, 72f).sp
+                val disclosure = weatherDisclosureFor(maxWidth.value, maxHeight.value)
 
                 Column(Modifier.fillMaxSize().padding(outerInset)) {
                     PanelHeader(
@@ -95,6 +96,7 @@ fun WeatherPanel(
                                 weather = weather,
                                 iconSize = summaryIconSize,
                                 temperatureSize = temperatureSize,
+                                showCondition = disclosure.showCondition,
                                 modifier = Modifier.weight(0.38f),
                             )
                             Column(
@@ -102,7 +104,7 @@ fun WeatherPanel(
                                     .verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(sectionGap),
                             ) {
-                                WeatherForecastSections(weather, compactRows = true)
+                                WeatherForecastSections(weather, disclosure, compactRows = true)
                             }
                         }
                     } else {
@@ -110,8 +112,8 @@ fun WeatherPanel(
                             Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                             verticalArrangement = Arrangement.spacedBy(sectionGap),
                         ) {
-                            WeatherSummary(weather, summaryIconSize, temperatureSize)
-                            WeatherForecastSections(weather, compactRows = false)
+                            WeatherSummary(weather, summaryIconSize, temperatureSize, disclosure.showCondition)
+                            WeatherForecastSections(weather, disclosure, compactRows = false)
                         }
                     }
                 }
@@ -125,6 +127,7 @@ private fun WeatherSummary(
     weather: WeatherUi,
     iconSize: androidx.compose.ui.unit.Dp,
     temperatureSize: androidx.compose.ui.unit.TextUnit,
+    showCondition: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -142,13 +145,28 @@ private fun WeatherSummary(
                 ),
                 color = AppleColors.primary,
             )
-            Text(weather.condition, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+            if (showCondition && weather.condition.isNotBlank()) {
+                Text(weather.condition, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+            }
         }
     }
 }
 
+internal data class WeatherDisclosure(
+    val hourlyCount: Int,
+    val dailyCount: Int,
+    val showCondition: Boolean,
+)
+
+/** Progressive disclosure based on the panel's actual space, not a hard-coded device model. */
+internal fun weatherDisclosureFor(widthDp: Float, heightDp: Float): WeatherDisclosure = when {
+    heightDp <= 420f -> WeatherDisclosure(hourlyCount = 6, dailyCount = 3, showCondition = false)
+    heightDp <= 560f || widthDp <= 480f -> WeatherDisclosure(hourlyCount = 8, dailyCount = 4, showCondition = true)
+    else -> WeatherDisclosure(hourlyCount = 12, dailyCount = 7, showCondition = true)
+}
+
 @Composable
-private fun WeatherForecastSections(weather: WeatherUi, compactRows: Boolean) {
+private fun WeatherForecastSections(weather: WeatherUi, disclosure: WeatherDisclosure, compactRows: Boolean) {
     if (weather.hourly.isNotEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.weather_section_hourly), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
@@ -156,14 +174,14 @@ private fun WeatherForecastSections(weather: WeatherUi, compactRows: Boolean) {
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(if (compactRows) 14.dp else 18.dp),
             ) {
-                weather.hourly.take(12).forEach { HourTile(it) }
+                weather.hourly.take(disclosure.hourlyCount).forEach { HourTile(it) }
             }
         }
     }
     if (weather.daily.isNotEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(stringResource(R.string.weather_section_daily), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
-            weather.daily.take(if (compactRows) 5 else 7).forEach { DayRow(it) }
+            weather.daily.take(disclosure.dailyCount).forEach { DayRow(it) }
         }
     }
 }

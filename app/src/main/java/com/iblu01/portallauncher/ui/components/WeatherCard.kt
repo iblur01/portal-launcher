@@ -15,7 +15,7 @@ data class WeatherUi(
     val indoorTemp: String = "22°",
     val city: String = "",
     val condition: String = "",
-    val glyph: WeatherGlyph = WeatherGlyph(showLuminary = false),
+    val glyph: WeatherGlyph = WeatherGlyph(),
     val hourly: List<ForecastPoint> = emptyList(),
     val daily: List<ForecastPoint> = emptyList(),
 )
@@ -53,19 +53,21 @@ class WeatherController(context: Context, private val pills: PillRepository) {
     }
 }
 
-/** HA condition string → animated glyph. */
+/** Home Assistant condition → bundled Meteocons asset. */
 fun weatherGlyph(condition: String, night: Boolean): WeatherGlyph = when (condition.lowercase()) {
-    "sunny", "clear" -> WeatherGlyph(night = false, showCloud = false)
-    "clear-night" -> WeatherGlyph(night = true, showCloud = false)
-    "partlycloudy" -> WeatherGlyph(night = night)
-    "cloudy" -> WeatherGlyph(showLuminary = false)
-    "fog" -> WeatherGlyph(precip = Precip.FOG, showLuminary = false)
-    "rainy" -> WeatherGlyph(night = night, precip = Precip.RAIN)
-    "pouring" -> WeatherGlyph(precip = Precip.RAIN, showLuminary = false)
-    "lightning", "lightning-rainy" -> WeatherGlyph(precip = Precip.THUNDER, showLuminary = false)
-    "snowy", "snowy-rainy", "hail" -> WeatherGlyph(precip = Precip.SNOW, showLuminary = false)
-    "windy", "windy-variant", "exceptional" -> WeatherGlyph(showLuminary = false)
-    else -> WeatherGlyph(showLuminary = false)
+    "sunny", "clear" -> WeatherGlyph(if (night) "clear-night" else "clear-day")
+    "clear-night" -> WeatherGlyph("clear-night")
+    "partlycloudy" -> WeatherGlyph(if (night) "partly-cloudy-night" else "partly-cloudy-day")
+    "cloudy" -> WeatherGlyph("cloudy")
+    "fog" -> WeatherGlyph("fog")
+    "rainy" -> WeatherGlyph("rain")
+    "pouring" -> WeatherGlyph("extreme-rain")
+    "lightning", "lightning-rainy" -> WeatherGlyph(if (night) "thunderstorms-night" else "thunderstorms-day")
+    "snowy" -> WeatherGlyph("snow")
+    "snowy-rainy" -> WeatherGlyph("sleet")
+    "hail" -> WeatherGlyph("hail")
+    "windy", "windy-variant" -> WeatherGlyph("wind")
+    else -> WeatherGlyph("not-available")
 }
 
 /** HA condition string → French label. */
