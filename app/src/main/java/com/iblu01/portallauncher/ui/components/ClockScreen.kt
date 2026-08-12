@@ -152,9 +152,9 @@ private val COMPACT_DATE_LIFT = 28.dp
 internal fun clockDetailAlpha(collapse: Float): Float =
     (1f - collapse.coerceIn(0f, 1f) * 2f).coerceIn(0f, 1f)
 
-private const val VERY_SMALL_SCREEN_MAX_DIAGONAL_INCHES = 5f
+private const val COMPACT_SCREEN_MAX_DIAGONAL_INCHES = 6f
 
-internal fun isVerySmallScreen(
+internal fun isCompactClockScreen(
     widthPixels: Int,
     heightPixels: Int,
     xdpi: Float,
@@ -164,7 +164,18 @@ internal fun isVerySmallScreen(
     val widthInches = widthPixels / xdpi
     val heightInches = heightPixels / ydpi
     return sqrt(widthInches * widthInches + heightInches * heightInches) <=
-        VERY_SMALL_SCREEN_MAX_DIAGONAL_INCHES
+        COMPACT_SCREEN_MAX_DIAGONAL_INCHES
+}
+
+@Composable
+private fun rememberCompactClockScreen(): Boolean {
+    val metrics = LocalContext.current.resources.displayMetrics
+    return isCompactClockScreen(
+        widthPixels = metrics.widthPixels,
+        heightPixels = metrics.heightPixels,
+        xdpi = metrics.xdpi,
+        ydpi = metrics.ydpi,
+    )
 }
 
 /**
@@ -188,13 +199,8 @@ fun ClockHeader(
     val time by rememberClock(if (clockTheme.format24h) "HH:mm" else "h:mm a")
     val date by rememberClock("EEEE d MMMM")
     val compactDate by rememberClock("EEE d MMM")
-    val displayMetrics = LocalContext.current.resources.displayMetrics
-    val useCompactTemperatureHeader = connected && isVerySmallScreen(
-        widthPixels = displayMetrics.widthPixels,
-        heightPixels = displayMetrics.heightPixels,
-        xdpi = displayMetrics.xdpi,
-        ydpi = displayMetrics.ydpi,
-    )
+    val compactScreen = rememberCompactClockScreen()
+    val useCompactTemperatureHeader = connected && compactScreen
     Column(
         modifier = modifier
             .graphicsLayer {
@@ -203,7 +209,7 @@ fun ClockHeader(
                 scaleX = scale
                 scaleY = scale
             }
-            .padding(top = 44.dp),
+            .padding(top = if (compactScreen) 24.dp else 44.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val timeWeight = FontWeight(clockTheme.weight)
@@ -228,7 +234,7 @@ fun ClockHeader(
                 CompactTemperatures(temperatures = temperatures, weather = weather)
             }
         }
-        Spacer(Modifier.height(4.dp * clockTheme.elementSpacing))
+        Spacer(Modifier.height((if (compactScreen) 0.dp else 4.dp) * clockTheme.elementSpacing))
         Text(
             text = time,
             style = AppleTypography.displayLarge.copy(
@@ -323,6 +329,12 @@ internal fun compactIndoorTemperature(minimum: String, maximum: String): String 
     else -> "${minimum.removeSuffix("°")}–$maximum"
 }
 
+internal fun compactTrayItemLimit(compactScreen: Boolean, expanded: Boolean): Int = when {
+    !expanded -> 3
+    compactScreen -> 6
+    else -> 9
+}
+
 /** The bottom chip tray: the "voir plus" toggle plus up to 3 (collapsed) or 9 (expanded) chips. */
 @Composable
 fun ClockTray(
@@ -334,13 +346,14 @@ fun ClockTray(
     selectedChipKey: String?,
     modifier: Modifier = Modifier,
 ) {
+    val compactScreen = rememberCompactClockScreen()
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp.scaled())
-            .padding(bottom = 36.dp.scaled()),
+            .padding(bottom = (if (compactScreen) 16.dp else 36.dp).scaled()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp.scaled()),
+        verticalArrangement = Arrangement.spacedBy((if (compactScreen) 4.dp else 8.dp).scaled()),
     ) {
         if (chips.size > 3) {
             ClockTrayControls(
@@ -349,7 +362,7 @@ fun ClockTray(
                 onPillsExpandedChange = onPillsExpandedChange,
             )
         }
-        val visible = if (pillsExpanded) chips.take(9) else chips.take(3)
+        val visible = chips.take(compactTrayItemLimit(compactScreen, pillsExpanded))
         visible.chunked(3).forEach { rowChips ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp.scaled(), Alignment.CenterHorizontally)) {
                 rowChips.forEach { chip ->
@@ -375,6 +388,7 @@ fun ClockTray(
     selectedChipKey: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    val compactScreen = rememberCompactClockScreen()
     val allVisible = composition.primary + composition.secondary
     var menuTargetKey by rememberSaveable { mutableStateOf<String?>(null) }
     val menuTarget = allVisible.firstOrNull { it.ref.stableKey == menuTargetKey }
@@ -383,9 +397,9 @@ fun ClockTray(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp.scaled())
-            .padding(bottom = 36.dp.scaled()),
+            .padding(bottom = (if (compactScreen) 16.dp else 36.dp).scaled()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp.scaled()),
+        verticalArrangement = Arrangement.spacedBy((if (compactScreen) 4.dp else 8.dp).scaled()),
     ) {
         if (composition.secondary.isNotEmpty()) {
             ClockTrayControls(
@@ -395,7 +409,8 @@ fun ClockTray(
             )
         }
         val visible = if (pillsExpanded) {
-            composition.primary + composition.secondary.take(6)
+            val totalLimit = compactTrayItemLimit(compactScreen, expanded = true)
+            composition.primary + composition.secondary.take((totalLimit - composition.primary.size).coerceAtLeast(0))
         } else {
             composition.primary
         }
