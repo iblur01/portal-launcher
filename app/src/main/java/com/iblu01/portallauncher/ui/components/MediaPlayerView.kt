@@ -164,10 +164,10 @@ fun MediaPlayerView(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 14.dp, vertical = 16.dp)
     ) {
         val availableWidth = maxWidth
         val availableHeight = maxHeight
+        val panelInset = (minOf(availableWidth, availableHeight) * 0.03f).coerceIn(10.dp, 20.dp)
         val availableWidthPx = with(LocalDensity.current) { availableWidth.toPx() }
         val wide = availableWidth > availableHeight
         val mainPlayer: @Composable () -> Unit = {
@@ -263,18 +263,29 @@ fun MediaPlayerView(
 
         if (wide) {
             Box(Modifier.fillMaxSize()) {
-                val artworkSize = minOf(availableHeight - 64.dp, availableWidth * 0.30f, 260.dp)
+                val shortEdge = minOf(availableWidth, availableHeight)
+                val outerInset = (shortEdge * 0.035f).coerceIn(10.dp, 24.dp)
+                val contentGap = (shortEdge * 0.045f).coerceIn(14.dp, 30.dp)
+                val artworkSize = minOf(
+                    availableHeight - outerInset * 2,
+                    availableWidth * 0.36f,
+                )
+                val artworkCorner = (artworkSize * 0.085f).coerceIn(14.dp, 28.dp)
+                val sectionGap = (shortEdge * 0.025f).coerceIn(8.dp, 16.dp)
+                val sourceFontSize = (shortEdge.value * 0.042f).coerceIn(17f, 23f).sp
+                val titleFontSize = (shortEdge.value * 0.052f).coerceIn(20f, 29f).sp
+                val artistFontSize = (shortEdge.value * 0.036f).coerceIn(14f, 19f).sp
                 Row(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(22.dp),
+                    modifier = Modifier.fillMaxSize().padding(outerInset),
+                    horizontalArrangement = Arrangement.spacedBy(contentGap),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
                         modifier = Modifier
                             .size(artworkSize)
-                            .clip(RoundedCornerShape(24.dp))
+                            .clip(RoundedCornerShape(artworkCorner))
                             .background(Color.White.copy(alpha = 0.07f))
-                            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(24.dp)),
+                            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(artworkCorner)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (imageRequest != null) {
@@ -301,7 +312,7 @@ fun MediaPlayerView(
                     Column(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(sectionGap),
                     ) {
                         Row(
                             modifier = Modifier
@@ -320,7 +331,7 @@ fun MediaPlayerView(
                             )
                             Text(
                                 sourceName,
-                                style = AppleTypography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
+                                style = AppleTypography.titleLarge.copy(fontSize = sourceFontSize, fontWeight = FontWeight.SemiBold),
                                 color = AppleColors.primary,
                             )
                         }
@@ -329,8 +340,8 @@ fun MediaPlayerView(
                             verticalArrangement = Arrangement.spacedBy(3.dp),
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                         ) {
-                            Text(media.title, style = AppleTypography.headlineLarge.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp), color = AppleColors.primary, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                            Text(media.artist, style = AppleTypography.titleMedium.copy(fontSize = 16.sp), color = AppleColors.primary.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                            Text(media.title, style = AppleTypography.headlineLarge.copy(fontWeight = FontWeight.Bold, fontSize = titleFontSize), color = AppleColors.primary, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                            Text(media.artist, style = AppleTypography.titleMedium.copy(fontSize = artistFontSize), color = AppleColors.primary.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                             media.album?.takeIf { it.isNotBlank() }?.let { album ->
                                 Text(album, style = AppleTypography.bodySmall.copy(fontSize = 13.sp), color = AppleColors.secondary.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                             }
@@ -346,7 +357,7 @@ fun MediaPlayerView(
                             trailingIcon = Icons.Filled.SkipNext,
                             trailingContentDescription = stringResource(R.string.media_next_track_desc),
                             onTrailingClick = onNext,
-                            size = ThreeWayControlSize.Compact,
+                            size = if (shortEdge < 560.dp) ThreeWayControlSize.Compact else ThreeWayControlSize.Regular,
                         )
 
                         Row(
@@ -489,7 +500,7 @@ fun MediaPlayerView(
 
         if (wide && secondaryMedia.isNotEmpty()) {
             // Strip mode: main player 66% wide, secondary sessions stacked in the last third.
-            Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxSize().padding(panelInset), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(modifier = Modifier.weight(2f).fillMaxHeight()) { mainPlayer() }
                 Column(
                     modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -518,7 +529,7 @@ fun MediaPlayerView(
                 }
             }
         } else {
-            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(modifier = Modifier.fillMaxSize().padding(panelInset), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f)) { mainPlayer() }
                 secondaryMedia.take(2).forEach { session ->
                     MiniMediaPlayer(

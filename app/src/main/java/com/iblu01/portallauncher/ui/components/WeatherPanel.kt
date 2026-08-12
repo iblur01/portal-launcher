@@ -5,11 +5,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,9 +42,10 @@ import kotlin.math.roundToInt
 /** Side panel opened from the clock's temperature pill: current condition + hourly & daily forecast. */
 @Composable
 fun WeatherPanel(weather: WeatherUi, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 16.dp)) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val panelInset = (minOf(maxWidth, maxHeight) * 0.03f).coerceIn(10.dp, 20.dp)
         Box(
-            modifier = Modifier.fillMaxSize().clip(AppleShapes.panel)
+            modifier = Modifier.fillMaxSize().padding(panelInset).clip(AppleShapes.panel)
                 .background(Color.Black.copy(alpha = 0.72f))
                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel),
         ) {
@@ -55,41 +58,101 @@ fun WeatherPanel(weather: WeatherUi, onDismiss: () -> Unit, modifier: Modifier =
                     )
                 )
             )
-            Column(
-                Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp).verticalScroll(rememberScrollState()),
-            ) {
-                PanelHeader(
-                    title = stringResource(R.string.weather_panel_title),
-                    onNavigation = onDismiss,
-                    navigationIcon = Icons.Filled.Close,
-                    navigationContentDescription = stringResource(R.string.weather_close_desc),
-                )
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val wide = maxWidth > maxHeight
+                val shortEdge = minOf(maxWidth, maxHeight)
+                val outerInset = (shortEdge * 0.04f).coerceIn(14.dp, 28.dp)
+                val sectionGap = (shortEdge * 0.045f).coerceIn(14.dp, 30.dp)
+                val summaryIconSize = (shortEdge * 0.18f).coerceIn(56.dp, 104.dp)
+                val temperatureSize = (shortEdge.value * 0.13f).coerceIn(42f, 72f).sp
 
-                Spacer(Modifier.height(18.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    WeatherIcon(weather.glyph, Modifier.size(64.dp))
-                    Column {
-                        Text(weather.temp, style = AppleTypography.displayLarge.copy(fontSize = 52.sp, fontWeight = FontWeight.SemiBold), color = AppleColors.primary)
-                        Text(weather.condition, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+                Column(Modifier.fillMaxSize().padding(outerInset)) {
+                    PanelHeader(
+                        title = stringResource(R.string.weather_panel_title),
+                        onNavigation = onDismiss,
+                        navigationIcon = Icons.Filled.Close,
+                        navigationContentDescription = stringResource(R.string.weather_close_desc),
+                    )
+                    Spacer(Modifier.height((shortEdge * 0.035f).coerceIn(10.dp, 22.dp)))
+                    if (wide) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(sectionGap),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            WeatherSummary(
+                                weather = weather,
+                                iconSize = summaryIconSize,
+                                temperatureSize = temperatureSize,
+                                modifier = Modifier.weight(0.38f),
+                            )
+                            Column(
+                                modifier = Modifier.weight(0.62f).fillMaxHeight()
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(sectionGap),
+                            ) {
+                                WeatherForecastSections(weather, compactRows = true)
+                            }
+                        }
+                    } else {
+                        Column(
+                            Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(sectionGap),
+                        ) {
+                            WeatherSummary(weather, summaryIconSize, temperatureSize)
+                            WeatherForecastSections(weather, compactRows = false)
+                        }
                     }
-                }
-
-                if (weather.hourly.isNotEmpty()) {
-                    Spacer(Modifier.height(22.dp))
-                    Text(stringResource(R.string.weather_section_hourly), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
-                    Spacer(Modifier.height(10.dp))
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                        weather.hourly.take(12).forEach { HourTile(it) }
-                    }
-                }
-
-                if (weather.daily.isNotEmpty()) {
-                    Spacer(Modifier.height(22.dp))
-                    Text(stringResource(R.string.weather_section_daily), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
-                    Spacer(Modifier.height(6.dp))
-                    weather.daily.take(7).forEach { DayRow(it) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WeatherSummary(
+    weather: WeatherUi,
+    iconSize: androidx.compose.ui.unit.Dp,
+    temperatureSize: androidx.compose.ui.unit.TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy((iconSize * 0.22f).coerceIn(12.dp, 22.dp)),
+    ) {
+        WeatherIcon(weather.glyph, Modifier.size(iconSize))
+        Column {
+            Text(
+                weather.temp,
+                style = AppleTypography.displayLarge.copy(
+                    fontSize = temperatureSize,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = AppleColors.primary,
+            )
+            Text(weather.condition, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+        }
+    }
+}
+
+@Composable
+private fun WeatherForecastSections(weather: WeatherUi, compactRows: Boolean) {
+    if (weather.hourly.isNotEmpty()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.weather_section_hourly), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(if (compactRows) 14.dp else 18.dp),
+            ) {
+                weather.hourly.take(12).forEach { HourTile(it) }
+            }
+        }
+    }
+    if (weather.daily.isNotEmpty()) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.weather_section_daily), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+            weather.daily.take(if (compactRows) 5 else 7).forEach { DayRow(it) }
         }
     }
 }

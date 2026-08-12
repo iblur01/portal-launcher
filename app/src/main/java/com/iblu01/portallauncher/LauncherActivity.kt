@@ -122,6 +122,8 @@ import com.iblu01.portallauncher.ui.components.MediaPlayerView
 import com.iblu01.portallauncher.ui.components.MediaDevicesPanel
 import com.iblu01.portallauncher.ui.components.PanelContent
 import com.iblu01.portallauncher.ui.components.LauncherPanelLayout
+import com.iblu01.portallauncher.ui.components.isCompactClockScreen
+import com.iblu01.portallauncher.ui.components.panelPresentation
 import com.iblu01.portallauncher.ui.components.QuickActionsOverlay
 import com.iblu01.portallauncher.ui.components.WeatherController
 import com.iblu01.portallauncher.ui.components.WeatherPanel
@@ -1221,6 +1223,21 @@ private fun PortalLauncherApp(
             LauncherPanelLayout(
                 panelVisible = panelContent != null,
                 modifier = Modifier.fillMaxSize(),
+                presentation = panelPresentation(
+                    compactScreen = context.resources.displayMetrics.let { metrics ->
+                        isCompactClockScreen(
+                            metrics.widthPixels,
+                            metrics.heightPixels,
+                            metrics.xdpi,
+                            metrics.ydpi,
+                        )
+                    },
+                    supportsFullscreen = (panelContent ?: retainedPanelContent).let { content ->
+                        content is PanelContent.Media ||
+                            content is PanelContent.Weather ||
+                            content is PanelContent.MediaBrowser
+                    },
+                ),
                 content = clockScreen,
                 panel = {
                     (panelContent ?: retainedPanelContent)?.let { sidePanel(it) }

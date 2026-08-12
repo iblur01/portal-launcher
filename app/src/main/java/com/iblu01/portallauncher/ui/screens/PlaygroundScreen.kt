@@ -55,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -76,6 +77,7 @@ import com.iblu01.portallauncher.ui.components.MediaPlayerView
 import com.iblu01.portallauncher.ui.components.StatusChip
 import com.iblu01.portallauncher.ui.components.launcherIcon
 import com.iblu01.portallauncher.ui.components.appleClickable
+import com.iblu01.portallauncher.ui.components.isCompactClockScreen
 import com.iblu01.portallauncher.ui.components.controls.AccessoryGrid
 import com.iblu01.portallauncher.ui.components.controls.AccessoryItem
 import com.iblu01.portallauncher.ui.components.controls.ControlContentLayout
@@ -148,8 +150,16 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         volumePercent = fakeMediaVolume, isMuted = false, playerNames = listOf("Salon"),
         players = listOf(MediaPlayerVolume("media_player.salon", "Salon", fakeMediaVolume, false)),
     )
+    val playgroundMetrics = LocalContext.current.resources.displayMetrics
+    val compactPlayground = isCompactClockScreen(
+        playgroundMetrics.widthPixels,
+        playgroundMetrics.heightPixels,
+        playgroundMetrics.xdpi,
+        playgroundMetrics.ydpi,
+    )
+    val fullscreenMedia = compactPlayground && selectedFakePanel is FakePanelSelection.Media
     val contentWidth by animateFloatAsState(
-        targetValue = if (selectedFakePanel == null) 1f else 0.67f,
+        targetValue = if (selectedFakePanel == null || fullscreenMedia) 1f else 0.67f,
         animationSpec = tween(500),
         label = "playgroundPanelWidth",
     )
@@ -635,7 +645,11 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                         onSecondaryPlayPause = {}, onSecondaryPrevious = {}, onSecondaryNext = {},
                         onSelectSecondary = {}, onSwipePlayer = {}, onJoinPlayer = {}, onUnjoinPlayer = {},
                         onDismiss = { selectedFakePanel = null },
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f),
+                        modifier = if (fullscreenMedia) {
+                            Modifier.fillMaxSize().background(Color.Black)
+                        } else {
+                            Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f)
+                        },
                     )
                 }
             }

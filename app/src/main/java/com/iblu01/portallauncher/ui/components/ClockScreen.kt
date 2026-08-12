@@ -237,7 +237,11 @@ fun ClockHeader(
             )
             if (useCompactTemperatureHeader && compactTemperaturesAvailable) {
                 Text("•", style = AppleTypography.bodySmall.copy(fontSize = 10.sp), color = AppleColors.secondary)
-                CompactTemperatures(temperatures = temperatures, weather = weather)
+                CompactTemperatures(
+                    temperatures = temperatures,
+                    weather = weather,
+                    onClick = onWeatherClick,
+                )
             }
         }
         Spacer(Modifier.height((if (compactScreen) 0.dp else 4.dp) * clockTheme.elementSpacing))
@@ -292,7 +296,11 @@ fun ClockHeader(
 }
 
 @Composable
-private fun CompactTemperatures(temperatures: TemperatureSummary, weather: WeatherUi) {
+private fun CompactTemperatures(
+    temperatures: TemperatureSummary,
+    weather: WeatherUi,
+    onClick: () -> Unit,
+) {
     val indoorTemperature = compactIndoorTemperature(temperatures.indoorMin, temperatures.indoorMax)
     val outdoorTemperature = compactOutdoorTemperature(temperatures.outdoor, weather.temp)
     val indoorDescription = indoorTemperature?.let {
@@ -302,9 +310,11 @@ private fun CompactTemperatures(temperatures: TemperatureSummary, weather: Weath
         stringResource(R.string.clock_outdoor_temp_format, it)
     }
     Row(
-        modifier = Modifier.semantics(mergeDescendants = true) {
-            contentDescription = listOfNotNull(indoorDescription, outdoorDescription).joinToString(", ")
-        },
+        modifier = Modifier
+            .appleClickable(onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = listOfNotNull(indoorDescription, outdoorDescription).joinToString(", ")
+            },
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
