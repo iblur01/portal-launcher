@@ -102,6 +102,7 @@ fun MediaPlayerView(
     onUnjoinPlayer: (String) -> Unit,
     onDismiss: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    fullScreen: Boolean = false,
 ) {
     val context = LocalContext.current
     val imageLoader = remember(context) {
@@ -167,7 +168,9 @@ fun MediaPlayerView(
     ) {
         val availableWidth = maxWidth
         val availableHeight = maxHeight
-        val panelInset = (minOf(availableWidth, availableHeight) * 0.03f).coerceIn(10.dp, 20.dp)
+        val panelInset = if (fullScreen) 0.dp else {
+            (minOf(availableWidth, availableHeight) * 0.03f).coerceIn(10.dp, 20.dp)
+        }
         val availableWidthPx = with(LocalDensity.current) { availableWidth.toPx() }
         val wide = availableWidth > availableHeight
         val mainPlayer: @Composable () -> Unit = {
@@ -240,7 +243,10 @@ fun MediaPlayerView(
                 }
                 .clip(AppleShapes.panel)
                 .background(Color.Black.copy(alpha = 0.72f))
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
+                .then(
+                    if (fullScreen) Modifier
+                    else Modifier.border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
+                )
         ) {
         if (imageRequest != null) {
             AsyncImage(

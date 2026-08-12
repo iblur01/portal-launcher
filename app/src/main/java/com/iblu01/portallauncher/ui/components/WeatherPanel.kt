@@ -41,13 +41,24 @@ import kotlin.math.roundToInt
 
 /** Side panel opened from the clock's temperature pill: current condition + hourly & daily forecast. */
 @Composable
-fun WeatherPanel(weather: WeatherUi, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+fun WeatherPanel(
+    weather: WeatherUi,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    fullScreen: Boolean = false,
+) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val panelInset = (minOf(maxWidth, maxHeight) * 0.03f).coerceIn(10.dp, 20.dp)
+        val panelInset = if (fullScreen) 0.dp else {
+            (minOf(maxWidth, maxHeight) * 0.03f).coerceIn(10.dp, 20.dp)
+        }
+        val panelShape = AppleShapes.panel
         Box(
-            modifier = Modifier.fillMaxSize().padding(panelInset).clip(AppleShapes.panel)
+            modifier = Modifier.fillMaxSize().padding(panelInset).clip(panelShape)
                 .background(Color.Black.copy(alpha = 0.72f))
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel),
+                .then(
+                    if (fullScreen) Modifier
+                    else Modifier.border(0.5.dp, AppleColors.frostedBorder, panelShape)
+                ),
         ) {
             Box(
                 Modifier.fillMaxSize().background(

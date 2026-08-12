@@ -500,6 +500,14 @@ private fun PortalLauncherApp(
     // not idle — letting the countdown run there would drag the page home behind the user's back.
     var resumed by remember { mutableStateOf(true) }
     val context = LocalContext.current
+    val compactScreen = context.resources.displayMetrics.let { metrics ->
+        isCompactClockScreen(
+            metrics.widthPixels,
+            metrics.heightPixels,
+            metrics.xdpi,
+            metrics.ydpi,
+        )
+    }
     // Grid geometry is discovered by the pages themselves (they know their size); until the first
     // layout a sane default keeps placement resolvable.
     val gridSpecState = remember { mutableStateOf(GridSpec(4, 3)) }
@@ -949,6 +957,7 @@ private fun PortalLauncherApp(
                 onSelectSession = { selectedMediaEntityId = it },
                 onDismiss = onPanelDismiss,
                 onSecondaryPlayPause = onSecondaryPlayPause,
+                fullScreen = compactScreen,
             )
             is PanelContent.ChipActions -> ChipActionsPanel(
                 chip = content.chip,
@@ -957,6 +966,7 @@ private fun PortalLauncherApp(
             is PanelContent.Weather -> WeatherPanel(
                 weather = content.weather,
                 onDismiss = onPanelDismiss,
+                fullScreen = compactScreen,
             )
             is PanelContent.Group -> GroupBrowserPanel(
                 group = content.group,
@@ -988,6 +998,7 @@ private fun PortalLauncherApp(
                         onSelectSession = { browsedMediaEntityId = it },
                         onDismiss = { browsedMediaEntityId = null },
                         onSecondaryPlayPause = onSecondaryPlayPause,
+                        fullScreen = compactScreen,
                     )
                 }
             }
@@ -1224,14 +1235,7 @@ private fun PortalLauncherApp(
                 panelVisible = panelContent != null,
                 modifier = Modifier.fillMaxSize(),
                 presentation = panelPresentation(
-                    compactScreen = context.resources.displayMetrics.let { metrics ->
-                        isCompactClockScreen(
-                            metrics.widthPixels,
-                            metrics.heightPixels,
-                            metrics.xdpi,
-                            metrics.ydpi,
-                        )
-                    },
+                    compactScreen = compactScreen,
                     supportsFullscreen = (panelContent ?: retainedPanelContent).let { content ->
                         content is PanelContent.Media ||
                             content is PanelContent.Weather ||
@@ -1399,6 +1403,7 @@ private fun MediaPlayerPanel(
     onSelectSession: (String?) -> Unit,
     onDismiss: () -> Unit,
     onSecondaryPlayPause: (PlayingMedia) -> Unit,
+    fullScreen: Boolean = false,
 ) {
     val callService = LocalCallService.current
     MediaPlayerView(
@@ -1452,6 +1457,7 @@ private fun MediaPlayerPanel(
         onUnjoinPlayer = { entityId ->
             callService("media_player", "unjoin", entityId)
         },
-        onDismiss = onDismiss
+        onDismiss = onDismiss,
+        fullScreen = fullScreen,
     )
 }

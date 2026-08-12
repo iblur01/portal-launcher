@@ -645,6 +645,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                         onSecondaryPlayPause = {}, onSecondaryPrevious = {}, onSecondaryNext = {},
                         onSelectSecondary = {}, onSwipePlayer = {}, onJoinPlayer = {}, onUnjoinPlayer = {},
                         onDismiss = { selectedFakePanel = null },
+                        fullScreen = fullscreenMedia,
                         modifier = if (fullscreenMedia) {
                             Modifier.fillMaxSize().background(Color.Black)
                         } else {
