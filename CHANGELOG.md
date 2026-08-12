@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.0.7-beta
+
+### Added
+
+- **Maison Home Assistant** : nouvelle page optionnelle avec sections configurables, favoris, pièces, groupes, entités individuelles, menus contextuels et réorganisation des raccourcis.
+- **Panneaux Home Assistant étendus** : prise en charge des humidificateurs, chauffe-eau, vannes, sirènes, tondeuses, lave-linge, groupes et entités génériques, avec navigation et contrôles adaptés à leurs capacités.
+- **Icônes Home Assistant et MDI** : police et index embarqués, résolution des icônes natives et personnalisées, cache local et rafraîchissement ciblé.
+- **Provisionnement ADB protégé** : activité cachée permettant de préconfigurer les identifiants Home Assistant sur les appareils administrés.
+- **Compatibilité TV et D-pad** : bannière Android TV, navigation clavier/télécommande et alias de débogage dédiés.
+
+### Changed
+
+- **Accueil responsive** : la page Maison utilise désormais une grille verticale adaptative de une à quatre colonnes et un en-tête partagé plus compact.
+- **Navigation du launcher** : ordre stable entre Maison, Accueil et applications, retour vers Accueil et transitions de pager optimisées.
+- **Pills Home Assistant** : catalogue complet, priorités contextuelles, alertes et capacités critiques, tout en réduisant le bruit des entités auxiliaires.
+- **Panneaux et réglages** : alarmes, médias, thermostats, purificateurs, accessoires, fonds et configuration des pills ont été enrichis et adaptés aux différentes tailles d'écran.
+
+### Removed
+
+- Les anciens panneaux dédiés Air Quality, Energy, Presence et Scenes ont été remplacés par les contrats génériques et les groupes Home Assistant.
+- Les rails horizontaux imbriqués de la page Maison et leur arbitrage gestuel ont été remplacés par une grille à défilement vertical unique.
+
+### Performance
+
+- Les transformations de snapshots Home Assistant sont échantillonnées et exécutées hors du thread principal.
+- Les transitions du pager et de l'horloge privilégient les transformations graphiques afin de limiter les recompositions.
+- L'index MDI est lu directement depuis l'APK sans chargement complet en mémoire.
+
+### i18n
+
+- Ajout des traductions anglaises et françaises pour la page Maison, les réglages, les appareils, les alarmes et le Playground.
+
+### Tests
+
+- Couverture étendue des préférences Maison, du catalogue et des priorités, de la navigation, des panneaux Home Assistant, des icônes, de l'accessibilité et des reducers de réglages.
+
 ## 0.0.5-beta
 
 ### Added
