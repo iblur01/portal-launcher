@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -108,20 +109,25 @@ fun AlarmControl(chip: LauncherChip) {
     ) {
         val requestedMode = pendingArmOption
         if (requestedMode != null) {
-            AlarmStatusCard(
-                title = stringResource(R.string.alarm_code_to_arm_title, stringResource(requestedMode.labelRes)),
-                subtitle = stringResource(R.string.alarm_code_to_arm_subtitle),
-                icon = requestedMode.icon,
-                accent = AppleColors.accent,
-            )
-            Spacer(Modifier.height(12.dp))
-            AlarmKeypad(
-                entityId = chip.entityId,
-                service = requestedMode.service,
-                currentState = state,
-                prompt = stringResource(R.string.alarm_arm_prompt),
-                accent = AppleColors.accent,
-                onCancel = { pendingArmOption = null },
+            AlarmStatusAndAction(
+                status = {
+                    AlarmStatusCard(
+                        title = stringResource(R.string.alarm_code_to_arm_title, stringResource(requestedMode.labelRes)),
+                        subtitle = stringResource(R.string.alarm_code_to_arm_subtitle),
+                        icon = requestedMode.icon,
+                        accent = AppleColors.accent,
+                    )
+                },
+                action = {
+                    AlarmKeypad(
+                        entityId = chip.entityId,
+                        service = requestedMode.service,
+                        currentState = state,
+                        prompt = stringResource(R.string.alarm_arm_prompt),
+                        accent = AppleColors.accent,
+                        onCancel = { pendingArmOption = null },
+                    )
+                },
             )
             return@Column
         }
@@ -182,31 +188,48 @@ fun AlarmControl(chip: LauncherChip) {
             AlarmPanelPhase.TRIGGERED,
             AlarmPanelPhase.OTHER -> {
                 val visual = alarmVisual(phase, state)
-                AlarmStatusCard(
-                    title = visual.title,
-                    subtitle = visual.subtitle,
-                    icon = visual.icon,
-                    accent = visual.accent,
+                AlarmStatusAndAction(
+                    status = { AlarmStatusCard(visual.title, visual.subtitle, visual.icon, visual.accent) },
+                    action = {
+                        if (entity.alarmCodeRequired(arming = false)) {
+                            AlarmKeypad(
+                                entityId = chip.entityId,
+                                service = "alarm_disarm",
+                                currentState = state,
+                                prompt = stringResource(R.string.alarm_disarm_prompt),
+                                accent = visual.accent,
+                                onCancel = null,
+                            )
+                        } else {
+                            PillButton(
+                                label = stringResource(R.string.alarm_disarm_button),
+                                onClick = { callService(ALARM_DOMAIN, "alarm_disarm", chip.entityId) },
+                                primary = true,
+                            )
+                        }
+                    },
                 )
-                Spacer(Modifier.height(12.dp))
-                if (entity.alarmCodeRequired(arming = false)) {
-                    AlarmKeypad(
-                        entityId = chip.entityId,
-                        service = "alarm_disarm",
-                        currentState = state,
-                        prompt = stringResource(R.string.alarm_disarm_prompt),
-                        accent = visual.accent,
-                        onCancel = null,
-                    )
-                } else {
-                    PillButton(
-                        label = stringResource(R.string.alarm_disarm_button),
-                        onClick = { callService(ALARM_DOMAIN, "alarm_disarm", chip.entityId) },
-                        primary = true,
-                    )
-                }
             }
         }
+    }
+}
+
+@Composable
+private fun AlarmStatusAndAction(
+    status: @Composable () -> Unit,
+    action: @Composable () -> Unit,
+) {
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        AdaptivePanelSplit(
+            modifier = Modifier.fillMaxSize(),
+            primaryWeight = 0.4f,
+            primary = { area -> Box(area, contentAlignment = Alignment.Center) { status() } },
+            secondary = { area -> Box(area, contentAlignment = Alignment.Center) { action() } },
+        )
+    } else {
+        status()
+        Spacer(Modifier.height(12.dp))
+        action()
     }
 }
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -55,13 +56,13 @@ fun SwitchControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val displayedOn = pending ?: on
     val onLabel = stringResource(R.string.switch_state_on)
     val offLabel = stringResource(R.string.switch_state_off)
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    val switchControl: @Composable (Modifier) -> Unit = { controlModifier ->
         BoxWithConstraints(
-            modifier = Modifier.fillMaxWidth(0.54f).weight(1f),
+            modifier = controlModifier,
             contentAlignment = Alignment.Center,
         ) {
             val ratio = 96f / 240f
-            val controlHeight = minOf(maxHeight, maxWidth / ratio)
+            val controlHeight = minOf(maxHeight, maxWidth / ratio, 300.dp)
             val controlWidth = controlHeight * ratio
             VerticalSwitch(
                 checked = displayedOn,
@@ -76,6 +77,17 @@ fun SwitchControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 modifier = Modifier.size(controlWidth, controlHeight),
             )
         }
+    }
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        AdaptivePanelSplit(modifier, primary = { switchControl(it) }, secondary = { secondaryModifier ->
+            Column(secondaryModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
+                Text(if (displayedOn) onLabel else offLabel, style = AppleTypography.headlineLarge, color = AppleColors.primary)
+                Spacer(Modifier.height(18.dp))
+                chip.details.take(4).forEach { PanelDetailRow(it) }
+            }
+        })
+    } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        switchControl(Modifier.fillMaxWidth(0.54f).weight(1f))
         Spacer(Modifier.height(20.dp))
         chip.details.forEach { PanelDetailRow(it) }
     }
@@ -90,22 +102,13 @@ fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val onLabel = stringResource(R.string.fan_state_on)
     val offLabel = stringResource(R.string.fan_state_off)
     val speedLabel = stringResource(R.string.fan_speed_label)
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(6.dp))
-        if (fan.primaryControl !is FanPrimaryControl.OnOff) {
-            Text(
-                if (!fan.isOn) offLabel else speedLabel,
-                style = AppleTypography.titleMedium.copy(fontSize = 17.sp),
-                color = AppleColors.primary,
-            )
-            Spacer(Modifier.height(12.dp))
-        }
+    val primary: @Composable (Modifier) -> Unit = { primaryModifier ->
         BoxWithConstraints(
-            modifier = Modifier.fillMaxWidth(0.54f).weight(1f),
+            modifier = primaryModifier,
             contentAlignment = Alignment.Center,
         ) {
             val ratio = 96f / 240f
-            val controlHeight = minOf(maxHeight, maxWidth / ratio)
+            val controlHeight = minOf(maxHeight, maxWidth / ratio, 300.dp)
             val controlWidth = controlHeight * ratio
         when (val control = fan.primaryControl) {
             FanPrimaryControl.OnOff -> {
@@ -165,10 +168,18 @@ fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
             }
         }
         }
-        Spacer(Modifier.height(20.dp))
-
+    }
+    val secondary: @Composable (Modifier) -> Unit = { secondaryModifier ->
+        Column(secondaryModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
+            if (fan.primaryControl !is FanPrimaryControl.OnOff) {
+                Text(
+                    if (!fan.isOn) offLabel else speedLabel,
+                    style = AppleTypography.headlineLarge,
+                    color = AppleColors.primary,
+                )
+            }
         if (fan.supportsOscillation) {
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(18.dp))
             val fixedLabel = stringResource(R.string.fan_oscillation_off)
             val oscillatingLabel = stringResource(R.string.fan_oscillation_on)
             HorizontalSegmentedSelector(
@@ -185,10 +196,34 @@ fun FanControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 isNeutral = { !it },
                 contentLayout = ControlContentLayout.Horizontal,
                 enabled = fan.isOn,
-                modifier = Modifier.fillMaxWidth(0.72f),
+                modifier = Modifier.fillMaxWidth(0.84f),
             )
         }
-
+            Spacer(Modifier.height(14.dp))
+            chip.details.take(3).forEach { PanelDetailRow(it) }
+        }
+    }
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        AdaptivePanelSplit(modifier, primary = { primary(it) }, secondary = { secondary(it) })
+    } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.height(6.dp))
+        if (fan.primaryControl !is FanPrimaryControl.OnOff) {
+            Text(if (!fan.isOn) offLabel else speedLabel, style = AppleTypography.titleMedium.copy(fontSize = 17.sp), color = AppleColors.primary)
+            Spacer(Modifier.height(12.dp))
+        }
+        primary(Modifier.fillMaxWidth(0.54f).weight(1f))
+        Spacer(Modifier.height(20.dp))
+        if (fan.supportsOscillation) {
+            val fixedLabel = stringResource(R.string.fan_oscillation_off)
+            val oscillatingLabel = stringResource(R.string.fan_oscillation_on)
+            HorizontalSegmentedSelector(
+                options = listOf(false, true), selected = fan.isOscillating,
+                onSelect = { oscillating -> if (oscillating != fan.isOscillating) callService("fan", "oscillate", chip.entityId, mapOf("oscillating" to oscillating)) },
+                label = { if (it) oscillatingLabel else fixedLabel }, icon = { if (it) Icons.Outlined.Sync else Icons.Outlined.Air },
+                accent = AppleColors.fanAccent, isNeutral = { !it }, contentLayout = ControlContentLayout.Horizontal,
+                enabled = fan.isOn, modifier = Modifier.fillMaxWidth(0.72f),
+            )
+        }
         Spacer(Modifier.height(12.dp))
         chip.details.forEach { PanelDetailRow(it) }
     }

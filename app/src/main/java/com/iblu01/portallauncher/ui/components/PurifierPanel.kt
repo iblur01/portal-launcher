@@ -142,7 +142,38 @@ fun PurifierActions(chip: LauncherChip, modifier: Modifier = Modifier) {
     }
 
     val purifierLabels = PurifierMode.entries.associateWith { stringResource(it.labelRes) }
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    val summary: @Composable (Modifier) -> Unit = { summaryModifier ->
+        Column(summaryModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            QualitySummary(overallQuality)
+            if (metrics.isNotEmpty()) {
+                Spacer(Modifier.height(18.dp))
+                CircleActionButton(Icons.Outlined.Info, stringResource(R.string.purifier_details_open), { detailsVisible = true })
+            }
+        }
+    }
+    val selector: @Composable (Modifier) -> Unit = { selectorModifier ->
+        BoxWithConstraints(selectorModifier, contentAlignment = Alignment.Center) {
+            val ratio = 96f / 240f
+            val selectorHeight = minOf(maxHeight, maxWidth / ratio, 310.dp)
+            val selectorWidth = selectorHeight * ratio
+            val options = PurifierMode.entries.toList()
+            VerticalSegmentedSelector(
+                options = options, selected = optimisticMode ?: currentMode,
+                onSelect = { mode -> if (mode != currentMode) {
+                    optimisticMode = mode
+                    if (mode == PurifierMode.OFF) callService("fan", "turn_off", chip.entityId)
+                    else callService("fan", "set_preset_mode", chip.entityId, mapOf("preset_mode" to mode.preset!!))
+                } },
+                label = { purifierLabels.getValue(it) }, icon = { it.icon }, accent = AppleColors.active,
+                isNeutral = { it == PurifierMode.OFF }, enabled = entity != null,
+                segmentHeight = selectorHeight / options.size, segmentPadding = 4.dp,
+                modifier = Modifier.size(selectorWidth, selectorHeight),
+            )
+        }
+    }
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        AdaptivePanelSplit(modifier, primary = { selector(it) }, secondary = { summary(it) })
+    } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.fillMaxWidth()) {
             QualitySummary(overallQuality, Modifier.align(Alignment.Center))
             if (metrics.isNotEmpty()) {
@@ -155,34 +186,7 @@ fun PurifierActions(chip: LauncherChip, modifier: Modifier = Modifier) {
             }
         }
         Spacer(Modifier.height(14.dp))
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxWidth(0.54f).weight(1f),
-            contentAlignment = Alignment.Center,
-        ) {
-            val ratio = 96f / 240f
-            val selectorHeight = minOf(maxHeight, maxWidth / ratio)
-            val selectorWidth = selectorHeight * ratio
-            val options = PurifierMode.entries.toList()
-            VerticalSegmentedSelector(
-                options = options,
-                selected = optimisticMode ?: currentMode,
-                onSelect = { mode ->
-                    if (mode != currentMode) {
-                        optimisticMode = mode
-                        if (mode == PurifierMode.OFF) callService("fan", "turn_off", chip.entityId)
-                        else callService("fan", "set_preset_mode", chip.entityId, mapOf("preset_mode" to mode.preset!!))
-                    }
-                },
-                label = { purifierLabels.getValue(it) },
-                icon = { it.icon },
-                accent = AppleColors.active,
-                isNeutral = { it == PurifierMode.OFF },
-                enabled = entity != null,
-                segmentHeight = selectorHeight / options.size,
-                segmentPadding = 4.dp,
-                modifier = Modifier.size(selectorWidth, selectorHeight),
-            )
-        }
+        selector(Modifier.fillMaxWidth(0.54f).weight(1f))
     }
 }
 

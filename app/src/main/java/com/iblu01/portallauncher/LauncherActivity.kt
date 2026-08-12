@@ -962,6 +962,7 @@ private fun PortalLauncherApp(
             is PanelContent.ChipActions -> ChipActionsPanel(
                 chip = content.chip,
                 onDismiss = onPanelDismiss,
+                fullScreen = compactScreen,
             )
             is PanelContent.Weather -> WeatherPanel(
                 weather = content.weather,
@@ -984,6 +985,7 @@ private fun PortalLauncherApp(
                 onCollectiveAction = { calls ->
                     calls.forEach { call -> vm.callService(call.domain, call.service, call.entityId) }
                 },
+                fullScreen = compactScreen,
             )
             PanelContent.MediaBrowser -> {
                 val selectedDevice = mediaDevices.firstOrNull { it.entityId == browsedMediaEntityId }
@@ -1236,11 +1238,7 @@ private fun PortalLauncherApp(
                 modifier = Modifier.fillMaxSize(),
                 presentation = panelPresentation(
                     compactScreen = compactScreen,
-                    supportsFullscreen = (panelContent ?: retainedPanelContent).let { content ->
-                        content is PanelContent.Media ||
-                            content is PanelContent.Weather ||
-                            content is PanelContent.MediaBrowser
-                    },
+                    supportsFullscreen = true,
                 ),
                 content = clockScreen,
                 panel = {

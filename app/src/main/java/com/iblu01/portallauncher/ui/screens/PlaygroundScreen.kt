@@ -157,9 +157,9 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         playgroundMetrics.xdpi,
         playgroundMetrics.ydpi,
     )
-    val fullscreenMedia = compactPlayground && selectedFakePanel is FakePanelSelection.Media
+    val fullscreenPanel = compactPlayground && selectedFakePanel != null
     val contentWidth by animateFloatAsState(
-        targetValue = if (selectedFakePanel == null || fullscreenMedia) 1f else 0.67f,
+        targetValue = if (selectedFakePanel == null || fullscreenPanel) 1f else 0.67f,
         animationSpec = tween(500),
         label = "playgroundPanelWidth",
     )
@@ -632,7 +632,9 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                     is FakePanelSelection.Chip -> ChipActionsPanel(
                         chip = allFakeChips.firstOrNull { it.id == selection.id } ?: selection.chip,
                         onDismiss = { selectedFakePanel = null },
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f),
+                        fullScreen = fullscreenPanel,
+                        modifier = if (fullscreenPanel) Modifier.fillMaxSize()
+                        else Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f),
                     )
                     is FakePanelSelection.Media -> MediaPlayerView(
                         media = fakeMedia,
@@ -645,8 +647,8 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                         onSecondaryPlayPause = {}, onSecondaryPrevious = {}, onSecondaryNext = {},
                         onSelectSecondary = {}, onSwipePlayer = {}, onJoinPlayer = {}, onUnjoinPlayer = {},
                         onDismiss = { selectedFakePanel = null },
-                        fullScreen = fullscreenMedia,
-                        modifier = if (fullscreenMedia) {
+                        fullScreen = fullscreenPanel,
+                        modifier = if (fullscreenPanel) {
                             Modifier.fillMaxSize().background(Color.Black)
                         } else {
                             Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f)
