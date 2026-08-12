@@ -25,6 +25,7 @@ class PanelDisclosureTest {
     @Test fun `small media panel preserves controls and removes secondary detail`() {
         val policy = mediaDisclosureFor(widthDp = 788f, heightDp = 394f)
         assertFalse(policy.showAlbum)
-        assertEquals(1, policy.secondaryPlayerCount)
+        assertEquals(0, policy.secondaryPlayerCount)
+        assertTrue(policy.emphasizePrimary)
     }
 }
