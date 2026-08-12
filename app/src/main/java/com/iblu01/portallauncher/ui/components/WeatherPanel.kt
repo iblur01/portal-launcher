@@ -52,6 +52,7 @@ fun WeatherPanel(
     modifier: Modifier = Modifier,
     fullScreen: Boolean = false,
 ) {
+    var forecastPage by remember { mutableStateOf(ForecastPage.HOURLY) }
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val panelInset = if (fullScreen) 0.dp else {
             (minOf(maxWidth, maxHeight) * 0.03f).coerceIn(10.dp, 20.dp)
@@ -82,13 +83,15 @@ fun WeatherPanel(
                 val disclosure = weatherDisclosureFor(maxWidth.value, maxHeight.value)
                 val summaryIconSize = if (disclosure.emphasizeSummary) 92.dp else (shortEdge * 0.18f).coerceIn(56.dp, 104.dp)
                 val temperatureSize = if (disclosure.emphasizeSummary) 84.sp else (shortEdge.value * 0.13f).coerceIn(42f, 72f).sp
+                val showForecastSwitcher = disclosure.emphasizeSummary && weather.hourly.isNotEmpty() && weather.daily.isNotEmpty()
 
                 Column(Modifier.fillMaxSize().padding(outerInset)) {
-                    PanelHeader(
+                    WeatherPanelHeader(
                         title = stringResource(R.string.weather_panel_title),
-                        onNavigation = onDismiss,
-                        navigationIcon = Icons.Filled.Close,
-                        navigationContentDescription = stringResource(R.string.weather_close_desc),
+                        onDismiss = onDismiss,
+                        page = forecastPage,
+                        showSwitcher = showForecastSwitcher,
+                        onPageChange = { forecastPage = it },
                     )
                     Spacer(Modifier.height((shortEdge * 0.035f).coerceIn(10.dp, 22.dp)))
                     if (wide) {
@@ -112,7 +115,7 @@ fun WeatherPanel(
                                 ),
                                 verticalArrangement = Arrangement.spacedBy(sectionGap),
                             ) {
-                                WeatherForecastSections(weather, disclosure, compactRows = true)
+                                WeatherForecastSections(weather, disclosure, compactRows = true, page = forecastPage)
                             }
                         }
                     } else {
@@ -121,11 +124,52 @@ fun WeatherPanel(
                             verticalArrangement = Arrangement.spacedBy(sectionGap),
                         ) {
                             WeatherSummary(weather, summaryIconSize, temperatureSize, disclosure.showCondition, stacked = false)
-                            WeatherForecastSections(weather, disclosure, compactRows = false)
+                            WeatherForecastSections(weather, disclosure, compactRows = false, page = forecastPage)
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WeatherPanelHeader(
+    title: String,
+    onDismiss: () -> Unit,
+    page: ForecastPage,
+    showSwitcher: Boolean,
+    onPageChange: (ForecastPage) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            style = AppleTypography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+            color = AppleColors.primary,
+            modifier = Modifier.weight(1f),
+        )
+        if (showSwitcher) {
+            ForecastPageSwitcher(page = page, onPageChange = onPageChange)
+            Spacer(Modifier.size(12.dp))
+        }
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(AppleColors.frostedFill)
+                .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = stringResource(R.string.weather_close_desc),
+                tint = AppleColors.primary,
+                modifier = Modifier.size(24.dp),
+            )
         }
     }
 }
@@ -206,9 +250,14 @@ internal fun weatherDisclosureFor(widthDp: Float, heightDp: Float): WeatherDiscl
 }
 
 @Composable
-private fun WeatherForecastSections(weather: WeatherUi, disclosure: WeatherDisclosure, compactRows: Boolean) {
+private fun WeatherForecastSections(
+    weather: WeatherUi,
+    disclosure: WeatherDisclosure,
+    compactRows: Boolean,
+    page: ForecastPage,
+) {
     if (disclosure.emphasizeSummary && weather.hourly.isNotEmpty() && weather.daily.isNotEmpty()) {
-        CompactForecastSwitcher(weather, disclosure)
+        CompactForecastSwitcher(weather, disclosure, page)
         return
     }
     if (weather.hourly.isNotEmpty()) {
@@ -241,32 +290,8 @@ private fun WeatherForecastSections(weather: WeatherUi, disclosure: WeatherDiscl
 private enum class ForecastPage { HOURLY, DAILY }
 
 @Composable
-private fun CompactForecastSwitcher(weather: WeatherUi, disclosure: WeatherDisclosure) {
-    var page by remember { mutableStateOf(ForecastPage.HOURLY) }
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .align(Alignment.Start)
-                .clip(AppleShapes.pill)
-                .background(AppleColors.frostedFill)
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                .padding(3.dp),
-        ) {
-            ForecastPageButton(
-                label = stringResource(R.string.weather_tab_hourly),
-                selected = page == ForecastPage.HOURLY,
-                onClick = { page = ForecastPage.HOURLY },
-            )
-            ForecastPageButton(
-                label = stringResource(R.string.weather_tab_daily),
-                selected = page == ForecastPage.DAILY,
-                onClick = { page = ForecastPage.DAILY },
-            )
-        }
-        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+private fun CompactForecastSwitcher(weather: WeatherUi, disclosure: WeatherDisclosure, page: ForecastPage) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
             val visibleItems = when (page) {
                 ForecastPage.HOURLY -> disclosure.hourlyCount
                 ForecastPage.DAILY -> disclosure.dailyCount
@@ -290,7 +315,28 @@ private fun CompactForecastSwitcher(weather: WeatherUi, disclosure: WeatherDiscl
                     }
                 }
             }
-        }
+    }
+}
+
+@Composable
+private fun ForecastPageSwitcher(page: ForecastPage, onPageChange: (ForecastPage) -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(AppleShapes.pill)
+            .background(AppleColors.frostedFill)
+            .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
+            .padding(3.dp),
+    ) {
+        ForecastPageButton(
+            label = stringResource(R.string.weather_tab_hourly),
+            selected = page == ForecastPage.HOURLY,
+            onClick = { onPageChange(ForecastPage.HOURLY) },
+        )
+        ForecastPageButton(
+            label = stringResource(R.string.weather_tab_daily),
+            selected = page == ForecastPage.DAILY,
+            onClick = { onPageChange(ForecastPage.DAILY) },
+        )
     }
 }
 
