@@ -85,7 +85,7 @@ internal fun alarmPanelPhase(state: String): AlarmPanelPhase = when (state.lower
  * - disarming: progress feedback replaces controls until HA confirms the new state.
  */
 @Composable
-fun AlarmControl(chip: LauncherChip) {
+fun AlarmControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val callService = LocalCallService.current
     val entity = rememberEntity(chip.entityId)
     if (entity == null || entity.isUnavailable()) {
@@ -104,7 +104,7 @@ fun AlarmControl(chip: LauncherChip) {
     }
 
     Column(
-        Modifier.fillMaxWidth(),
+        modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val requestedMode = pendingArmOption
@@ -135,43 +135,56 @@ fun AlarmControl(chip: LauncherChip) {
         when (phase) {
             AlarmPanelPhase.DISARMED -> {
                 val options = ArmOption.entries.filter { entity.supports(it.feature) }
-                Text(
-                    stringResource(R.string.alarm_choose_mode_title),
-                    style = AppleTypography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = AppleColors.primary,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(5.dp))
-                Text(
-                    stringResource(R.string.alarm_disarmed_subtitle),
-                    style = AppleTypography.bodySmall,
-                    color = AppleColors.secondary,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(18.dp))
-                if (options.isEmpty()) {
-                    PanelUnavailable(stringResource(R.string.alarm_no_modes_available))
-                } else {
-                    val labels = options.associateWith { stringResource(it.labelRes) }
-                    AccessoryGrid(
-                        items = options.map { option ->
-                            AccessoryItem(
-                                id = option.service,
-                                title = labels.getValue(option),
-                                icon = option.icon,
-                                on = false,
-                                accent = AppleColors.active,
-                                onToggle = {
-                                    if (entity.alarmCodeRequired(arming = true)) {
-                                        pendingArmOption = option
-                                    } else {
-                                        callService(ALARM_DOMAIN, option.service, chip.entityId)
-                                    }
-                                },
-                            )
-                        },
-                        tileHeight = 72.dp,
+                val intro: @Composable () -> Unit = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            stringResource(R.string.alarm_choose_mode_title),
+                            style = AppleTypography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = AppleColors.primary,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(5.dp))
+                        Text(
+                            stringResource(R.string.alarm_disarmed_subtitle),
+                            style = AppleTypography.bodySmall,
+                            color = AppleColors.secondary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+                val modes: @Composable () -> Unit = {
+                    if (options.isEmpty()) {
+                        PanelUnavailable(stringResource(R.string.alarm_no_modes_available))
+                    } else {
+                        val labels = options.associateWith { stringResource(it.labelRes) }
+                        AccessoryGrid(
+                            items = options.map { option ->
+                                AccessoryItem(
+                                    id = option.service,
+                                    title = labels.getValue(option),
+                                    icon = option.icon,
+                                    on = false,
+                                    accent = AppleColors.active,
+                                    onToggle = {
+                                        if (entity.alarmCodeRequired(arming = true)) pendingArmOption = option
+                                        else callService(ALARM_DOMAIN, option.service, chip.entityId)
+                                    },
+                                )
+                            },
+                            tileHeight = 72.dp,
+                        )
+                    }
+                }
+                if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+                    AdaptivePanelSplit(
+                        primaryWeight = 0.36f,
+                        primary = { area -> Box(area, contentAlignment = Alignment.Center) { intro() } },
+                        secondary = { area -> Box(area, contentAlignment = Alignment.Center) { modes() } },
                     )
+                } else {
+                    intro()
+                    Spacer(Modifier.height(18.dp))
+                    modes()
                 }
             }
 

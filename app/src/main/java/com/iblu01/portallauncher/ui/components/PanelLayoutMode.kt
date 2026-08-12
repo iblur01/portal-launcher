@@ -13,6 +13,10 @@ import androidx.compose.ui.unit.dp
 /** Content composition, derived from the panel container rather than device orientation. */
 internal enum class PanelLayoutMode { VERTICAL, HORIZONTAL }
 
+/** The panel's own bounds decide the composition; the device orientation is intentionally ignored. */
+internal fun panelLayoutModeFor(widthDp: Float, heightDp: Float): PanelLayoutMode =
+    if (widthDp > heightDp) PanelLayoutMode.HORIZONTAL else PanelLayoutMode.VERTICAL
+
 internal val LocalPanelLayoutMode = staticCompositionLocalOf { PanelLayoutMode.VERTICAL }
 
 /** Two genuine compositions: stacked in a side panel, split in wide/fullscreen containers. */

@@ -100,7 +100,7 @@ fun ChipActionsPanel(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(AppleShapes.panel)
-                .background(Color.Black.copy(alpha = 0.72f))
+                .background(if (fullScreen) Color.Black else Color.Black.copy(alpha = 0.72f))
                 .then(
                     if (fullScreen) Modifier
                     else Modifier.border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
@@ -116,7 +116,7 @@ fun ChipActionsPanel(
                 )
             )
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                val layoutMode = if (maxWidth > maxHeight) PanelLayoutMode.HORIZONTAL else PanelLayoutMode.VERTICAL
+                val layoutMode = panelLayoutModeFor(maxWidth.value, maxHeight.value)
                 CompositionLocalProvider(LocalPanelLayoutMode provides layoutMode) {
                     val directLightDetail = chip.individualLightDetailOrNull()
                     var lightDetail by remember(chip.id) { mutableStateOf(directLightDetail) }
@@ -206,7 +206,7 @@ private fun ChipActionsContent(
         // Center the control block vertically in the remaining space; it still scrolls if a
         // panel's content is taller than the panel (keypads, long detail lists).
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.PURIFIER, PanelKind.THERMOSTAT, PanelKind.VACUUM, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
+            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.PURIFIER, PanelKind.THERMOSTAT, PanelKind.VACUUM, PanelKind.ALARM, PanelKind.WASHER, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
                 // Vertical controls need finite panel constraints so they can fill the available
                 // height while preserving the same proportions as lights and covers.
                 when (chip.toPanelKind()) {
@@ -217,6 +217,8 @@ private fun ChipActionsContent(
                     PanelKind.PURIFIER -> PurifierActions(chip, Modifier.fillMaxSize())
                     PanelKind.THERMOSTAT -> ThermostatControl(chip, Modifier.fillMaxSize())
                     PanelKind.VACUUM -> VacuumControl(chip, Modifier.fillMaxSize())
+                    PanelKind.ALARM -> AlarmControl(chip, Modifier.fillMaxSize())
+                    PanelKind.WASHER -> WasherControl(chip, Modifier.fillMaxSize())
                     PanelKind.HUMIDIFIER -> GenericHaEntityControl(chip, Modifier.fillMaxSize())
                     PanelKind.WATER_HEATER -> WaterHeaterControl(chip, Modifier.fillMaxSize())
                     PanelKind.VALVE -> ValveControl(chip, Modifier.fillMaxSize())
@@ -242,8 +244,7 @@ private fun ChipActionsContent(
                 PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH -> Unit // Bounded branch above.
                 PanelKind.THERMOSTAT -> Unit // Bounded branch above.
                 PanelKind.VACUUM -> Unit // Bounded branch above.
-                PanelKind.ALARM -> AlarmControl(chip)
-                PanelKind.WASHER -> WasherControl(chip)
+                PanelKind.ALARM, PanelKind.WASHER -> Unit // Bounded branch above.
                 PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
                 PanelKind.LAWN_MOWER -> Unit // Bounded branch above.
                 // Direct media pills are routed to MediaPlayerPanel upstream. A media member opened
@@ -379,7 +380,7 @@ internal fun PanelHeader(
                 Icon(
                     Icons.Filled.Close,
                     contentDescription = closeContentDescription ?: stringResource(R.string.side_panel_close_desc),
-                    tint = AppleColors.secondary,
+                    tint = AppleColors.primary,
                     modifier = Modifier.size(22.dp.scaled()),
                 )
             }

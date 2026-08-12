@@ -778,7 +778,7 @@ fun LightsActions(chip: LauncherChip, onOpenLight: (PillDetail) -> Unit) {
     val rooms = lightRooms(actionableChip) { areas[it] }
     // Fewer than two rooms (or registries not loaded yet): keep the plain flat list.
     if (rooms.size <= 1) {
-        lights.forEach { LightRow(it, onOpen = { onOpenLight(it) }) }
+        LightRows(lights, onOpenLight)
         AllOffRow(lights, "Tout éteindre")
         return
     }
@@ -791,19 +791,37 @@ fun LightsActions(chip: LauncherChip, onOpenLight: (PillDetail) -> Unit) {
     } else {
         DetailHeader(current.first, onBack = { selectedRoom = null })
         Spacer(Modifier.height(12.dp))
-        current.second.forEach { LightRow(it, onOpen = { onOpenLight(it) }) }
+        LightRows(current.second, onOpenLight)
         AllOffRow(current.second, "Éteindre la pièce")
     }
 }
 
 @Composable
+private fun LightRows(details: List<PillDetail>, onOpen: (PillDetail) -> Unit) {
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL && details.size > 1) {
+        details.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { detail ->
+                    Box(Modifier.weight(1f)) { LightRow(detail, onOpen = { onOpen(detail) }) }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+    } else {
+        details.forEach { detail -> LightRow(detail, onOpen = { onOpen(detail) }) }
+    }
+}
+
+@Composable
 private fun RoomGrid(rooms: List<Pair<String, List<PillDetail>>>, onSelect: (String) -> Unit) {
-    rooms.chunked(2).forEach { row ->
+    val columns = if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) 3 else 2
+    rooms.chunked(columns).forEach { row ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             row.forEach { (name, details) ->
                 RoomCard(name, details, Modifier.weight(1f), onClick = { onSelect(name) })
             }
-            if (row.size == 1) Spacer(Modifier.weight(1f))
+            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
         }
     }
 }

@@ -153,7 +153,7 @@ fun PurifierActions(chip: LauncherChip, modifier: Modifier = Modifier) {
     }
     val selector: @Composable (Modifier) -> Unit = { selectorModifier ->
         BoxWithConstraints(selectorModifier, contentAlignment = Alignment.Center) {
-            val ratio = 96f / 240f
+            val ratio = if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) 0.68f else 96f / 240f
             val selectorHeight = minOf(maxHeight, maxWidth / ratio, 310.dp)
             val selectorWidth = selectorHeight * ratio
             val options = PurifierMode.entries.toList()

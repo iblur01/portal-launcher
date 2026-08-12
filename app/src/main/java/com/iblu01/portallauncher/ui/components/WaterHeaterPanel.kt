@@ -67,7 +67,11 @@ fun WaterHeaterControl(chip: LauncherChip, modifier: Modifier = Modifier) {
         }
     }
     if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
-        AdaptivePanelSplit(modifier, primary = { dial(it) }, secondary = { modes(it) })
+        if (canSetTemperature) {
+            AdaptivePanelSplit(modifier, primary = { dial(it) }, secondary = { modes(it) })
+        } else {
+            modes(modifier.fillMaxSize())
+        }
     } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         if (canSetTemperature) {
             dial(Modifier.fillMaxWidth().weight(1f))

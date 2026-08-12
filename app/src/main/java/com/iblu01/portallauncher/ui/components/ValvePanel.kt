@@ -43,6 +43,7 @@ fun ValveControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val canClose = "close_valve" in contract.actions
     val canStop = "stop_valve" in contract.actions
     val canPosition = "set_valve_position" in contract.actions
+    val hasPrimaryControl = canPosition || (canOpen && canClose && !canStop)
     var position by remember(entity.entityId, contract.value) { mutableFloatStateOf(contract.value ?: if (entity.state == "closed") 0f else 100f) }
     val openLabel = stringResource(R.string.valve_action_open)
     val closeLabel = stringResource(R.string.valve_action_close)
@@ -100,7 +101,11 @@ fun ValveControl(chip: LauncherChip, modifier: Modifier = Modifier) {
         }
     }
     if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
-        AdaptivePanelSplit(modifier, primary = { primaryControl(it) }, secondary = { actions(it) })
+        if (hasPrimaryControl) {
+            AdaptivePanelSplit(modifier, primary = { primaryControl(it) }, secondary = { actions(it) })
+        } else {
+            actions(modifier.fillMaxSize())
+        }
     } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text(stateLabel, style = AppleTypography.titleMedium, color = AppleColors.primary)
         Spacer(Modifier.height(14.dp))
