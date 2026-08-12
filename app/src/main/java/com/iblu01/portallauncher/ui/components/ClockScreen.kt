@@ -138,11 +138,16 @@ fun ClockScreen(
     }
 }
 
-/** Collapsed header height reserved on the apps page, i.e. the clock at [COLLAPSED_SCALE]. */
+/** Collapsed header height reserved on the apps page, i.e. the clock at [ClockCollapsedScale]. */
 val ClockHeaderCollapsedHeight = 92.dp
 
 /** Scale the header shrinks to when the pager is fully on the apps page. */
-private const val COLLAPSED_SCALE = 0.34f
+const val ClockCollapsedScale = 0.34f
+private val COMPACT_DATE_LIFT = 28.dp
+
+/** Decorative clock details disappear before the header reaches its compact state. */
+internal fun clockDetailAlpha(collapse: Float): Float =
+    (1f - collapse.coerceIn(0f, 1f) * 2f).coerceIn(0f, 1f)
 
 /**
  * The clock block (date, time, weather pill, stale banner). Pinned above the pager, it shrinks
@@ -167,7 +172,7 @@ fun ClockHeader(
     Column(
         modifier = modifier
             .graphicsLayer {
-                val scale = 1f - (1f - COLLAPSED_SCALE) * collapse()
+                val scale = 1f - (1f - ClockCollapsedScale) * collapse()
                 transformOrigin = TransformOrigin(0.5f, 0f)
                 scaleX = scale
                 scaleY = scale
@@ -184,7 +189,10 @@ fun ClockHeader(
                 fontSize = 20.sp,
                 letterSpacing = 2.3.sp,
             ),
-            color = clockTheme.tint.color.copy(alpha = 0.7f)
+            color = clockTheme.tint.color.copy(alpha = 0.7f),
+            // The compact launcher header only needs the time. Keep the node measured throughout
+            // the swipe, but fade its pixels in the layer phase to avoid text relayout per frame.
+            modifier = Modifier.graphicsLayer { alpha = clockDetailAlpha(collapse()) },
         )
         Spacer(Modifier.height(4.dp * clockTheme.elementSpacing))
         Text(
@@ -202,14 +210,19 @@ fun ClockHeader(
             ),
             color = clockTheme.tint.color,
             maxLines = 1,
-            softWrap = false
+            softWrap = false,
+            // Reclaim the date's visual slot as it fades, so the minimal time sits at the same top
+            // position it would have had if the date were not in the layout at all.
+            modifier = Modifier.graphicsLayer {
+                translationY = -COMPACT_DATE_LIFT.toPx() * collapse().coerceIn(0f, 1f)
+            },
         )
         // Keep these nodes composed throughout the gesture. Removing them when alpha reaches zero
         // causes a structural recomposition and a text remeasure exactly halfway through the swipe.
         Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
         Row(
             modifier = Modifier
-                .graphicsLayer { alpha = (1f - collapse() * 2f).coerceIn(0f, 1f) }
+                .graphicsLayer { alpha = clockDetailAlpha(collapse()) }
                 .clip(AppleShapes.pill)
                 .background(Color.White.copy(alpha = 0.15f), AppleShapes.pill)
                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
@@ -223,7 +236,7 @@ fun ClockHeader(
         }
         if (!connected && lastUpdateAt > 0L) {
             Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
-            Box(Modifier.graphicsLayer { alpha = (1f - collapse() * 2f).coerceIn(0f, 1f) }) {
+            Box(Modifier.graphicsLayer { alpha = clockDetailAlpha(collapse()) }) {
                 StaleBanner(lastUpdateAt = lastUpdateAt)
             }
         }

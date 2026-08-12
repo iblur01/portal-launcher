@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -111,6 +112,13 @@ class LauncherPagerTest {
         // The header must not grow back on later pages: collapse saturates at 1.
         assertEquals(1f, state().collapseFraction(), 0.01f)
         assertEquals("pager index 2 is app page 1", 1, appPageOf(state().currentPage))
+    }
+
+    @Test
+    fun `compact clock removes secondary details while expanded clock keeps them`() {
+        assertEquals(1f, clockDetailAlpha(0f), 0.001f)
+        assertEquals(0f, clockDetailAlpha(0.5f), 0.001f)
+        assertEquals(0f, clockDetailAlpha(1f), 0.001f)
     }
 
     @Test
@@ -292,7 +300,7 @@ class LauncherPagerTest {
     }
 
     @Test
-    fun `Maison is left of the initial clock and owns the header`() {
+    fun `Maison is left of Accueil and shares its collapsed launcher header`() {
         lateinit var state: PagerState
         val layout = LauncherPagerLayout(homePageEnabled = true, appPageCount = 1)
         rule.setContent {
@@ -305,6 +313,15 @@ class LauncherPagerTest {
                 userScrollEnabled = true,
                 pageLayout = layout,
                 header = { Box(Modifier.width(120.dp).height(HEADER_HEIGHT).testTag("header")) },
+                headerActions = {
+                    Box(Modifier.width(40.dp).height(40.dp).testTag("appHeaderActions"))
+                },
+                houseHeader = {
+                    Box(Modifier.width(80.dp).height(40.dp).testTag("houseHeader"))
+                },
+                houseHeaderActions = {
+                    Box(Modifier.width(40.dp).height(40.dp).testTag("houseHeaderActions"))
+                },
                 housePage = { Box(Modifier.fillMaxSize().testTag("housePage")) },
                 clockPage = { Box(Modifier.fillMaxSize().testTag("clockPage")) },
                 appPage = { _, _ -> Box(Modifier.fillMaxSize().testTag("appsPage")) },
@@ -313,10 +330,23 @@ class LauncherPagerTest {
         rule.waitForIdle()
 
         assertEquals("the logical accueil remains the initial page", layout.clockPage, state.currentPage)
+        rule.onNodeWithTag("appHeaderActions").assertDoesNotExist()
+        rule.onNodeWithTag("houseHeader").assertDoesNotExist()
+        rule.onNodeWithTag("houseHeaderActions").assertDoesNotExist()
         rule.onNodeWithTag("clockPage").performTouchInput { swipeRight() }
         rule.waitForIdle()
 
         assertEquals(layout.housePage, state.currentPage)
+        rule.onNodeWithTag("header").assertIsDisplayed()
+        rule.onNodeWithTag("houseHeader").assertIsDisplayed()
+        rule.onNodeWithTag("houseHeaderActions").assertIsDisplayed()
+        rule.onNodeWithTag("appHeaderActions").assertDoesNotExist()
+        assertEquals(
+            "Maison drives the same fully collapsed clock state as the app grid",
+            1f,
+            state.collapseFraction(layout),
+            0.01f,
+        )
         rule.onNodeWithTag("housePage").performTouchInput { swipeLeft() }
         rule.waitForIdle()
         assertEquals(layout.clockPage, state.currentPage)

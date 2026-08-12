@@ -4,23 +4,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -44,15 +40,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -66,22 +59,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.domain.home.Availability
+import com.iblu01.portallauncher.domain.home.HomeGridLayoutPolicy
 import com.iblu01.portallauncher.domain.home.HomePageModel
-import com.iblu01.portallauncher.domain.home.HomeRailLayoutPolicy
 import com.iblu01.portallauncher.domain.home.HomeSectionModel
 import com.iblu01.portallauncher.domain.home.PillRef
 import com.iblu01.portallauncher.domain.home.ResolvedPill
 import com.iblu01.portallauncher.ui.components.HomePillActions
 import com.iblu01.portallauncher.ui.components.HomePillContextMenu
 import com.iblu01.portallauncher.ui.components.HomePillMove
+import com.iblu01.portallauncher.ui.components.LocalCollapsedHeaderHeight
 import com.iblu01.portallauncher.ui.components.ManualGroupMenuOption
-import com.iblu01.portallauncher.ui.components.LocalLauncherPagerGestureLock
 import com.iblu01.portallauncher.ui.components.StatusChip
 import com.iblu01.portallauncher.ui.components.groupDescription
 import com.iblu01.portallauncher.ui.components.homePillReorderDrag
 import com.iblu01.portallauncher.ui.theme.AppleColors
+import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
-import kotlin.math.min
 
 data class HomePageEditActions(
     val onMoveSection: (sectionId: String, move: HomePillMove) -> Unit = { _, _ -> },
@@ -90,9 +83,28 @@ data class HomePageEditActions(
     val onEditManualGroups: () -> Unit = {},
 )
 
+/** Breathing room between the compact clock header and the first line of Maison content. */
+private val HomeContentTopGap = 14.dp
+private val HomeContentSideGutter = 24.dp
+private val HomePillGap = 10.dp
+
+/**
+ * Frosted-glass slab drawn under each Maison pill.
+ *
+ * The tray's frosted fill (white 8 %) assumes the darkened bottom of the clock page. Maison covers
+ * the whole wallpaper, and a translucent scrim was not enough: a bright photo still read through
+ * the pills. The Portal is API 28, where [androidx.compose.ui.draw.blur] is a no-op, so the frost
+ * has to be an opaque elevated surface rather than a real blur. It is drawn *before* the chip's own
+ * fill, so the white sheen, the border and the accent/selected states are untouched.
+ */
+private val HomePillSurface = AppleColors.elevated
+
 /**
  * Maison's catalog surface. It is a pure renderer of [HomePageModel]: ordering, availability and
  * business priority are resolved upstream, while all mutations are emitted as callbacks.
+ *
+ * The page owns a single vertical gesture. Sections wrap their pills across full-width lines
+ * instead of hiding them in horizontal rails, so nothing needs a second scroll axis to be reached.
  */
 @Composable
 fun HomePage(
@@ -104,8 +116,6 @@ fun HomePage(
     reordering: Boolean = false,
     stale: Boolean = false,
     onEditingChange: (Boolean) -> Unit = {},
-    /** Lets the parent pager yield the complete gesture to a rail that received the down event. */
-    onRailGestureActiveChange: (Boolean) -> Unit = {},
     editActions: HomePageEditActions = HomePageEditActions(),
     onOpenHomeAssistantSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -116,38 +126,56 @@ fun HomePage(
         .associateBy { it.ref.stableKey }
     val menuTarget = menuTargetRef?.let(pillsByKey::get)
     val isStale = stale || pillsByKey.values.any { it.availability == Availability.STALE }
-    val lockParentPager = LocalLauncherPagerGestureLock.current
-    val railGestureChanged: (Boolean) -> Unit = { active ->
-        lockParentPager(active)
-        onRailGestureActiveChange(active)
-    }
 
     LaunchedEffect(menuTargetRef, pillsByKey.keys) {
         if (menuTargetRef != null && menuTarget == null) menuTargetRef = null
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            // A steady scrim keeps rails readable on user-selected photography, including API 28
-            // where blurCompat intentionally degrades to a flat translucent surface.
-            .background(Color.Black.copy(alpha = 0.34f))
             .testTag("homePage"),
     ) {
+        // The header is user-themed, so its collapsed height is measured by the pager rather than
+        // assumed here. Guessing is what pushed the first line of pills under the clock.
+        val topInset = LocalCollapsedHeaderHeight.current + HomeContentTopGap
+        val scrollViewportHeight = (maxHeight - topInset).coerceAtLeast(0.dp)
+        val density = LocalDensity.current
+        val contentWidthDp = (maxWidth - HomeContentSideGutter * 2).value
+        val columns = remember(contentWidthDp, density.fontScale) {
+            HomeGridLayoutPolicy.columns(
+                availableWidthDp = contentWidthDp,
+                fontScale = density.fontScale,
+            )
+        }
+
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 28.dp, end = 28.dp, top = 34.dp, bottom = 42.dp),
-            verticalArrangement = Arrangement.spacedBy(26.dp),
+            // A smaller viewport anchored below the header, not a full-screen list with top
+            // padding. Clipping makes it impossible for content to travel under the chrome.
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(scrollViewportHeight)
+                .clipToBounds()
+                .testTag("homeScrollableContent"),
+            contentPadding = PaddingValues(
+                start = HomeContentSideGutter,
+                end = HomeContentSideGutter,
+                top = 0.dp,
+                bottom = 42.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(30.dp),
             userScrollEnabled = !reordering,
         ) {
-            item(key = "home-header") {
-                HomePageHeader(
-                    editing = editing,
-                    isStale = isStale,
-                    onEditingChange = onEditingChange,
-                    onCreateManualGroup = editActions.onCreateManualGroup,
-                    onEditManualGroups = editActions.onEditManualGroups,
-                )
+            if (editing || isStale) {
+                item(key = "home-header") {
+                    HomePageHeader(
+                        editing = editing,
+                        isStale = isStale,
+                        onCreateManualGroup = editActions.onCreateManualGroup,
+                        onEditManualGroups = editActions.onEditManualGroups,
+                    )
+                }
             }
 
             if (model.sections.isEmpty()) {
@@ -162,12 +190,11 @@ fun HomePage(
                 items(model.sections, key = { it.sectionId }) { section ->
                     HomeSection(
                         section = section,
+                        columns = columns,
                         pinnedRefs = pinnedRefs,
                         actions = actions,
                         editing = editing,
-                        reordering = reordering,
                         onLongPress = { menuTargetRef = it.ref.stableKey },
-                        onRailGestureActiveChange = railGestureChanged,
                         editActions = editActions,
                     )
                 }
@@ -188,34 +215,16 @@ fun HomePage(
 private fun HomePageHeader(
     editing: Boolean,
     isStale: Boolean,
-    onEditingChange: (Boolean) -> Unit,
     onCreateManualGroup: () -> Unit,
     onEditManualGroups: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Maison",
-                    style = AppleTypography.displaySmall,
-                    color = AppleColors.primary,
-                    modifier = Modifier.semantics { heading() },
-                )
-                if (isStale) {
-                    Text(
-                        "Hors ligne · données figées, commandes suspendues",
-                        style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
-                        color = AppleColors.warning,
-                        modifier = Modifier.testTag("homeStaleState"),
-                    )
-                }
-            }
-            HomeTextButton(
-                label = if (editing) "Terminer" else "Modifier",
-                onClick = { onEditingChange(!editing) },
+        if (isStale) {
+            Text(
+                "Hors ligne · données figées, commandes suspendues",
+                style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
+                color = AppleColors.warning,
+                modifier = Modifier.testTag("homeStaleState"),
             )
         }
         if (editing) {
@@ -235,17 +244,17 @@ private fun HomePageHeader(
 @Composable
 private fun HomeSection(
     section: HomeSectionModel,
+    columns: Int,
     pinnedRefs: Set<PillRef>,
     actions: HomePillActions,
     editing: Boolean,
-    reordering: Boolean,
     onLongPress: (ResolvedPill) -> Unit,
-    onRailGestureActiveChange: (Boolean) -> Unit,
     editActions: HomePageEditActions,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .focusGroup()
             .testTag("homeSection:${section.sectionId}"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -277,118 +286,62 @@ private fun HomeSection(
                 }
             }
         }
-        HomeRail(
-            section = section,
-            pinnedRefs = pinnedRefs,
-            actions = actions,
-            editing = editing,
-            userScrollEnabled = !reordering,
-            onLongPress = onLongPress,
-            onRailGestureActiveChange = onRailGestureActiveChange,
-        )
-    }
-}
 
-/** Independent, saveable rail state per stable section id. */
-@Composable
-private fun HomeRail(
-    section: HomeSectionModel,
-    pinnedRefs: Set<PillRef>,
-    actions: HomePillActions,
-    editing: Boolean,
-    userScrollEnabled: Boolean,
-    onLongPress: (ResolvedPill) -> Unit,
-    onRailGestureActiveChange: (Boolean) -> Unit,
-) {
-    val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    val railState = rememberScrollState()
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val widthDp = with(density) { maxWidth.toPx() / density.density }
-        val availableRailHeight = min(configuration.screenHeightDp * 0.28f, 156f)
-        val layout = remember(section.items.size, widthDp, availableRailHeight, density.fontScale) {
-            HomeRailLayoutPolicy.calculate(
-                itemCount = section.items.size,
-                availableWidthDp = widthDp,
-                availableHeightDp = availableRailHeight,
-                fontScale = density.fontScale,
-            )
-        }
-        val rows = remember(section.items, layout.rowCount) {
-            distributeHomeRailRows(section.items, layout.rowCount)
-        }
-
+        // Reported for tests and for anyone debugging a density issue: the column count is a pure
+        // function of the available width, never of how many tiles the section happens to hold.
         Box(
             Modifier
                 .size(0.dp)
-                .testTag("homeRailRows:${section.sectionId}:${layout.rowCount}"),
+                .testTag("homeGridColumns:${section.sectionId}:$columns"),
         )
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .focusGroup()
-                .horizontalScroll(railState, enabled = userScrollEnabled)
-                .pointerInput(section.sectionId) {
-                    awaitEachGesture {
-                        awaitFirstDown(
-                            requireUnconsumed = false,
-                            pass = PointerEventPass.Initial,
-                        )
-                        onRailGestureActiveChange(true)
-                        try {
-                            do {
-                                val event = awaitPointerEvent(PointerEventPass.Final)
-                            } while (event.changes.any { it.pressed })
-                        } finally {
-                            onRailGestureActiveChange(false)
-                        }
-                    }
-                }
-                .padding(end = 28.dp)
-                .testTag("homeRail:${section.sectionId}"),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .testTag("homeGrid:${section.sectionId}"),
+            verticalArrangement = Arrangement.spacedBy(HomePillGap),
         ) {
-            rows.forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            section.items.chunked(columns).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(HomePillGap)) {
                     row.forEach { pill ->
                         key(pill.ref.stableKey) {
-                        HomeRailPill(
-                            pill = pill,
-                            sectionTitle = section.title,
-                            pinned = pill.ref in pinnedRefs,
-                            editing = editing,
-                            actions = actions,
-                            onLongPress = { onLongPress(pill) },
-                        )
+                            HomePill(
+                                pill = pill,
+                                sectionTitle = section.title,
+                                pinned = pill.ref in pinnedRefs,
+                                editing = editing,
+                                actions = actions,
+                                onLongPress = { onLongPress(pill) },
+                                modifier = Modifier.weight(1f),
+                            )
                         }
                     }
+                    // Keep the last line's pills the same width as every other line's.
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
     }
 }
 
-/** Keeps reading order column-major while each visual row packs its pills independently. */
-internal fun <T> distributeHomeRailRows(items: List<T>, rowCount: Int): List<List<T>> {
-    val safeRows = rowCount.coerceAtLeast(1)
-    return List(safeRows) { row -> items.filterIndexed { index, _ -> index % safeRows == row } }
-        .filter { it.isNotEmpty() }
-}
-
+/**
+ * One device pill — the exact chip Accueil renders, laid out on the section's grid so every line
+ * keeps the same widths.
+ */
 @Composable
-private fun HomeRailPill(
+private fun HomePill(
     pill: ResolvedPill,
     sectionTitle: String,
     pinned: Boolean,
     editing: Boolean,
     actions: HomePillActions,
     onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val available = pill.availability == Availability.AVAILABLE
     val description = homePillAccessibilityLabel(pill, pinned, sectionTitle)
     Column(
-        modifier = Modifier.widthIn(min = 132.dp),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         StatusChip(
@@ -398,7 +351,9 @@ private fun HomeRailPill(
             onClick = { if (available) actions.onOpen(pill) },
             onLongPress = onLongPress,
             modifier = Modifier
+                .fillMaxWidth()
                 .heightIn(min = 48.dp)
+                .background(HomePillSurface, AppleShapes.pill)
                 .homePillReorderDrag(pill, actions)
                 .alpha(if (available) 1f else 0.72f)
                 .testTag("homePill:${pill.ref.stableKey}")

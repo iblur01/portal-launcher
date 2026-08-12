@@ -187,10 +187,3 @@ object HomeSectionIds {
     const val MANUAL_GROUPS = "manual_groups"
     fun kind(kind: PillKind): String = "kind:${kind.name}"
 }
-
-data class HomeRailLayout(
-    val rowCount: Int,
-    val placements: List<HomeRailPlacement>,
-)
-
-data class HomeRailPlacement(val itemIndex: Int, val row: Int, val column: Int)

@@ -18,7 +18,7 @@ import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.domain.home.AlertSeverity
 import com.iblu01.portallauncher.domain.home.Availability
 import com.iblu01.portallauncher.domain.home.HomePageModel
-import com.iblu01.portallauncher.domain.home.HomeRailLayoutPolicy
+import com.iblu01.portallauncher.domain.home.HomeGridLayoutPolicy
 import com.iblu01.portallauncher.domain.home.HomeSectionModel
 import com.iblu01.portallauncher.domain.home.HomeSectionType
 import com.iblu01.portallauncher.domain.home.PillAlert
@@ -120,23 +120,11 @@ class HomeAccessibilityAcceptanceTest {
     }
 
     @Test
-    fun `large text and short height switch to one row before compressing touch targets`() {
-        val dense = HomeRailLayoutPolicy.calculate(
-            itemCount = 18,
-            availableWidthDp = 480f,
-            availableHeightDp = 120f,
-            fontScale = 1.8f,
-        )
-        assertEquals(1, dense.rowCount)
-        assertTrue(dense.placements.all { it.row == 0 })
+    fun `large text yields fewer columns instead of compressing pills`() {
+        val dense = HomeGridLayoutPolicy.columns(availableWidthDp = 480f, fontScale = 1.8f)
+        assertEquals(1, dense)
 
-        val roomy = HomeRailLayoutPolicy.calculate(
-            itemCount = 18,
-            availableWidthDp = 480f,
-            availableHeightDp = 220f,
-            fontScale = 1.8f,
-        )
-        assertEquals(2, roomy.rowCount)
-        assertEquals(listOf(0, 1, 0, 1), roomy.placements.take(4).map { it.row })
+        val roomy = HomeGridLayoutPolicy.columns(availableWidthDp = 480f, fontScale = 1f)
+        assertEquals(2, roomy)
     }
 }

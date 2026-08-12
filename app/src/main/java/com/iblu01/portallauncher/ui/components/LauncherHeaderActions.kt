@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Done
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.MeetingRoom
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
@@ -18,6 +21,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.R
@@ -57,19 +62,74 @@ fun LauncherHeaderActions(
     }
 }
 
+/** Maison title rendered in the shared compact-clock header rather than inside page content. */
+@Composable
+fun HomeHeaderTitle() {
+    Box(modifier = Modifier.size(width = 112.dp, height = 40.dp), contentAlignment = Alignment.CenterStart) {
+        Text(
+            text = stringResource(R.string.home_header_title),
+            style = AppleTypography.titleLarge,
+            color = AppleColors.primary,
+            modifier = Modifier.semantics { heading() },
+        )
+    }
+}
+
+/**
+ * Maison-specific top-bar actions.
+ *
+ * [onGroupingModeClick] is intentionally only an extension point for now: the button advertises
+ * the future Type/Pièce switch, but the caller does not mutate the page model yet.
+ */
+@Composable
+fun HomeHeaderActions(
+    editing: Boolean,
+    onEditingChange: (Boolean) -> Unit,
+    onGroupingModeClick: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        HeaderAction(
+            // The current catalog remains grouped by type; the room glyph names the future target.
+            icon = Icons.Outlined.MeetingRoom,
+            contentDescription = stringResource(R.string.home_header_grouping_content_desc),
+            onClick = onGroupingModeClick,
+        )
+        HeaderAction(
+            icon = if (editing) Icons.Outlined.Done else Icons.Outlined.Edit,
+            contentDescription = stringResource(
+                if (editing) R.string.home_header_finish_content_desc
+                else R.string.home_header_edit_content_desc,
+            ),
+            selected = editing,
+            onClick = { onEditingChange(!editing) },
+        )
+        HeaderAction(
+            icon = Icons.Outlined.Settings,
+            contentDescription = stringResource(R.string.header_settings_content_desc),
+            onClick = onSettings,
+        )
+    }
+}
+
 @Composable
 private fun HeaderAction(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
     badge: String? = null,
+    selected: Boolean = false,
 ) {
     Box(modifier = Modifier.size(40.dp)) {
         Box(
             modifier = Modifier
                 .size(40.dp)
                 .clip(AppleShapes.pill)
-                .background(Color.White.copy(alpha = 0.12f), AppleShapes.pill)
+                .background(
+                    if (selected) AppleColors.accent.copy(alpha = 0.28f)
+                    else Color.White.copy(alpha = 0.12f),
+                    AppleShapes.pill,
+                )
                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
                 .appleClickable(onClick),
             contentAlignment = Alignment.Center,

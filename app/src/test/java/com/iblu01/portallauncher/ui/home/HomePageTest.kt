@@ -2,6 +2,7 @@ package com.iblu01.portallauncher.ui.home
 
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -22,6 +23,7 @@ import com.iblu01.portallauncher.domain.home.HomeSectionType
 import com.iblu01.portallauncher.domain.home.PillAlert
 import com.iblu01.portallauncher.domain.home.PillRef
 import com.iblu01.portallauncher.domain.home.ResolvedPill
+import com.iblu01.portallauncher.ui.components.ClockHeaderCollapsedHeight
 import com.iblu01.portallauncher.ui.components.HomePillActions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,7 +63,7 @@ class HomePageTest {
     }
 
     @Test
-    fun `sections render in model order and expose independent rails`() {
+    fun `sections render in model order below the fixed header`() {
         val salon = pill("salon")
         val cuisine = pill("cuisine")
         val model = HomePageModel(
@@ -82,11 +84,16 @@ class HomePageTest {
 
         rule.onNodeWithTag("homeSection:favorites").assertExists()
         rule.onNodeWithTag("homeSection:lights").assertExists()
-        rule.onNodeWithTag("homeRail:favorites").assertExists()
-        rule.onNodeWithTag("homeRail:lights").assertExists()
+        rule.onNodeWithTag("homeGrid:favorites").assertExists()
+        rule.onNodeWithTag("homeGrid:lights").assertExists()
         rule.onNodeWithContentDescription(
             "Salon, Allumée, Appareil, section Favoris, épinglé",
         ).assertExists()
+        assertTrue(
+            "the complete Maison scroll surface must start below the fixed header",
+            rule.onNodeWithTag("homeScrollableContent").getUnclippedBoundsInRoot().top >=
+                ClockHeaderCollapsedHeight,
+        )
     }
 
     @Test
@@ -148,7 +155,7 @@ class HomePageTest {
     }
 
     @Test
-    fun `dense rail uses two deterministic rows while a short rail stays on one`() {
+    fun `every section wraps its pills on the same width driven column count`() {
         val short = listOf(pill("one"), pill("two"))
         val dense = (1..10).map { pill("dense$it") }
         rule.setContent {
@@ -165,8 +172,10 @@ class HomePageTest {
             )
         }
 
-        rule.onNodeWithTag("homeRailRows:short:1").assertExists()
-        rule.onNodeWithTag("homeRailRows:dense:2").assertExists()
+        // w800dp minus the 24dp gutters fits three 220dp pills, whatever a section holds.
+        rule.onNodeWithTag("homeGridColumns:short:3").assertExists()
+        rule.onNodeWithTag("homeGridColumns:dense:3").assertExists()
+        rule.onNodeWithTag("homePill:${dense.last().ref.stableKey}").assertExists()
     }
 
     @Test

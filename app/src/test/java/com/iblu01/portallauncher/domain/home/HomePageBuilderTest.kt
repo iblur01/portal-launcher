@@ -59,19 +59,14 @@ class HomePageBuilderTest {
         assertTrue(page.sections.isEmpty())
     }
 
-    @Test fun `rail uses deterministic one or two row column major placement`() {
-        val one = HomeRailLayoutPolicy.calculate(3, 800f, 200f, 1f)
-        assertEquals(1, one.rowCount)
-        val two = HomeRailLayoutPolicy.calculate(8, 400f, 140f, 1f)
-        assertEquals(2, two.rowCount)
-        assertEquals(
-            listOf(0 to 0, 1 to 0, 0 to 1, 1 to 1),
-            two.placements.take(4).map { it.row to it.column },
-        )
+    @Test fun `column count follows the available width and never exceeds four`() {
+        assertEquals(4, HomeGridLayoutPolicy.columns(availableWidthDp = 1200f, fontScale = 1f))
+        assertEquals(3, HomeGridLayoutPolicy.columns(availableWidthDp = 800f, fontScale = 1f))
+        assertEquals(1, HomeGridLayoutPolicy.columns(availableWidthDp = 400f, fontScale = 1f))
     }
 
-    @Test fun `large font avoids a second row when two accessible rows do not fit`() {
-        val layout = HomeRailLayoutPolicy.calculate(20, 400f, 110f, 1.5f)
-        assertEquals(1, layout.rowCount)
+    @Test fun `large font yields fewer columns rather than narrower pills`() {
+        assertEquals(2, HomeGridLayoutPolicy.columns(availableWidthDp = 1200f, fontScale = 2f))
+        assertEquals(1, HomeGridLayoutPolicy.columns(availableWidthDp = 800f, fontScale = 2f))
     }
 }

@@ -353,7 +353,7 @@ L'accueil principal devient la page initiale, même si son index interne n'est p
 
 La navigation doit être modélisée par identité logique (`House`, `Clock`, `Apps(index)`) et seulement ensuite convertie en index physique. Quand Maison est activée, les index nominaux sont `House = 0`, `Clock = 1`, `Apps = 2+n`; quand elle est désactivée, ils redeviennent `Clock = 0`, `Apps = 1+n`. Une activation ou désactivation à chaud remappe la page courante par identité afin de ne jamais transformer silencieusement une page Application en une autre.
 
-Le calcul de repli de l'en-tête devient relatif à l'index de l'accueil, et non à zéro. Maison possède son propre en-tête : le grand en-tête Horloge ne doit pas rester superposé au-dessus d'elle. Le parallaxe, le scrim, les indicateurs, le drag inter-pages et les helpers `appPageOf` sont recalculés depuis ce modèle logique.
+Le calcul de repli de l'en-tête devient relatif à l'index de l'accueil, et non à zéro, puis utilise la distance absolue à cet index. Maison et la grille d'applications partagent ainsi le même chrome du launcher : l'horloge se replie vers le haut et les actions rondes apparaissent dans les deux directions. Le parallaxe, le scrim, les indicateurs, le drag inter-pages et les helpers `appPageOf` sont recalculés depuis ce modèle logique.
 
 Lorsque Maison est désactivée, le pager se comporte comme aujourd'hui et aucun emplacement vide n'est conservé.
 
@@ -380,6 +380,11 @@ La page reprend le motif de `HaCapabilityLab` dans `PlaygroundScreen` :
 - défilement horizontal indépendant par section ;
 - espacement et tokens Apple existants ;
 - fond cohérent avec le launcher et scrim suffisant sur photo.
+
+Le titre « Maison » appartient au header partagé avec l'horloge compacte, et non au contenu
+vertical. À droite, Maison remplace l'action « applications masquées » par un futur switch de
+regroupement Type/Pièce et place également Modifier/Terminer dans le header. À ce stade, le switch
+est uniquement présent visuellement et ne modifie pas la composition des sections.
 
 Exemple nominal :
 
@@ -458,7 +463,7 @@ Il ne permet pas :
 
 Le déplacement d'une pill automatique reste limité à sa ligne. Pour modifier son appartenance, l'UI explique que cela se gère dans Home Assistant.
 
-Une alternative accessible au drag est obligatoire : déplacer avant/après, placer en premier/dernier et, pour les groupes manuels, déplacer vers un autre groupe. L'ordre TalkBack suit exactement l'ordre visuel, y compris dans les rails à deux rangées.
+Une alternative accessible au drag est obligatoire : déplacer avant/après, placer en premier/dernier et, pour les groupes manuels, déplacer vers un autre groupe. L'ordre TalkBack suit exactement l'ordre visuel, y compris sur les lignes de tuiles d'une section.
 
 ## 15. Panel navigateur de groupe
 
@@ -520,7 +525,7 @@ Contraintes :
 - Les `LazyRow`/grilles paresseuses sont préférées aux `Row.horizontalScroll` pour les catalogues potentiellement longs.
 - Le pager parent ne doit pas voler un geste horizontal déjà engagé dans une ligne Maison ; la stratégie d'arbitrage gestuel doit être testée sur bord de ligne.
 
-Arbitrage attendu : un geste commencé sur une pill ou dans un rail défile d'abord le rail ; un geste commencé sur l'en-tête, un titre, l'espace entre sections ou la marge latérale navigue dans le pager. Au bord droit d'un rail, l'excédent peut être transmis au pager après le touch slop. Une zone de bord de 24 dp garantit le retour Maison -> Accueil. Pendant une réorganisation, pager et scroll vertical sont verrouillés.
+Arbitrage attendu : Maison ne défile qu'à la verticale et le pager qu'à l'horizontale, donc les deux gestes ne se disputent jamais le même axe et aucun arbitrage de page n'est nécessaire. Pendant une réorganisation, pager et scroll vertical sont verrouillés.
 
 ## 18. États vides et erreurs
 

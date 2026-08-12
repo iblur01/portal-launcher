@@ -105,6 +105,8 @@ import com.iblu01.portallauncher.ui.components.ChipActionsPanel
 import com.iblu01.portallauncher.ui.components.ClockHeader
 import com.iblu01.portallauncher.ui.components.GroupBrowserPanel
 import com.iblu01.portallauncher.ui.components.HomePillActions
+import com.iblu01.portallauncher.ui.components.HomeHeaderActions
+import com.iblu01.portallauncher.ui.components.HomeHeaderTitle
 import com.iblu01.portallauncher.ui.components.HomePillMove
 import com.iblu01.portallauncher.ui.components.HomePillMoveAvailability
 import com.iblu01.portallauncher.ui.components.HiddenAppsDialog
@@ -114,7 +116,6 @@ import com.iblu01.portallauncher.ui.components.LauncherPagerLayout
 import com.iblu01.portallauncher.ui.components.ManualGroupMenuOption
 import com.iblu01.portallauncher.ui.components.PageIdentity
 import com.iblu01.portallauncher.ui.components.collapseFraction
-import com.iblu01.portallauncher.ui.components.clockHeaderAlpha
 import com.iblu01.portallauncher.ui.components.pagerDragForward
 import com.iblu01.portallauncher.ui.components.rememberLauncherPagerState
 import com.iblu01.portallauncher.ui.components.MediaPlayerView
@@ -292,7 +293,9 @@ class LauncherActivity : ComponentActivity() {
         // The hold lives in a process-wide object: leaving it set would keep the idle timeout off
         // for good if the alarm is still alerting when the launcher goes away.
         onAlarmAlerting(false)
-        appList.stop()
+        // A fresh install hands off to onboarding before launcher resources are initialized.
+        // finish() still reaches onDestroy(), so only stop the store when startup got that far.
+        if (::appList.isInitialized) appList.stop()
         super.onDestroy()
     }
 
@@ -451,8 +454,8 @@ class LauncherActivity : ComponentActivity() {
     }
 }
 
-/** Extra wallpaper dimming once the app grid is fully in view. */
-private const val APPS_PAGE_SCRIM = 0.45f
+/** Extra wallpaper dimming once a launcher content page is fully in view. */
+private const val LAUNCHER_PAGE_SCRIM = 0.45f
 
 /**
  * The whole launcher UI: ambient clock, floating widget tray, and the long-press
@@ -1015,13 +1018,13 @@ private fun PortalLauncherApp(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Swiping to the app grid dims the wallpaper further, so the icons keep their contrast
-            // whatever the photo is. Alpha is read in the layer phase — no recomposition per frame.
+            // Maison and the app grid share the same launcher-level scrim, so neither reads as a
+            // separate overlay. Alpha is read in the layer phase — no recomposition per frame.
             Box(
                 Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = pagerState.collapseFraction(pagerLayout) }
-                    .background(Color.Black.copy(alpha = APPS_PAGE_SCRIM))
+                    .background(Color.Black.copy(alpha = LAUNCHER_PAGE_SCRIM))
             )
 
             Box(
@@ -1032,8 +1035,7 @@ private fun PortalLauncherApp(
                     // Read in the layer phase, not in composition: the swipe fades the tray
                     // gradient out without recomposing the launcher on every frame.
                     .graphicsLayer {
-                        alpha = pagerState.clockHeaderAlpha(pagerLayout) *
-                            (1f - pagerState.collapseFraction(pagerLayout))
+                        alpha = 1f - pagerState.collapseFraction(pagerLayout)
                     }
                     .background(
                         Brush.verticalGradient(
@@ -1198,6 +1200,16 @@ private fun PortalLauncherApp(
                         LauncherHeaderActions(
                             hiddenCount = hiddenItems.size,
                             onShowHidden = { showHidden = true },
+                            onSettings = onOpenSettings,
+                        )
+                    },
+                    houseHeader = { HomeHeaderTitle() },
+                    houseHeaderActions = {
+                        HomeHeaderActions(
+                            editing = homeEditing,
+                            onEditingChange = { homeEditing = it },
+                            // UI placeholder only: grouping still follows the saved section model.
+                            onGroupingModeClick = {},
                             onSettings = onOpenSettings,
                         )
                     },

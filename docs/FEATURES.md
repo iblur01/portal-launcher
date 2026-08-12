@@ -83,7 +83,7 @@ Scrim: separate darkening layer, 0–60 %, default 25 %, only when mode ≠ neut
 
 Pipeline: HA snapshot + `Prefs.pillRules` + the versioned Maison preferences → complete
 `PillCatalogSnapshot` → dynamic ranking → `HomePillComposer` (3 primary / 6 secondary / favorite
-overflow) and `HomePageBuilder` (ordered Maison rails) → `LauncherViewModel.uiState` → Compose.
+overflow) and `HomePageBuilder` (ordered Maison sections) → `LauncherViewModel.uiState` → Compose.
 The 100 ms sampled transform stays on `Dispatchers.Default`; capacity is applied only by the home
 composer, never while building the catalog — `PillRepository.kt:173-247`,
 `PillPriorityEngine.kt:20-59`.
@@ -460,53 +460,67 @@ settings catalog is complete rather than top-nine-limited and uses stable `area_
 
 ### Logical pager pages
 One flat `HorizontalPager` holds `[Maison?, Accueil, app page 0, app page 1, …]`
-(`LauncherPager.kt`). It is not a pager nested inside the apps page: Maison rails are the only nested
-horizontal scrollers.
+(`LauncherPager.kt`). It is not a pager nested inside the apps page, and no launcher page nests a
+second horizontal scroller.
 
 `LauncherPagerLayout` maps the logical identities `House`, `Clock`, `Apps(n)` to physical indices.
 With Maison enabled those are `0`, `1`, `2+n`; without it they are `0`, `1+n`. The initial destination
 is always Accueil, and a hot Maison toggle remaps the settled logical identity so an application page
 never silently shifts to a neighbour — `LauncherPager.kt:60-149,264-281`.
 
-The clock header collapse is relative to the logical Accueil index. Its alpha falls to zero over
-Maison, which owns its own title/header, while app pages keep the clock collapsed. HOME, Back and
-auto-return call the Maison-aware `returnToClockPage(..., layout)` and therefore always target the
-main Accueil, never Maison — `LauncherPager.kt:151-209`, `LauncherBack.kt:44-64`,
-`LauncherActivity.kt:800-831`.
+The clock header collapse is relative to the logical Accueil index and uses the absolute page
+distance: Maison and app pages both keep the clock collapsed in the shared launcher top bar. HOME,
+Back and auto-return call the Maison-aware `returnToClockPage(..., layout)` and therefore always
+target the main Accueil, never Maison — `LauncherPager.kt:151-209`,
+`LauncherBack.kt:44-64`, `LauncherActivity.kt:800-831`.
 
 When enabled, Maison is reachable by a left-to-right gesture from Accueil. There is deliberately no
 extra bottom home icon. When disabled, the physical page disappears without leaving a placeholder.
 
-### Maison page and rails
+### Maison page and grid
 
 Maison renders an independently vertical `LazyColumn` of non-empty ordered sections: available pins
 (Favoris), automatic rooms, one section per populated kind (individual devices only; the redundant
 aggregate type pill is not repeated at the start of its own line),
 and rendered manual groups. Hidden and empty sections are omitted while their preferences remain
-stored. An empty catalog produces one page-level explanation/action rather than repeated empty rails —
-`HomePageBuilder.kt:6-105`, `HomePage.kt:91-178,430-469`.
+stored. An empty catalog produces one page-level explanation/action rather than repeated empty
+sections — `HomePageBuilder.kt:6-105`, `HomePage.kt`.
 
-Each section owns a saveable `LazyRow` keyed by stable section id. A pure responsive policy chooses
-one or two rows from width, available height, item count and font scale; the deterministic fill is
-top-to-bottom then left-to-right and never exceeds two rows. Pills retain a 48 dp minimum target and
-keyboard/D-pad activation — `HomeRailLayoutPolicy.kt:3-28`, `HomePage.kt:285-428`.
+Each section wraps its devices across full-width lines of equal pills — the same `StatusChip`
+Accueil renders, stretched to the line's column width: the page owns a single vertical gesture, so
+everything a section holds is reachable without a second scroll axis. The column count is a pure
+function of the available width and the font scale (`HomeGridLayoutPolicy`, 220 dp minimum pill,
+4 columns maximum) — large text yields fewer columns, never a narrower pill. Pills keep their 48 dp
+minimum target and keyboard/D-pad activation. Each one sits on an opaque elevated slab drawn under
+the chip's own frosted fill: the tray's fill assumes the darkened bottom of the clock page, while
+Maison covers the full wallpaper, and on API 28 `Modifier.blur` is a no-op — so the frost is a solid
+surface, not a translucent scrim that a bright photo reads straight through —
+`HomeGridLayoutPolicy.kt`, `HomePage.kt`.
 
-The header's **Modifier** mode exposes section before/after/hide controls plus group-management
-entry points, and explains that automatic room/type membership is managed in HA. Pill long-press
-opens the same complete context menu used by Accueil. TalkBack descriptions include name, state,
-pin/stale/critical status and group membership — `HomePage.kt:180-282,489-529`.
+Maison's shared clock header owns its title and round actions: a future Type/Pièce grouping switch,
+**Modifier/Terminer**, and Settings. The grouping control is intentionally a UI extension point for
+now and does not alter the saved section model. Edit mode exposes section before/after/hide controls
+plus group-management entry points in the page content, and explains that automatic room/type
+membership is managed in HA. Pill long-press opens the same complete context menu used by Accueil.
+TalkBack descriptions include name, state, pin/stale/critical status and group membership —
+`LauncherHeaderActions.kt`, `HomePage.kt`.
 
-A down event inside a rail reserves the gesture for that rail; pager navigation remains available
-from headers, gaps and margins. A dedicated 24 dp right edge guarantees Maison → Accueil beside long
-rails, and both pager and vertical scrolling lock during pill reorder —
-`HomePage.kt:322-347`, `LauncherActivity.kt:1093,1194-1205`.
+Maison's vertical list is a smaller viewport anchored to the bottom and clipped to its own bounds,
+so scrolling cannot carry later lines behind the fixed header. Its top edge is the header height
+*measured by the pager* (`LocalCollapsedHeaderHeight`) plus a 14 dp gap: the clock is user-themed,
+so a hardcoded constant is what pushed the first line of pills under it. The surface also fades in
+with the leftward collapse progress, matching the app grid reveal.
+
+Maison scrolls vertically and the pager scrolls horizontally, so the two gestures never compete and
+no page-level gesture arbitration is needed. Vertical scrolling locks during pill reorder —
+`HomePage.kt`, `LauncherActivity.kt`.
 
 ### App pages
-- The clock header is a sibling above the pager, not inside Accueil. It is hidden over Maison; from Accueil it shrinks to 34 % over the clock→apps swipe, driven by the logical-clock-relative offset through a `graphicsLayer` scale — GPU only, no relayout per frame (the Portal is API 28) — and stays collapsed on later app pages.
+- The clock header is a sibling above the pager, not inside Accueil. From Accueil it shrinks to 34 % toward Maison or the apps grid, driven by the absolute logical-clock-relative offset through a `graphicsLayer` scale — GPU only, no relayout per frame (the Portal is API 28) — and stays collapsed on every non-Accueil launcher page. In that compact state only the time remains: the date and weather details fade out while the time translates upward to reclaim the date's visual slot.
 - Because the header is drawn *above* the pager it would be a dead zone for the swipe, so it forwards its own horizontal drags to the pager via `dispatchRawDelta` and settles at 25 % of a page width or 600 px/s (`pagerDragForward`). Its reported height follows the visible (scaled) height so the collapsed clock stops eating taps meant for the first row of icons (`collapsingHeight`).
 - Tap/long-press on the clock keep their meaning (HA / quick actions) but only while it is expanded (`collapse < 0.5`).
-- **Masquées** and **Réglages** live in the top bar, right-aligned beside the clock (`LauncherHeaderActions.kt`), and fade in with the swipe so the idle clock screen stays bare. They used to be grid tiles, which took cells meant for apps and looked draggable.
-- Pill/app drag and an active Maison rail gesture lock parent pager scrolling. An open panel reserves
+- Application pages show **Masquées** and **Réglages** in the top bar. Maison replaces **Masquées** with its Type/Pièce and edit actions while retaining Settings. The two direction-specific action groups fade independently, so app controls never leak into Maison during a swipe (`LauncherHeaderActions.kt`).
+- Pill/app drag locks parent pager scrolling. An open panel reserves
   33 % of the relevant axis and remeasures Clock, Maison and application pages into the remaining
   area; only the full-screen wallpaper/scrims continue underneath. Sitting on Maison or any app page
   arms auto-return like the expanded tray does.
@@ -607,7 +621,7 @@ HaStateRepository.states() + area/device registries    ← WebSocket, Dispatcher
   → PillRepository.snapshotFlow                        ← sample(100ms), scan
       → PillCatalogBuilder                             ← devices, groups, availability
       → PillPriorityEngine                             ← non-truncated dynamic ranking
-      → HomePillComposer / HomePageBuilder             ← 3/6/overflow + ordered rails
+      → HomePillComposer / HomePageBuilder             ← 3/6/overflow + ordered sections
       → MediaSessionBuilder / temperature summary
                                       flowOn(Dispatchers.Default)
   → LauncherViewModel.uiState                          ← one immutable snapshot StateFlow
@@ -630,7 +644,7 @@ panel does not snap shut when its pill temporarily leaves the composition —
 `ui/panel/PanelState.kt` is a pure reducer, including the typed group/device stack.
 `ui/mapper/ChipMapper.kt` is the single place where legacy chip ids and kinds are branched on,
 keeping call sites free of display-label matching. `domain/home` contains the Compose/Android-free
-catalog, alert, composition, rail and Maison reducers; `LauncherChip` is kept on the live rendering
+catalog, alert, composition, layout and Maison reducers; `LauncherChip` is kept on the live rendering
 side of that boundary.
 
 Three known leaks:
@@ -655,19 +669,19 @@ The Maison work adds direct coverage for:
 - complete catalog eligibility, area/type/manual groups, partial availability and global stale state;
 - pure dynamic alert policy and the 3/6/overflow composer, including restoration/promotion and stable
   tie-breaks;
-- Maison section/order and one/two-row layout policies;
+- Maison section/order and responsive column policies;
 - logical pager remapping, HOME/Back/auto-return targeting and the typed group panel reducer;
 - Settings reducers for every pin/section/manual-group mutation and accessible reorder alternative;
-- Robolectric semantics for the collapsed/expanded tray, Maison icon, context menu, rails, empty/stale
-  states and group browser;
+- Robolectric semantics for the collapsed/expanded tray, Maison icon, context menu, section grids,
+  empty/stale states and group browser;
 - explicit non-regression contracts for SWITCH/FAN, Presence/Energy, media `PanelSource`, panels and
   application-page mapping.
 
 Representative files: `HomePillComposerTest.kt`, `PillCatalogBuilderTest.kt`,
 `HomePillPreferencesCodecTest.kt`, `HomePageBuilderTest.kt`, `HomeSettingsReducerTest.kt`,
 `LauncherPagerTest.kt`, `HomeTrayAcceptanceTest.kt`, `GroupBrowserAcceptanceTest.kt` and
-`FeatureAcceptanceNonRegressionTest.kt`, plus `HomeAccessibilityAcceptanceTest.kt` and
-`HomeRailPagerGestureTest.kt` for TalkBack/large-text/D-pad and nested-gesture contracts.
+`FeatureAcceptanceNonRegressionTest.kt`, plus `HomeAccessibilityAcceptanceTest.kt` for
+TalkBack/large-text/D-pad contracts.
 `./gradlew test` passed with 552 tests, 0 failed/skipped, on 2026-08-08.
 
 **Still without proportionate automated coverage**:
@@ -716,8 +730,7 @@ Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59,
 - A fresh install auto-enables three pill kinds: lights, media and purifier.
 - The historical dynamic purifier aggregate still summarizes only the first purifier; all compatible purifiers are nevertheless present individually in Maison and automatic groups.
 - Settings' entity refresh overwrites `label` / `kind` / `relatedEntityIds` from the live HA scan, so those fields can't hold a manual edit.
-- Pill reordering is a relative horizontal drag after an explicit menu action, not a free-position drag overlay. Accueil exposes only the visible nine; overflow order is reachable through the Favoris rail or Settings.
-- Maison rail gestures remain rail-owned for their full gesture. Pager navigation beside a long rail is guaranteed through a dedicated 24 dp edge, but there is no velocity/residual-delta handoff from a rail at its scroll boundary.
+- Pill reordering is a relative horizontal drag after an explicit menu action, not a free-position drag overlay. Accueil exposes only the visible nine; overflow order is reachable through the Favoris section or Settings.
 - The new accessibility and responsive contracts have Robolectric/logic coverage, but no device-level TalkBack, D-pad or large-font screenshot suite; real Android 9 wall-panel validation is still manual.
 - Media: mute not actionable, no seek, primary transport hits the leader only, `join` sends one member at a time.
 - Thermostat has no dual setpoint.

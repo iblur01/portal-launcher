@@ -232,6 +232,10 @@
     <string name="clock_stale_banner_format">Offline — info frozen since %1$s</string>
     <string name="header_hidden_apps_content_desc">Hidden apps (%1$d)</string>
     <string name="header_settings_content_desc">Settings</string>
+    <string name="home_header_title">Home</string>
+    <string name="home_header_grouping_content_desc">Group by room (coming soon)</string>
+    <string name="home_header_edit_content_desc">Edit Home</string>
+    <string name="home_header_finish_content_desc">Finish editing Home</string>
     <string name="auto_return_pill_label">Auto close</string>
     <string name="auto_return_cancel_desc">Cancel</string>
     <string name="bg_mode_system">Android wallpaper</string>

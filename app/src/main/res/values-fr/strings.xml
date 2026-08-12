@@ -230,6 +230,10 @@
     <string name="clock_stale_banner_format">Hors ligne — infos figées depuis %1$s</string>
     <string name="header_hidden_apps_content_desc">Applications masquées (%1$d)</string>
     <string name="header_settings_content_desc">Réglages</string>
+    <string name="home_header_title">Maison</string>
+    <string name="home_header_grouping_content_desc">Grouper par pièce (bientôt disponible)</string>
+    <string name="home_header_edit_content_desc">Modifier Maison</string>
+    <string name="home_header_finish_content_desc">Terminer la modification de Maison</string>
     <string name="auto_return_pill_label">Fermeture auto</string>
     <string name="auto_return_cancel_desc">Annuler</string>
     <string name="bg_mode_system">Fond d’écran Android</string>
