@@ -351,7 +351,7 @@ fun ClockTray(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp.scaled())
-            .padding(bottom = (if (compactScreen) 28.dp else 36.dp).scaled()),
+            .padding(bottom = (if (compactScreen) 40.dp else 36.dp).scaled()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy((if (compactScreen) 4.dp else 8.dp).scaled()),
     ) {
@@ -397,7 +397,7 @@ fun ClockTray(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp.scaled())
-            .padding(bottom = (if (compactScreen) 28.dp else 36.dp).scaled()),
+            .padding(bottom = (if (compactScreen) 40.dp else 36.dp).scaled()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy((if (compactScreen) 4.dp else 8.dp).scaled()),
     ) {
