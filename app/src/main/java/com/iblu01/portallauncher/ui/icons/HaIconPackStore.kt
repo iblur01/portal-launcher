@@ -1,0 +1,342 @@
+package com.iblu01.portallauncher.ui.icons
+
+import android.content.Context
+import android.util.Log
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.net.URI
+import java.util.concurrent.TimeUnit
+
+/** One icon extracted from a custom icon set: a single SVG path over a `width` × `height` box. */
+data class PackIcon(val width: Float, val height: Float, val path: String)
+
+/**
+ * Disk cache for icons that come from third-party Home Assistant icon sets (`phu:`, `hue:`, …).
+ *
+ * Those sets are **frontend JavaScript modules**, not API data — they install themselves into
+ * `window.customIconsets` — so there is no endpoint to query. Instead the module is streamed from
+ * the user's own Home Assistant and the handful of icons their entities actually reference are
+ * extracted line by line into `filesDir/haicons/<namespace>/<name>.path`.
+ *
+ * The point of streaming is memory: `custom-brand-icons.js` is 4.4 MB for ~1700 icons, of which a
+ * given home uses maybe five. It is never held in memory, and never fetched again once its icons
+ * are on disk. An icon that no installed pack provides is cached as an **empty file**, so a missing
+ * reference does not re-download megabytes on every boot — but only once a module was actually
+ * read end to end, so an offline boot never poisons the cache.
+ *
+ * Every pack ships single-path icons — a hard constraint of both packs' builders — so the renderer
+ * only needs [androidx.compose.ui.graphics.vector.PathParser], not an SVG parser.
+ */
+class HaIconPackStore(context: Context, client: OkHttpClient) {
+
+    private val root = File(context.filesDir, "haicons")
+    private val routesFile = File(root, "routes.json")
+    private val http = client.newBuilder().callTimeout(CALL_TIMEOUT_S, TimeUnit.SECONDS).build()
+
+    /** namespace -> the resource URL known to provide it; avoids rescanning every module on a miss. */
+    private val namespaceUrls = mutableMapOf<String, String>()
+    /**
+     * `namespace|url` pairs already read once and found to hold nothing for that namespace. Keyed
+     * per namespace on purpose: hass-hue-icons yields nothing when we are hunting `phu:` names, and
+     * writing it off wholesale would make `hue:` unresolvable forever.
+     */
+    private val barrenPairs = mutableSetOf<String>()
+    /** Identity of the module list the cache was built against; see [invalidateForModules]. */
+    private var modulesFingerprint: String? = null
+    private var routesLoaded = false
+
+    private fun file(ref: IconRef) = File(File(root, ref.namespace), "${ref.name}.path")
+
+    /**
+     * Reads a cached icon off disk. Returns null when it is not cached, or when it is cached as a
+     * known miss (an empty file). Callers are expected to cache the parsed result rather than
+     * re-read per frame.
+     */
+    fun cached(ref: IconRef): PackIcon? {
+        val file = file(ref)
+        if (!file.isFile || file.length() == 0L) return null
+        return runCatching {
+            // "<width> <height>\n<path data>"
+            val text = file.readText()
+            val newline = text.indexOf('\n')
+            val box = text.substring(0, newline).split(' ')
+            PackIcon(box[0].toFloat(), box[1].toFloat(), text.substring(newline + 1))
+        }.getOrElse {
+            Log.w(TAG, "corrupt cache entry for $ref; dropping", it)
+            file.delete()
+            null
+        }
+    }
+
+    /** True when [ref] still needs fetching — neither a cached icon nor a cached miss. */
+    fun isPending(ref: IconRef): Boolean = !ref.isMdi && !file(ref).exists()
+
+    /**
+     * Downloads whatever [wanted] references are not on disk yet, from the icon-set modules listed
+     * in [resourceUrls] (as reported by the `lovelace/resources` websocket command). Blocking; call
+     * from a background dispatcher. Returns true when anything new landed on disk.
+     */
+    @Synchronized
+    fun sync(baseUrl: String, token: String, resourceUrls: List<String>, wanted: Set<IconRef>): Boolean {
+        if (resourceUrls.isEmpty()) return false
+        loadRoutes()
+        var changed = invalidateForModules(resourceUrls) > 0
+        val missing = wanted.filter { isPending(it) }
+        Log.i(TAG, "sync: ${missing.size} of ${wanted.size} refs uncached, ${resourceUrls.size} modules to search")
+        if (missing.isEmpty()) {
+            if (changed) saveRoutes()
+            return changed
+        }
+        for ((namespace, refs) in missing.groupBy { it.namespace }) {
+            val names = refs.mapTo(mutableSetOf()) { it.name }
+            var scannedAny = false
+            for (url in candidates(namespace, resourceUrls)) {
+                if (names.isEmpty()) break
+                val result = harvest(baseUrl, token, url, namespace, names)
+                if (result.written > 0) Log.i(TAG, "sync: cached ${result.written} $namespace: icons from $url")
+                if (!result.fetched) continue
+                scannedAny = true
+                if (result.written > 0) {
+                    namespaceUrls[namespace] = url
+                    changed = true
+                } else if (namespaceUrls[namespace] != url) {
+                    barrenPairs += "$namespace|$url"
+                }
+            }
+            // Only remember a miss once a module was actually read: an unreachable HA must not
+            // permanently cache "this icon does not exist".
+            if (scannedAny) names.forEach { markMissing(IconRef(namespace, it)) }
+        }
+        saveRoutes()
+        return changed
+    }
+
+    /**
+     * Drops cache entries that the current module list makes obsolete, and returns how many went.
+     *
+     * Two things go stale when Home Assistant's set of frontend modules changes, and both would
+     * otherwise be permanent:
+     *
+     *  - **Cached misses.** A reference no pack provided is stored as an empty file so a boot stays
+     *    offline. Install the pack that provides it and that verdict is simply wrong — and
+     *    [isPending] would never look again. Every miss is therefore re-opened.
+     *  - **Art from a pack that moved.** These packs version through their URL (`?hacstag=…`), so a
+     *    namespace whose provider is no longer in the list is showing icons from the old release.
+     *
+     * Resolved icons whose provider is unchanged are kept: a card update must not cost a re-download.
+     * The first run after install invalidates nothing — there is no prior cache to be stale.
+     */
+    internal fun invalidateForModules(resourceUrls: List<String>): Int {
+        loadRoutes()
+        val fingerprint = resourceUrls.sorted().joinToString("\n").hashCode().toString()
+        if (fingerprint == modulesFingerprint) return 0
+        val firstRun = modulesFingerprint == null
+        modulesFingerprint = fingerprint
+        // Persist the new baseline immediately. Recording it only alongside a download would leave
+        // every boot looking like the first one, and no module change would ever be noticed.
+        if (firstRun) {
+            saveRoutes()
+            return 0
+        }
+
+        barrenPairs.clear()
+        var dropped = 0
+        root.listFiles()?.forEach { dir ->
+            if (!dir.isDirectory) return@forEach
+            val providerMoved = namespaceUrls[dir.name]?.let { it !in resourceUrls } == true
+            dir.listFiles()?.forEach { entry ->
+                if (providerMoved || entry.length() == 0L) {
+                    entry.delete()
+                    dropped++
+                }
+            }
+            if (providerMoved) namespaceUrls.remove(dir.name)
+        }
+        Log.i(TAG, "icon modules changed; dropped $dropped stale cache entries")
+        saveRoutes()
+        return dropped
+    }
+
+    /** Known provider first, then anything that looks like an icon pack, then the rest. */
+    private fun candidates(namespace: String, resourceUrls: List<String>): List<String> {
+        val known = namespaceUrls[namespace]?.takeIf { it in resourceUrls }
+        val rest = resourceUrls.filter { it != known && "$namespace|$it" !in barrenPairs }
+        val (iconish, others) = rest.partition { it.contains("icon", ignoreCase = true) }
+        return listOfNotNull(known) + iconish + others
+    }
+
+    private class Harvest(val fetched: Boolean, val written: Int)
+
+    /** Streams one icon-set module and writes out every icon in [names] it provides. */
+    private fun harvest(baseUrl: String, token: String, url: String, namespace: String, names: MutableSet<String>): Harvest {
+        val absolute = when {
+            url.startsWith("http://", true) || url.startsWith("https://", true) -> url
+            else -> baseUrl.trimEnd('/') + "/" + url.trimStart('/')
+        }
+        val request = Request.Builder().url(absolute)
+            .apply { if (isSameOrigin(absolute, baseUrl) && token.isNotBlank()) header("Authorization", "Bearer $token") }
+            .build()
+
+        var written = 0
+        var fetched = false
+        runCatching {
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "icon pack fetch failed (${response.code}): $absolute")
+                    return@use
+                }
+                val source = response.body?.source() ?: return@use
+                fetched = true
+                var read = 0L
+                var overflowed = false
+                val lines = generateSequence { source.readUtf8Line() }
+                    .takeWhile { line ->
+                        read += line.length + 1
+                        overflowed = read > MAX_MODULE_BYTES
+                        !overflowed
+                    }
+                // Counted per icon rather than from the return value: a stream that dies mid-module
+                // throws past the return, and whatever already reached the disk still counts.
+                IconPackParser.extract(lines, names) { name, width, height, path ->
+                    write(namespace, name, width, height, path)
+                    written++
+                }
+                if (overflowed) {
+                    Log.w(TAG, "icon pack exceeded $MAX_MODULE_BYTES bytes; giving up on $absolute")
+                    fetched = false
+                }
+            }
+        }.onFailure { Log.w(TAG, "icon pack fetch failed: $absolute", it); fetched = false }
+        return Harvest(fetched, written)
+    }
+
+    private fun write(namespace: String, name: String, width: Float, height: Float, path: String) {
+        val file = file(IconRef(namespace, name))
+        runCatching {
+            file.parentFile?.mkdirs()
+            // Written aside and renamed into place: [cached] runs on the composition thread and
+            // would otherwise be able to read a half-written file, throw, and delete the entry —
+            // costing a re-download of the whole module for one icon.
+            val temp = File(file.parentFile, "${file.name}.tmp")
+            temp.writeText("$width $height\n$path")
+            if (!temp.renameTo(file)) {
+                temp.delete()
+                error("rename failed")
+            }
+        }.onFailure { Log.w(TAG, "cannot cache $namespace:$name", it) }
+    }
+
+    private fun markMissing(ref: IconRef) {
+        val file = file(ref)
+        runCatching { file.parentFile?.mkdirs(); file.writeBytes(ByteArray(0)) }
+    }
+
+    private fun loadRoutes() {
+        if (routesLoaded) return
+        routesLoaded = true
+        val json = runCatching { JSONObject(routesFile.readText()) }.getOrNull() ?: return
+        json.optJSONObject("namespaces")?.let { ns ->
+            ns.keys().forEach { key -> namespaceUrls[key] = ns.optString(key) }
+        }
+        val barren = json.optJSONArray("barren") ?: JSONArray()
+        for (i in 0 until barren.length()) barrenPairs += barren.optString(i)
+        modulesFingerprint = json.optString("modules").takeIf { it.isNotBlank() }
+    }
+
+    private fun saveRoutes() {
+        runCatching {
+            root.mkdirs()
+            val json = JSONObject()
+                .put("namespaces", JSONObject(namespaceUrls.toMap()))
+                .put("barren", JSONArray(barrenPairs.toList()))
+                .put("modules", modulesFingerprint)
+            routesFile.writeText(json.toString())
+        }.onFailure { Log.w(TAG, "cannot persist icon pack routes", it) }
+    }
+
+    internal companion object {
+        const val TAG = "HaIconPackStore"
+
+        /**
+         * Whether [url] points at the same Home Assistant as [baseUrl], and may therefore carry the
+         * access token.
+         *
+         * A Lovelace resource is an arbitrary URL out of the user's dashboard config — it can point
+         * at a CDN, or at another service on the same machine. Comparing hosts alone would hand a
+         * long-lived HA token to whatever listens on a different port, so scheme and port count too.
+         */
+        internal fun isSameOrigin(url: String, baseUrl: String): Boolean = runCatching {
+            val a = URI(url)
+            val b = URI(baseUrl)
+            fun port(u: URI) = if (u.port != -1) u.port else if (u.scheme.equals("https", true)) 443 else 80
+            a.host != null && a.host.equals(b.host, ignoreCase = true) &&
+                a.scheme.equals(b.scheme, ignoreCase = true) &&
+                port(a) == port(b)
+        }.getOrDefault(false)
+        const val CALL_TIMEOUT_S = 60L
+        /** Refuse to stream more than this from one module; a runaway resource is not an icon set. */
+        const val MAX_MODULE_BYTES = 24L * 1024 * 1024
+    }
+}
+
+/**
+ * Pulls named icons out of a Home Assistant icon-set module, one line at a time.
+ *
+ * Two shapes exist in the wild and both keep one icon per line, which is what makes a streaming
+ * line scanner enough — no JS engine, no whole-file buffer:
+ *
+ *     custom-brand-icons   `"sonos-arc":[0,0,24,24,"M…"],`
+ *     hass-hue-icons       `"adore":{` / `  path:"M…",` / `  keywords:[…]` / `},`
+ */
+internal object IconPackParser {
+
+    private val ARRAY_ICON = Regex("\"([A-Za-z0-9_-]+)\"\\s*:\\s*\\[\\s*[-\\d.]+\\s*,\\s*[-\\d.]+\\s*,\\s*([-\\d.]+)\\s*,\\s*([-\\d.]+)\\s*,\\s*\"([^\"]+)\"")
+    private val KEYED_PATH = Regex("\\bpath\\s*:\\s*\"([^\"]+)\"")
+    private val OBJECT_KEY = Regex("\"([A-Za-z0-9_-]+)\"\\s*:\\s*\\{")
+
+    /** Icons are drawn on a 24×24 box; only the array form states it explicitly. */
+    private const val BOX = 24f
+
+    /**
+     * Scans [lines], calling [emit] with `(name, width, height, path)` for every icon whose name is
+     * in [wanted]. Names are removed from [wanted] as they are found, so the caller can tell what is
+     * still missing and stop early — scanning ends as soon as the set empties. Returns the emit count.
+     */
+    fun extract(
+        lines: Sequence<String>,
+        wanted: MutableSet<String>,
+        emit: (name: String, width: Float, height: Float, path: String) -> Unit,
+    ): Int {
+        if (wanted.isEmpty()) return 0
+        var written = 0
+        var pendingName: String? = null
+        for (line in lines) {
+            val inline = ARRAY_ICON.find(line)
+            if (inline != null) {
+                val (name, width, height, path) = inline.destructured
+                if (wanted.remove(name.lowercase())) {
+                    emit(name.lowercase(), width.toFloatOrNull() ?: BOX, height.toFloatOrNull() ?: BOX, path)
+                    written++
+                }
+                pendingName = null
+            } else {
+                val keyed = KEYED_PATH.find(line)
+                if (keyed != null) {
+                    val name = pendingName
+                    if (name != null && wanted.remove(name)) {
+                        emit(name, BOX, BOX, keyed.groupValues[1])
+                        written++
+                    }
+                    pendingName = null
+                } else {
+                    OBJECT_KEY.find(line)?.let { pendingName = it.groupValues[1].lowercase() }
+                }
+            }
+            if (wanted.isEmpty()) break
+        }
+        return written
+    }
+}

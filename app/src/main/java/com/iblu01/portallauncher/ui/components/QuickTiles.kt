@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.PillKind
+import com.iblu01.portallauncher.ui.icons.HaIcon
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -70,24 +71,39 @@ import com.iblu01.portallauncher.ui.theme.PortalTheme
 import com.iblu01.portallauncher.ui.theme.scaled
 import com.iblu01.portallauncher.ui.theme.stateColor
 
-@Composable
-fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Boolean = false, onClick: (() -> Unit)? = null, onLongPress: (() -> Unit)? = null) {
-    val entity = rememberEntity(chip.entityId)
-    val target = when (chip.kind) {
+private val NeutralDeviceStates = setOf(
+    "off", "stopped", "stop", "idle", "standby", "paused", "docked",
+    "disarmed", "éteint", "eteint", "arrêt", "arret",
+)
+
+private val SelectedChipContent = Color(0xFF1C1C1E)
+
+/** Neutral glyphs need a dark tint on the selected chip's white surface. */
+internal fun selectedChipAccent(accent: Color, selected: Boolean): Color =
+    if (selected && (accent == AppleColors.inactive || accent.alpha < 1f)) SelectedChipContent else accent
+
+/** One accent policy shared by pills and their panels. Inactive always wins over device colour. */
+fun launcherChipAccent(chip: LauncherChip): Color = when {
+    chip.deviceState?.trim()?.lowercase() in NeutralDeviceStates -> AppleColors.inactive
+    else -> when (chip.kind) {
         PillKind.LOCK -> if (chip.state.lowercase() in setOf("critical", "error")) AppleColors.error else AppleColors.lockAccent
         PillKind.FAN -> AppleColors.fanAccent
-        PillKind.THERMOSTAT -> when (entity?.state?.lowercase()) {
+        PillKind.VALVE -> AppleColors.accent
+        PillKind.THERMOSTAT -> when (chip.deviceState?.lowercase()) {
             "heat" -> AppleColors.thermostatHeat
             "cool" -> AppleColors.thermostatCool
-            "off" -> AppleColors.inactive
             else -> stateColor(chip.state)
         }
         else -> stateColor(chip.state)
     }
+}
+
+@Composable
+fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Boolean = false, onClick: (() -> Unit)? = null, onLongPress: (() -> Unit)? = null) {
+    val target = selectedChipAccent(launcherChipAccent(chip), selected)
     val accent by animateColorAsState(target, AppleMotion.spring(), label = "chipAccent")
     val animatedProgress by animateFloatAsState(chip.progress, AppleMotion.spring(), label = "chipProgress")
     // Selected chip: iOS-style — white fill, dark text, matching border.
-    val selectedContent = Color(0xFF1C1C1E)
     val selectedSubtitle = Color(0xFF3C3C43).copy(alpha = 0.6f)
     val borderColor by animateColorAsState(if (selected) Color.White else AppleColors.frostedBorder, AppleMotion.spring(), label = "chipBorder")
     val fillColor by animateColorAsState(if (selected) Color.White else AppleColors.frostedFill, AppleMotion.spring(), label = "chipFill")
@@ -145,16 +161,37 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
             Text(
                 chip.value,
                 style = AppleTypography.titleLarge.copy(fontSize = AppleTypography.titleLarge.fontSize.scaled()),
-                color = if (selected) selectedContent else AppleColors.primary,
+                color = if (selected) SelectedChipContent else AppleColors.primary,
                 maxLines = 1,
             )
         }
     }
 }
 
+/**
+ * Whether this chip should show its entity's Home Assistant icon rather than a launcher glyph, so
+ * a device customised on the dashboard looks the same here.
+ *
+ * Two chips keep their own glyph. A group chip aggregates many entities and has no single icon to
+ * borrow. The washer's glyph animates through wash phases, which no static icon can express — lock
+ * and fan lose nothing by deferring, since HA varies those by state itself.
+ *
+ * Even when this returns true the HA icon may not resolve, and the launcher glyph still wins; this
+ * only decides whether it is worth asking.
+ */
+internal fun LauncherChip.defersToHaIcon(): Boolean = entityId.isNotBlank() && icon != "washer"
+
 @Composable
 private fun ChipGlyph(chip: LauncherChip, accent: Color, iconSize: Dp = 26.dp.scaled()) {
     val modifier = Modifier.size(iconSize)
+
+    val haRef = if (chip.defersToHaIcon()) rememberHaIconRef(chip.entityId) else null
+    if (haRef != null) {
+        HaIcon(haRef, null, accent, iconSize, launcherIcon(chip.icon))
+        return
+    }
+
+    // Nothing from HA: fall back to the launcher's own glyphs, bespoke ones included.
     when (chip.icon) {
         "washer" -> WasherGlyph(chip.value, accent, modifier)
         "air" -> AirGlyph(chip.state, accent, modifier)

@@ -7,9 +7,10 @@ package com.iblu01.portallauncher.ui.model
  */
 enum class PanelKind {
     // ex-groupes string-id
-    LIGHTS, AIR_QUALITY, PURIFIER, SCENES, PRESENCE, ENERGY,
+    LIGHTS, PURIFIER,
     // ex-PillKind
-    LOCK, COVER, THERMOSTAT, VACUUM, FAN, SWITCH, ALARM,
+    LOCK, COVER, THERMOSTAT, VACUUM, FAN, SWITCH, ALARM, WASHER,
+    HUMIDIFIER, WATER_HEATER, VALVE, SIREN, LAWN_MOWER,
     // universels
     GENERIC_DETAILS, MEDIA, WEATHER,
 }

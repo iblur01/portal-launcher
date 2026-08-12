@@ -113,6 +113,7 @@ enum class ControlContentLayout { Vertical, Horizontal }
 @Composable
 private fun ControlLabel(
     icon: ImageVector?,
+    iconContent: (@Composable (Color, Dp) -> Unit)? = null,
     text: String?,
     color: Color,
     textStyle: TextStyle,
@@ -122,9 +123,12 @@ private fun ControlLabel(
     gap: Dp = 5.dp,
     textModifier: Modifier = Modifier,
 ) {
-    if (icon == null && text == null) return
+    if (icon == null && iconContent == null && text == null) return
     val iconSlot: @Composable () -> Unit = {
-        if (icon != null) Icon(icon, null, tint = color, modifier = Modifier.size(iconSize))
+        when {
+            iconContent != null -> iconContent(color, iconSize)
+            icon != null -> Icon(icon, null, tint = color, modifier = Modifier.size(iconSize))
+        }
     }
     val textSlot: @Composable () -> Unit = {
         if (text != null) {
@@ -195,6 +199,8 @@ fun VerticalFillSlider(
     enabled: Boolean = true,
     hapticSteps: Int = 20,
     icon: ImageVector? = null,
+    /** Optional entity-aware icon renderer; takes precedence over [icon] when supplied. */
+    iconContent: (@Composable (Color, Dp) -> Unit)? = null,
     label: ((Float) -> String)? = { percentLabel(it, valueRange) },
     contentLayout: ControlContentLayout = ControlContentLayout.Vertical,
     shape: Shape = VerticalSliderSquircle,
@@ -322,6 +328,7 @@ fun VerticalFillSlider(
         Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp * contentScale)) {
             ControlLabel(
                 icon = icon,
+                iconContent = iconContent,
                 text = label?.invoke(valueOf(targetFraction, valueRange)),
                 color = captionColor,
                 textStyle = AppleTypography.bodySmall.copy(

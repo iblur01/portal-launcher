@@ -66,12 +66,11 @@ fun OpacityPreviewScreen(
 
     Box(modifier.fillMaxSize()) {
         // 1 · Real wallpaper.
-        AmbientBackground(mode = backgroundMode, modifier = Modifier.fillMaxSize())
-
-        // 2 · Live scrim — same rule as home: only drawn when a wallpaper is shown.
-        if (backgroundMode != "neutral") {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = opacity)))
-        }
+        AmbientBackground(
+            mode = backgroundMode,
+            overlayOpacity = opacity,
+            modifier = Modifier.fillMaxSize(),
+        )
 
         // 3 · Same bottom gradient as home, so the mock pills read as they do on the launcher.
         Box(

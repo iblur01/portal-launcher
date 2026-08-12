@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher
 import com.iblu01.portallauncher.domain.model.PlayingMedia
+import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 
 import android.content.Intent
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -40,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
@@ -67,11 +71,9 @@ import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.LocalHaStates
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
-import com.iblu01.portallauncher.ui.mapper.chipPlacement
 import com.iblu01.portallauncher.ui.mapper.toChipAction
 import com.iblu01.portallauncher.ui.mapper.toPanelKind
 import com.iblu01.portallauncher.ui.model.ChipAction
-import com.iblu01.portallauncher.ui.model.ChipPlacement
 import com.iblu01.portallauncher.ui.model.PanelKind
 import com.iblu01.portallauncher.ui.panel.PanelEvent
 import com.iblu01.portallauncher.ui.panel.PanelSource
@@ -101,22 +103,33 @@ import com.iblu01.portallauncher.ui.components.returnToClockPage
 import com.iblu01.portallauncher.ui.components.AutoReturnOverlay
 import com.iblu01.portallauncher.ui.components.ChipActionsPanel
 import com.iblu01.portallauncher.ui.components.ClockHeader
+import com.iblu01.portallauncher.ui.components.GroupBrowserPanel
+import com.iblu01.portallauncher.ui.components.HomePillActions
+import com.iblu01.portallauncher.ui.components.HomeHeaderActions
+import com.iblu01.portallauncher.ui.components.HomeHeaderTitle
+import com.iblu01.portallauncher.ui.components.HomePillMove
+import com.iblu01.portallauncher.ui.components.HomePillMoveAvailability
 import com.iblu01.portallauncher.ui.components.HiddenAppsDialog
 import com.iblu01.portallauncher.ui.components.ClockTray
 import com.iblu01.portallauncher.ui.components.LauncherPager
-import com.iblu01.portallauncher.ui.components.PAGE_CLOCK
-import com.iblu01.portallauncher.ui.components.PAGE_FIRST_APP
+import com.iblu01.portallauncher.ui.components.LauncherPagerLayout
+import com.iblu01.portallauncher.ui.components.ManualGroupMenuOption
+import com.iblu01.portallauncher.ui.components.PageIdentity
 import com.iblu01.portallauncher.ui.components.collapseFraction
+import com.iblu01.portallauncher.ui.components.pagerDragForward
 import com.iblu01.portallauncher.ui.components.rememberLauncherPagerState
 import com.iblu01.portallauncher.ui.components.MediaPlayerView
+import com.iblu01.portallauncher.ui.components.MediaDevicesPanel
 import com.iblu01.portallauncher.ui.components.PanelContent
-import com.iblu01.portallauncher.ui.components.PresenceIndicator
+import com.iblu01.portallauncher.ui.components.LauncherPanelLayout
 import com.iblu01.portallauncher.ui.components.QuickActionsOverlay
 import com.iblu01.portallauncher.ui.components.WeatherController
 import com.iblu01.portallauncher.ui.components.WeatherPanel
 import com.iblu01.portallauncher.ui.onboarding.OnboardingActivity
 import com.iblu01.portallauncher.ui.onboarding.OnboardingStatus
 import com.iblu01.portallauncher.ui.onboarding.shouldRunOnboarding
+import com.iblu01.portallauncher.ui.home.HomePage
+import com.iblu01.portallauncher.ui.home.HomePageEditActions
 import com.iblu01.portallauncher.ui.theme.PortalTheme
 import com.iblu01.portallauncher.ui.theme.blurCompat
 import kotlinx.coroutines.Dispatchers
@@ -126,6 +139,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import androidx.compose.runtime.snapshotFlow
+import com.iblu01.portallauncher.domain.home.HomePillPreferences
+import com.iblu01.portallauncher.domain.home.HomeCriticalCapacityPolicy
+import com.iblu01.portallauncher.domain.home.HomePillComposer
+import com.iblu01.portallauncher.domain.home.HomeSectionPreference
+import com.iblu01.portallauncher.domain.home.PillGroupSnapshot
+import com.iblu01.portallauncher.domain.home.PillRef
 
 @AndroidEntryPoint
 class LauncherActivity : ComponentActivity() {
@@ -274,7 +293,9 @@ class LauncherActivity : ComponentActivity() {
         // The hold lives in a process-wide object: leaving it set would keep the idle timeout off
         // for good if the alarm is still alerting when the launcher goes away.
         onAlarmAlerting(false)
-        appList.stop()
+        // A fresh install hands off to onboarding before launcher resources are initialized.
+        // finish() still reaches onDestroy(), so only stop the store when startup got that far.
+        if (::appList.isInitialized) appList.stop()
         super.onDestroy()
     }
 
@@ -433,8 +454,8 @@ class LauncherActivity : ComponentActivity() {
     }
 }
 
-/** Extra wallpaper dimming once the app grid is fully in view. */
-private const val APPS_PAGE_SCRIM = 0.45f
+/** Extra wallpaper dimming once a launcher content page is fully in view. */
+private const val LAUNCHER_PAGE_SCRIM = 0.45f
 
 /**
  * The whole launcher UI: ambient clock, floating widget tray, and the long-press
@@ -496,17 +517,43 @@ private fun PortalLauncherApp(
     val appPages = remember {
         derivedStateOf { appPageCount(placedItems.value, spare = gridDrag.isDragging) }
     }
-    val pagerState = rememberLauncherPagerState { appPages.value }
+
+    // Collect the complete home snapshot before creating the pager: Maison's preference controls
+    // both page count and the logical clock index, and must therefore come from the same atomic UI
+    // state as its catalog/composition rather than from a second local preference read.
+    val vm: LauncherViewModel = viewModel(
+        factory = viewModelFactory {
+            initializer {
+                LauncherViewModel(
+                    snapshots = pills.snapshotFlow(prefs),
+                    callServiceFn = pills::callService,
+                    updateHomePreferencesFn = { transform ->
+                        pills.updateHomePillPreferences(prefs, transform)
+                    },
+                )
+            }
+        }
+    )
+    val ui by vm.uiState.collectAsStateWithLifecycle()
+    val pagerLayout = LauncherPagerLayout(
+        homePageEnabled = ui.homePreferences.homePageEnabled,
+        appPageCount = appPages.value,
+    )
+    val pagerState = rememberLauncherPagerState(
+        homePageEnabled = { ui.homePreferences.homePageEnabled },
+        appPageCount = { appPages.value },
+    )
+    val latestPagerLayout by rememberUpdatedState(pagerLayout)
 
     // Match Launcher3's wallpaper protocol: advertise the horizontal page step and continuously
     // report the pager position. WallpaperService handles static and live wallpaper movement;
     // failures are intentionally ignored because some fixed-wallpaper OEM implementations reject
     // offsets even though displaying the wallpaper still works.
     val hostView = LocalView.current
-    LaunchedEffect(hostView, pagerState, appPages.value, backgroundMode) {
+    LaunchedEffect(hostView, pagerState, pagerLayout, backgroundMode) {
         if (backgroundMode != "system") return@LaunchedEffect
         val manager = WallpaperManager.getInstance(hostView.context)
-        val pageCount = (PAGE_FIRST_APP + appPages.value).coerceAtLeast(1)
+        val pageCount = pagerLayout.pageCount.coerceAtLeast(1)
         val xStep = if (pageCount > 1) 1f / (pageCount - 1) else 0f
         runCatching { manager.setWallpaperOffsetSteps(xStep, 0f) }
         snapshotFlow { pagerState.currentPage + pagerState.currentPageOffsetFraction }
@@ -548,30 +595,32 @@ private fun PortalLauncherApp(
             // page, or it snaps back before the app appears and coming back lands on the clock.
             if (event == Lifecycle.Event.ON_PAUSE) resumed = false
             if (event == Lifecycle.Event.ON_PAUSE && !keepPageAcrossPause()) {
-                pagerScope.launch { pagerState.scrollToPage(PAGE_CLOCK) }
+                pagerScope.launch { pagerState.scrollToPage(latestPagerLayout.clockPage) }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Single state-holder collection (MAD/UDF). Replaces the ~9 mutableStateOf + PillHub.Listener
-    // DisposableEffect: transforms run off-main in PillHub.snapshotFlow (flowOn(Default)), conflated
-    // by the VM's StateFlow. chips/temperatures/mediaSessions/connection derive from this one snapshot.
-    val vm: LauncherViewModel = viewModel(
-        factory = viewModelFactory {
-            initializer {
-                LauncherViewModel(
-                    snapshots = pills.snapshotFlow(prefs),
-                    callServiceFn = pills::callService,
-                )
-            }
-        }
-    )
-    val ui by vm.uiState.collectAsStateWithLifecycle()
     val chips = ui.chips
     val temperatures = ui.temperatures
     val mediaSessions = ui.mediaSessions
+    val mediaDevices = ui.latestStates.values.filter { it.domain == "media_player" }.map { entity ->
+        mediaSessions.firstOrNull { session -> session.players.any { it.entityId == entity.entityId } }
+            ?: PlayingMedia(
+                entityId = entity.entityId,
+                title = entity.attributes.optString("media_title").ifBlank { "Aucun média" },
+                artist = entity.name,
+                album = entity.attributes.optString("media_album_name").takeIf { it.isNotBlank() },
+                state = entity.state,
+                coverUrl = null,
+                volumePercent = (entity.attributes.optDouble("volume_level", 0.0) * 100).toInt(),
+                isMuted = entity.attributes.optBoolean("is_volume_muted", false),
+                playerNames = listOf(entity.name),
+                players = listOf(MediaPlayerVolume(entity.entityId, entity.name, (entity.attributes.optDouble("volume_level", 0.0) * 100).toInt(), entity.attributes.optBoolean("is_volume_muted", false))),
+                hasMedia = false,
+            )
+    }.distinctBy { it.entityId }.sortedBy { it.playerNames.firstOrNull().orEmpty() }
     val haConnected = ui.connected
     val haLastUpdateAt = ui.lastUpdateAt
     // Media-selection state stays local (moves to the panel reducer at step 6).
@@ -579,6 +628,7 @@ private fun PortalLauncherApp(
     var secondaryMedia by remember { mutableStateOf(emptyList<PlayingMedia>()) }
     var displayedSecondaryMedia by remember { mutableStateOf(emptyList<PlayingMedia>()) }
     var selectedMediaEntityId by remember { mutableStateOf<String?>(null) }
+    var browsedMediaEntityId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(mediaSessions, selectedMediaEntityId) {
         val selected = mediaSessions.firstOrNull { session ->
             session.players.any { it.entityId == selectedMediaEntityId }
@@ -606,6 +656,9 @@ private fun PortalLauncherApp(
     }
     var overlayVisible by remember { mutableStateOf(false) }
     var pillsExpanded by remember { mutableStateOf(false) }
+    var homeEditing by remember { mutableStateOf(false) }
+    var armedPillReorderKey by remember { mutableStateOf<String?>(null) }
+    var pillDragActive by remember { mutableStateOf(false) }
     // Long-press menu of the app grid: which tile, and its shortcuts (queried lazily, off-main).
     var menuTarget by remember { mutableStateOf<AppMenuTarget?>(null) }
     var menuShortcuts by remember { mutableStateOf(emptyList<AppShortcut>()) }
@@ -644,8 +697,9 @@ private fun PortalLauncherApp(
     // AUTO (media) panel is the resting state while something plays, so it must not arm the timer.
     // Sitting on the apps page is user state too, exactly like the expanded tray: the wall panel
     // must fall back to the clock on its own.
-    val onAppsPage = pagerState.currentPage != PAGE_CLOCK
-    val userState = pillsExpanded || overlayVisible || onAppsPage || menuTarget != null || showHidden
+    val awayFromClock = pagerLayout.identityOf(pagerState.currentPage) != PageIdentity.Clock
+    val userState = pillsExpanded || overlayVisible || awayFromClock || menuTarget != null ||
+        showHidden || armedPillReorderKey != null || pillDragActive
     // While an alarm is alerting the countdown is suspended outright: returning to the clock would
     // take the disarm keypad off screen exactly when it is needed.
     LaunchedEffect(panel.request, panel.source, userState, resumed, alarmAlerting) {
@@ -663,34 +717,70 @@ private fun PortalLauncherApp(
             if (overlayVisible) overlayVisible = false
             if (menuTarget != null) menuTarget = null
             if (showHidden) showHidden = false
+            homeEditing = false
+            armedPillReorderKey = null
+            pillDragActive = false
             // Deliberately not awaited here: `stop()` below (and the arming effect, once the page
             // midpoint is crossed) clears `shouldReturn`, which would cancel this very effect and
             // strand the pager mid-scroll.
-            if (pagerState.currentPage != PAGE_CLOCK) returnToClockPage(pagerScope, pagerState)
+            if (pagerState.currentPage != pagerLayout.clockPage) {
+                returnToClockPage(pagerScope, pagerState, pagerLayout)
+            }
             autoReturnTimer.stop()
         }
     }
     val media = activeMedia
+    val groupRequest = panel.request as? PanelRequest.Group
+    val livePanelGroup = groupRequest?.let { ui.catalog.groups[it.destination] }
+    var lastPanelGroup by remember { mutableStateOf<PillGroupSnapshot?>(null) }
+    LaunchedEffect(groupRequest?.destination, livePanelGroup) {
+        if (groupRequest == null) lastPanelGroup = null
+        else if (livePanelGroup != null) lastPanelGroup = livePanelGroup
+    }
     val panelContent: PanelContent? = when (val req = panel.request) {
         is PanelRequest.Weather -> PanelContent.Weather(weather)
         is PanelRequest.Media -> {
             val session = mediaSessions.firstOrNull { it.entityId == req.key } ?: media
             session?.let { PanelContent.Media(it) }
         }
-        is PanelRequest.Chip ->
-            if (req.panelKind == PanelKind.MEDIA) media?.let { PanelContent.Media(it) }
-            else panelChip?.let { PanelContent.ChipActions(it) }
+        is PanelRequest.Chip -> resolveChipPanelContent(req, panelChip, mediaDevices)
+        is PanelRequest.Group -> (livePanelGroup ?: lastPanelGroup)?.let { group ->
+            PanelContent.Group(
+                group = group,
+                selectedDevice = panelChip,
+                deviceRequested = req.device != null,
+            )
+        }
         null -> null
     }
-    val isSplit = panelContent != null
+    // AnimatedVisibility keeps its subtree for the exit transition, but panelContent itself becomes
+    // null as soon as the reducer dismisses it. Retain the last payload just long enough for the
+    // full-sized panel to slide back into the screen edge instead of vanishing on the first frame.
+    var retainedPanelContent by remember { mutableStateOf<PanelContent?>(null) }
+    LaunchedEffect(panelContent) {
+        if (panelContent != null) retainedPanelContent = panelContent
+        else {
+            delay(500)
+            retainedPanelContent = null
+        }
+    }
+    LaunchedEffect(panel.request) {
+        val request = panel.request as? PanelRequest.Chip
+        if (request?.panelKind != PanelKind.MEDIA) browsedMediaEntityId = null
+    }
     // Dropping an icon back onto an earlier page removes the growth page from under our feet.
     LaunchedEffect(appPages.value) {
-        val lastPage = PAGE_FIRST_APP + appPages.value - 1
+        val lastPage = (pagerLayout.pageCount - 1).coerceAtLeast(pagerLayout.clockPage)
         if (pagerState.currentPage > lastPage) pagerState.animateScrollToPage(page = lastPage)
     }
     // Back never escapes the launcher: finishing a home activity gives a black flash while the
     // system restarts it. Innermost surface first, then the page, then nothing.
     BackHandler(enabled = true) {
+        if (armedPillReorderKey != null) {
+            armedPillReorderKey = null
+            pillDragActive = false
+            return@BackHandler
+        }
         when (
             backAction(
                 itemMenuOpen = menuTarget != null,
@@ -698,7 +788,7 @@ private fun PortalLauncherApp(
                 widgetPickerOpen = widgetPickerRequested,
                 quickActionsOpen = overlayVisible,
                 userPanelOpen = panel.request != null && panel.source == PanelSource.USER,
-                onClockPage = pagerState.currentPage == PAGE_CLOCK,
+                currentPage = pagerLayout.identityOf(pagerState.currentPage) ?: PageIdentity.Clock,
             )
         ) {
             BackAction.CloseItemMenu -> menuTarget = null
@@ -708,8 +798,8 @@ private fun PortalLauncherApp(
                 widgetOffers = null
             }
             BackAction.CloseQuickActions -> overlayVisible = false
-            BackAction.DismissPanel -> vm.onEvent(PanelEvent.Dismiss)
-            BackAction.GoToClockPage -> returnToClockPage(pagerScope, pagerState)
+            BackAction.DismissPanel -> vm.onEvent(PanelEvent.Back)
+            BackAction.GoToClockPage -> returnToClockPage(pagerScope, pagerState, pagerLayout)
             BackAction.Nothing -> Unit
         }
     }
@@ -718,9 +808,19 @@ private fun PortalLauncherApp(
     LaunchedEffect(homePresses) {
         menuTarget = null
         showHidden = false
+        widgetPickerRequested = false
+        widgetOffers = null
         overlayVisible = false
         pillsExpanded = false
-        if (pagerState.currentPage != PAGE_CLOCK) returnToClockPage(pagerScope, pagerState)
+        homeEditing = false
+        armedPillReorderKey = null
+        pillDragActive = false
+        if (panel.request != null && panel.source == PanelSource.USER) {
+            vm.onEvent(PanelEvent.Dismiss)
+        }
+        if (pagerState.currentPage != pagerLayout.clockPage) {
+            returnToClockPage(pagerScope, pagerState, pagerLayout)
+        }
     }
     // Remembered so it stays the same instance across the recompositions every HA push triggers
     // (unstable-param skip guard for the open panel, e.g. the alarm keypad — removed at step 10).
@@ -732,13 +832,85 @@ private fun PortalLauncherApp(
             is ChipAction.OpenPanel -> vm.onEvent(PanelEvent.OpenChip(PanelRequest.Chip(chip.id, action.panelKind)))
         }
     }
-    // Long-press always opens the control panel (fan speed, switch info, …), except media.
-    val onChipLongPress: (LauncherChip) -> Unit = { chip ->
-        val kind = chip.toPanelKind()
-        if (kind != PanelKind.MEDIA) {
-            vm.onEvent(PanelEvent.LongPressChip(PanelRequest.Chip(chip.id, kind)))
+    val pinnedRefs = ui.homePreferences.pinnedOrder.toSet()
+    val manualGroupOptions = ui.homePreferences.manualGroups.map { group ->
+        ManualGroupMenuOption(
+            groupId = group.id,
+            name = group.name,
+            memberEntityIds = group.members.mapTo(linkedSetOf()) { it.entityId },
+        )
+    }
+    val onOpenResolvedPill: (com.iblu01.portallauncher.domain.home.ResolvedPill) -> Unit = { pill ->
+        when (pill.ref) {
+            is PillRef.Device -> onChipClick(pill.chip)
+            else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(pill.ref)))
         }
     }
+    val onOpenResolvedCommands: (com.iblu01.portallauncher.domain.home.ResolvedPill) -> Unit = { pill ->
+        when (pill.ref) {
+            is PillRef.Device -> vm.onEvent(
+                PanelEvent.LongPressChip(PanelRequest.Chip(pill.chip.id, pill.chip.toPanelKind())),
+            )
+            else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(pill.ref)))
+        }
+    }
+    val homePillActions = HomePillActions(
+        onOpen = onOpenResolvedPill,
+        onSetPinned = { pill, pinned -> vm.setPinned(pill.ref, pinned) },
+        onAddToManualGroup = { pill, groupId ->
+            val device = pill.ref as? PillRef.Device
+            if (device != null) {
+                vm.updateHomePillPreferences { preferences ->
+                    preferences.copy(
+                        manualGroups = preferences.manualGroups.map { group ->
+                            if (group.id != groupId || device in group.members) group
+                            else group.copy(members = group.members + device)
+                        },
+                    )
+                }
+            }
+        },
+        onStartReorder = { pill ->
+            if (pill.ref in pinnedRefs) armedPillReorderKey = pill.ref.stableKey
+        },
+        onMove = { pill, move ->
+            val order = ui.homePreferences.pinnedOrder
+            val index = order.indexOf(pill.ref)
+            if (index >= 0) {
+                val target = when (move) {
+                    HomePillMove.FIRST -> 0
+                    HomePillMove.BEFORE -> index - 1
+                    HomePillMove.AFTER -> index + 1
+                    HomePillMove.LAST -> order.lastIndex
+                }
+                vm.movePinned(pill.ref, target)
+            }
+        },
+        onOpenCommands = onOpenResolvedCommands,
+        onHideDevice = { pill -> pills.setPillEnabled(prefs, pill, enabled = false) },
+        canReorder = { it.ref in pinnedRefs },
+        moveAvailability = { pill ->
+            val index = ui.homePreferences.pinnedOrder.indexOf(pill.ref)
+            val last = ui.homePreferences.pinnedOrder.lastIndex
+            HomePillMoveAvailability(
+                before = index > 0,
+                after = index in 0 until last,
+                first = index > 0,
+                last = index in 0 until last,
+            )
+        },
+        isDragReordering = { it.ref.stableKey == armedPillReorderKey },
+        onDragActiveChange = { pillDragActive = it },
+        onDragDrop = { pill, offset ->
+            val order = ui.homePreferences.pinnedOrder
+            val index = order.indexOf(pill.ref)
+            if (index >= 0) vm.movePinned(pill.ref, index + offset)
+        },
+        onDragFinished = {
+            pillDragActive = false
+            armedPillReorderKey = null
+        },
+    )
     val onSecondaryPlayPause: (PlayingMedia) -> Unit = { session ->
         displayedSecondaryMedia = displayedSecondaryMedia.map {
             if (it.entityId == session.entityId) it.copy(
@@ -750,18 +922,7 @@ private fun PortalLauncherApp(
         }
     }
 
-    // Only the media chip hides when its panel is open — other chips stay visible.
-    val mediaChipId = if (panelContent is PanelContent.Media) "media_group" else null
-    // Presence only renders through the top-left ambient indicator. Energy stays available to the
-    // data layer but has no launcher pill; the media chip hides while its panel is open.
-    val presenceChip = chips.firstOrNull { it.chipPlacement() == ChipPlacement.FLOATING }
-    val visibleChips = chips.filterNot {
-        it.id == mediaChipId ||
-            it.chipPlacement() == ChipPlacement.FLOATING ||
-            it.kind == PillKind.ENERGY
-    }
-    // The selected chip (its panel is open) gets a highlighted style in the tray.
-    val selectedChipKey = (panel.request as? PanelRequest.Chip)?.key
+    val selectedChipKey = panel.request?.key
 
     val bottomGradientHeight by animateDpAsState(
         targetValue = if (pillsExpanded) 620.dp else 360.dp,
@@ -795,6 +956,39 @@ private fun PortalLauncherApp(
                 weather = content.weather,
                 onDismiss = onPanelDismiss,
             )
+            is PanelContent.Group -> GroupBrowserPanel(
+                group = content.group,
+                selectedDevice = content.selectedDevice,
+                deviceRequested = content.deviceRequested,
+                onSelectMember = { member ->
+                    vm.onEvent(
+                        PanelEvent.OpenGroupDevice(
+                            PanelRequest.Chip(member.chip.id, member.chip.toPanelKind()),
+                        ),
+                    )
+                },
+                onBack = { vm.onEvent(PanelEvent.Back) },
+                onDismiss = onPanelDismiss,
+                onCollectiveAction = { calls ->
+                    calls.forEach { call -> vm.callService(call.domain, call.service, call.entityId) }
+                },
+            )
+            PanelContent.MediaBrowser -> {
+                val selectedDevice = mediaDevices.firstOrNull { it.entityId == browsedMediaEntityId }
+                if (selectedDevice == null) {
+                    MediaDevicesPanel(mediaDevices, onSelect = { browsedMediaEntityId = it.entityId }, onDismiss = onPanelDismiss)
+                } else {
+                    MediaPlayerPanel(
+                        media = selectedDevice,
+                        secondaryMedia = emptyList(),
+                        prefs = prefs,
+                        mediaSessions = mediaDevices,
+                        onSelectSession = { browsedMediaEntityId = it },
+                        onDismiss = { browsedMediaEntityId = null },
+                        onSecondaryPlayPause = onSecondaryPlayPause,
+                    )
+                }
+            }
         }
     }
 
@@ -820,24 +1014,17 @@ private fun PortalLauncherApp(
             AmbientBackground(
                 mode = backgroundMode,
                 wallpaperVersion = wallpaperVersion,
+                overlayOpacity = bgOverlayOpacity,
                 modifier = Modifier.fillMaxSize()
             )
 
-            if (backgroundMode != "neutral") {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = bgOverlayOpacity))
-                )
-            }
-
-            // Swiping to the app grid dims the wallpaper further, so the icons keep their contrast
-            // whatever the photo is. Alpha is read in the layer phase — no recomposition per frame.
+            // Maison and the app grid share the same launcher-level scrim, so neither reads as a
+            // separate overlay. Alpha is read in the layer phase — no recomposition per frame.
             Box(
                 Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = pagerState.collapseFraction() }
-                    .background(Color.Black.copy(alpha = APPS_PAGE_SCRIM))
+                    .graphicsLayer { alpha = pagerState.collapseFraction(pagerLayout) }
+                    .background(Color.Black.copy(alpha = LAUNCHER_PAGE_SCRIM))
             )
 
             Box(
@@ -847,7 +1034,9 @@ private fun PortalLauncherApp(
                     .height(bottomGradientHeight)
                     // Read in the layer phase, not in composition: the swipe fades the tray
                     // gradient out without recomposing the launcher on every frame.
-                    .graphicsLayer { alpha = 1f - pagerState.collapseFraction() }
+                    .graphicsLayer {
+                        alpha = 1f - pagerState.collapseFraction(pagerLayout)
+                    }
                     .background(
                         Brush.verticalGradient(
                             colorStops = arrayOf(
@@ -860,26 +1049,15 @@ private fun PortalLauncherApp(
                     )
             )
 
-            val topHeightFraction by animateFloatAsState(
-                targetValue = if (isSplit) 0.67f else 1.0f,
-                animationSpec = tween(500),
-                label = "topHeightFraction"
-            )
-            val leftWidthFraction by animateFloatAsState(
-                targetValue = if (isSplit) 0.67f else 1.0f,
-                animationSpec = tween(500),
-                label = "leftWidthFraction"
-            )
-
             // Page 0 = clock + chip tray, page 1 = the app grid. The clock header lives above both
             // (LauncherPager) and shrinks as the swipe progresses.
             val clockScreen: @Composable () -> Unit = {
                 LauncherPager(
                     state = pagerState,
                     // Dragging an icon must not also swipe the page out from under it.
-                    // A panel narrows the pager to leftWidthFraction/topHeightFraction, but the app
-                    // grid still fits and swipes there just fine — no reason to lock it.
-                    userScrollEnabled = !appDragActive,
+                    // The adaptive panel host remeasures this pager into the unobstructed area.
+                    userScrollEnabled = !appDragActive && !pillDragActive,
+                    pageLayout = pagerLayout,
                     onHeaderTap = onOpenHomeAssistant,
                     onHeaderLongPress = { context.startActivity(Intent(context, ClockThemeActivity::class.java)) },
                     header = { collapse ->
@@ -904,17 +1082,90 @@ private fun PortalLauncherApp(
                                     )
                                 }
                         ) {
-                            ClockTray(
-                                chips = visibleChips,
-                                pillsExpanded = pillsExpanded,
-                                onPillsExpandedChange = { pillsExpanded = it },
-                                onChipClick = onChipClick,
-                                onChipLongPress = onChipLongPress,
-                                selectedChipKey = selectedChipKey,
-                                modifier = Modifier.align(Alignment.BottomCenter),
-                            )
+                            BoxWithConstraints(Modifier.fillMaxSize()) {
+                                val density = LocalDensity.current
+                                val responsiveCapacity = HomeCriticalCapacityPolicy.capacity(
+                                    availableWidthDp = maxWidth.value,
+                                    fontScale = density.fontScale,
+                                )
+                                val responsiveComposition = if (
+                                    responsiveCapacity.extraCriticalPrimarySlots > 0
+                                ) {
+                                    HomePillComposer.compose(
+                                        catalog = ui.catalog,
+                                        preferences = ui.homePreferences,
+                                        capacity = responsiveCapacity,
+                                    )
+                                } else {
+                                    ui.homeComposition
+                                }
+                                ClockTray(
+                                    composition = responsiveComposition,
+                                    pinnedRefs = pinnedRefs,
+                                    manualGroups = manualGroupOptions,
+                                    actions = homePillActions,
+                                    pillsExpanded = pillsExpanded,
+                                    onPillsExpandedChange = { pillsExpanded = it },
+                                    selectedChipKey = selectedChipKey,
+                                    modifier = Modifier.align(Alignment.BottomCenter),
+                                )
+                            }
                         }
                     },
+                    housePage = if (pagerLayout.homePageEnabled) {
+                        {
+                            Box(Modifier.fillMaxSize()) {
+                                HomePage(
+                                    model = ui.homePage,
+                                    pinnedRefs = pinnedRefs,
+                                    actions = homePillActions,
+                                    manualGroups = manualGroupOptions,
+                                    editing = homeEditing,
+                                    reordering = pillDragActive,
+                                    stale = !ui.connected,
+                                    onEditingChange = { homeEditing = it },
+                                    editActions = HomePageEditActions(
+                                        onMoveSection = { sectionId, move ->
+                                            vm.updateHomePillPreferences { preferences ->
+                                                moveVisibleHomeSection(
+                                                    preferences = preferences,
+                                                    visibleSectionIds = ui.homePage.sections.map { it.sectionId },
+                                                    sectionId = sectionId,
+                                                    move = move,
+                                                )
+                                            }
+                                        },
+                                        onHideSection = { sectionId ->
+                                            vm.updateHomePillPreferences { preferences ->
+                                                setHomeSectionVisible(
+                                                    preferences = preferences,
+                                                    visibleSectionIds = ui.homePage.sections.map { it.sectionId },
+                                                    sectionId = sectionId,
+                                                    visible = false,
+                                                )
+                                            }
+                                        },
+                                        onCreateManualGroup = onOpenSettings,
+                                        onEditManualGroups = onOpenSettings,
+                                    ),
+                                    onOpenHomeAssistantSettings = onOpenSettings,
+                                )
+                                // Rails own their horizontal gestures. This dedicated 24dp edge is
+                                // always pager-owned, guaranteeing Maison -> Accueil even beside a
+                                // long rail while leaving the rail itself first priority.
+                                Box(
+                                    Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .width(24.dp)
+                                        .fillMaxHeight()
+                                        .pagerDragForward(
+                                            pagerState,
+                                            enabled = !appDragActive && !pillDragActive,
+                                        ),
+                                )
+                            }
+                        }
+                    } else null,
                     appPage = { page, appear ->
                         AppGridPage(
                             page = page,
@@ -952,54 +1203,30 @@ private fun PortalLauncherApp(
                             onSettings = onOpenSettings,
                         )
                     },
+                    houseHeader = { HomeHeaderTitle() },
+                    houseHeaderActions = {
+                        HomeHeaderActions(
+                            editing = homeEditing,
+                            onEditingChange = { homeEditing = it },
+                            // UI placeholder only: grouping still follows the saved section model.
+                            onGroupingModeClick = {},
+                            onSettings = onOpenSettings,
+                        )
+                    },
                     dragOverlay = { DraggedIconOverlay(gridDrag, iconSize = 56.dp * gridScale) },
                     drag = gridDrag,
                 )
             }
 
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val landscape = maxWidth > maxHeight
-                if (landscape) {
-                    Row(modifier = Modifier.fillMaxSize()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .fillMaxWidth(leftWidthFraction)
-                        ) { clockScreen() }
-                        if (leftWidthFraction < 1.0f && panelContent != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth()
-                            ) { sidePanel(panelContent) }
-                        }
-                    }
-                } else {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(topHeightFraction)
-                        ) { clockScreen() }
-                        if (topHeightFraction < 1.0f && panelContent != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight()
-                            ) { sidePanel(panelContent) }
-                        }
-                    }
-                }
-            }
+            LauncherPanelLayout(
+                panelVisible = panelContent != null,
+                modifier = Modifier.fillMaxSize(),
+                content = clockScreen,
+                panel = {
+                    (panelContent ?: retainedPanelContent)?.let { sidePanel(it) }
+                },
+            )
         }
-
-        PresenceIndicator(
-            chip = presenceChip,
-            onClick = { presenceChip?.let(onChipClick) },
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 20.dp, top = 16.dp),
-        )
 
         QuickActionsOverlay(
             visible = overlayVisible,
@@ -1067,6 +1294,83 @@ private fun PortalLauncherApp(
         AutoReturnOverlay(state = autoReturnState, onCancel = { autoReturnTimer.onInteraction() })
     }
     }
+}
+
+/** Pure routing for a user-opened device panel; individual media must not fall into an empty shell. */
+internal fun resolveChipPanelContent(
+    request: PanelRequest.Chip,
+    panelChip: LauncherChip?,
+    mediaDevices: List<PlayingMedia>,
+): PanelContent? = if (request.panelKind == PanelKind.MEDIA) {
+    mediaDevices.firstOrNull { device ->
+        device.entityId == request.key || device.players.any { it.entityId == request.key }
+    }?.let(PanelContent::Media) ?: PanelContent.MediaBrowser
+} else {
+    panelChip?.let(PanelContent::ChipActions)
+}
+
+/** Pure preference reducer used by Maison's accessible section-order controls. */
+internal fun moveVisibleHomeSection(
+    preferences: HomePillPreferences,
+    visibleSectionIds: List<String>,
+    sectionId: String,
+    move: HomePillMove,
+): HomePillPreferences {
+    val ordered = visibleSectionIds.distinct().toMutableList()
+    val from = ordered.indexOf(sectionId)
+    if (from < 0) return preferences
+    val to = when (move) {
+        HomePillMove.FIRST -> 0
+        HomePillMove.BEFORE -> from - 1
+        HomePillMove.AFTER -> from + 1
+        HomePillMove.LAST -> ordered.lastIndex
+    }.coerceIn(0, ordered.lastIndex)
+    if (from != to) ordered.add(to, ordered.removeAt(from))
+    return writeVisibleSectionOrder(preferences, ordered)
+}
+
+/** Pure visibility reducer; automatic membership and ids are deliberately untouched. */
+internal fun setHomeSectionVisible(
+    preferences: HomePillPreferences,
+    visibleSectionIds: List<String>,
+    sectionId: String,
+    visible: Boolean,
+): HomePillPreferences {
+    val existing = preferences.homeSections.associateBy { it.sectionId }
+    val visibleOrder = visibleSectionIds.distinct().filterNot { it == sectionId }.toMutableList()
+    if (visible) visibleOrder += sectionId
+    val normalized = writeVisibleSectionOrder(preferences, visibleOrder)
+    val byId = normalized.homeSections.associateBy { it.sectionId }.toMutableMap()
+    val previous = byId[sectionId] ?: existing[sectionId]
+    byId[sectionId] = HomeSectionPreference(
+        sectionId = sectionId,
+        visible = visible,
+        order = previous?.order ?: visibleOrder.size,
+        itemOrder = previous?.itemOrder.orEmpty(),
+    )
+    return normalized.copy(homeSections = byId.values.sortedWith(
+        compareBy<HomeSectionPreference> { it.order }.thenBy { it.sectionId },
+    ))
+}
+
+private fun writeVisibleSectionOrder(
+    preferences: HomePillPreferences,
+    orderedIds: List<String>,
+): HomePillPreferences {
+    val existing = preferences.homeSections.associateBy { it.sectionId }
+    val visible = orderedIds.mapIndexed { index, id ->
+        val previous = existing[id]
+        HomeSectionPreference(
+            sectionId = id,
+            visible = true,
+            order = index,
+            itemOrder = previous?.itemOrder.orEmpty(),
+        )
+    }
+    val visibleIds = orderedIds.toSet()
+    val remaining = preferences.homeSections.filter { it.sectionId !in visibleIds }
+        .mapIndexed { index, section -> section.copy(order = orderedIds.size + index) }
+    return preferences.copy(homeSections = visible + remaining)
 }
 
 @Composable

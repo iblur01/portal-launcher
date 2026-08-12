@@ -4,6 +4,7 @@ import com.iblu01.portallauncher.domain.model.PillDetail
 
 import java.time.Instant
 import java.time.OffsetDateTime
+import java.util.Locale
 import kotlin.math.roundToInt
 
 class PillPriorityEngine(private val context: Context) {
@@ -16,81 +17,40 @@ class PillPriorityEngine(private val context: Context) {
             runCatching { OffsetDateTime.parse(value).toInstant() }.getOrNull()
         }
 
+    /**
+     * Produces the complete deterministic dynamic ranking. Visual capacity belongs to
+     * HomePillComposer; truncating here would make pins, overflow and Maison impossible to resolve.
+     */
     fun select(rules: List<PillRule>, states: Map<String, HaEntity>, nowMs: Long = System.currentTimeMillis()): List<LauncherChip> {
-        val enabled = rules.filter { it.enabled }
-        val groupedKinds = setOf(PillKind.OPENING, PillKind.CLIMATE, PillKind.LIGHTS, PillKind.MEDIA, PillKind.PURIFIER, PillKind.AIR, PillKind.SCENE, PillKind.PRESENCE, PillKind.ENERGY)
+        // Re-check the live entity even for persisted rules. This is the migration boundary that
+        // prevents old button/number/select/camera and passive diagnostic rules from resurfacing.
+        val enabled = rules.mapNotNull { rule ->
+            val entity = states[rule.entityId] ?: return@mapNotNull null
+            if (!rule.enabled || !PillSupport.isAllowedAsPersistedChip(rule, entity)) return@mapNotNull null
+            // Kinds are derived data. Normalize stale persisted classifications (notably the old
+            // motion -> PRESENCE mapping) while preserving legacy appliance heuristics.
+            rule.copy(kind = if (rule.kind == PillKind.APPLIANCE) PillKind.APPLIANCE else PillSupport.kind(entity))
+        }
+        val groupedKinds = setOf(PillKind.OPENING, PillKind.LIGHTS, PillKind.MEDIA, PillKind.PURIFIER)
         val individual = enabled.asSequence().filter { it.kind !in groupedKinds }
             .mapNotNull { rule -> states[rule.entityId]?.let { toChip(rule, it, states, nowMs) } }.toList()
         val openings = openingGroup(enabled.filter { it.kind == PillKind.OPENING }, states, nowMs)
-        val temperatures = temperatureGroup(enabled.filter { it.kind == PillKind.CLIMATE }, states)
-        val batteries = relatedBatteryAlert(enabled, states)
         val lights = lightsGroup(enabled.filter { it.kind == PillKind.LIGHTS }, states)
         val media = mediaGroup(enabled.filter { it.kind == PillKind.MEDIA }, states, nowMs)
         val purifier = purifierGroup(enabled.filter { it.kind == PillKind.PURIFIER }, states)
-        val air = airGroup(enabled.filter { it.kind == PillKind.AIR }, states)
-        val scenes = scenesGroup(enabled.filter { it.kind == PillKind.SCENE }, states)
-        val presence = presenceGroup(enabled.filter { it.kind == PillKind.PRESENCE }, states)
-        val energy = energyGroup(enabled.filter { it.kind == PillKind.ENERGY }, states)
-        return (individual + listOfNotNull(openings, batteries, temperatures, lights, media, purifier, air, scenes, presence, energy))
-            .sortedWith(compareByDescending<LauncherChip> { it.priority }.thenBy { it.label }).take(9)
+        return (individual + listOfNotNull(openings, lights, media, purifier))
+            .sortedWith(
+                compareByDescending<LauncherChip> { it.priority }
+                    .thenBy { it.label.trim().lowercase(Locale.ROOT) }
+                    .thenBy { it.id },
+            )
     }
 
-    /** All person.* entities in one pill; panel shows avatars + who is home. */
-    private fun presenceGroup(rules: List<PillRule>, states: Map<String, HaEntity>): LauncherChip? {
-        val people = rules.mapNotNull { rule -> states[rule.entityId]?.let { rule to it } }
-            .filter { it.second.state.lowercase() !in setOf("unavailable", "unknown") }
-        if (people.isEmpty()) return null
-        val home = people.filter { it.second.state.equals("home", true) }
-        val details = people.sortedByDescending { it in home }.map { (rule, entity) ->
-            val status = when (entity.state.lowercase()) {
-                "home" -> context.getString(R.string.presence_home)
-                "not_home" -> context.getString(R.string.presence_away)
-                else -> context.getString(R.string.presence_away) + " · ${entity.state.replaceFirstChar { it.uppercase() }}"
-            }
-            PillDetail(rule.label, status, entityId = entity.entityId, active = entity.state.equals("home", true))
-        }
-        return LauncherChip(
-            id = "presence_group", icon = "presence", label = context.getString(R.string.pill_group_presence),
-            value = if (home.isEmpty()) context.getString(R.string.pill_presence_nobody) else context.getString(R.string.pill_presence_count_format, home.size),
-            state = "info", priority = if (home.isEmpty()) 6 else 9,
-            details = details, kind = PillKind.PRESENCE,
-        )
-    }
-
-    /** Main power / daily-energy sensors in one pill; panel shows live watts + today's kWh. */
-    private fun energyGroup(rules: List<PillRule>, states: Map<String, HaEntity>): LauncherChip? {
-        val entities = rules.mapNotNull { rule -> states[rule.entityId] }
-            .filter { it.state.lowercase() !in setOf("unavailable", "unknown") }
-        if (entities.isEmpty()) return null
-        val powerName = Regex("maison|total|grid|global|home|conso", RegexOption.IGNORE_CASE)
-        val power = entities.filter { it.deviceClass == "power" }.let { p -> p.firstOrNull { powerName.containsMatchIn(it.entityId) } ?: p.firstOrNull() }
-        val watts = power?.state?.toDoubleOrNull()
-        val details = buildList {
-            power?.let { add(PillDetail(context.getString(R.string.pill_individual_energy_power), "${watts?.roundToInt() ?: 0} W", entityId = it.entityId)) }
-            entities.filter { it.deviceClass == "energy" }.firstOrNull()?.let {
-                add(PillDetail(context.getString(R.string.pill_individual_energy_today), it.state + (it.attributes.optString("unit_of_measurement").ifBlank { " kWh" }.let { u -> if (u.startsWith(" ")) u else " $u" }), entityId = it.entityId))
-            }
-        }
-        return LauncherChip(
-            id = "energy_group", icon = "energy", label = context.getString(R.string.pill_group_energy),
-            value = watts?.let { "${it.roundToInt()} W" } ?: "—",
-            state = "info", priority = 8,
-            details = details, kind = PillKind.ENERGY,
-        )
-    }
-
-    /** All enabled scenes and scripts grouped into one pill; the panel renders one button per entity. */
-    private fun scenesGroup(rules: List<PillRule>, states: Map<String, HaEntity>): LauncherChip? {
-        val entities = rules.mapNotNull { rule -> states[rule.entityId]?.let { rule to it } }
-        if (entities.isEmpty()) return null
-        return LauncherChip(
-            id = "scenes_group", icon = "scene", label = context.getString(R.string.pill_group_scenes),
-            value = context.resources.getQuantityString(R.plurals.pill_scenes_count, entities.size, entities.size),
-            state = "info", priority = 10,
-            details = entities.map { (rule, entity) -> PillDetail(rule.label, "", entityId = entity.entityId) },
-            kind = PillKind.SCENE,
-        )
-    }
+    fun rankDynamic(
+        rules: List<PillRule>,
+        states: Map<String, HaEntity>,
+        nowMs: Long = System.currentTimeMillis(),
+    ): List<LauncherChip> = select(rules, states, nowMs)
 
     private fun lightsGroup(rules: List<PillRule>, states: Map<String, HaEntity>): LauncherChip? {
         val entities = rules.mapNotNull { rule -> states[rule.entityId]?.let { rule to it } }
@@ -104,6 +64,7 @@ class PillPriorityEngine(private val context: Context) {
             details = entities.sortedByDescending { it in on }.map { (rule, entity) ->
                 PillDetail(rule.label, if (entity.state == "on") context.getString(R.string.light_state_on) else context.getString(R.string.light_state_off), entityId = entity.entityId, active = entity.state.equals("on", true))
             },
+            kind = PillKind.LIGHTS, deviceState = if (on.isEmpty()) "off" else "on",
         )
     }
 
@@ -134,6 +95,8 @@ class PillPriorityEngine(private val context: Context) {
             }.map { (rule, entity) ->
                 PillDetail(rule.label, entity.attributes.optString("media_title").ifBlank { entity.state.replaceFirstChar { it.uppercase() } })
             },
+            kind = PillKind.MEDIA,
+            deviceState = when { playing.isNotEmpty() -> "playing"; paused.isNotEmpty() -> "paused"; else -> "off" },
         )
     }
 
@@ -143,30 +106,10 @@ class PillPriorityEngine(private val context: Context) {
         if (entity.state.lowercase() in setOf("unknown", "unavailable")) return null
         val running = entity.state.equals("on", true)
         val related = rule.relatedEntityIds.mapNotNull(states::get).filter { it.state !in setOf("unknown", "unavailable") }
-        return LauncherChip(
-            id = "purifier_group", icon = "air", label = context.getString(R.string.pill_group_purifier),
-            value = if (running) entity.attributes.optString("preset_mode").takeIf { it.isNotBlank() }?.let { context.getString(R.string.pill_fan_on_format, it) } ?: context.getString(R.string.pill_fan_on) else context.getString(R.string.pill_fan_off),
-            state = if (running) "active" else "ok", priority = if (running) 15 else 5,
-            entityId = entity.entityId,
-            details = related.filter { 
-                it.deviceClass in setOf("pm25", "pm10", "volatile_organic_compounds", "aqi") || 
-                it.entityId.contains("filtre") || 
-                it.entityId.contains("filter") || 
-                it.entityId.contains("tvoc") || 
-                it.entityId.contains("qualite_d_air") ||
-                it.entityId.contains("pm2_5")
-            }
-                .map { PillDetail(it.name.replace(Regex("^${Regex.escape(rule.label)} ", RegexOption.IGNORE_CASE), ""), it.state + it.attributes.optString("unit_of_measurement")) },
-        )
-    }
-
-    private fun airGroup(rules: List<PillRule>, states: Map<String, HaEntity>): LauncherChip? {
-        val sensors = rules.mapNotNull { rule -> states[rule.entityId]?.let { rule to it } }
-            .filter { it.second.state.lowercase() !in setOf("unknown", "unavailable") }
-        if (sensors.isEmpty()) return null
-        val warnings = sensors.filter { (rule, entity) ->
-            val reading = entity.state.toFloatOrNull() ?: return@filter false
-            when (entity.deviceClass) {
+        val airSensors = related.filter { it.deviceClass in setOf("carbon_dioxide", "pm25", "pm10", "volatile_organic_compounds", "aqi") }
+        val airWarnings = airSensors.count { sensor ->
+            val reading = sensor.state.toFloatOrNull() ?: return@count false
+            when (sensor.deviceClass) {
                 "carbon_dioxide" -> reading > 1_000
                 "pm25" -> reading > 25
                 "pm10" -> reading > 50
@@ -174,60 +117,34 @@ class PillPriorityEngine(private val context: Context) {
                 else -> reading > 800
             }
         }
-        val qualitative = when {
-            warnings.isNotEmpty() && sensors.size == warnings.size -> context.getString(R.string.air_quality_bad)
-            warnings.isNotEmpty() -> context.getString(R.string.air_quality_medium)
-            else -> context.getString(R.string.air_quality_good)
+        val airState = when {
+            airSensors.isEmpty() -> "info"
+            airWarnings == 0 -> "active"
+            airWarnings == airSensors.size -> "critical"
+            else -> "warning"
         }
-        val details = sensors.map { (rule, entity) ->
-            val unit = entity.attributes.optString("unit_of_measurement", "")
-            PillDetail(rule.label, entity.state + unit, entityId = entity.entityId, active = false)
-        }
+        val preset = entity.attributes.optString("preset_mode").trim()
         return LauncherChip(
-            id = "air_group", icon = "air", label = context.getString(R.string.pill_group_air_quality),
-            value = qualitative,
-            state = if (warnings.isNotEmpty()) "warning" else "active",
-            priority = if (warnings.isEmpty()) 8 else 35,
-            details = details,
-        )
-    }
-
-    private fun temperatureGroup(rules: List<PillRule>, states: Map<String, HaEntity>): LauncherChip? {
-        val readings = rules.mapNotNull { rule ->
-            val entity = states[rule.entityId] ?: return@mapNotNull null
-            if (entity.deviceClass != "temperature") return@mapNotNull null
-            entity.state.toDoubleOrNull()?.let { Triple(rule, entity, it) }
-        }
-        if (readings.isEmpty()) return null
-        val min = readings.minOf { it.third }
-        val max = readings.maxOf { it.third }
-        fun fmt(value: Double) = if (value % 1.0 == 0.0) "${value.toInt()}°" else "%.1f°".format(value)
-        val abnormal = min < 16 || max > 28
-        val details = readings.sortedBy { it.third }.map { (rule, entity, value) ->
-            val humidity = rule.relatedEntityIds.mapNotNull(states::get).firstOrNull { it.deviceClass == "humidity" }?.state?.toDoubleOrNull()
-            val suffix = humidity?.let { " · ${it.toInt()}%" }.orEmpty()
-            PillDetail(rule.label.replace(Regex(" (Température|Temperature)$", RegexOption.IGNORE_CASE), ""), fmt(value) + suffix)
-        }
-        return LauncherChip(
-            id = "temperature_group", icon = "temperature", label = context.getString(R.string.pill_group_temperatures),
-            value = if (readings.size == 1) fmt(min) else context.getString(R.string.pill_temperature_range_format, fmt(min), fmt(max)),
-            state = if (abnormal) "warning" else "ok", priority = if (abnormal) 35 else 2,
-            details = details,
-        )
-    }
-
-    private fun relatedBatteryAlert(rules: List<PillRule>, states: Map<String, HaEntity>): LauncherChip? {
-        val low = rules.flatMap { it.relatedEntityIds }.distinct().mapNotNull(states::get)
-            .filter { it.deviceClass == "battery" }.mapNotNull { e -> e.state.toFloatOrNull()?.let { e to it } }
-            .filter { it.second <= 30 }
-        if (low.isEmpty()) return null
-        val minimum = low.minOf { it.second }
-        return LauncherChip(
-            id = "battery_group", icon = "battery", label = context.getString(R.string.pill_group_batteries),
-            value = if (low.size == 1) "${minimum.toInt()}%" else context.getString(R.string.pill_battery_state_multi_format, low.size, "${minimum.toInt()}%"),
-            state = if (minimum <= 10) "critical" else "warning",
-            priority = if (minimum <= 10) 82 else 6,
-            details = low.sortedBy { it.second }.map { (entity, level) -> PillDetail(entity.name.replace(Regex(" (Batterie|Battery)$", RegexOption.IGNORE_CASE), ""), "${level.toInt()}%") },
+            id = "purifier_group", icon = "air", label = context.getString(R.string.pill_group_purifier),
+            value = if (running) preset.takeIf { it.isNotBlank() }?.replace('_', ' ')?.replaceFirstChar { it.uppercase() } ?: context.getString(R.string.pill_fan_on) else context.getString(R.string.pill_fan_off),
+            state = airState, priority = if (running) 15 else 5,
+            entityId = entity.entityId,
+            deviceState = entity.state,
+            details = related.filter {
+                it.deviceClass in setOf("carbon_dioxide", "pm25", "pm10", "volatile_organic_compounds", "aqi") ||
+                it.entityId.contains("filtre") || 
+                it.entityId.contains("filter") || 
+                it.entityId.contains("tvoc") || 
+                it.entityId.contains("qualite_d_air") ||
+                it.entityId.contains("pm2_5")
+            }
+                .map {
+                    PillDetail(
+                        label = it.name.replace(Regex("^${Regex.escape(rule.label)} ", RegexOption.IGNORE_CASE), ""),
+                        value = it.state + it.attributes.optString("unit_of_measurement"),
+                        entityId = it.entityId,
+                    )
+                },
         )
     }
 
@@ -284,7 +201,16 @@ class PillPriorityEngine(private val context: Context) {
                 s in activeAppliance -> visual = "active"
                 else -> visible = false
             }
-            PillKind.BATTERY -> { val value = s.toFloatOrNull() ?: return null; visible = value <= 30; score = if (value <= 10) 82 else 45; visual = if (value <= 10) "critical" else "warning" }
+            PillKind.BATTERY -> if (e.domain == "binary_sensor") {
+                visible = s == "on"
+                score = 82
+                visual = "critical"
+            } else {
+                val value = s.toFloatOrNull() ?: return null
+                visible = value <= 30
+                score = if (value <= 10) 82 else 45
+                visual = if (value <= 10) "critical" else "warning"
+            }
             PillKind.AIR -> {
                 val reading = s.toFloatOrNull()
                 val warning = when (e.deviceClass) {
@@ -312,8 +238,24 @@ class PillPriorityEngine(private val context: Context) {
             }
             PillKind.SWITCH -> { val on = s == "on"; score = if (on) rule.kind.basePriority else 6; visual = if (on) "active" else "ok" }
             PillKind.FAN -> { val on = s == "on"; score = if (on) rule.kind.basePriority else 5; visual = if (on) "active" else "ok" }
+            PillKind.HUMIDIFIER, PillKind.WATER_HEATER -> { visual = if (s == "off") "ok" else "active" }
+            PillKind.VALVE -> { visual = if (s == "closed") "ok" else "active"; score = if (s == "closed") 8 else rule.kind.basePriority }
+            PillKind.SIREN -> { visual = if (s == "on") "critical" else "ok"; score = if (s == "on") 92 else 8 }
+            PillKind.LAWN_MOWER -> { visual = if (s in setOf("mowing", "returning")) "active" else if (s == "error") "critical" else "ok" }
             PillKind.LIGHTS, PillKind.MEDIA, PillKind.PURIFIER, PillKind.CLIMATE, PillKind.SCENE, PillKind.PRESENCE -> visible = false
-            PillKind.GENERIC -> visible = s !in inactive
+            PillKind.GENERIC -> when {
+                e.domain == "binary_sensor" && e.deviceClass == "connectivity" -> {
+                    visible = s == "off"
+                    score = 72
+                    visual = "warning"
+                }
+                e.domain == "binary_sensor" && e.deviceClass in setOf("motion", "occupancy", "presence", "moving", "vibration", "sound", "running") -> {
+                    visible = s == "on"
+                    score = 42
+                    visual = "active"
+                }
+                else -> visible = false
+            }
         }
         if (!visible) return null
         val related = rule.relatedEntityIds.mapNotNull(states::get)
@@ -438,6 +380,7 @@ class PillPriorityEngine(private val context: Context) {
                 else -> rawDisplay
             }
             PillKind.SWITCH -> when (s) { "on" -> context.getString(R.string.pill_switch_on); "off" -> context.getString(R.string.pill_switch_off); else -> rawDisplay }
+            PillKind.GENERIC -> if (e.domain == "binary_sensor") friendlyEntityState(e) else rawDisplay
             PillKind.FAN -> when (s) {
                 "on" -> e.attributes.optInt("percentage", -1).let { if (it in 0..100) context.getString(R.string.pill_fan_on_format, it.toString()) else context.getString(R.string.pill_fan_on) }
                 "off" -> context.getString(R.string.pill_fan_off)
@@ -448,7 +391,6 @@ class PillPriorityEngine(private val context: Context) {
         val humidity = related.firstOrNull { it.deviceClass == "humidity" && it.state.toFloatOrNull() != null }
         val value = when {
             humidity != null && e.deviceClass == "temperature" -> "$display · ${humidity.state}%"
-            battery != null && rule.kind in setOf(PillKind.LOCK, PillKind.VACUUM, PillKind.OPENING) -> "$display · $battery%"
             else -> display
         }
         val label = rule.label
@@ -468,6 +410,6 @@ class PillPriorityEngine(private val context: Context) {
         val details = if (rule.kind == PillKind.AIR) listOf(PillDetail(e.name, e.state + e.attributes.optString("unit_of_measurement"))) else emptyList()
         return LauncherChip(rule.entityId, rule.kind.icon, finalLabel, qualitativeAir, visual,
             ((progressValue ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f), e.entityId, score, false, details,
-            kind = rule.kind, batteryPercent = batteryPercent)
+            kind = rule.kind, batteryPercent = batteryPercent, deviceState = s)
     }
 }

@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher.ui.panel
 
+import com.iblu01.portallauncher.PillKind
+import com.iblu01.portallauncher.domain.home.PillRef
 import com.iblu01.portallauncher.ui.model.PanelKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -11,6 +13,11 @@ class PanelStateTest {
 
     private fun chip(key: String, kind: PanelKind = PanelKind.GENERIC_DETAILS) =
         PanelRequest.Chip(key, kind)
+
+    private fun group(
+        ref: PillRef = PillRef.AreaGroup("living_room"),
+        device: PanelRequest.Chip? = null,
+    ) = PanelRequest.Group(ref, device)
 
     @Test fun `open chip from empty`() {
         val s = reduce(PanelState(), PanelEvent.OpenChip(chip("light.a", PanelKind.LIGHTS)))
@@ -174,5 +181,83 @@ class PanelStateTest {
         s = reduce(s, PanelEvent.Dismiss)                                   // dismiss chip
         assertNull(s.request)
         assertNull(s.dismissedAutoKey)                                      // chip dismiss, not media
+    }
+
+    @Test fun `group opens from its stable domain identity`() {
+        val request = group(PillRef.AreaGroup("kitchen"))
+        val s = reduce(PanelState(), PanelEvent.OpenGroup(request))
+
+        assertEquals(request, s.request)
+        assertEquals("area:kitchen", s.request?.key)
+        assertEquals(PanelSource.USER, s.source)
+    }
+
+    @Test fun `all supported group identities keep stable non-localized keys`() {
+        assertEquals("area:kitchen", group(PillRef.AreaGroup("kitchen")).key)
+        assertEquals("kind:LIGHTS", group(PillRef.KindGroup(PillKind.LIGHTS)).key)
+        assertEquals("manual:evening", group(PillRef.ManualGroup("evening")).key)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `a device identity cannot masquerade as a group destination`() {
+        group(PillRef.Device("light.kitchen"))
+    }
+
+    @Test fun `group device back group back close pops one level at a time`() {
+        val root = group(PillRef.ManualGroup("evening"))
+        val device = chip("light.corner", PanelKind.LIGHTS)
+
+        var s = reduce(PanelState(), PanelEvent.OpenGroup(root))
+        s = reduce(s, PanelEvent.OpenGroupDevice(device))
+        assertEquals(root.copy(device = device), s.request)
+
+        s = reduce(s, PanelEvent.Back)
+        assertEquals("first Back returns to the group browser", root, s.request)
+
+        s = reduce(s, PanelEvent.Back)
+        assertNull("second Back closes the group browser", s.request)
+    }
+
+    @Test fun `Fermer closes the entire group stack from a device`() {
+        val selected = group(device = chip("light.corner", PanelKind.LIGHTS))
+        val s = reduce(PanelState(request = selected), PanelEvent.Dismiss)
+        assertNull(s.request)
+    }
+
+    @Test fun `orphan group device navigation is ignored`() {
+        val weather = PanelState(request = PanelRequest.Weather, source = PanelSource.USER)
+        val s = reduce(weather, PanelEvent.OpenGroupDevice(chip("light.corner", PanelKind.LIGHTS)))
+        assertEquals(weather, s)
+    }
+
+    @Test fun `reopening a group starts at root and tapping its root toggles closed`() {
+        val destination = PillRef.AreaGroup("living_room")
+        val selected = group(destination, chip("light.corner", PanelKind.LIGHTS))
+
+        val closed = reduce(PanelState(request = selected), PanelEvent.OpenGroup(group(destination)))
+        assertNull(closed.request)
+
+        val reopened = reduce(closed, PanelEvent.OpenGroup(group(destination)))
+        assertEquals(group(destination), reopened.request)
+    }
+
+    @Test fun `media auto-open cannot clobber a group user destination`() {
+        val open = PanelState(request = group(), source = PanelSource.USER)
+        val s = reduce(open, PanelEvent.MediaAutoOpen("m1"))
+        assertEquals(open, s)
+    }
+
+    @Test fun `alert remains highest priority over group navigation`() {
+        val open = PanelState(request = group(), source = PanelSource.USER)
+        val s = reduce(open, PanelEvent.AlarmAlert(alarm("alarm.entry")))
+        assertEquals(alarm("alarm.entry"), s.request)
+        assertEquals(PanelSource.ALERT, s.source)
+    }
+
+    @Test fun `ordinary Back preserves media dismissal guard behavior`() {
+        val media = PanelState(request = PanelRequest.Media("m1"), source = PanelSource.AUTO)
+        val s = reduce(media, PanelEvent.Back)
+        assertNull(s.request)
+        assertEquals("m1", s.dismissedAutoKey)
     }
 }

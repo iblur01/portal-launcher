@@ -24,4 +24,6 @@ data class LauncherChip(
     val kind: PillKind = PillKind.GENERIC,
     /** Battery percentage resolved from the entity itself or one of its related HA sensors. */
     val batteryPercent: Int? = null,
+    /** Raw accessory state when presentation needs more detail than the generic visual state. */
+    val deviceState: String? = null,
 )

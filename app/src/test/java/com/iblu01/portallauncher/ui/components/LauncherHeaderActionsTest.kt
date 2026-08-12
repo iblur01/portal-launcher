@@ -3,6 +3,7 @@ package com.iblu01.portallauncher.ui.components
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -53,5 +54,34 @@ class LauncherHeaderActionsTest {
         }
 
         rule.onNodeWithContentDescription("Hidden apps (0)").assertDoesNotExist()
+    }
+
+    @Test
+    fun `Maison header replaces hidden apps with grouping and edit actions`() {
+        var grouping = 0
+        var editing = false
+        rule.setContent {
+            HomeHeaderActions(
+                editing = editing,
+                onEditingChange = { editing = it },
+                onGroupingModeClick = { grouping++ },
+                onSettings = {},
+            )
+        }
+
+        rule.onNodeWithContentDescription("Hidden apps (2)").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Group by room (coming soon)").performClick()
+        rule.onNodeWithContentDescription("Edit Home").performClick()
+        rule.waitForIdle()
+
+        assertEquals(1, grouping)
+        assertEquals(true, editing)
+    }
+
+    @Test
+    fun `Maison title belongs to the compact header`() {
+        rule.setContent { HomeHeaderTitle() }
+
+        rule.onNodeWithText("Home").assertIsDisplayed()
     }
 }

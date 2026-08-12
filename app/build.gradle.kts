@@ -25,8 +25,8 @@ android {
         applicationId = "com.iblu01.portallauncher"
         minSdk = 28
         targetSdk = 28
-        versionCode = 5
-        versionName = "0.0.5-beta"
+        versionCode = 7
+        versionName = "0.0.7-beta"
     }
 
     signingConfigs {
@@ -65,6 +65,13 @@ android {
         disable += "ExpiredTargetSdkVersion"
     }
 
+    androidResources {
+        // The MDI name->codepoint index is binary-searched in place with AssetManager.openFd(),
+        // which only works on a stored (non-deflated) APK entry. Compressing it would trade a
+        // 330 KB APK saving for a megabyte of permanently resident heap.
+        noCompress += "mdi"
+    }
+
     buildFeatures {
         compose = true
     }
@@ -93,10 +100,12 @@ androidComponents {
     // the debug variant's manifest but never ships in the release APK, as intended. Robolectric
     // resolves the unit-test manifest from each build type's own main manifest (testImplementation
     // manifests are not merged in for JVM unit tests), so testReleaseUnitTest can never resolve
-    // that activity. Disable the release unit-test variant rather than duplicating test-only
-    // manifest content into a release-shipped path.
-    beforeVariants(selector().withBuildType("release")) { variantBuilder ->
-        variantBuilder.enableUnitTest = false
+    // that activity. Disable release-equivalent unit-test variants rather than duplicating
+    // test-only manifest content into a release-shipped path.
+    listOf("release", "productionTest").forEach { buildType ->
+        beforeVariants(selector().withBuildType(buildType)) { variantBuilder ->
+            variantBuilder.enableUnitTest = false
+        }
     }
 }
 

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Keep existing -->
-    <string name="app_name">Portal Launcher</string>
+    <string name="app_name" translatable="false">Portal Launcher</string>
     <string name="accessibility_label">Portal Launcher Screen Control</string>
-    <string name="accessibility_description">Permet a Portal Launcher d\'eteindre l\'ecran sur commande Home Assistant. Le service ne lit pas le contenu de l\'ecran.</string>
+    <string name="accessibility_description">Allows Portal Launcher to turn off the screen on a Home Assistant command. The service does not read screen content.</string>
 
     <!-- ===== SETUP WIZARD ===== -->
     <string name="setup_welcome_title">Welcome</string>
@@ -165,6 +165,52 @@
     <string name="pills_extra_battery">battery</string>
     <string name="pills_extra_cycle">cycle</string>
     <string name="pills_extra_completion">est. finish</string>
+    <string name="pills_settings_sections_title">CUSTOMISATION</string>
+    <string name="pills_settings_launcher_home">Home screen</string>
+    <string name="pills_settings_launcher_home_description">The first three positions are always visible. The next six appear under See more. Alerts may temporarily take precedence without changing this order.</string>
+    <string name="pills_settings_house_page">House page</string>
+    <string name="pills_settings_available_devices">Available devices</string>
+    <string name="pills_settings_pinned_count">Pinned: %1$d</string>
+    <string name="pills_enabled">Enabled</string>
+    <string name="pills_disabled">Disabled</string>
+    <string name="pills_settings_primary_slots">PRIMARY · 3 POSITIONS</string>
+    <string name="pills_settings_secondary_slots">SECONDARY · 6 POSITIONS</string>
+    <string name="pills_settings_overflow">HOUSE FAVOURITES OVERFLOW</string>
+    <string name="pills_settings_automatic_slot">Automatic</string>
+    <string name="pills_pin">Pin</string>
+    <string name="pills_unpin">Unpin</string>
+    <string name="pills_unavailable">Unavailable</string>
+    <string name="pills_stale">Offline</string>
+    <string name="pills_stale_state">Offline — last state: %1$s</string>
+    <string name="pills_enable_before_pin">Enable to pin</string>
+    <string name="pills_not_available_to_pin">No available member: this group cannot be pinned</string>
+    <string name="pills_move_first">Move first</string>
+    <string name="pills_move_before">Move before</string>
+    <string name="pills_move_after">Move after</string>
+    <string name="pills_move_last">Move last</string>
+    <string name="pills_house_activation">ACTIVATION</string>
+    <string name="pills_house_enable">Show the House page</string>
+    <string name="pills_house_sections">SECTIONS · VISIBILITY AND ORDER</string>
+    <string name="pills_house_section_position">Position %1$d</string>
+    <string name="pills_house_automatic_groups">AUTOMATIC GROUPS</string>
+    <string name="pills_house_automatic_groups_hint">Room and type membership comes from Home Assistant and cannot be changed here.</string>
+    <string name="pills_section_favorites">Favourites</string>
+    <string name="pills_section_areas">Rooms</string>
+    <string name="pills_manual_groups">MY GROUPS</string>
+    <string name="pills_manual_create">Create a group</string>
+    <string name="pills_manual_empty">No manual group yet. Empty groups remain editable here and are hidden from the House page.</string>
+    <string name="pills_manual_member_count">Members: %1$d</string>
+    <string name="pills_group_member_count">%1$s members</string>
+    <string name="pills_devices_description">Enable compatible devices and pin them even when they are not currently in the nine home positions. Unavailable devices can be unpinned but not newly pinned.</string>
+    <string name="pills_manual_identity">GROUP</string>
+    <string name="pills_manual_name">Name</string>
+    <string name="pills_pin_group">Pin this group</string>
+    <string name="pills_manual_members">MEMBERS</string>
+    <string name="pills_manual_delete">Delete group</string>
+    <string name="pills_manual_delete_title">Delete “%1$s”?</string>
+    <string name="pills_manual_delete_description">The devices are not deleted or disabled. This only removes the local manual group.</string>
+    <string name="pills_manual_save">Save</string>
+    <string name="pills_manual_move_to_group">Move to another group</string>
 
     <!-- ===== CLOCK THEME EDITOR ===== -->
     <string name="clock_theme_label_font">Font</string>
@@ -186,11 +232,14 @@
     <string name="clock_stale_banner_format">Offline — info frozen since %1$s</string>
     <string name="header_hidden_apps_content_desc">Hidden apps (%1$d)</string>
     <string name="header_settings_content_desc">Settings</string>
+    <string name="home_header_title">Home</string>
+    <string name="home_header_grouping_content_desc">Group by room (coming soon)</string>
+    <string name="home_header_edit_content_desc">Edit Home</string>
+    <string name="home_header_finish_content_desc">Finish editing Home</string>
     <string name="auto_return_pill_label">Auto close</string>
     <string name="auto_return_cancel_desc">Cancel</string>
     <string name="bg_mode_system">Android wallpaper</string>
     <string name="bg_mode_neutral">Neutral</string>
-    <string name="bg_mode_nature">Nature (Unsplash)</string>
     <string name="bg_mode_custom">Custom photo</string>
     <string name="bg_mode_immich">Immich album</string>
 
@@ -256,6 +305,7 @@
     <string name="media_source_many_format">%1$s + %2$d others</string>
     <string name="media_cover_desc_format">Cover of %1$s</string>
     <string name="media_no_cover_desc">No cover</string>
+    <string name="media_player_icon_desc_format">%1$s media player</string>
     <string name="media_previous_track_desc">Previous track</string>
     <string name="media_pause_desc">Pause</string>
     <string name="media_play_desc">Play</string>
@@ -304,8 +354,26 @@
     <string name="alarm_mode_home">Home</string>
     <string name="alarm_mode_night">Night</string>
     <string name="alarm_mode_vacation">Vacation</string>
+    <string name="alarm_mode_custom_bypass">Custom bypass</string>
     <string name="alarm_mode_off">Disabled</string>
     <string name="alarm_disarm_button">Disarm</string>
+    <string name="alarm_choose_mode_title">Choose an arming mode</string>
+    <string name="alarm_disarmed_subtitle">The alarm is currently disabled</string>
+    <string name="alarm_no_modes_available">No arming mode is available</string>
+    <string name="alarm_code_to_arm_title">Arm · %1$s</string>
+    <string name="alarm_code_to_arm_subtitle">Confirm this mode with your code</string>
+    <string name="alarm_armed_title">Alarm active</string>
+    <string name="alarm_armed_subtitle">Enter your code to disarm</string>
+    <string name="alarm_armed_mode_format">%1$s mode · enter your code to disarm</string>
+    <string name="alarm_arming_title">Arming in progress</string>
+    <string name="alarm_arming_subtitle">Exit delay is running. You can still disarm.</string>
+    <string name="alarm_pending_title">Event detected</string>
+    <string name="alarm_pending_subtitle">The alarm will trigger shortly. Enter your code now.</string>
+    <string name="alarm_triggered_title">Alarm triggered</string>
+    <string name="alarm_triggered_subtitle">An alarm event is in progress. Enter your code to stop it.</string>
+    <string name="alarm_disarming_title">Disarming…</string>
+    <string name="alarm_disarming_subtitle">Waiting for confirmation from Home Assistant</string>
+    <string name="alarm_event_title">Alarm status</string>
 
     <!-- ===== COVER PANEL (Blinds) ===== -->
     <string name="cover_state_open">Open</string>
@@ -329,6 +397,17 @@
     <string name="thermostat_status_hold_between">HOLD BETWEEN</string>
     <string name="thermostat_room_temperature">Room temperature</string>
     <string name="thermostat_room_temperature_format">Room · %1$s%2$s</string>
+    <string name="valve_state_open">Open</string>
+    <string name="valve_state_closed">Closed</string>
+    <string name="valve_state_opening">Opening…</string>
+    <string name="valve_state_closing">Closing…</string>
+    <string name="valve_action_open">Open</string>
+    <string name="valve_action_stop">Stop</string>
+    <string name="valve_action_close">Close</string>
+    <string name="siren_state_active">Siren sounding</string>
+    <string name="siren_state_inactive">Siren ready</string>
+    <string name="siren_action_trigger">Trigger</string>
+    <string name="siren_action_stop">Stop</string>
 
     <!-- ===== VACUUM PANEL ===== -->
     <string name="vacuum_button_start">Start</string>
@@ -357,11 +436,22 @@
     <string name="fan_state_off">Stopped</string>
     <string name="fan_speed_label">Speed</string>
     <string name="fan_oscillation_label">Oscillation</string>
+    <string name="fan_oscillation_off">Fixed</string>
+    <string name="fan_oscillation_on">Oscillating</string>
     <string name="purifier_mode_auto">Auto</string>
     <string name="purifier_mode_sleep">Sleep</string>
     <string name="purifier_mode_manual">Manual</string>
     <string name="purifier_mode_pet">Pets</string>
     <string name="purifier_mode_off">Off</string>
+    <string name="purifier_air_quality">Air quality</string>
+    <string name="purifier_quality_good">Good</string>
+    <string name="purifier_quality_fair">Fair</string>
+    <string name="purifier_quality_poor">Poor</string>
+    <string name="purifier_quality_unknown">No reading</string>
+    <string name="purifier_details_open">Show air quality details</string>
+    <string name="purifier_details_back">Back to purifier controls</string>
+    <string name="purifier_details_title">Air details</string>
+    <string name="purifier_details_empty">No air measurement is available</string>
 
     <!-- ===== ENERGY PANEL ===== -->
     <string name="energy_power_label">Power</string>
@@ -402,6 +492,49 @@
     <string name="playground_section_vertical_slider">Vertical slider</string>
     <string name="playground_section_fake_panels">Interactive panel lab</string>
     <string name="playground_fake_panels_hint">Tap a fake device to open its real side panel. Actions stay local and never reach Home Assistant.</string>
+    <string name="playground_section_ha_capabilities">Home Assistant capability lab</string>
+    <string name="playground_ha_capabilities_hint">Each chip represents a different supported_features and attributes combination. Tap it to test the resulting production panel.</string>
+    <string name="playground_capability_humidifier">Humidifier</string>
+    <string name="playground_capability_water_heater">Water heater</string>
+    <string name="playground_capability_valve">Valve</string>
+    <string name="playground_capability_siren">Siren</string>
+    <string name="playground_capability_mower">Lawn mower</string>
+    <string name="playground_capability_cover">Cover</string>
+    <string name="playground_capability_fan">Fan</string>
+    <string name="playground_capability_climate">Climate</string>
+    <string name="playground_capability_vacuum">Vacuum</string>
+    <string name="playground_capability_security">Locks and alarms</string>
+    <string name="playground_capability_modes">Modes + off</string>
+    <string name="playground_capability_on_off">On / off</string>
+    <string name="playground_capability_temperature_modes">Temperature + modes</string>
+    <string name="playground_capability_temperature_only">Temperature only</string>
+    <string name="playground_capability_position_stop">Position + stop</string>
+    <string name="playground_capability_three_actions">Open / stop / close</string>
+    <string name="playground_capability_tones">Tones</string>
+    <string name="playground_capability_all_actions">All actions</string>
+    <string name="playground_capability_without_pause">Without pause</string>
+    <string name="playground_capability_percentage">Percentage</string>
+    <string name="playground_capability_presets">Preset modes</string>
+    <string name="playground_capability_percentage_oscillation">Percentage + oscillation</string>
+    <string name="playground_capability_temperature_range">Low / high targets</string>
+    <string name="playground_capability_modes_only">Modes only</string>
+    <string name="playground_capability_suction_modes">Suction modes</string>
+    <string name="playground_capability_pause_dock_locate">Pause + dock + locate</string>
+    <string name="playground_capability_start_only">Start only</string>
+    <string name="playground_capability_lock_normal">Normal</string>
+    <string name="playground_capability_lock_jammed">Jammed</string>
+    <string name="playground_capability_alarm_no_code">Alarm without code</string>
+    <string name="playground_capability_alarm_with_code">Alarm with code</string>
+    <string name="playground_alarm_state_armed_away">Armed · away</string>
+    <string name="playground_alarm_state_armed_home">Armed · home</string>
+    <string name="playground_alarm_state_armed_night">Armed · night</string>
+    <string name="playground_alarm_state_armed_vacation">Armed · vacation</string>
+    <string name="playground_alarm_state_armed_custom_bypass">Armed · custom bypass</string>
+    <string name="playground_alarm_state_arming">Arming</string>
+    <string name="playground_alarm_state_pending">Event detected</string>
+    <string name="playground_alarm_state_triggered">Triggered</string>
+    <string name="playground_alarm_state_disarming">Disarming</string>
+    <string name="playground_alarm_test_code_hint">Test code: 1234</string>
     <string name="playground_slider_from_bottom">From bottom</string>
     <string name="playground_slider_from_top">From top</string>
     <string name="playground_slider_disabled">Disabled</string>
@@ -660,15 +793,12 @@
     <string name="onb_bg_title">Choose your mood</string>
     <string name="onb_bg_body">The background stays deliberately understated to keep the time and important information readable.</string>
     <string name="onb_bg_tile_calm">Calm</string>
-    <string name="onb_bg_tile_nature">Nature</string>
     <string name="onb_bg_tile_my_photo">My photo</string>
     <string name="onb_bg_tile_immich">Immich</string>
+    <string name="onb_bg_android_desc">Use Android’s static or live wallpaper.</string>
     <string name="onb_bg_calm_desc">A dark gradient, entirely offline.</string>
     <string name="onb_bg_calm_opacity_label">Interface opacity</string>
     <string name="onb_bg_calm_preview_action">Full-screen preview</string>
-    <string name="onb_bg_nature_desc">Portal gently cycles through a selection of landscapes.</string>
-    <string name="onb_bg_nature_warning_internet">This option requires an Internet connection.</string>
-    <string name="onb_bg_nature_auto_change_label">Automatic change</string>
     <string name="onb_bg_photo_desc">Choose an image from this device.</string>
     <string name="onb_bg_photo_choose_action">Choose an image</string>
     <string name="onb_bg_photo_dim_label">Dimming</string>

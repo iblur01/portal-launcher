@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -29,11 +31,10 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -73,6 +74,8 @@ import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.PlayingMedia
 import com.iblu01.portallauncher.ui.components.controls.PortalThreeWayControl
 import com.iblu01.portallauncher.ui.components.controls.ThreeWayControlSize
+import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
+import com.iblu01.portallauncher.ui.components.controls.controlSize
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -123,7 +126,7 @@ fun MediaPlayerView(
         }
     }
     val isPlaying = media.state == "playing" || media.state == "buffering"
-    var volumeDialogVisible by remember { mutableStateOf(false) }
+    var volumePanelVisible by remember { mutableStateOf(false) }
     var groupDialogVisible by remember { mutableStateOf(false) }
     var selectedGroupMembers by remember(media.entityId) { mutableStateOf(media.groupMemberIds.toSet()) }
     LaunchedEffect(media.groupMemberIds) {
@@ -146,6 +149,16 @@ fun MediaPlayerView(
         1 -> media.playerNames.first()
         2 -> "${media.playerNames[0]} + ${media.playerNames[1]}"
         else -> stringResource(R.string.media_source_many_format, media.playerNames.first(), media.playerNames.size - 1)
+    }
+
+    if (volumePanelVisible) {
+        MediaVolumePanel(
+            players = media.players.ifEmpty { listOf(MediaPlayerVolume(media.entityId, sourceName, media.volumePercent, media.isMuted)) },
+            onVolumeChange = onVolumeChange,
+            onBack = { volumePanelVisible = false },
+            modifier = modifier,
+        )
+        return
     }
 
     BoxWithConstraints(
@@ -272,6 +285,14 @@ fun MediaPlayerView(
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier.fillMaxSize()
                                             )
+                                        } else if (!media.hasMedia) {
+                                            HaEntityIcon(
+                                                entityId = media.entityId,
+                                                contentDescription = stringResource(R.string.media_player_icon_desc_format, sourceName),
+                                                tint = AppleColors.secondary,
+                                                size = 64.dp,
+                                                fallback = Icons.Outlined.MusicNote,
+                                            )
                                         } else {
                                             Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(64.dp))
                         }
@@ -290,6 +311,13 @@ fun MediaPlayerView(
                             horizontalArrangement = Arrangement.spacedBy(7.dp),
                         ) {
                             Box(Modifier.size(7.dp).background(if (isPlaying) AppleColors.active else AppleColors.warning, CircleShape))
+                            HaEntityIcon(
+                                entityId = media.entityId,
+                                contentDescription = null,
+                                tint = if (isPlaying) AppleColors.active else AppleColors.warning,
+                                size = 23.dp,
+                                fallback = Icons.Outlined.MusicNote,
+                            )
                             Text(
                                 sourceName,
                                 style = AppleTypography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
@@ -326,7 +354,7 @@ fun MediaPlayerView(
                                 .clip(AppleShapes.pill)
                                 .background(AppleColors.frostedFill, AppleShapes.pill)
                                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                                .clickable { volumeDialogVisible = true }
+                                .clickable { volumePanelVisible = true }
                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(7.dp)
@@ -366,15 +394,29 @@ fun MediaPlayerView(
                         onNavigation = onDismiss,
                         navigationIcon = Icons.Filled.Close,
                         navigationContentDescription = stringResource(R.string.media_close_player_desc),
+                        titleIcon = Icons.Outlined.MusicNote,
+                        titleEntityId = media.entityId,
                         accent = if (isPlaying) AppleColors.active else AppleColors.warning,
                         onTitleClick = if (media.groupablePlayers.size > 1) ({ groupDialogVisible = true }) else null,
                     )
                 } else {
-                    Text(
-                        sourceName,
-                        style = AppleTypography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
-                        color = AppleColors.primary,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    ) {
+                        HaEntityIcon(
+                            entityId = media.entityId,
+                            contentDescription = null,
+                            tint = if (isPlaying) AppleColors.active else AppleColors.warning,
+                            size = 23.dp,
+                            fallback = Icons.Outlined.MusicNote,
+                        )
+                        Text(
+                            sourceName,
+                            style = AppleTypography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+                            color = AppleColors.primary,
+                        )
+                    }
                 }
 
                 Box(
@@ -387,6 +429,14 @@ fun MediaPlayerView(
                 ) {
                         if (imageRequest != null) {
                             AsyncImage(model = imageRequest, imageLoader = imageLoader, contentDescription = stringResource(R.string.media_cover_desc_format, media.title), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        } else if (!media.hasMedia) {
+                            HaEntityIcon(
+                                entityId = media.entityId,
+                                contentDescription = stringResource(R.string.media_player_icon_desc_format, sourceName),
+                                tint = AppleColors.secondary,
+                                size = 82.dp,
+                                fallback = Icons.Outlined.MusicNote,
+                            )
                         } else {
                             Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(82.dp))
                     }
@@ -423,7 +473,7 @@ fun MediaPlayerView(
                         .clip(AppleShapes.pill)
                         .background(AppleColors.frostedFill, AppleShapes.pill)
                         .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                        .clickable { volumeDialogVisible = true }
+                        .clickable { volumePanelVisible = true }
                         .padding(horizontal = 18.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(9.dp)
@@ -491,52 +541,6 @@ fun MediaPlayerView(
             }
         }
 
-        if (volumeDialogVisible) {
-            Dialog(onDismissRequest = { volumeDialogVisible = false }) {
-                Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = Color(0xF21B1D20),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, AppleColors.frostedBorder),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp).fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
-                    ) {
-                        Text(stringResource(R.string.media_volume_dialog_title), style = AppleTypography.headlineLarge.copy(fontSize = 24.sp), color = AppleColors.primary)
-                        (media.players.ifEmpty {
-                            listOf(com.iblu01.portallauncher.domain.model.MediaPlayerVolume(media.entityId, sourceName, media.volumePercent, media.isMuted))
-                        }).forEach { player ->
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(player.name, modifier = Modifier.weight(1f), style = AppleTypography.titleMedium, color = AppleColors.primary)
-                                    Text("${player.volumePercent}%", style = AppleTypography.bodySmall, color = AppleColors.secondary)
-                                }
-                                var position by remember(player.entityId, player.volumePercent) {
-                                    mutableFloatStateOf(player.volumePercent / 100f)
-                                }
-                                Slider(
-                                    value = position,
-                                    onValueChange = { position = it },
-                                    onValueChangeFinished = { onVolumeChange(player.entityId, position) },
-                                    colors = SliderDefaults.colors(
-                                        activeTrackColor = Color.White,
-                                        inactiveTrackColor = Color.White.copy(alpha = 0.16f),
-                                        thumbColor = Color.White,
-                                    ),
-                                )
-                            }
-                        }
-                        Text(
-                            stringResource(R.string.media_volume_dialog_close),
-                            modifier = Modifier.align(Alignment.End).clip(AppleShapes.pill).clickable { volumeDialogVisible = false }
-                                .background(AppleColors.frostedFill).padding(horizontal = 18.dp, vertical = 10.dp),
-                            style = AppleTypography.titleMedium,
-                            color = AppleColors.primary,
-                        )
-                    }
-                }
-            }
-        }
         if (groupDialogVisible) {
             Dialog(onDismissRequest = { groupDialogVisible = false }) {
                 Surface(
@@ -587,6 +591,81 @@ fun MediaPlayerView(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaVolumePanel(
+    players: List<MediaPlayerVolume>,
+    onVolumeChange: (String, Float) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var selectedId by remember(players) { mutableStateOf(players.first().entityId) }
+    val selected = players.firstOrNull { it.entityId == selectedId } ?: players.first()
+    var position by remember(selected.entityId, selected.volumePercent) {
+        mutableFloatStateOf(selected.volumePercent.toFloat())
+    }
+    Box(
+        modifier = modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 16.dp)
+            .clip(AppleShapes.panel).background(Color.Black.copy(alpha = 0.76f))
+            .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel),
+    ) {
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.14f), Color.Black.copy(alpha = 0.94f)))))
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            PanelHeader(
+                title = stringResource(R.string.media_volume_dialog_title),
+                onNavigation = onBack,
+                navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
+                navigationContentDescription = stringResource(R.string.playground_back_desc),
+                titleIcon = if (selected.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                accent = if (position > 0f) AppleColors.accent else AppleColors.inactive,
+            )
+            if (players.size > 1) {
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    players.forEach { player ->
+                        val active = player.entityId == selected.entityId
+                        Row(
+                            Modifier.clip(AppleShapes.pill)
+                                .background(if (active) AppleColors.accent.copy(alpha = 0.20f) else AppleColors.frostedFill, AppleShapes.pill)
+                                .border(0.5.dp, if (active) AppleColors.accent.copy(alpha = 0.65f) else AppleColors.frostedBorder, AppleShapes.pill)
+                                .clickable { selectedId = player.entityId }
+                                .padding(horizontal = 13.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            Box(Modifier.size(7.dp).background(if (player.volumePercent > 0) AppleColors.accent else AppleColors.inactive, CircleShape))
+                            Text(player.name, style = AppleTypography.bodySmall, color = if (active) AppleColors.primary else AppleColors.secondary, maxLines = 1)
+                            Text("${player.volumePercent} %", style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Text(selected.name, style = AppleTypography.titleLarge, color = AppleColors.primary)
+            Text("${position.toInt()} %", style = AppleTypography.headlineLarge.copy(fontSize = 34.sp), color = AppleColors.primary)
+            Spacer(Modifier.height(14.dp))
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                VerticalFillSlider(
+                    value = position,
+                    onValueChange = { position = it },
+                    valueRange = 0f..100f,
+                    accent = AppleColors.accent,
+                    icon = if (position <= 0f) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                    label = { "${it.toInt()} %" },
+                    hapticSteps = 20,
+                    onValueChangeFinished = { onVolumeChange(selected.entityId, it / 100f) },
+                    modifier = Modifier.controlSize(104.dp),
+                )
             }
         }
     }

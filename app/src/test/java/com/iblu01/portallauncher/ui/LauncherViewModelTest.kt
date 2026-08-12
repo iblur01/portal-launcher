@@ -6,6 +6,11 @@ import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.domain.model.PillSnapshot
 import com.iblu01.portallauncher.domain.model.PlayingMedia
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
+import com.iblu01.portallauncher.domain.home.Availability
+import com.iblu01.portallauncher.domain.home.HomePillPreferences
+import com.iblu01.portallauncher.domain.home.PillCatalogSnapshot
+import com.iblu01.portallauncher.domain.home.PillRef
+import com.iblu01.portallauncher.domain.home.ResolvedPill
 import com.iblu01.portallauncher.ui.model.PanelKind
 import com.iblu01.portallauncher.ui.panel.PanelEvent
 import com.iblu01.portallauncher.ui.panel.PanelRequest
@@ -53,7 +58,29 @@ class LauncherViewModelTest {
     private fun vm(
         source: MutableStateFlow<PillSnapshot>,
         onCall: (String, String, String?, Map<String, Any>?) -> Unit = { _, _, _, _ -> },
-    ) = LauncherViewModel(source, onCall)
+        onPreferences: (((HomePillPreferences) -> HomePillPreferences) -> HomePillPreferences)? = null,
+    ) = LauncherViewModel(source, onCall, onPreferences)
+
+    private fun preferences(vararg refs: PillRef) = HomePillPreferences(
+        schemaVersion = 1,
+        homePageEnabled = true,
+        pinnedOrder = refs.toList(),
+        homeSections = emptyList(),
+        manualGroups = emptyList(),
+    )
+
+    private fun catalog(vararg entries: Pair<PillRef.Device, Availability>): PillCatalogSnapshot {
+        val resolved = entries.filter { it.second.isRenderable }.associate { (ref, availability) ->
+            ref to ResolvedPill(ref, chip(ref.entityId.substringAfter('.'), ref.entityId), availability, setOf(ref.entityId))
+        }
+        return PillCatalogSnapshot(
+            devices = resolved.mapValues { it.value.chip },
+            groups = emptyMap(),
+            availability = entries.toMap(),
+            dynamicCandidates = emptyList(),
+            resolvedDevices = resolved,
+        )
+    }
 
     @Test fun `uiState mirrors snapshot chips`() = runTest {
         val source = MutableStateFlow(emptySnapshot())
@@ -92,7 +119,10 @@ class LauncherViewModelTest {
 
     @Test fun `callService is delegated to the injected lambda`() {
         val calls = mutableListOf<String>()
-        val model = vm(MutableStateFlow(emptySnapshot())) { d, s, e, _ -> calls += "$d.$s@$e" }
+        val model = vm(
+            MutableStateFlow(emptySnapshot()),
+            onCall = { d, s, e, _ -> calls += "$d.$s@$e" },
+        )
         model.callService("switch", "toggle", "switch.x")
         assertEquals(listOf("switch.toggle@switch.x"), calls)
     }
@@ -145,6 +175,80 @@ class LauncherViewModelTest {
             source.value = emptySnapshot().copy(chips = emptyList())
             expectNoEvents()                                          // panelChip does NOT go null
             assertEquals("a", model.panelChip.value?.id)              // frozen last-known-good
+        }
+    }
+
+    @Test fun `uiState exposes one atomic catalog composition preferences and stable area frame`() = runTest {
+        val ref = PillRef.Device("switch.a")
+        val prefs = preferences(ref)
+        val source = MutableStateFlow(
+            emptySnapshot().copy(
+                catalog = catalog(ref to Availability.AVAILABLE),
+                homePreferences = prefs,
+                areaIdByEntity = mapOf(ref.entityId to "kitchen"),
+                areaNameById = mapOf("kitchen" to "Cuisine"),
+            ),
+        )
+        val model = vm(source)
+        model.uiState.test {
+            val state = awaitItem()
+            assertEquals(prefs, state.homePreferences)
+            assertEquals(Availability.AVAILABLE, state.catalog.availability[ref])
+            assertEquals("kitchen", state.areaIdByEntity[ref.entityId])
+            assertEquals("Cuisine", state.areaNameById["kitchen"])
+        }
+    }
+
+    @Test fun `new pin requires available while stale existing pin can be removed`() = runTest {
+        val available = PillRef.Device("switch.available")
+        val stale = PillRef.Device("switch.stale")
+        val unavailable = PillRef.Device("switch.unavailable")
+        var stored = preferences(stale)
+        val source = MutableStateFlow(
+            emptySnapshot().copy(
+                catalog = catalog(
+                    available to Availability.AVAILABLE,
+                    stale to Availability.STALE,
+                    unavailable to Availability.UNAVAILABLE,
+                ),
+                homePreferences = stored,
+            ),
+        )
+        val model = vm(source, onPreferences = { reducer -> reducer(stored).also { stored = it } })
+
+        assertEquals(true, model.setPinned(stale, pinned = true))
+        assertEquals(false, model.setPinned(unavailable, pinned = true))
+        assertEquals(true, model.setPinned(available, pinned = true))
+        assertEquals(listOf(stale, available), stored.pinnedOrder)
+        assertEquals(true, model.setPinned(stale, pinned = false))
+        assertEquals(listOf(available), stored.pinnedOrder)
+    }
+
+    @Test fun `pin reorder mutates persistent order without touching dynamic slots`() = runTest {
+        val a = PillRef.Device("switch.a")
+        val b = PillRef.Device("switch.b")
+        val c = PillRef.Device("switch.c")
+        var stored = preferences(a, b, c)
+        val source = MutableStateFlow(emptySnapshot().copy(homePreferences = stored))
+        val model = vm(source, onPreferences = { reducer -> reducer(stored).also { stored = it } })
+
+        assertEquals(true, model.movePinned(c, 0))
+        assertEquals(listOf(c, a, b), stored.pinnedOrder)
+    }
+
+    @Test fun `group device panel resolves from full catalog and remains last known good`() = runTest {
+        val device = PillRef.Device("switch.group_member")
+        val group = PillRef.AreaGroup("kitchen")
+        val source = MutableStateFlow(emptySnapshot().copy(catalog = catalog(device to Availability.AVAILABLE)))
+        val model = vm(source)
+        model.panelChip.test {
+            assertNull(awaitItem())
+            model.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(group)))
+            model.onEvent(PanelEvent.OpenGroupDevice(PanelRequest.Chip(device.entityId.substringAfter('.'), PanelKind.SWITCH)))
+            assertEquals(device.entityId, awaitItem()?.entityId)
+            source.value = emptySnapshot()
+            expectNoEvents()
+            assertEquals(device.entityId, model.panelChip.value?.entityId)
         }
     }
 }

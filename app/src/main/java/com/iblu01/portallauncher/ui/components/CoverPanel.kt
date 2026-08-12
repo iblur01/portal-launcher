@@ -38,6 +38,7 @@ fun CoverControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val state = entity.state.lowercase()
     val position = entity.attributes.optInt("current_position", -1)
     val canSetPosition = entity.supports(CoverFeature.SET_POSITION) && position in 0..100
+    val canStop = entity.supports(CoverFeature.STOP)
 
     // While dragging, the finger owns the readout; otherwise it follows the entity.
     var sliderPos by remember(position) { mutableFloatStateOf(position.toFloat()) }
@@ -90,9 +91,9 @@ fun CoverControl(chip: LauncherChip, modifier: Modifier = Modifier) {
             leadingContentDescription = stringResource(R.string.cover_button_close),
             leadingLabel = stringResource(R.string.cover_button_close),
             onLeadingClick = { callService("cover", "close_cover", chip.entityId) },
-            centerIcon = Icons.Filled.Pause,
-            centerContentDescription = stringResource(R.string.cover_button_stop),
-            onCenterClick = { callService("cover", "stop_cover", chip.entityId) },
+            centerIcon = Icons.Filled.Pause.takeIf { canStop },
+            centerContentDescription = stringResource(R.string.cover_button_stop).takeIf { canStop },
+            onCenterClick = if (canStop) ({ callService("cover", "stop_cover", chip.entityId) }) else null,
             trailingIcon = Icons.Outlined.KeyboardArrowUp,
             trailingContentDescription = stringResource(R.string.cover_button_open),
             trailingLabel = stringResource(R.string.cover_button_open),

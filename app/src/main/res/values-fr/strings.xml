@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="accessibility_label">Contrôle de l’écran Portal Launcher</string>
+    <string name="accessibility_description">Permet à Portal Launcher d’éteindre l’écran sur commande de Home Assistant. Le service ne lit pas le contenu de l’écran.</string>
+
     <!-- ===== SETUP WIZARD ===== -->
     <string name="setup_welcome_title">Bienvenue</string>
     <string name="setup_welcome_subtitle">Commençons par trouver ta maison. Assure-toi que Home Assistant est allumé sur le même réseau.</string>
@@ -160,6 +163,52 @@
     <string name="pills_extra_battery">batterie</string>
     <string name="pills_extra_cycle">cycle</string>
     <string name="pills_extra_completion">fin prévue</string>
+    <string name="pills_settings_sections_title">PERSONNALISATION</string>
+    <string name="pills_settings_launcher_home">Accueil</string>
+    <string name="pills_settings_launcher_home_description">Les trois premières positions restent visibles. Les six suivantes apparaissent avec Voir plus. Les alertes peuvent les dépasser temporairement sans modifier cet ordre.</string>
+    <string name="pills_settings_house_page">Page Maison</string>
+    <string name="pills_settings_available_devices">Appareils disponibles</string>
+    <string name="pills_settings_pinned_count">Épinglées : %1$d</string>
+    <string name="pills_enabled">Activée</string>
+    <string name="pills_disabled">Désactivée</string>
+    <string name="pills_settings_primary_slots">PRINCIPALES · 3 POSITIONS</string>
+    <string name="pills_settings_secondary_slots">SECONDAIRES · 6 POSITIONS</string>
+    <string name="pills_settings_overflow">DÉBORDEMENT DES FAVORIS MAISON</string>
+    <string name="pills_settings_automatic_slot">Automatique</string>
+    <string name="pills_pin">Épingler</string>
+    <string name="pills_unpin">Désépingler</string>
+    <string name="pills_unavailable">Indisponible</string>
+    <string name="pills_stale">Hors ligne</string>
+    <string name="pills_stale_state">Hors ligne — dernier état : %1$s</string>
+    <string name="pills_enable_before_pin">Activer pour épingler</string>
+    <string name="pills_not_available_to_pin">Aucun membre disponible : ce groupe ne peut pas être épinglé</string>
+    <string name="pills_move_first">Placer en premier</string>
+    <string name="pills_move_before">Déplacer avant</string>
+    <string name="pills_move_after">Déplacer après</string>
+    <string name="pills_move_last">Placer en dernier</string>
+    <string name="pills_house_activation">ACTIVATION</string>
+    <string name="pills_house_enable">Afficher la page Maison</string>
+    <string name="pills_house_sections">SECTIONS · VISIBILITÉ ET ORDRE</string>
+    <string name="pills_house_section_position">Position %1$d</string>
+    <string name="pills_house_automatic_groups">GROUPES AUTOMATIQUES</string>
+    <string name="pills_house_automatic_groups_hint">L’appartenance aux pièces et aux types vient de Home Assistant et ne peut pas être modifiée ici.</string>
+    <string name="pills_section_favorites">Favoris</string>
+    <string name="pills_section_areas">Pièces</string>
+    <string name="pills_manual_groups">MES GROUPES</string>
+    <string name="pills_manual_create">Créer un groupe</string>
+    <string name="pills_manual_empty">Aucun groupe manuel. Les groupes vides restent éditables ici et sont masqués sur Maison.</string>
+    <string name="pills_manual_member_count">Membres : %1$d</string>
+    <string name="pills_group_member_count">%1$s membres</string>
+    <string name="pills_devices_description">Active les appareils compatibles et épingle-les même s’ils ne figurent pas parmi les neuf positions actuelles. Un appareil indisponible peut être désépinglé, mais pas nouvellement épinglé.</string>
+    <string name="pills_manual_identity">GROUPE</string>
+    <string name="pills_manual_name">Nom</string>
+    <string name="pills_pin_group">Épingler ce groupe</string>
+    <string name="pills_manual_members">MEMBRES</string>
+    <string name="pills_manual_delete">Supprimer le groupe</string>
+    <string name="pills_manual_delete_title">Supprimer « %1$s » ?</string>
+    <string name="pills_manual_delete_description">Les appareils ne seront ni supprimés ni désactivés. Seul ce groupe manuel local disparaîtra.</string>
+    <string name="pills_manual_save">Enregistrer</string>
+    <string name="pills_manual_move_to_group">Déplacer vers un autre groupe</string>
 
     <!-- ===== CLOCK THEME EDITOR ===== -->
     <string name="clock_theme_label_font">Police</string>
@@ -181,11 +230,14 @@
     <string name="clock_stale_banner_format">Hors ligne — infos figées depuis %1$s</string>
     <string name="header_hidden_apps_content_desc">Applications masquées (%1$d)</string>
     <string name="header_settings_content_desc">Réglages</string>
+    <string name="home_header_title">Maison</string>
+    <string name="home_header_grouping_content_desc">Grouper par pièce (bientôt disponible)</string>
+    <string name="home_header_edit_content_desc">Modifier Maison</string>
+    <string name="home_header_finish_content_desc">Terminer la modification de Maison</string>
     <string name="auto_return_pill_label">Fermeture auto</string>
     <string name="auto_return_cancel_desc">Annuler</string>
     <string name="bg_mode_system">Fond d’écran Android</string>
     <string name="bg_mode_neutral">Neutre</string>
-    <string name="bg_mode_nature">Nature (Unsplash)</string>
     <string name="bg_mode_custom">Photo perso</string>
     <string name="bg_mode_immich">Album Immich</string>
 
@@ -251,6 +303,7 @@
     <string name="media_source_many_format">%1$s + %2$d autres</string>
     <string name="media_cover_desc_format">Pochette de %1$s</string>
     <string name="media_no_cover_desc">Aucune pochette</string>
+    <string name="media_player_icon_desc_format">Lecteur multimédia %1$s</string>
     <string name="media_previous_track_desc">Titre précédent</string>
     <string name="media_pause_desc">Pause</string>
     <string name="media_play_desc">Lecture</string>
@@ -299,8 +352,26 @@
     <string name="alarm_mode_home">Présence</string>
     <string name="alarm_mode_night">Nuit</string>
     <string name="alarm_mode_vacation">Vacances</string>
+    <string name="alarm_mode_custom_bypass">Contournement</string>
     <string name="alarm_mode_off">Désactivée</string>
     <string name="alarm_disarm_button">Désarmer</string>
+    <string name="alarm_choose_mode_title">Choisir un mode d’armement</string>
+    <string name="alarm_disarmed_subtitle">L’alarme est actuellement désactivée</string>
+    <string name="alarm_no_modes_available">Aucun mode d’armement disponible</string>
+    <string name="alarm_code_to_arm_title">Armer · %1$s</string>
+    <string name="alarm_code_to_arm_subtitle">Confirmez ce mode avec votre code</string>
+    <string name="alarm_armed_title">Alarme active</string>
+    <string name="alarm_armed_subtitle">Entrez votre code pour désarmer</string>
+    <string name="alarm_armed_mode_format">Mode %1$s · entrez votre code pour désarmer</string>
+    <string name="alarm_arming_title">Armement en cours</string>
+    <string name="alarm_arming_subtitle">Le délai de sortie est lancé. Vous pouvez encore désarmer.</string>
+    <string name="alarm_pending_title">Événement détecté</string>
+    <string name="alarm_pending_subtitle">L’alarme va se déclencher. Entrez votre code maintenant.</string>
+    <string name="alarm_triggered_title">Alarme déclenchée</string>
+    <string name="alarm_triggered_subtitle">Un événement d’alarme est en cours. Entrez votre code pour l’arrêter.</string>
+    <string name="alarm_disarming_title">Désarmement…</string>
+    <string name="alarm_disarming_subtitle">En attente de la confirmation de Home Assistant</string>
+    <string name="alarm_event_title">État de l’alarme</string>
 
     <!-- ===== COVER PANEL (Blinds) ===== -->
     <string name="cover_state_open">Ouvert</string>
@@ -324,6 +395,17 @@
     <string name="thermostat_status_hold_between">MAINTENIR ENTRE</string>
     <string name="thermostat_room_temperature">Température ambiante</string>
     <string name="thermostat_room_temperature_format">Pièce · %1$s%2$s</string>
+    <string name="valve_state_open">Ouverte</string>
+    <string name="valve_state_closed">Fermée</string>
+    <string name="valve_state_opening">Ouverture…</string>
+    <string name="valve_state_closing">Fermeture…</string>
+    <string name="valve_action_open">Ouvrir</string>
+    <string name="valve_action_stop">Arrêter</string>
+    <string name="valve_action_close">Fermer</string>
+    <string name="siren_state_active">Sirène déclenchée</string>
+    <string name="siren_state_inactive">Sirène prête</string>
+    <string name="siren_action_trigger">Déclencher</string>
+    <string name="siren_action_stop">Arrêter</string>
 
     <!-- ===== VACUUM PANEL ===== -->
     <string name="vacuum_button_start">Démarrer</string>
@@ -352,11 +434,22 @@
     <string name="fan_state_off">Arrêté</string>
     <string name="fan_speed_label">Vitesse</string>
     <string name="fan_oscillation_label">Oscillation</string>
+    <string name="fan_oscillation_off">Fixe</string>
+    <string name="fan_oscillation_on">Oscillation</string>
     <string name="purifier_mode_auto">Auto</string>
     <string name="purifier_mode_sleep">Nuit</string>
     <string name="purifier_mode_manual">Manuel</string>
     <string name="purifier_mode_pet">Animaux</string>
     <string name="purifier_mode_off">Arrêt</string>
+    <string name="purifier_air_quality">Qualité de l’air</string>
+    <string name="purifier_quality_good">Bonne</string>
+    <string name="purifier_quality_fair">Moyenne</string>
+    <string name="purifier_quality_poor">Mauvaise</string>
+    <string name="purifier_quality_unknown">Aucune mesure</string>
+    <string name="purifier_details_open">Afficher le détail de la qualité de l’air</string>
+    <string name="purifier_details_back">Retour aux commandes du purificateur</string>
+    <string name="purifier_details_title">Détails de l’air</string>
+    <string name="purifier_details_empty">Aucune mesure de l’air disponible</string>
 
     <!-- ===== ENERGY PANEL ===== -->
     <string name="energy_power_label">Puissance</string>
@@ -397,6 +490,49 @@
     <string name="playground_section_vertical_slider">Curseur vertical</string>
     <string name="playground_section_fake_panels">Laboratoire de panneaux</string>
     <string name="playground_fake_panels_hint">Touchez un faux appareil pour ouvrir son vrai panneau latéral. Les actions restent locales et ne contactent jamais Home Assistant.</string>
+    <string name="playground_section_ha_capabilities">Laboratoire des capacités Home Assistant</string>
+    <string name="playground_ha_capabilities_hint">Chaque chip représente une combinaison différente de supported_features et d’attributs. Touchez-la pour tester le panneau réel obtenu.</string>
+    <string name="playground_capability_humidifier">Humidificateur</string>
+    <string name="playground_capability_water_heater">Chauffe-eau</string>
+    <string name="playground_capability_valve">Vanne</string>
+    <string name="playground_capability_siren">Sirène</string>
+    <string name="playground_capability_mower">Robot tondeuse</string>
+    <string name="playground_capability_cover">Volet</string>
+    <string name="playground_capability_fan">Ventilateur</string>
+    <string name="playground_capability_climate">Thermostat</string>
+    <string name="playground_capability_vacuum">Aspirateur</string>
+    <string name="playground_capability_security">Serrures et alarmes</string>
+    <string name="playground_capability_modes">Modes + arrêt</string>
+    <string name="playground_capability_on_off">Marche / arrêt</string>
+    <string name="playground_capability_temperature_modes">Température + modes</string>
+    <string name="playground_capability_temperature_only">Température seule</string>
+    <string name="playground_capability_position_stop">Position + arrêt</string>
+    <string name="playground_capability_three_actions">Ouvrir / arrêter / fermer</string>
+    <string name="playground_capability_tones">Tonalités</string>
+    <string name="playground_capability_all_actions">Toutes les commandes</string>
+    <string name="playground_capability_without_pause">Sans pause</string>
+    <string name="playground_capability_percentage">Pourcentage</string>
+    <string name="playground_capability_presets">Modes prédéfinis</string>
+    <string name="playground_capability_percentage_oscillation">Pourcentage + oscillation</string>
+    <string name="playground_capability_temperature_range">Consignes basse / haute</string>
+    <string name="playground_capability_modes_only">Modes uniquement</string>
+    <string name="playground_capability_suction_modes">Modes d’aspiration</string>
+    <string name="playground_capability_pause_dock_locate">Pause + base + localiser</string>
+    <string name="playground_capability_start_only">Démarrage uniquement</string>
+    <string name="playground_capability_lock_normal">Normale</string>
+    <string name="playground_capability_lock_jammed">Bloquée</string>
+    <string name="playground_capability_alarm_no_code">Alarme sans code</string>
+    <string name="playground_capability_alarm_with_code">Alarme avec code</string>
+    <string name="playground_alarm_state_armed_away">Armée · absence</string>
+    <string name="playground_alarm_state_armed_home">Armée · présence</string>
+    <string name="playground_alarm_state_armed_night">Armée · nuit</string>
+    <string name="playground_alarm_state_armed_vacation">Armée · vacances</string>
+    <string name="playground_alarm_state_armed_custom_bypass">Armée · contournement</string>
+    <string name="playground_alarm_state_arming">Armement</string>
+    <string name="playground_alarm_state_pending">Événement détecté</string>
+    <string name="playground_alarm_state_triggered">Déclenchée</string>
+    <string name="playground_alarm_state_disarming">Désarmement</string>
+    <string name="playground_alarm_test_code_hint">Code de test : 1234</string>
     <string name="playground_slider_from_bottom">Depuis le bas</string>
     <string name="playground_slider_from_top">Depuis le haut</string>
     <string name="playground_slider_disabled">Désactivé</string>
@@ -538,7 +674,7 @@
     <!-- ===== PILL MEDIA STATE (plurals) ===== -->
     <plurals name="pill_media_state">
         <item quantity="zero">Aucun média</item>
-        <item quantity="one">En pause</item>
+        <item quantity="one">%1$d média en pause</item>
         <item quantity="other">%1$d en lecture</item>
     </plurals>
 
@@ -655,15 +791,12 @@
     <string name="onb_bg_title">Choisissez votre ambiance</string>
     <string name="onb_bg_body">Le fond reste volontairement discret pour préserver la lisibilité de l\'heure et des informations importantes.</string>
     <string name="onb_bg_tile_calm">Calme</string>
-    <string name="onb_bg_tile_nature">Nature</string>
     <string name="onb_bg_tile_my_photo">Ma photo</string>
     <string name="onb_bg_tile_immich">Immich</string>
+    <string name="onb_bg_android_desc">Utiliser le fond d’écran statique ou animé d’Android.</string>
     <string name="onb_bg_calm_desc">Un dégradé sombre, entièrement hors ligne.</string>
     <string name="onb_bg_calm_opacity_label">Opacité de l\'interface</string>
     <string name="onb_bg_calm_preview_action">Aperçu plein écran</string>
-    <string name="onb_bg_nature_desc">Portal fait doucement défiler une sélection de paysages.</string>
-    <string name="onb_bg_nature_warning_internet">Cette option nécessite une connexion Internet.</string>
-    <string name="onb_bg_nature_auto_change_label">Changement automatique</string>
     <string name="onb_bg_photo_desc">Choisissez une image depuis cet appareil.</string>
     <string name="onb_bg_photo_choose_action">Choisir une image</string>
     <string name="onb_bg_photo_dim_label">Assombrissement</string>
@@ -691,7 +824,7 @@
     <string name="onb_ha_intro_discovery_searching">Recherche de votre maison sur le réseau…</string>
     <string name="onb_ha_intro_discovery_found_none">Aucune maison détectée sur ce réseau.</string>
     <plurals name="onb_ha_intro_discovery_found_count">
-        <item quantity="one">Maison détectée</item>
+        <item quantity="one">%1$d maison détectée</item>
         <item quantity="other">%1$d maisons détectées</item>
     </plurals>
     <string name="onb_ha_intro_action_continue">Continuer avec cette maison</string>

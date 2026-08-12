@@ -29,7 +29,7 @@ import com.iblu01.portallauncher.ui.theme.AppleTypography
 enum class ThreeWayControlSize { Compact, Regular }
 
 /**
- * Shared three-action capsule used by media playback and directional devices such as covers.
+ * Shared two/three-action capsule used by media playback and directional devices such as covers.
  *
  * This component owns presentation only: callers provide icons, accessible descriptions and
  * callbacks. Optional side labels create the cover variation without coupling it to a domain.
@@ -39,9 +39,9 @@ fun PortalThreeWayControl(
     leadingIcon: ImageVector,
     leadingContentDescription: String,
     onLeadingClick: () -> Unit,
-    centerIcon: ImageVector,
-    centerContentDescription: String,
-    onCenterClick: () -> Unit,
+    centerIcon: ImageVector?,
+    centerContentDescription: String?,
+    onCenterClick: (() -> Unit)?,
     trailingIcon: ImageVector,
     trailingContentDescription: String,
     onTrailingClick: () -> Unit,
@@ -49,6 +49,9 @@ fun PortalThreeWayControl(
     leadingLabel: String? = null,
     trailingLabel: String? = null,
     size: ThreeWayControlSize = ThreeWayControlSize.Regular,
+    leadingEnabled: Boolean = true,
+    centerEnabled: Boolean = true,
+    trailingEnabled: Boolean = true,
 ) {
     val metrics = when (size) {
         ThreeWayControlSize.Compact -> ThreeWayMetrics(
@@ -77,19 +80,23 @@ fun PortalThreeWayControl(
             onClick = onLeadingClick,
             buttonSize = metrics.sideButton,
             iconSize = metrics.sideIcon,
+            enabled = leadingEnabled,
         )
-        IconButton(
-            onClick = onCenterClick,
-            modifier = Modifier
-                .size(metrics.centerButton)
-                .background(Color.White, CircleShape),
-        ) {
-            Icon(
-                centerIcon,
-                contentDescription = centerContentDescription,
-                tint = Color.Black,
-                modifier = Modifier.size(metrics.centerIcon),
-            )
+        if (centerIcon != null && centerContentDescription != null && onCenterClick != null) {
+            IconButton(
+                onClick = onCenterClick,
+                enabled = centerEnabled,
+                modifier = Modifier
+                    .size(metrics.centerButton)
+                    .background(Color.White, CircleShape),
+            ) {
+                Icon(
+                    centerIcon,
+                    contentDescription = centerContentDescription,
+                    tint = Color.Black,
+                    modifier = Modifier.size(metrics.centerIcon),
+                )
+            }
         }
         SideAction(
             icon = trailingIcon,
@@ -98,6 +105,7 @@ fun PortalThreeWayControl(
             onClick = onTrailingClick,
             buttonSize = metrics.sideButton,
             iconSize = metrics.sideIcon,
+            enabled = trailingEnabled,
         )
     }
 }
@@ -110,8 +118,9 @@ private fun SideAction(
     onClick: () -> Unit,
     buttonSize: Dp,
     iconSize: Dp,
+    enabled: Boolean,
 ) {
-    IconButton(onClick = onClick, modifier = Modifier.size(buttonSize)) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(buttonSize)) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy((-2).dp),
@@ -119,7 +128,7 @@ private fun SideAction(
             Icon(
                 icon,
                 contentDescription = contentDescription,
-                tint = AppleColors.primary,
+                tint = if (enabled) AppleColors.primary else AppleColors.tertiary,
                 modifier = Modifier.size(iconSize),
             )
             if (label != null) {

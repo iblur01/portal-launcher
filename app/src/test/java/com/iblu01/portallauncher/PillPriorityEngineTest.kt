@@ -34,19 +34,91 @@ class PillPriorityEngineTest {
         assertEquals("All closed", result.last().value)
     }
 
-    @Test fun `danger wins over activity`() {
-        val smoke = entity("binary_sensor.smoke", "on", "smoke")
+    @Test fun `alarm danger wins over activity`() {
+        val alarm = entity("alarm_control_panel.home", "triggered")
         val washer = entity("sensor.washer", "running")
-        val rules = listOf(PillRule(smoke.entityId, PillKind.SAFETY, "Fumée"), PillRule(washer.entityId, PillKind.APPLIANCE, "Machine"))
-        val result = engine.select(rules, mapOf(smoke.entityId to smoke, washer.entityId to washer))
-        assertEquals(smoke.entityId, result.first().entityId)
+        val rules = listOf(PillRule(alarm.entityId, PillKind.SAFETY, "Alarme"), PillRule(washer.entityId, PillKind.APPLIANCE, "Machine"))
+        val result = engine.select(rules, mapOf(alarm.entityId to alarm, washer.entityId to washer))
+        assertEquals(alarm.entityId, result.first().entityId)
         assertEquals("critical", result.first().state)
     }
 
-    @Test fun `selection is limited to nine`() {
+    @Test fun `motion is contextual while people are not pill candidates`() {
+        val motion = entity("binary_sensor.hall_motion", "on", "motion")
+        val person = entity("person.marie", "home")
+        val rules = listOf(
+            PillRule(motion.entityId, PillKind.GENERIC, "Couloir"),
+            PillRule(person.entityId, PillKind.PRESENCE, "Marie"),
+        )
+        val active = engine.select(rules, listOf(motion, person).associateBy { it.entityId })
+        assertEquals(listOf("binary_sensor.hall_motion"), active.map { it.entityId })
+        assertEquals(listOf(PillKind.GENERIC), active.map { it.kind })
+
+        val idleMotion = entity("binary_sensor.hall_motion", "off", "motion")
+        val idle = engine.select(rules, listOf(idleMotion, person).associateBy { it.entityId })
+        assertTrue(idle.isEmpty())
+    }
+
+    @Test fun `stale motion presence rule is normalized on selection`() {
+        val motion = entity("binary_sensor.hall_motion", "on", "motion")
+        val staleRule = PillRule(motion.entityId, PillKind.PRESENCE, "Couloir")
+
+        val chip = engine.select(listOf(staleRule), mapOf(motion.entityId to motion)).single()
+
+        assertEquals(PillKind.GENERIC, chip.kind)
+        assertEquals(motion.entityId, chip.entityId)
+    }
+
+    @Test fun `binary battery never becomes visual noise`() {
+        val low = entity("binary_sensor.remote_battery", "on", "battery")
+        val ok = entity("binary_sensor.lock_battery", "off", "battery")
+        val rules = listOf(
+            PillRule(low.entityId, PillKind.BATTERY, "Télécommande"),
+            PillRule(ok.entityId, PillKind.BATTERY, "Serrure"),
+        )
+        val chips = engine.select(rules, listOf(low, ok).associateBy { it.entityId })
+        assertTrue(chips.isEmpty())
+    }
+
+    @Test fun `connectivity diagnostics never become pills`() {
+        val online = entity("binary_sensor.router", "on", "connectivity")
+        val offline = entity("binary_sensor.gateway", "off", "connectivity")
+        val rules = listOf(
+            PillRule(online.entityId, PillKind.GENERIC, "Routeur"),
+            PillRule(offline.entityId, PillKind.GENERIC, "Passerelle"),
+        )
+        val chips = engine.select(rules, listOf(online, offline).associateBy { it.entityId })
+        assertTrue(chips.isEmpty())
+    }
+
+    @Test fun `binary problem and safety sensors remain outside the pill surface`() {
+        val problem = entity("binary_sensor.boiler_problem", "on", "problem")
+        val safe = entity("binary_sensor.gas", "off", "gas")
+        val rules = listOf(
+            PillRule(problem.entityId, PillKind.SAFETY, "Chaudière"),
+            PillRule(safe.entityId, PillKind.SAFETY, "Gaz"),
+        )
+        val chips = engine.select(rules, listOf(problem, safe).associateBy { it.entityId })
+        assertTrue(chips.isEmpty())
+    }
+
+    @Test fun `persisted dashboard style rules cannot bypass quick chip policy`() {
+        val entities = listOf(
+            entity("button.reboot", "unknown"),
+            entity("number.threshold", "42"),
+            entity("select.program", "eco"),
+            entity("camera.doorbell", "streaming"),
+            entity("sensor.last_seen", "2026-08-08T08:00:00Z", "timestamp"),
+            entity("sensor.wifi", "-51", "signal_strength"),
+        )
+        val rules = entities.map { PillRule(it.entityId, PillKind.GENERIC, it.name) }
+        assertTrue(engine.select(rules, entities.associateBy { it.entityId }).isEmpty())
+    }
+
+    @Test fun `dynamic ranking is complete and is not limited to nine`() {
         val entities = (1..12).associate { i -> "sensor.task_$i" to entity("sensor.task_$i", "running") }
         val rules = entities.keys.map { PillRule(it, PillKind.APPLIANCE, it) }
-        assertEquals(9, engine.select(rules, entities).size)
+        assertEquals(12, engine.select(rules, entities).size)
     }
 
     @Test fun `supported opening is classified`() {
@@ -85,20 +157,16 @@ class PillPriorityEngineTest {
         assertTrue(chip.progress in 0.31f..0.33f)
     }
 
-    @Test fun `normal temperature remains as low priority fallback`() {
+    @Test fun `normal temperature is not a fallback pill`() {
         val temperature = entity("sensor.salon_temperature", "21.4", "temperature")
         val rule = PillRule(temperature.entityId, PillKind.CLIMATE, "Salon")
-        val chip = engine.select(listOf(rule), mapOf(temperature.entityId to temperature)).single()
-        assertEquals(2, chip.priority)
-        assertEquals("ok", chip.state)
+        assertTrue(engine.select(listOf(rule), mapOf(temperature.entityId to temperature)).isEmpty())
     }
 
-    @Test fun `temperature candidate absorbs matching humidity`() {
+    @Test fun `temperature and humidity are not primary pill candidates`() {
         val temperature = entity("sensor.salon_temperature", "21.4", "temperature")
         val humidity = entity("sensor.salon_humidity", "48", "humidity")
-        val candidate = PillSupport.candidates(listOf(temperature, humidity)).single()
-        assertEquals(temperature.entityId, candidate.primary.entityId)
-        assertEquals(listOf(humidity.entityId), candidate.related.map { it.entityId })
+        assertTrue(PillSupport.candidates(listOf(temperature, humidity)).isEmpty())
     }
 
     @Test fun `openings are grouped without battery in value`() {
@@ -116,17 +184,33 @@ class PillPriorityEngineTest {
         assertEquals(setOf("Open", "Closed"), chip.details.map { it.value }.toSet())
     }
 
-    @Test fun `temperatures are grouped with min max and room details`() {
+    @Test fun `individual opening keeps battery out of its pill value`() {
+        val terrace = entity("binary_sensor.terrace_door", "on", "door")
+        val battery = entity("sensor.terrace_door_battery", "87", "battery")
+        val rule = PillRule(
+            terrace.entityId,
+            PillKind.OPENING,
+            "Porte de la terrasse",
+            relatedEntityIds = listOf(battery.entityId),
+        )
+
+        val chip = engine.select(
+            listOf(rule),
+            listOf(terrace, battery).associateBy { it.entityId },
+        ).single()
+
+        assertTrue(chip.value.contains("open", ignoreCase = true))
+        assertTrue(!chip.value.contains("87"))
+    }
+
+    @Test fun `persisted temperature rules cannot recreate a temperature group`() {
         val salon = entity("sensor.salon_temperature", "21.4", "temperature")
         val chambre = entity("sensor.chambre_temperature", "19.2", "temperature")
         val rules = listOf(
             PillRule(salon.entityId, PillKind.CLIMATE, "Salon Température"),
             PillRule(chambre.entityId, PillKind.CLIMATE, "Chambre Température"),
         )
-        val chip = engine.select(rules, listOf(salon, chambre).associateBy { it.entityId }).single()
-        assertEquals("Temperatures", chip.label)
-        assertEquals("Min 19.2° · Max 21.4°", chip.value)
-        assertEquals(setOf("Salon", "Chambre"), chip.details.map { it.label }.toSet())
+        assertTrue(engine.select(rules, listOf(salon, chambre).associateBy { it.entityId }).isEmpty())
     }
 
     @Test fun `nominal alarm and lock remain visible for reassurance`() {

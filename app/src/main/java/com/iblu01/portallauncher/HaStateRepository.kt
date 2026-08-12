@@ -7,9 +7,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 
+import android.content.Context
 import android.util.Log
 import android.os.Handler
 import android.os.Looper
+import com.iblu01.portallauncher.ui.icons.HaIcons
+import com.iblu01.portallauncher.ui.icons.IconRef
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -18,10 +21,11 @@ import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.net.Proxy
 
-class HaStateRepository(private val url: String, private val token: String) {
+class HaStateRepository(appContext: Context, private val url: String, private val token: String) {
     fun interface Listener { fun onStates(states: Map<String, HaEntity>, connected: Boolean) }
     private val listeners = CopyOnWriteArraySet<Listener>()
     private val client = OkHttpClient.Builder()
@@ -30,6 +34,18 @@ class HaStateRepository(private val url: String, private val token: String) {
         .pingInterval(30, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build()
+
+    init { HaIcons.init(appContext, client) }
+
+    /** Custom icon-set modules registered in the frontend, from `lovelace/resources`. */
+    @Volatile private var iconResourceUrls: List<String> = emptyList()
+    /** Set while a pack scan is queued or running, so an event burst collapses into one pass. */
+    private val iconSyncPending = java.util.concurrent.atomic.AtomicBoolean(false)
+    /** Icon-pack downloads run here so socket callbacks never touch the network or the disk. */
+    @Volatile private var iconExecutor = newIconExecutor()
+    private fun newIconExecutor() = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "ha-icon-packs").apply { isDaemon = true }
+    }
     private val states = linkedMapOf<String, HaEntity>()
     private var socket: WebSocket? = null
     private var connected = false
@@ -54,6 +70,18 @@ class HaStateRepository(private val url: String, private val token: String) {
 
     /** entity_id -> area display name, resolved from the HA area/entity/device registries. */
     @Volatile var areaByEntity: Map<String, String> = emptyMap()
+        private set
+    /** entity_id -> stable area_id. Entity assignment wins, then the entity's device area. */
+    @Volatile var areaIdByEntity: Map<String, String> = emptyMap()
+        private set
+    /** Stable area_id -> current HA display name. Names are rendering metadata, never identity. */
+    @Volatile var areaNameById: Map<String, String> = emptyMap()
+        private set
+    @Volatile var deviceIdByEntity: Map<String, String> = emptyMap()
+        private set
+    @Volatile var entityCategoryByEntity: Map<String, String> = emptyMap()
+        private set
+    @Volatile var entityRegistryResolved: Boolean = false
         private set
     private var areaNames: Map<String, String> = emptyMap()        // area_id -> name
     private var entityAreaId: Map<String, String?> = emptyMap()    // entity_id -> area_id
@@ -84,6 +112,11 @@ class HaStateRepository(private val url: String, private val token: String) {
                     weatherEntityId = weatherEntityId,
                     hourlyForecast = hourlyForecast,
                     dailyForecast = dailyForecast,
+                    deviceIdByEntity = deviceIdByEntity,
+                    entityCategoryByEntity = entityCategoryByEntity,
+                    entityRegistryResolved = entityRegistryResolved,
+                    areaIdByEntity = areaIdByEntity,
+                    areaNameById = areaNameById,
                 )
             )
         }
@@ -94,13 +127,17 @@ class HaStateRepository(private val url: String, private val token: String) {
         enabled = true
         if (token.isBlank()) { Log.w(TAG, "start skipped: token is blank"); return }
         if (socket != null) { Log.d(TAG, "start skipped: socket already active"); return }
+        entityRegistryResolved = false
+        deviceIdByEntity = emptyMap()
+        entityDeviceId = emptyMap()
+        if (iconExecutor.isShutdown) iconExecutor = newIconExecutor()
         val wsUrl = url.trimEnd('/').replaceFirst("http://", "ws://").replaceFirst("https://", "wss://") + "/api/websocket"
         Log.i(TAG, "connecting to ${url.trimEnd('/')} (token present)")
         lastActivityAt = System.currentTimeMillis()
         socket = client.newWebSocket(Request.Builder().url(wsUrl).build(), WsListener())
         scheduleWatchdog()
     }
-    fun stop() { enabled = false; retryHandler.removeCallbacksAndMessages(null); watchdogHandler.removeCallbacksAndMessages(null); socket?.close(1000, "screen stopped"); socket = null; connected = false; notifyListeners() }
+    fun stop() { enabled = false; retryHandler.removeCallbacksAndMessages(null); watchdogHandler.removeCallbacksAndMessages(null); socket?.close(1000, "screen stopped"); socket = null; connected = false; iconExecutor.shutdownNow(); notifyListeners() }
     private fun reconnect() {
         if (!enabled || token.isBlank()) return
         retryHandler.removeCallbacksAndMessages(null)
@@ -150,13 +187,51 @@ class HaStateRepository(private val url: String, private val token: String) {
 
     private fun parseEntityRegistry(arr: JSONArray) {
         val areaMap = HashMap<String, String?>(); val devMap = HashMap<String, String?>()
+        val categoryMap = HashMap<String, String>()
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
             val eid = o.optString("entity_id"); if (eid.isBlank()) continue
             areaMap[eid] = o.optString("area_id").takeIf { it.isNotBlank() && !o.isNull("area_id") }
             devMap[eid] = o.optString("device_id").takeIf { it.isNotBlank() && !o.isNull("device_id") }
+            o.optString("entity_category").takeIf { it.isNotBlank() && !o.isNull("entity_category") }
+                ?.let { categoryMap[eid] = it }
         }
         entityAreaId = areaMap; entityDeviceId = devMap
+        deviceIdByEntity = devMap.mapNotNull { (entityId, deviceId) -> deviceId?.let { entityId to it } }.toMap()
+        entityCategoryByEntity = categoryMap
+    }
+
+    /** JS-module resources only; a CSS or HTML resource can never register an icon set. */
+    private fun parseIconResources(arr: JSONArray): List<String> =
+        (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+            .filter { it.optString("type") in setOf("module", "js") }
+            .mapNotNull { it.optString("url").takeIf { url -> url.isNotBlank() } }
+
+    /**
+     * Fetches whatever custom-namespace icons the current states reference and are not cached yet.
+     * Cheap and idempotent when everything is already on disk, so it can be called on every trigger;
+     * the real work is serialised onto [iconExecutor], off the socket thread.
+     */
+    private fun syncIconPacks() {
+        val store = HaIcons.packs ?: return
+        val urls = iconResourceUrls
+        if (urls.isEmpty()) return
+        // A burst of state changes must not queue a burst of scans: each one walks every entity and
+        // stats the cache, and one pending pass already covers whatever the burst produced.
+        if (!iconSyncPending.compareAndSet(false, true)) return
+        // Racy by nature — stop() can shut the executor down between the check and the submit — so
+        // the rejection is swallowed rather than thrown at the socket thread mid-message.
+        runCatching {
+            iconExecutor.execute {
+                iconSyncPending.set(false)
+                val snapshot = synchronized(states) { states.values.toList() }
+                val wanted = snapshot.mapNotNullTo(mutableSetOf<IconRef>()) {
+                    HaIcons.resolver.refFor(it)?.takeUnless { ref -> ref.isMdi }
+                }
+                Log.i(TAG, "custom icon refs in use: ${wanted.size}")
+                if (store.sync(url, token, urls, wanted)) HaIcons.onPackCacheChanged()
+            }
+        }.onFailure { iconSyncPending.set(false) }
     }
 
     private fun parseDeviceAreas(arr: JSONArray): Map<String, String?> {
@@ -169,15 +244,21 @@ class HaStateRepository(private val url: String, private val token: String) {
         return m
     }
 
-    /** Rebuild entity->area name once registries arrive; area on the entity wins, else its device's area. */
+    /** Rebuild stable ids and legacy display-name lookup from the same registry frame. */
     private fun resolveAreas() {
-        if (areaNames.isEmpty() || entityAreaId.isEmpty()) return
-        val resolved = entityAreaId.keys.mapNotNull { eid ->
-            val areaId = entityAreaId[eid] ?: entityDeviceId[eid]?.let { deviceAreaId[it] }
-            val name = areaId?.let { areaNames[it] } ?: return@mapNotNull null
-            eid to name
+        val resolvedIds = resolveAreaIds(entityAreaId, entityDeviceId, deviceAreaId)
+        val resolvedNames = resolvedIds.mapNotNull { (entityId, areaId) ->
+            areaNames[areaId]?.let { entityId to it }
         }.toMap()
-        if (resolved != areaByEntity) { areaByEntity = resolved; notifyListeners() }
+        val changed = resolvedIds != areaIdByEntity ||
+            areaNames != areaNameById ||
+            resolvedNames != areaByEntity
+        if (changed) {
+            areaIdByEntity = resolvedIds
+            areaNameById = areaNames
+            areaByEntity = resolvedNames
+            notifyListeners()
+        }
     }
 
     private fun parseState(o: JSONObject): HaEntity? {
@@ -221,12 +302,39 @@ class HaStateRepository(private val url: String, private val token: String) {
                             webSocket.send("{\"id\":$FORECAST_HOURLY_ID,\"type\":\"weather/subscribe_forecast\",\"forecast_type\":\"hourly\",\"entity_id\":\"$w\"}")
                             webSocket.send("{\"id\":$FORECAST_DAILY_ID,\"type\":\"weather/subscribe_forecast\",\"forecast_type\":\"daily\",\"entity_id\":\"$w\"}")
                         }
-                    } else if (id in 3..5 && msg.optBoolean("success")) {
-                        val result = msg.optJSONArray("result") ?: JSONArray()
+                        // HA's own per-domain/device-class icon defaults, plus the custom icon-set
+                        // modules the frontend loads. Sent last: HA requires strictly increasing ids.
+                        webSocket.send("{\"id\":$ICONS_ID,\"type\":\"frontend/get_icons\",\"category\":\"entity_component\"}")
+                        webSocket.send("{\"id\":$RESOURCES_ID,\"type\":\"lovelace/resources\"}")
+                    } else if (id == ICONS_ID) {
+                        if (msg.optBoolean("success")) {
+                            val resources = msg.optJSONObject("result")?.optJSONObject("resources")
+                            HaIcons.resolver.componentIcons = resources
+                            Log.i(TAG, "component icons: ${resources?.length() ?: 0} domains")
+                            notifyListeners()
+                            syncIconPacks()
+                        } else Log.w(TAG, "frontend/get_icons failed: ${msg.optJSONObject("error")}")
+                    } else if (id == RESOURCES_ID) {
+                        // Absent on YAML-mode dashboards, and forbidden for non-admin tokens: custom
+                        // icon namespaces simply stay unresolved and fall back, which is fine.
+                        if (msg.optBoolean("success")) {
+                            iconResourceUrls = parseIconResources(msg.optJSONArray("result") ?: JSONArray())
+                            Log.i(TAG, "frontend modules available for icon sets: ${iconResourceUrls.size}")
+                            syncIconPacks()
+                        } else Log.i(TAG, "lovelace/resources unavailable; custom icon sets disabled")
+                    } else if (id in 3..5) {
+                        val success = msg.optBoolean("success")
+                        val result = if (success) msg.optJSONArray("result") ?: JSONArray() else JSONArray()
                         when (id) {
-                            3 -> areaNames = parseAreaNames(result)
-                            4 -> parseEntityRegistry(result)
-                            5 -> deviceAreaId = parseDeviceAreas(result)
+                            3 -> if (success) areaNames = parseAreaNames(result)
+                            4 -> {
+                                parseEntityRegistry(result)
+                                entityRegistryResolved = true
+                                // Wake consumers even when the registry is empty/forbidden: they
+                                // can now safely use the legacy fallback instead of racing id=4.
+                                notifyListeners()
+                            }
+                            5 -> if (success) deviceAreaId = parseDeviceAreas(result)
                         }
                         resolveAreas()
                     } else if (id == 6) {
@@ -251,6 +359,9 @@ class HaStateRepository(private val url: String, private val token: String) {
                     synchronized(states) { if (entity == null) states.remove(id) else states[entity.entityId] = entity }
                     lastUpdateAt = System.currentTimeMillis()
                     notifyListeners()
+                    // An entity that just started pointing at a custom namespace needs its icon
+                    // fetched. Checked in-memory here; the disk lookup happens on the executor.
+                    if (entity != null && HaIcons.resolver.refFor(entity)?.isMdi == false) syncIconPacks()
                 }
             }
         }
@@ -316,5 +427,18 @@ class HaStateRepository(private val url: String, private val token: String) {
         const val STALE_MS = 75_000L       // ~2 missed pings before force-reconnect
         const val FORECAST_HOURLY_ID = 7
         const val FORECAST_DAILY_ID = 8
+        const val ICONS_ID = 9
+        const val RESOURCES_ID = 10
     }
 }
+
+/** Pure registry resolver shared with tests: an entity-level area always overrides its device. */
+internal fun resolveAreaIds(
+    entityAreaId: Map<String, String?>,
+    entityDeviceId: Map<String, String?>,
+    deviceAreaId: Map<String, String?>,
+): Map<String, String> = entityAreaId.keys.mapNotNull { entityId ->
+    val areaId = entityAreaId[entityId]
+        ?: entityDeviceId[entityId]?.let(deviceAreaId::get)
+    areaId?.takeIf(String::isNotBlank)?.let { entityId to it }
+}.toMap()

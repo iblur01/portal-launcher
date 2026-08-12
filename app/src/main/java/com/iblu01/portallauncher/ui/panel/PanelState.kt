@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher.ui.panel
 
+import com.iblu01.portallauncher.domain.home.PillRef
 import com.iblu01.portallauncher.ui.model.PanelKind
 
 /**
@@ -14,6 +15,27 @@ sealed interface PanelRequest {
     val key: String
     data class Chip(override val key: String, val panelKind: PanelKind) : PanelRequest
     data class Media(override val key: String) : PanelRequest
+
+    /**
+     * Stable group destination and its optional device sub-panel.
+     *
+     * [destination] deliberately uses the persisted domain identity, never a display label. The
+     * selected [device] is retained in state so a live catalog update cannot tear down an already
+     * open sub-panel; the renderer can show its standard unavailable treatment instead.
+     */
+    data class Group(
+        val destination: PillRef,
+        val device: Chip? = null,
+    ) : PanelRequest {
+        init {
+            require(destination !is PillRef.Device) {
+                "A group panel destination must be an area, kind or manual group"
+            }
+        }
+
+        override val key: String = destination.stableKey
+    }
+
     data object Weather : PanelRequest {
         override val key: String get() = "weather"
     }
@@ -48,6 +70,8 @@ data class PanelState(
 sealed interface PanelEvent {
     data class OpenChip(val request: PanelRequest.Chip) : PanelEvent
     data class LongPressChip(val request: PanelRequest.Chip) : PanelEvent
+    data class OpenGroup(val request: PanelRequest.Group) : PanelEvent
+    data class OpenGroupDevice(val request: PanelRequest.Chip) : PanelEvent
     data object WeatherTap : PanelEvent
     data class MediaAutoOpen(val key: String) : PanelEvent
     data object MediaStopped : PanelEvent
@@ -57,6 +81,11 @@ sealed interface PanelEvent {
 
     /** The alarm left its alerting states (disarmed, or armed again): drop the forced panel. */
     data object AlarmCleared : PanelEvent
+
+    /** System Back: pop group -> device first; otherwise apply the normal panel dismissal. */
+    data object Back : PanelEvent
+
+    /** Explicit Fermer action: always closes the complete stack. */
     data object Dismiss : PanelEvent
 }
 
@@ -69,6 +98,21 @@ fun reduce(state: PanelState, event: PanelEvent): PanelState = when (event) {
     // Long-press always opens the control panel; no toggle-close.
     is PanelEvent.LongPressChip ->
         state.copy(request = event.request, source = PanelSource.USER)
+
+    // A group pill is a user destination. Opening the same destination toggles the complete panel
+    // closed, consistently with ordinary chip taps; reopening always starts at the group level.
+    is PanelEvent.OpenGroup -> {
+        val root = event.request.copy(device = null)
+        if (state.request?.key == root.key) state.copy(request = null, source = PanelSource.USER)
+        else state.copy(request = root, source = PanelSource.USER)
+    }
+
+    // Device navigation is valid only inside an open group and preserves its source/guards.
+    // A stale event after the group closed is ignored instead of opening an orphan device panel.
+    is PanelEvent.OpenGroupDevice -> {
+        val group = state.request as? PanelRequest.Group
+        if (group == null) state else state.copy(request = group.copy(device = event.request))
+    }
 
     // Weather is a user intent; toggle-close on repeat.
     PanelEvent.WeatherTap ->
@@ -103,6 +147,14 @@ fun reduce(state: PanelState, event: PanelEvent): PanelState = when (event) {
     PanelEvent.AlarmCleared ->
         if (state.source == PanelSource.ALERT) PanelState(dismissedAutoKey = state.dismissedAutoKey)
         else state.copy(dismissedAlertKey = null)
+
+    // Back pops exactly one level inside a group. At group root (and for ordinary requests), it is
+    // equivalent to a dismissal. Fermer remains a distinct Dismiss event and closes every level.
+    PanelEvent.Back -> {
+        val group = state.request as? PanelRequest.Group
+        if (group?.device != null) state.copy(request = group.copy(device = null))
+        else reduce(state, PanelEvent.Dismiss)
+    }
 
     // Dismiss: remember a dismissed media/alert key so it won't reopen while the cause persists.
     PanelEvent.Dismiss -> {

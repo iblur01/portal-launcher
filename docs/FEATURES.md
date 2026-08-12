@@ -5,8 +5,8 @@ Exhaustive inventory of what the app actually does, derived from the code (not f
 Scope note: this is a **launcher** that takes the home role on any Android 9+ device, whose default
 screen is a clock and whose Home Assistant integration is optional. Portal-specific behaviour (the
 dream/sleep presence proxy, the API 28 blur fallback) is called out where it appears.
-Every non-obvious claim carries a `file:line`. Written 2026-07-28 against branch
-`refactor/mad-panel-architecture`.
+Every non-obvious claim carries a `file:line`. Updated 2026-08-08 against branch
+`feature/home-assistant-extended-support`.
 
 Conventions used below:
 - **Interactive** = issues Home Assistant service calls. **Read-only** = display only.
@@ -72,70 +72,157 @@ Scrim: separate darkening layer, 0–60 %, default 25 %, only when mode ≠ neut
 - Panel (tap the temperature pill): current conditions + horizontal hourly strip (≤12) + daily list (≤7), `high° / low°` — `WeatherPanel.kt:70-121`. Empty forecasts render nothing, no loading or error state.
 
 ### Other idle-screen elements
-- **Presence micro-chip**, top-left: up to 4 overlapping avatars of people home, nothing if the house is empty; avatars come from HA `entity_picture` (bearer-authenticated) with an initial-letter fallback — `PresencePanel.kt:44-59,104-121`. It is the only `FLOATING` chip and is excluded from the tray so it never double-renders (`LauncherActivity.kt:384-385`).
 - **Temperature pill**: `Appartement {min}–{max}` + `Ext. {outdoor}` — `ClockScreen.kt:132-143`.
 - **Offline banner**: shown only when `!connected && lastUpdateAt > 0`, ticking every second, amber pill reading "Hors ligne — infos figées depuis {N}s" — `ClockScreen.kt:144-147,191-210`. ⚠️ Never rolls over to hours: after 100 minutes it reads "142min".
-- **Expand affordance**: "Voir plus d'informations" appears only when there are more than 3 chips; collapsed shows 3, expanded shows up to 9 in rows of 3 — `ClockScreen.kt:159-185`. Expanding also grows the bottom gradient 360→620 dp over 450 ms (`LauncherActivity.kt:389-393`) and arms auto-return.
+- **Pill tray**: collapsed renders 3 pills whenever at least 3 enabled compatible devices are available (with one exceptional extra critical slot only when four remain readable); expanded reaches 9 with up to 6 secondary pills. After alerts, pins and relevant activity, calm unpinned devices fill remaining positions. The bottom Maison icon was removed; Maison remains reachable by swipe — `ClockScreen.kt`, `HomePillComposer.kt`, `HomeCriticalCapacityPolicy.kt`.
+- Expanding still grows the bottom gradient 360→620 dp over 450 ms and arms auto-return — `LauncherActivity.kt:941-945`.
 
 ---
 
-## 2. Pill system (the ranked chip tray)
+## 2. Pill system, catalog and Maison composition
 
-Pipeline: `Prefs.pillRules` → `PillRepository.transformSnapshots` (sampled 100 ms, `Dispatchers.Default`) → `PillPriorityEngine.select` → `LauncherViewModel.uiState` → tray — `PillRepository.kt:133,150`, `PillPriorityEngine.kt:18`.
+Pipeline: HA snapshot + `Prefs.pillRules` + the versioned Maison preferences → complete
+`PillCatalogSnapshot` → dynamic ranking → `HomePillComposer` (3 primary / 6 secondary / favorite
+overflow) and `HomePageBuilder` (ordered Maison sections) → `LauncherViewModel.uiState` → Compose.
+The 100 ms sampled transform stays on `Dispatchers.Default`; capacity is applied only by the home
+composer, never while building the catalog — `PillRepository.kt:173-247`,
+`PillPriorityEngine.kt:20-59`.
 
-### The 20 kinds and how each is detected
-`PillRules.kt:6-27` (kind + base priority), detection in `PillSupport.kind` (`:172-193`):
+### Supported pill kinds and detection
+`PillRules.kt` retains legacy enum values so old preferences remain decodable, but
+`PillSupport` only admits actionable devices plus movement and opening sensors:
 
 | Kind | Base | Detected from |
 |---|---|---|
-| SAFETY | 90 | `alarm_control_panel`, or binary_sensor with class smoke/CO/gas/moisture/safety/tamper |
+| SAFETY | 90 | domain `alarm_control_panel` |
 | APPLIANCE | 58 | entity id contains washer/dryer/dishwasher/printer tokens **and** is the main state sensor |
 | VACUUM | 58 | domain `vacuum` |
 | TIMER | 50 | domain `timer` or class `duration` |
 | LOCK | 35 | domain `lock` or class `lock` |
-| AIR | 35 | class aqi / CO₂ / VOC / pm25 / pm10 |
 | COVER | 26 | domain `cover` |
 | THERMOSTAT | 24 | domain `climate` |
 | OPENING | 25 | class door / window / opening / garage_door |
-| CLIMATE | 22 | class temperature / humidity |
-| PRESENCE | 20 | domain `person` |
-| BATTERY | 20 | class `battery` |
-| ENERGY | 18 | class energy / power / current / voltage |
 | SWITCH | 17 | domain `switch` |
 | LIGHTS | 16 | domain `light` |
 | FAN | 15 | domain `fan`, not matching "purif" |
 | PURIFIER | 15 | domain `fan` + name/id contains "purif" |
 | MEDIA | 13 | domain `media_player` |
-| SCENE | 12 | domain `scene` / `script` |
-| GENERIC | 15 | fallback |
+| HUMIDIFIER | 20 | domain `humidifier` |
+| WATER_HEATER | 24 | domain `water_heater` |
+| VALVE | 30 | domain `valve` |
+| SIREN | 45 | domain `siren` |
+| LAWN_MOWER | 28 | domain `lawn_mower` |
+| GENERIC | 15 | movement binary sensors: motion / occupancy / moving |
 
-⚠️ **Eligibility gate**: `PillSupport.isPrimary` (`PillRules.kt:159-171`) only admits `sensor` entities for the air/temperature/humidity classes and the one appliance-state sensor. Arbitrary `sensor.*`, `input_boolean`, etc. are invisible to the pill system entirely, whatever the rule says.
+`scene`, `script`, `person`, `device_tracker`, energy/air/temperature/battery sensors and every
+binary sensor except movement and door/window/opening classes are deliberately unsupported. Old
+rules for those entities stay persisted but cannot re-enter the catalog, settings families,
+automatic groups or panel routing.
 
-**Related-entity auto-linking**: a `logicalKey` (entity id stripped of `_state`, `_contact`, `_temperature`, `_humidity`, …) groups sibling sensors into `relatedEntityIds`, so a washer's cycle/completion sensors ride along with its main pill instead of becoming their own — `PillRules.kt:199-213`.
+**Eligibility gate**: a persistent target must pass `PillSupport.isAllowedAsPersistedChip`; entities
+without a routed panel (notably button/number/select/camera and passive diagnostic sensors) are not
+catalogued. Compatible devices discovered after the saved rules are included in Maison even before
+being enabled for dynamic ranking. An explicitly disabled rule remains discoverable in Settings but
+is hidden from Accueil, Maison and automatic-group members; only enabled rules can be pinned from
+Settings or feed dynamic ranking — `PillRules.kt:179-203`,
+`PillCatalogBuilder.kt:27-63,166-190`.
 
-### Ranking
-One sort for everything: `compareByDescending{priority}.thenBy{label}` then **`.take(9)`** — `PillPriorityEngine.kt:34`.
-- ⚠️ Overflow past 9 is silently dropped, with no "+N more" affordance anywhere.
-- Per-kind state overrides dominate the base priority. Highlights: alarm triggered → 100; safety sensor active → 100; lock unlocked/jammed → 88; battery ≤10 % → 82; open door → `55 + min(age_minutes, 30)` so it escalates the longer it stays open; appliance finished → 76 but only for 10 minutes; battery visible only ≤30 %.
-- ⚠️ Scores are not on a normalised scale — they were tuned per kind ad hoc.
+**Related-entity auto-linking**: a `logicalKey` (entity id stripped of `_state`, `_contact`, `_temperature`, `_humidity`, …) groups sibling sensors into `relatedEntityIds`, so a washer's cycle/completion sensors ride along with its main pill instead of becoming their own — `PillRules.kt:233-272`.
 
-### Grouped pills
-Nine kinds never appear individually, only merged into one pill (`groupedKinds`, `PillPriorityEngine.kt:20-22`): openings, temperatures, lights, media, purifier, air, scenes, presence, energy. Notable behaviours:
+### Stable identity, persistence and migration
+
+`LauncherChip` remains a live rendering model. Persisted identity is a typed `PillRef`: `device:<entity_id>`,
+`area:<area_id>`, `kind:<PillKind>` or `manual:<immutable id>`; no localized display label is used
+as an identity — `HomePillModels.kt:6-47`, `HomePillPreferencesCodec.kt:113-131`.
+
+`HomePillPreferences` schema v1 stores the Maison toggle, unlimited ordered pins, section visibility /
+order / item order, and manual groups. The first read writes defaults (Maison and all automatic
+sections enabled, no pins, no manual groups) without touching legacy `pill_rules`. Corrupt or future
+JSON falls back in memory without overwriting its source; unknown stable references survive decode.
+Writes are process-serialized, canonical-JSON deduplicated and emit one
+`homePillPreferences` live-change event — `HomePillPreferencesCodec.kt:18-111`,
+`Prefs.kt:283-356`.
+
+### Complete catalog and groups
+
+`PillCatalogBuilder` produces, without a nine-item limit:
+
+- one `ResolvedPill` per compatible device;
+- automatic area groups keyed by HA `area_id` and labelled separately through `areaNameById`;
+- automatic type groups keyed by `PillKind`;
+- locally persisted manual groups, including heterogeneous groups;
+- typed representations of historical aggregates for dynamic-ranking compatibility.
+
+The same device can therefore appear individually, in its room, in its kind, in multiple manual
+groups and in Favorites. Group membership is derived locally and never writes HA area/type state —
+`PillCatalogBuilder.kt:15-115`, `HaStateRepository.kt:72-82,227-252`.
+
+Group summaries report active/available member counts. A collective action exists only for an
+explicit safe intersection: turn off for light/switch/fan/purifier sets, close for covers, lock for
+locks; mixed unsupported groups get none — `PillCatalogBuilder.kt:117-163,263-269`.
+
+The remaining historical dynamic aggregates retain their prior state summaries:
 - **openingGroup** — "Toutes fermées" / "N ouverte(s)", priority rises with how long something has been open (`:229-253`).
-- **temperatureGroup** — "Min X · Max Y", warning below 16 °C or above 28 °C; humidity siblings shown as "· NN%" (`:190-212`).
-- **relatedBatteryAlert** — not a kind: any *related* entity that is a battery ≤30 % surfaces here. The only way a non-primary battery becomes visible (`:214-227`).
 - **mediaGroup** — playing/buffering counts; a paused player only counts if paused less than 30 s ago (`:109-133`).
 - ⚠️ **purifierGroup** takes only the **first** enabled purifier; additional ones are silently invisible (`:135-156`).
-- ⚠️ **energyGroup** guesses the main meter by regex `maison|total|grid|global|home|conso`, else takes an arbitrary power sensor — there is no explicit "main meter" designation (`:60-79`).
+
+### Availability, ranking and nine-slot composition
+
+Availability is three-state: `AVAILABLE`, `STALE`, `UNAVAILABLE`. An individually unknown,
+unavailable or missing entity is unavailable; a global HA disconnect marks the cached snapshot stale
+instead, keeping it rendered while blocking new pins and service actions. A group remains renderable
+while at least one member is available or stale — `HomePillModels.kt:49-57,95-109`,
+`PillCatalogBuilder.kt:227-230`.
+
+`PillPriorityEngine.select` now returns the complete deterministic dynamic ranking; there is no
+`.take(9)` in the engine. Existing per-kind state scores and recency rules remain, with score
+descending, normalized label and stable id as tie-breakers. Calm unpinned enabled devices are the
+final fallback used to keep the fixed 3/9 tray full — `PillPriorityEngine.kt:20-59`,
+`PillCatalogBuilder.kt:166-190,233-256`.
+
+`HomePillComposer` is a pure, atomic projection with this precedence:
+
+1. available/renderable critical alerts;
+2. available/renderable pins in persisted order;
+3. relevant dynamic candidates in deterministic score order.
+4. calm enabled individual devices, by priority then stable label/id.
+
+It deduplicates references and duplicate incidents (an individual representation wins over its group),
+then splits 3 primary + 6 secondary; further available pins become `favoriteOverflow`. Removing or
+losing a visible pin promotes the first available overflow item, while the unavailable reference stays
+persisted and automatically regains its logical rank when it returns. A disabled device is omitted
+without deleting that pin, so re-enabling it from Settings restores its previous position —
+`HomePillComposer.kt`.
+
+The pure alert policy treats active safety/alarm states, an active siren and a jammed lock as critical.
+An unlocked/open lock is a high warning but does not overtake pins. Critical alerts sort by severity,
+recency and stable key, never mutate `pinnedOrder`, and may use one exceptional fourth primary slot
+only when width and font scale allow it — `PillAlertPolicy.kt:5-42`,
+`HomeCriticalCapacityPolicy.kt:7-18`.
 
 ### Auto-init on fresh install
-One-shot, gated by `pillAutoGroupsInitialized` (`PillRepository.kt:108-119`): auto-enables LIGHTS, MEDIA, PURIFIER, SCENE, PRESENCE, ENERGY. ⚠️ **OPENING, AIR and CLIMATE are excluded**, so a fresh install shows no door/window, air-quality or temperature pills until the user enables them by hand.
+One-shot, gated by `pillAutoGroupsInitialized`: auto-enables only LIGHTS, MEDIA and PURIFIER.
+Openings and movement sensors remain manually selectable; passive sensor, scene and presence kinds
+are not selectable at all.
 
 ### Interaction
-- Tap: SWITCH and FAN call `toggle` directly; every other kind opens its panel — `ChipMapper.kt`, `LauncherActivity.kt:357-362`.
-- Long-press: always opens the control panel, ⚠️ except media, which has no long-press at all (`LauncherActivity.kt:364-369`).
-- The open panel's chip gets an accent fill + border; only the media chip hides itself while its panel is open (`LauncherActivity.kt:382-387`).
-- If a chip's entity goes unavailable or falls out of the top 9 **while its panel is open**, the panel keeps the last-known-good snapshot instead of closing — `LauncherViewModel.kt:84-89`. The tray chip disappears underneath, so the highlight target vanishes; cosmetic only.
+- Tap opens the typed panel for individual devices, including SWITCH; FAN alone retains its direct
+  `toggle`. A single light opens its detail controls immediately without a redundant one-item
+  browser; a group opens the group browser — `ChipMapper.kt:39-47`,
+  `LauncherActivity.kt:837-863`.
+- Long-press on Accueil or Maison opens the semantic context menu instead of routing immediately.
+  It offers pin/unpin, add-device-to-manual-group, reorder (drag plus first/before/after/last), and
+  "Ouvrir les commandes". Individual devices also offer "Ne plus afficher cet appareil", which
+  disables their Settings rule while preserving pins/membership for later restoration. Stale targets still allow safe actions such as unpin but block commands —
+  `HomePillContextMenu.kt:192-303,329-355`.
+- Drag reorder is armed explicitly from the menu, locks pager/vertical scrolling, stages relative
+  movement and commits once on drop; cancellation writes nothing. Every reorder path updates the
+  same persisted `pinnedOrder` — `HomePillContextMenu.kt:99-175`,
+  `LauncherActivity.kt:881-919,1093`.
+- If a device leaves the tray while its panel is open, `LauncherViewModel.panelChip` retains the
+  last-known-good chip. Group navigation retains the selected typed device destination and renders a
+  recoverable unavailable state rather than tearing down the stack — `LauncherViewModel.kt:131-152`,
+  `PanelState.kt:19-37`.
 
 ---
 
@@ -143,7 +230,8 @@ One-shot, gated by `pillAutoGroupsInitialized` (`PillRepository.kt:108-119`): au
 
 Router: `ChipActionsPanel` → exhaustive `when (chip.toPanelKind())`, no catch-all — `SidePanel.kt:174-191`. Shared chrome = frosted card, circular "×" top-left, centred icon+label pill, `chip.value` as title, scrollable body (`SidePanel.kt:118-171`). Live entity access via `rememberEntity()`, which dedups HA pushes by comparing state + attributes so unrelated updates don't recompose an open control (`PanelHelpers.kt:36-48`).
 
-Unavailable handling: single-entity panels render "Appareil indisponible" (`PanelHelpers.kt:54-69`). ⚠️ List-based panels (lights, purifier, air, energy, scenes, presence) have no unavailable state and degrade silently.
+Unavailable handling: single-entity panels render "Appareil indisponible" (`PanelHelpers.kt:54-69`).
+List-based lights and purifier panels retain their existing per-member degradation.
 
 | Panel | Mode | Controls → HA service |
 |---|---|---|
@@ -156,11 +244,20 @@ Unavailable handling: single-entity panels render "Appareil indisponible" (`Pane
 | **Switch** | Interactive | `switch.toggle` |
 | **Fan** | Interactive | `fan.toggle`, `fan.set_percentage`, `fan.oscillate` |
 | **Purifier** | Interactive | `fan.turn_off`, `fan.set_preset_mode` |
-| **Scenes/Scripts** | Interactive | `{scene\|script}.turn_on`, domain inferred from the entity id prefix |
-| **Air quality** | Read-only | — |
-| **Energy** | Read-only | — |
-| **Presence** | Read-only | — |
 | **Weather** | Read-only | — |
+
+### Group browser (`GroupBrowserPanel.kt`)
+
+Area, kind and manual-group pills open a typed `PanelRequest.Group(destination, device?)` rather
+than an id-special-cased panel. The root shows the group summary, an optional explicitly safe
+collective action and the currently resolved members. Selecting a member replaces the content with
+its existing control panel; Back pops to the group, while Close dismisses the whole stack. A member
+that vanishes while selected gets a recoverable "Appareil indisponible" state —
+`PanelState.kt:14-37,92-167`, `GroupBrowserPanel.kt:92-188,296-325`.
+
+Collective services are mapped only from `GroupCollectiveAction` plus the member's typed kind/domain;
+localized group labels are never inspected. Stale groups remain readable but expose neither member
+commands nor collective commands — `GroupBrowserPanel.kt:51-90,157-184,218-275`.
 
 ### Lights — the deepest panel (`LightDetailPanel.kt`)
 - Capability detection from `supported_color_modes`: colour, white channel, brightness, on/off-only — `:121-128`.
@@ -177,10 +274,8 @@ Unavailable handling: single-entity panels render "Appareil indisponible" (`Pane
 
 ### Other panel notes
 - ⚠️ **Thermostat is single-setpoint**: `target_temp_low/high` are never read even though `heat_cool` is a handled mode label (`ThermostatPanel.kt:144`). The dial is a 270° drag ring that commits only on release.
-- ⚠️ **Energy detects its sensors by matching the French labels** `"Puissance"` and `"Aujourd'hui"` (`EnergyPanel.kt:37-38`) — a brittle coupling that will break during i18n. Gauge auto-scales from 3000 W upward and never back down.
 - ⚠️ **Purifier and Fan are two entirely different UIs for the same `fan` domain** with no shared code (mode selector vs toggle + speed + oscillate).
 - ⚠️ **Weather bypasses the shared panel chrome** and reimplements its own header/close button (`WeatherPanel.kt:59-67`).
-- Air quality renders full-bleed with a tinted radial glow and a 2–3 column sensor grid; thresholds per unit type (µg/m³ >25/>50, ppm >800/>1000, AQI >50/>100, ppb >500/>800) — `AirQualityPanel.kt:233-282`.
 - 💀 `VacuumFeature.CLEAN_SPOT` and `.START` constants are declared and never used — there is no clean-mode or spot-clean UI (`PanelHelpers.kt:75`).
 - ⚠️ Lock battery % is not read from an attribute here; it arrives via whatever `chip.details` the mapper populated.
 
@@ -334,16 +429,104 @@ The presence proxy depends on Portal dream broadcasts; tap compensation is keyed
 
 ## 7. Settings, preferences
 
-### Pages
-One flat `HorizontalPager` holds everything: `[clock, app page 0, app page 1, …]` (`LauncherPager.kt`). Not a pager nested inside the apps page — two horizontal scrollers competing for the same drag has no good answer, and stock launchers treat their home screens as one pager for the same reason. Swipe right-to-left to reach the apps, and keep going for further pages.
-- The clock header is **pinned above every page**, not inside one. It shrinks to 34 % over the clock→apps swipe, driven by `currentPage + currentPageOffsetFraction` through a `graphicsLayer` scale — GPU only, no relayout per frame (the Portal is API 28) — and stays collapsed on later pages because the fraction saturates at 1.
+### Pill and Maison editor
+
+The Pills tile is now a small settings hierarchy with three entry points — `PillsSettingsPage.kt:62-142`:
+
+- **Accueil** previews all 3 primary and 6 secondary pin slots, labels unused positions
+  "Automatique", lists overflow and temporarily unavailable pins separately, and provides ordered
+  first/previous/next/last controls — `PillsSettingsPage.kt:199-288`.
+- **Page Maison** toggles the page, controls visibility/order and per-section item order, exposes every
+  automatic room/type group as a pin target, and creates/orders manual groups —
+  `PillsSettingsPage.kt:290-408`.
+- **Appareils disponibles** preserves the existing per-device activation rule while adding pin/unpin
+  independently of whether the target currently ranks in the home nine. Targets are grouped by the
+  existing user-facing `PillFamily` buckets; unavailable/stale targets cannot be newly pinned —
+  `PillsSettingsPage.kt:410-445,550-604`, `HomeSettingsReducer.kt:42-61,209-265`.
+
+Manual-group detail supports rename, pin/unpin, add/remove and reorder members, move a member to
+another manual group, and confirmed deletion. Deleting a group removes only dangling local group
+references; it never disables or deletes member devices — `PillsSettingsPage.kt:447-548`,
+`HomeSettingsReducer.kt:100-170`.
+
+All these operations are typed `HomeSettingsAction`s reduced outside composables, written through the
+same atomic `Prefs` codec and reflected through `SettingsChangeBus` in the active launcher. The
+settings catalog is complete rather than top-nine-limited and uses stable `area_id` references —
+`HomeSettingsReducer.kt:14-40,63-207`, `SettingsActivity.kt:242-265`.
+
+---
+
+## 8. Overlays, gestures, navigation
+
+### Logical pager pages
+One flat `HorizontalPager` holds `[Maison?, Accueil, app page 0, app page 1, …]`
+(`LauncherPager.kt`). It is not a pager nested inside the apps page, and no launcher page nests a
+second horizontal scroller.
+
+`LauncherPagerLayout` maps the logical identities `House`, `Clock`, `Apps(n)` to physical indices.
+With Maison enabled those are `0`, `1`, `2+n`; without it they are `0`, `1+n`. The initial destination
+is always Accueil, and a hot Maison toggle remaps the settled logical identity so an application page
+never silently shifts to a neighbour — `LauncherPager.kt:60-149,264-281`.
+
+The clock header collapse is relative to the logical Accueil index and uses the absolute page
+distance: Maison and app pages both keep the clock collapsed in the shared launcher top bar. HOME,
+Back and auto-return call the Maison-aware `returnToClockPage(..., layout)` and therefore always
+target the main Accueil, never Maison — `LauncherPager.kt:151-209`,
+`LauncherBack.kt:44-64`, `LauncherActivity.kt:800-831`.
+
+When enabled, Maison is reachable by a left-to-right gesture from Accueil. There is deliberately no
+extra bottom home icon. When disabled, the physical page disappears without leaving a placeholder.
+
+### Maison page and grid
+
+Maison renders an independently vertical `LazyColumn` of non-empty ordered sections: available pins
+(Favoris), automatic rooms, one section per populated kind (individual devices only; the redundant
+aggregate type pill is not repeated at the start of its own line),
+and rendered manual groups. Hidden and empty sections are omitted while their preferences remain
+stored. An empty catalog produces one page-level explanation/action rather than repeated empty
+sections — `HomePageBuilder.kt:6-105`, `HomePage.kt`.
+
+Each section wraps its devices across full-width lines of equal pills — the same `StatusChip`
+Accueil renders, stretched to the line's column width: the page owns a single vertical gesture, so
+everything a section holds is reachable without a second scroll axis. The column count is a pure
+function of the available width and the font scale (`HomeGridLayoutPolicy`, 220 dp minimum pill,
+4 columns maximum) — large text yields fewer columns, never a narrower pill. Pills keep their 48 dp
+minimum target and keyboard/D-pad activation. Each one sits on an opaque elevated slab drawn under
+the chip's own frosted fill: the tray's fill assumes the darkened bottom of the clock page, while
+Maison covers the full wallpaper, and on API 28 `Modifier.blur` is a no-op — so the frost is a solid
+surface, not a translucent scrim that a bright photo reads straight through —
+`HomeGridLayoutPolicy.kt`, `HomePage.kt`.
+
+Maison's shared clock header owns its title and round actions: a future Type/Pièce grouping switch,
+**Modifier/Terminer**, and Settings. The grouping control is intentionally a UI extension point for
+now and does not alter the saved section model. Edit mode exposes section before/after/hide controls
+plus group-management entry points in the page content, and explains that automatic room/type
+membership is managed in HA. Pill long-press opens the same complete context menu used by Accueil.
+TalkBack descriptions include name, state, pin/stale/critical status and group membership —
+`LauncherHeaderActions.kt`, `HomePage.kt`.
+
+Maison's vertical list is a smaller viewport anchored to the bottom and clipped to its own bounds,
+so scrolling cannot carry later lines behind the fixed header. Its top edge is the header height
+*measured by the pager* (`LocalCollapsedHeaderHeight`) plus a 14 dp gap: the clock is user-themed,
+so a hardcoded constant is what pushed the first line of pills under it. The surface also fades in
+with the leftward collapse progress, matching the app grid reveal.
+
+Maison scrolls vertically and the pager scrolls horizontally, so the two gestures never compete and
+no page-level gesture arbitration is needed. Vertical scrolling locks during pill reorder —
+`HomePage.kt`, `LauncherActivity.kt`.
+
+### App pages
+- The clock header is a sibling above the pager, not inside Accueil. From Accueil it shrinks to 34 % toward Maison or the apps grid, driven by the absolute logical-clock-relative offset through a `graphicsLayer` scale — GPU only, no relayout per frame (the Portal is API 28) — and stays collapsed on every non-Accueil launcher page. In that compact state only the time remains: the date and weather details fade out while the time translates upward to reclaim the date's visual slot.
 - Because the header is drawn *above* the pager it would be a dead zone for the swipe, so it forwards its own horizontal drags to the pager via `dispatchRawDelta` and settles at 25 % of a page width or 600 px/s (`pagerDragForward`). Its reported height follows the visible (scaled) height so the collapsed clock stops eating taps meant for the first row of icons (`collapsingHeight`).
 - Tap/long-press on the clock keep their meaning (HA / quick actions) but only while it is expanded (`collapse < 0.5`).
-- **Masquées** and **Réglages** live in the top bar, right-aligned beside the clock (`LauncherHeaderActions.kt`), and fade in with the swipe so the idle clock screen stays bare. They used to be grid tiles, which took cells meant for apps and looked draggable.
-- The pager locks to the clock page while a panel is open (`userScrollEnabled = !isSplit`), and sitting on any app page arms auto-return like the expanded tray does.
+- Application pages show **Masquées** and **Réglages** in the top bar. Maison replaces **Masquées** with its Type/Pièce and edit actions while retaining Settings. The two direction-specific action groups fade independently, so app controls never leak into Maison during a swipe (`LauncherHeaderActions.kt`).
+- Pill/app drag locks parent pager scrolling. An open panel reserves
+  33 % of the relevant axis and remeasures Clock, Maison and application pages into the remaining
+  area; only the full-screen wallpaper/scrims continue underneath. Sitting on Maison or any app page
+  arms auto-return like the expanded tray does.
 - **A pause keeps the page when the launcher itself opened something** (an app, a shortcut, Settings, app info, uninstall — `openingFromLauncher`); any other pause, screen-off included, resets to the clock so the panel never wakes up on the grid. Without that split the page snapped home before the launched app even appeared, and coming back landed on the clock instead of where the icon was.
 - Auto-return is frozen while the launcher is not resumed: it exists for an idle *visible* panel, and letting the countdown run behind another app dragged the page home behind the user's back. Coming back re-arms it from zero.
-- Every return to the clock goes through `returnToClockPage`, which launches the scroll in a scope that outlives the caller's effect. Awaiting it inside a `LaunchedEffect` keyed on the trigger stranded the pager mid-scroll — crossing the page midpoint cleared the trigger, the key changed, the effect was cancelled, and a few icons stayed faintly visible over the clock.
+- Every return to Accueil goes through the logical-layout-aware `returnToClockPage`, which launches the scroll in a scope that outlives the caller's effect. Awaiting it inside a `LaunchedEffect` keyed on the trigger stranded the pager mid-scroll — crossing the page midpoint cleared the trigger, the key changed, the effect was cancelled, and a few icons stayed faintly visible over the clock.
 - Page count is derived: every occupied page, plus a trailing empty one **only while an icon is in hand**. That page is how new pages are created (drag an icon onto it) but dead weight otherwise — an extra dot and a swipe into nothing — so it appears with the drag and goes away with it. Dropping back onto an earlier page removes it from under the current page, so the pager clamps back to the last real one.
 - The wallpaper dims a further 45 % across the swipe, and the tray gradient fades out; both alphas are read in the layer phase, so no recomposition per frame.
 - Apps are enumerated **once** off-main with icons pre-rasterized to `ImageBitmap` (`AppListStore`), refreshed through `LauncherApps.Callback` (registered for the activity's whole life, since an uninstall happens while the launcher is paused). The old drawer called `getApplicationIcon()` inside composition — disk I/O on the main thread, invisible behind a fade but a visible stutter inside a pager.
@@ -377,10 +560,10 @@ Bound through our own `AppWidgetHost` (`WidgetHostController.kt`), added from th
 - Resizing is `−`/`+` per axis in the item menu, in whole cells, bounded by the page. A deliberate simplification over a drag-handle frame: the capability is there, the gesture surface is not.
 
 ### Being the tablet's launcher
-`CATEGORY_HOME` + `singleTask`, plus `stateNotNeeded` / `clearTaskOnLaunch` / `taskAffinity=""` as AOSP Launcher3 declares them. HOME pressed while already home routes through `onNewIntent` and returns to the clock page, closing the menu, the tray and the overlay. `PinShortcutActivity` accepts `ACTION_CONFIRM_PIN_SHORTCUT` headlessly (a wall panel has nobody to confirm a dialog) and rasterizes the icon on the spot, because a `ShortcutInfo`'s icon cannot be resolved again after the request is consumed.
+`CATEGORY_HOME` + `singleTask`, plus `stateNotNeeded` / `clearTaskOnLaunch` / `taskAffinity=""` as AOSP Launcher3 declares them. HOME pressed while already home routes through `onNewIntent` and returns to logical Accueil, closing menus, collapsing the tray, leaving Maison edit/reorder mode and dismissing a USER panel. `PinShortcutActivity` accepts `ACTION_CONFIRM_PIN_SHORTCUT` headlessly (a wall panel has nobody to confirm a dialog) and rasterizes the icon on the spot, because a `ShortcutInfo`'s icon cannot be resolved again after the request is consumed.
 
 ### Back
-Back is always consumed — finishing a home activity gives a black flash while the system restarts it. Innermost surface first: item menu → hidden list → surface menu → USER panel → back to the clock page → nothing (`ui/LauncherBack.kt`, pure and unit-tested). An AUTO (media) panel is deliberately spared, as everywhere else.
+Back is always consumed — finishing a home activity gives a black flash while the system restarts it. Innermost surface first: item menu → hidden list → widget picker → surface menu → USER panel (including one-level group pop) → logical Accueil from Maison/apps → nothing (`ui/LauncherBack.kt`, `ui/panel/PanelState.kt`, pure and unit-tested). An AUTO (media) panel is deliberately spared, as everywhere else.
 
 ### Overlays
 - **Surface menu** — long-press the clock **or an empty cell of the app grid**: fond d'écran (`ACTION_SET_WALLPAPER` chooser), Réglages, Composants, plus **Définir comme launcher par défaut** (`ACTION_HOME_SETTINGS`) when the home role is missing — offered first, since without it app shortcuts and pin requests cannot work at all. The item menu offers the same fix where the user actually notices the problem.
@@ -390,12 +573,15 @@ Back is always consumed — finishing a home activity gives a black flash while 
 
 
 ### Gestures
-Swipe right-to-left anywhere on the home page (clock band included) → app grid; swipe back, or wait for auto-return. Long-press an app icon → its menu; long-press then drag → move it to any free cell, swap with an occupied one, or hold at a page edge to carry it to another page. Tap the clock → open HA (1 s debounce). Long-press the clock → quick actions. Tap chip → toggle or panel. Long-press chip → panel (except media). Tap the weather pill → weather panel. Swipe down on the quick-actions panel → dismiss. Swipe horizontally on the artwork → change session. Vertical drag on the custom sliders → brightness / Kelvin / cover position. Drag the thermostat ring → setpoint, committed on release. Every touch also feeds the sleep scheduler and the auto-return reset via `dispatchTouchEvent` (`LauncherActivity.kt:135-141`). No pinch or rotate anywhere.
+A left-to-right gesture from Accueil reaches Maison and a right-to-left gesture reaches apps (when Maison is enabled; otherwise the former has no page); Back/HOME/auto-return restore Accueil. Long-press an app icon → its menu; long-press then drag → move it to any free cell, swap with an occupied one, or hold at a page edge to carry it to another app page. Tap the clock → open HA (1 s debounce). Long-press the clock → quick actions. Tap a pill → its existing direct command/panel or a group browser; long-press → the complete pill context menu. An explicitly armed horizontal pill drag reorders pins on drop. Tap the weather pill → weather panel. Swipe down on the quick-actions panel → dismiss. Swipe horizontally on the artwork → change session. Vertical drag on the custom sliders → brightness / Kelvin / cover position. Drag the thermostat ring → setpoint, committed on release. Every touch also feeds the sleep scheduler and the auto-return reset via `dispatchTouchEvent`. No pinch or rotate anywhere.
 
 `Modifier.appleClickable` is the single tap primitive: rippleless, with a GPU-only press-scale (no recomposition), and long-press consumes the gesture so parents don't also fire — `Interactions.kt:37-64`.
 
-### Split layout
-`isSplit` whenever a panel resolves. 67/33 split, `tween(500)`: a `Row` in landscape, a `Column` in portrait, chosen from `BoxWithConstraints`. The panel stays mounted through the collapse animation and only unmounts once the clock is back to full width — `LauncherActivity.kt:489-554`.
+### Panel-reserved layout
+Panels slide into a reserved 33 % zone: right side in landscape, bottom in portrait. The wallpaper
+remains continuous, while Clock, Maison and application pages are animated and remeasured into the
+unobstructed 67 %, so no interactive element is hidden below the panel. The last payload remains
+mounted briefly for a complete exit transition — `LauncherPanelLayout.kt`.
 
 ---
 
@@ -424,31 +610,46 @@ Swipe right-to-left anywhere on the home page (clock band included) → app grid
 - **Queries** — declares visibility into the HA companion app and any `MAIN`/`LAUNCHER` activity, so the app drawer can enumerate what's installed — `:14-20`.
 
 ### Dependency injection
-`PortalApp` is the only `@HiltAndroidApp`. `di/AppModule.kt` is deliberately thin — it provides just `Prefs` (needs `Context`) and `SettingsChangeBus`; `PillRepository` is `@Singleton @Inject constructor()`. Everything lives in `SingletonComponent`; there are no narrower scopes.
+`PortalApp` is the only `@HiltAndroidApp`. `di/AppModule.kt` is deliberately thin — it provides `Prefs` and `SettingsChangeBus`; `PillRepository` is a `@Singleton @Inject` repository with the application context. Everything lives in `SingletonComponent`; there are no narrower scopes.
 
-Notably, **`LauncherViewModel` is not Hilt-injected**: it's built by a manual `viewModelFactory` and fed `pills.snapshotFlow(prefs)` plus a `callService` lambda (`LauncherActivity.kt:266-275`). That's on purpose — the VM has zero Android or Hilt dependency, which is why it can be unit-tested directly with fakes.
+Notably, **`LauncherViewModel` is not Hilt-injected**: it is built by a manual `viewModelFactory` and fed `pills.snapshotFlow(prefs)`, a service-call lambda and the repository's atomic Home-preference updater. The VM still has zero Android or Hilt dependency and is directly unit-testable with fake flows/functions — `LauncherActivity.kt:543-550`, `LauncherViewModel.kt:92-96`.
 
 ### Data flow
 ```
-HaStateRepository.states()      ← WebSocket, Dispatchers.IO
-  → PillRepository.snapshotFlow ← sample(100ms), scan, PillPriorityEngine + MediaSessionBuilder
-                                  flowOn(Dispatchers.Default)
-  → LauncherViewModel.uiState   ← stateIn(WhileSubscribed(5s))
-  → Compose                     ← collectAsStateWithLifecycle
+HaStateRepository.states() + area/device registries    ← WebSocket, Dispatchers.IO
+  + Prefs.pillRules + HomePillPreferences
+  → PillRepository.snapshotFlow                        ← sample(100ms), scan
+      → PillCatalogBuilder                             ← devices, groups, availability
+      → PillPriorityEngine                             ← non-truncated dynamic ranking
+      → HomePillComposer / HomePageBuilder             ← 3/6/overflow + ordered sections
+      → MediaSessionBuilder / temperature summary
+                                      flowOn(Dispatchers.Default)
+  → LauncherViewModel.uiState                          ← one immutable snapshot StateFlow
+  → ClockTray / HomePage / GroupBrowserPanel           ← render + typed intents only
 ```
-The raw→UI transform runs in exactly one place, off both the socket thread and the main thread — `PillRepository.kt:132-178`.
+The raw→UI projection is atomic and runs in exactly one place, off both the socket thread and the
+main thread — `PillRepository.kt:199-247`. Settings/launcher/Maison mutations all go through the
+same versioned preference store, whose change event is combined into `snapshotFlow` for immediate
+recomposition — `PillRepository.kt:137-141,173-188`, `Prefs.kt:300-355`.
 
 ⚠️ `uiState` is nominally `WhileSubscribed(5000)`, but the VM's own `init` collector subscribes for the VM's whole lifetime, so upstream never actually goes cold. Deliberate for an always-on kiosk, documented at `LauncherViewModel.kt:48-51`.
 
-The VM also owns the panel reducer and derives `panelChip` through a pure `scan` that keeps the last-known-good chip, so an open panel doesn't snap shut when its chip briefly leaves the top 9 (`:76-89`).
+The VM exposes catalog, area ids/names, Home preferences, `HomeComposition` and `HomePageModel` in
+the same immutable `LauncherUiState`. It provides typed pin/reorder/toggle APIs, owns the panel
+reducer and derives `panelChip` through a pure `scan` that keeps the last-known-good chip, so an open
+panel does not snap shut when its pill temporarily leaves the composition —
+`LauncherViewModel.kt:39-63,129-152,193-232`.
 
 ### Layering, and where it leaks
-`ui/panel/PanelState.kt` is a pure reducer. `ui/mapper/ChipMapper.kt` is the single place where chip ids and kinds are branched on, keeping the call sites free of string matching. `domain/model/Models.kt` is Compose-free and Android-free by declaration.
+`ui/panel/PanelState.kt` is a pure reducer, including the typed group/device stack.
+`ui/mapper/ChipMapper.kt` is the single place where legacy chip ids and kinds are branched on,
+keeping call sites free of display-label matching. `domain/home` contains the Compose/Android-free
+catalog, alert, composition, layout and Maison reducers; `LauncherChip` is kept on the live rendering
+side of that boundary.
 
 Three known leaks:
-1. **`LauncherActivity.kt` is still a ~600-line god composable** holding UI state that belongs in the VM. The `design §N` / `step N/10` comments throughout mark this as a staged, in-progress migration rather than an accident.
+1. **`LauncherActivity.kt` remains a large orchestration composable** holding transient pager/menu/drag state. Persistent pins/groups and composition no longer live there, but extracting the remaining UI coordination is still unfinished.
 2. **`WeatherController` is a second, parallel state-holder** — a plain class with `mutableStateOf` and a manual `start()`/`stop()`, talking to `PillRepository`'s legacy debounced `Listener` instead of `snapshotFlow`. Two different ways of getting HA data into Compose coexist, and nothing flags it.
-3. **`PresencePanel` constructs its own `Prefs(context)`** via `remember` rather than taking it from the graph or a `CompositionLocal` — even though `LocalCallService`/`LocalHaStates`/`LocalAreas` already exist next door (`LauncherActivity.kt:447-451`).
 
 A typed `ChipVisual` enum to replace the stringly-typed `LauncherChip.state` was considered and **explicitly deferred** — the engine emits ad-hoc state strings that don't fit an enum cleanly, and there's no visual-regression net to migrate against (`domain/model/Models.kt:45-49`).
 
@@ -457,17 +658,39 @@ A typed `ChipVisual` enum to replace the stringly-typed `LauncherChip.state` was
 ## 11. Tests and build
 
 ### Coverage
-113 tests, 18 files, **all under `app/src/test`**. There is no `androidTest` source set at all — the two "Compose UI tests" run under Robolectric on the JVM (`@Config(sdk = [28])`), not on a device.
+540 automated tests in 73 test files remain under `app/src/test`; there is still no `androidTest` source set. Compose
+semantics/layout tests run under Robolectric on the JVM (`@Config(sdk = [28])`), not on a physical
+device.
 
-**Covered**: the panel reducer (16 cases, every branch including interleaved user/auto), the priority engine (18), chip mapping (9), the media session builder (8), the VM's stream composition via Turbine (8), the `PillRepository` transform, `HaEntity` equality, panel helpers. Two Compose tests are targeted regression guards for a specific past bug (alarm-keypad jank), not general coverage.
+The Maison work adds direct coverage for:
 
-**Zero coverage**:
+- `HomePillPreferencesCodec` round-trip/defaults/unknown ids/corruption and the non-destructive
+  `Prefs` migration;
+- complete catalog eligibility, area/type/manual groups, partial availability and global stale state;
+- pure dynamic alert policy and the 3/6/overflow composer, including restoration/promotion and stable
+  tie-breaks;
+- Maison section/order and responsive column policies;
+- logical pager remapping, HOME/Back/auto-return targeting and the typed group panel reducer;
+- Settings reducers for every pin/section/manual-group mutation and accessible reorder alternative;
+- Robolectric semantics for the collapsed/expanded tray, Maison icon, context menu, section grids,
+  empty/stale states and group browser;
+- explicit non-regression contracts for SWITCH/FAN, Presence/Energy, media `PanelSource`, panels and
+  application-page mapping.
+
+Representative files: `HomePillComposerTest.kt`, `PillCatalogBuilderTest.kt`,
+`HomePillPreferencesCodecTest.kt`, `HomePageBuilderTest.kt`, `HomeSettingsReducerTest.kt`,
+`LauncherPagerTest.kt`, `HomeTrayAcceptanceTest.kt`, `GroupBrowserAcceptanceTest.kt` and
+`FeatureAcceptanceNonRegressionTest.kt`, plus `HomeAccessibilityAcceptanceTest.kt` for
+TalkBack/large-text/D-pad contracts.
+`./gradlew test` passed with 552 tests, 0 failed/skipped, on 2026-08-08.
+
+**Still without proportionate automated coverage**:
 - the entire HA connectivity layer — `HaStateRepository`, `HaApiClient`, `HaDiscovery`, `HaMdnsDiscovery`. The reconnect and liveness-watchdog logic this README advertises is untested at the unit level.
 - `MqttBridgeService` — discovery payload construction and publishing.
 - the whole device subsystem — `DeviceStateHub`, `SensorBridge`, `SoundMonitor`, `ScreenControl`, `SleepScheduler`, `BootReceiver`, `AdbControl`.
-- the clock/idle surface — `ClockScreen`, `DynamicBackground`, `WeatherGlyph`/`WeatherCard`/`WeatherPanel`, `ClockTheme`, `PresencePanel`.
-- **every rendered panel** and the whole component library.
-- the settings UI, the setup wizard, and the HA connection flow.
+- most of the clock/idle surface — `DynamicBackground`, `WeatherGlyph`/`WeatherCard`/`WeatherPanel`, `ClockTheme`; the new tray itself has semantics tests.
+- most legacy rendered panels and the component library; the new group browser and its nested-panel path are covered.
+- the rendered settings navigation, setup wizard, and HA connection flow; the new settings mutation/projection layer is covered as pure code.
 - no golden/screenshot tests exist (no Paparazzi or Roborazzi), so visual regressions in the design language are caught only by looking at real hardware.
 
 ### Build
@@ -482,7 +705,10 @@ A typed `ChipVisual` enum to replace the stringly-typed `LauncherChip.state` was
 
 Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59, dev-only so low priority), `PillRules.kt` (47), `SettingsScreen.kt` (41), `MediaPlayerView.kt` (40), `HaDiscovery.kt` (22, needs triage — some are HA-facing entity names), `HomeConnectionPage.kt` (21), `LightDetailPanel.kt` (21), `ClockScreen.kt` (19), `SetupWizard.kt` (17).
 
-⚠️ Extraction is **not** purely mechanical. The two biggest offenders are domain logic, not Compose — they generate labels without a `Context`, so either they take a resource lookup or they return keys resolved at the Compose boundary. `ClockFont`/`ClockTint` store labels as `String` fields on an enum, and enum constructors can't call `@Composable`, so those need a mapping function. And `EnergyPanel.kt:37-38` matches the literal strings `"Puissance"` and `"Aujourd'hui"` to find its sensors — translating those blanks the panel silently. Fix that first.
+⚠️ Extraction is **not** purely mechanical. Domain logic still generates labels without a
+`Context`, so either it takes a resource lookup or returns keys resolved at the Compose boundary.
+`ClockFont`/`ClockTint` store labels as `String` fields on an enum, and enum constructors cannot call
+`@Composable`, so those need a mapping function.
 
 ---
 
@@ -494,19 +720,18 @@ Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59,
 | Tap-sensitivity slider | inert — the accelerometer is never registered |
 
 | `priorityBoost` on pill rules | decoded, clamped, added to scores — but no UI writes it and all 9 grouped kinds ignore it |
-| `LauncherChip.stale` | declared, never set to true |
 | `VacuumFeature.CLEAN_SPOT` / `.START` | declared, never checked |
 | `ConnectionDot` | composable exists, only its own preview uses it |
 | `ClockScreen(drawBackground = true)` | preview-only path; production always draws the background one level up |
-| `toChip` branches for OPENING / AIR / ENERGY | unreachable — those kinds are always grouped |
+| `toChip` branches for legacy AIR / CLIMATE / BATTERY / ENERGY / SCENE / PRESENCE | unreachable behind the strict support gate; retained only to keep exhaustive handling of codec-compatible `PillKind` values |
 | Accelerometer / RGB / tap-tilt MQTT entities | retired, discovery actively retracted |
 
 ### Behavioural rough edges
-- Pill overflow past 9 is invisible with no affordance.
-- A fresh install auto-enables 6 pill kinds but not openings, air or temperature.
-- Only the first purifier is ever shown.
-- The energy "main meter" is a regex guess; the energy panel finds its sensors by matching French labels.
+- A fresh install auto-enables three pill kinds: lights, media and purifier.
+- The historical dynamic purifier aggregate still summarizes only the first purifier; all compatible purifiers are nevertheless present individually in Maison and automatic groups.
 - Settings' entity refresh overwrites `label` / `kind` / `relatedEntityIds` from the live HA scan, so those fields can't hold a manual edit.
+- Pill reordering is a relative horizontal drag after an explicit menu action, not a free-position drag overlay. Accueil exposes only the visible nine; overflow order is reachable through the Favoris section or Settings.
+- The new accessibility and responsive contracts have Robolectric/logic coverage, but no device-level TalkBack, D-pad or large-font screenshot suite; real Android 9 wall-panel validation is still manual.
 - Media: mute not actionable, no seek, primary transport hits the leader only, `join` sends one member at a time.
 - Thermostat has no dual setpoint.
 - HA reconnect has no backoff; the watchdog can be fooled by a ponging-but-silent instance.
@@ -518,7 +743,7 @@ Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59,
 - Silent fallback to unencrypted preferences if the Keystore is unavailable.
 
 ### Not implemented at all
-`button` / `input_*` / `number` / `select` HA entities · presence zones · media seek and source selection · vacuum clean modes · light theme and accent colour · portrait/small-screen layout (one exception: `LightDetailPanel` does branch on orientation) · pill reorder and pinning · i18n (the UI is French-only).
+`button` / `number` / `select` HA entities · presence zones · media seek and source selection · vacuum clean modes · light theme and accent colour · comprehensive portrait/small-screen adaptation outside the new Maison/tray surfaces · complete i18n (new pill/Maison settings strings are extracted in English/French, but much of the older UI remains Kotlin-literal French).
 
 ### Verified NOT bugs
 Claims that looked like defects and were checked, then refuted — recorded so nobody re-opens them:
