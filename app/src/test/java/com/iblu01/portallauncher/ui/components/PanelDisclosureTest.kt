@@ -11,6 +11,7 @@ class PanelDisclosureTest {
         assertEquals(6, policy.hourlyCount)
         assertEquals(3, policy.dailyCount)
         assertFalse(policy.showCondition)
+        assertTrue(policy.emphasizeSummary)
     }
 
     @Test fun `large weather panel keeps complete forecast`() {
@@ -18,6 +19,7 @@ class PanelDisclosureTest {
         assertEquals(12, policy.hourlyCount)
         assertEquals(7, policy.dailyCount)
         assertTrue(policy.showCondition)
+        assertFalse(policy.emphasizeSummary)
     }
 
     @Test fun `small media panel preserves controls and removes secondary detail`() {

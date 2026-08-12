@@ -74,9 +74,9 @@ fun WeatherPanel(
                 val shortEdge = minOf(maxWidth, maxHeight)
                 val outerInset = (shortEdge * 0.04f).coerceIn(14.dp, 28.dp)
                 val sectionGap = (shortEdge * 0.045f).coerceIn(14.dp, 30.dp)
-                val summaryIconSize = (shortEdge * 0.18f).coerceIn(56.dp, 104.dp)
-                val temperatureSize = (shortEdge.value * 0.13f).coerceIn(42f, 72f).sp
                 val disclosure = weatherDisclosureFor(maxWidth.value, maxHeight.value)
+                val summaryIconSize = if (disclosure.emphasizeSummary) 92.dp else (shortEdge * 0.18f).coerceIn(56.dp, 104.dp)
+                val temperatureSize = if (disclosure.emphasizeSummary) 84.sp else (shortEdge.value * 0.13f).coerceIn(42f, 72f).sp
 
                 Column(Modifier.fillMaxSize().padding(outerInset)) {
                     PanelHeader(
@@ -97,6 +97,7 @@ fun WeatherPanel(
                                 iconSize = summaryIconSize,
                                 temperatureSize = temperatureSize,
                                 showCondition = disclosure.showCondition,
+                                stacked = disclosure.emphasizeSummary,
                                 modifier = Modifier.weight(0.38f),
                             )
                             Column(
@@ -112,7 +113,7 @@ fun WeatherPanel(
                             Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                             verticalArrangement = Arrangement.spacedBy(sectionGap),
                         ) {
-                            WeatherSummary(weather, summaryIconSize, temperatureSize, disclosure.showCondition)
+                            WeatherSummary(weather, summaryIconSize, temperatureSize, disclosure.showCondition, stacked = false)
                             WeatherForecastSections(weather, disclosure, compactRows = false)
                         }
                     }
@@ -128,15 +129,15 @@ private fun WeatherSummary(
     iconSize: androidx.compose.ui.unit.Dp,
     temperatureSize: androidx.compose.ui.unit.TextUnit,
     showCondition: Boolean,
+    stacked: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy((iconSize * 0.22f).coerceIn(12.dp, 22.dp)),
-    ) {
-        WeatherIcon(weather.glyph, Modifier.size(iconSize))
-        Column {
+    if (stacked) {
+        Column(
+            modifier = modifier.fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
             Text(
                 weather.temp,
                 style = AppleTypography.displayLarge.copy(
@@ -145,8 +146,28 @@ private fun WeatherSummary(
                 ),
                 color = AppleColors.primary,
             )
-            if (showCondition && weather.condition.isNotBlank()) {
-                Text(weather.condition, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+            Spacer(Modifier.height(12.dp))
+            WeatherIcon(weather.glyph, Modifier.size(iconSize))
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy((iconSize * 0.22f).coerceIn(12.dp, 22.dp)),
+        ) {
+            WeatherIcon(weather.glyph, Modifier.size(iconSize))
+            Column {
+                Text(
+                    weather.temp,
+                    style = AppleTypography.displayLarge.copy(
+                        fontSize = temperatureSize,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = AppleColors.primary,
+                )
+                if (showCondition && weather.condition.isNotBlank()) {
+                    Text(weather.condition, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+                }
             }
         }
     }
@@ -156,57 +177,66 @@ internal data class WeatherDisclosure(
     val hourlyCount: Int,
     val dailyCount: Int,
     val showCondition: Boolean,
+    val emphasizeSummary: Boolean,
 )
 
 /** Progressive disclosure based on the panel's actual space, not a hard-coded device model. */
 internal fun weatherDisclosureFor(widthDp: Float, heightDp: Float): WeatherDisclosure = when {
-    heightDp <= 420f -> WeatherDisclosure(hourlyCount = 6, dailyCount = 3, showCondition = false)
-    heightDp <= 560f || widthDp <= 480f -> WeatherDisclosure(hourlyCount = 8, dailyCount = 4, showCondition = true)
-    else -> WeatherDisclosure(hourlyCount = 12, dailyCount = 7, showCondition = true)
+    heightDp <= 420f -> WeatherDisclosure(hourlyCount = 6, dailyCount = 3, showCondition = false, emphasizeSummary = true)
+    heightDp <= 560f || widthDp <= 480f -> WeatherDisclosure(hourlyCount = 8, dailyCount = 4, showCondition = true, emphasizeSummary = false)
+    else -> WeatherDisclosure(hourlyCount = 12, dailyCount = 7, showCondition = true, emphasizeSummary = false)
 }
 
 @Composable
 private fun WeatherForecastSections(weather: WeatherUi, disclosure: WeatherDisclosure, compactRows: Boolean) {
     if (weather.hourly.isNotEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.weather_section_hourly), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+            Text(
+                stringResource(R.string.weather_section_hourly),
+                style = AppleTypography.labelSmall.copy(fontSize = if (disclosure.emphasizeSummary) 14.sp else 12.sp),
+                color = AppleColors.tertiary,
+            )
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(if (compactRows) 14.dp else 18.dp),
             ) {
-                weather.hourly.take(disclosure.hourlyCount).forEach { HourTile(it) }
+                weather.hourly.take(disclosure.hourlyCount).forEach { HourTile(it, disclosure.emphasizeSummary) }
             }
         }
     }
     if (weather.daily.isNotEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(stringResource(R.string.weather_section_daily), style = AppleTypography.labelSmall, color = AppleColors.tertiary)
-            weather.daily.take(disclosure.dailyCount).forEach { DayRow(it) }
+            Text(
+                stringResource(R.string.weather_section_daily),
+                style = AppleTypography.labelSmall.copy(fontSize = if (disclosure.emphasizeSummary) 14.sp else 12.sp),
+                color = AppleColors.tertiary,
+            )
+            weather.daily.take(disclosure.dailyCount).forEach { DayRow(it, disclosure.emphasizeSummary) }
         }
     }
 }
 
 @Composable
-private fun HourTile(p: ForecastPoint) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(forecastPointLabel(p.datetime, hourly = true), style = AppleTypography.bodySmall.copy(fontSize = 12.sp), color = AppleColors.secondary)
-        WeatherIcon(weatherGlyph(p.condition, night = false), Modifier.size(30.dp))
-        Text("${p.temp.roundToInt()}°", style = AppleTypography.bodyLarge, color = AppleColors.primary)
+private fun HourTile(p: ForecastPoint, enlarged: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (enlarged) 7.dp else 6.dp)) {
+        Text(forecastPointLabel(p.datetime, hourly = true), style = AppleTypography.bodySmall.copy(fontSize = if (enlarged) 14.sp else 12.sp), color = AppleColors.secondary)
+        WeatherIcon(weatherGlyph(p.condition, night = false), Modifier.size(if (enlarged) 40.dp else 30.dp))
+        Text("${p.temp.roundToInt()}°", style = AppleTypography.bodyLarge.copy(fontSize = if (enlarged) 20.sp else 17.sp), color = AppleColors.primary)
     }
 }
 
 @Composable
-private fun DayRow(p: ForecastPoint) {
+private fun DayRow(p: ForecastPoint, enlarged: Boolean) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(forecastPointLabel(p.datetime, hourly = false), style = AppleTypography.bodyLarge, color = AppleColors.primary, modifier = Modifier.weight(1f))
-        WeatherIcon(weatherGlyph(p.condition, night = false), Modifier.size(28.dp))
+        Text(forecastPointLabel(p.datetime, hourly = false), style = AppleTypography.bodyLarge.copy(fontSize = if (enlarged) 19.sp else 17.sp), color = AppleColors.primary, modifier = Modifier.weight(1f))
+        WeatherIcon(weatherGlyph(p.condition, night = false), Modifier.size(if (enlarged) 38.dp else 28.dp))
         Spacer(Modifier.size(16.dp))
         Text(
             p.tempLow?.let { "${p.temp.roundToInt()}° / ${it.roundToInt()}°" } ?: "${p.temp.roundToInt()}°",
-            style = AppleTypography.bodyLarge, color = AppleColors.secondary,
+            style = AppleTypography.bodyLarge.copy(fontSize = if (enlarged) 19.sp else 17.sp), color = AppleColors.secondary,
         )
     }
 }
