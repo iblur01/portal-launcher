@@ -5,8 +5,9 @@ Exhaustive inventory of what the app actually does, derived from the code (not f
 Scope note: this is a **launcher** that takes the home role on any Android 9+ device, whose default
 screen is a clock and whose Home Assistant integration is optional. Portal-specific behaviour (the
 dream/sleep presence proxy, the API 28 blur fallback) is called out where it appears.
-Every non-obvious claim carries a `file:line`. Updated 2026-08-08 against branch
-`feature/home-assistant-extended-support`.
+Every non-obvious claim carries a source reference. Updated 2026-08-13 against the current
+`preapre-0.08` worktree, including its uncommitted onboarding, remote-configuration, background and
+Home-grouping changes. Line numbers inherited from the earlier audit are indicative and can drift.
 
 Conventions used below:
 - **Interactive** = issues Home Assistant service calls. **Read-only** = display only.
@@ -57,10 +58,11 @@ Editor: Settings → Application → "Thème de l'horloge" → `ClockThemeActivi
 - ⚠️ UI ranges are narrower than the persisted clamps (`Prefs` allows size 60–200, spacing −5..15) — `Prefs.kt:113,117`.
 
 ### Background
-Three modes via `Prefs.backgroundMode` — `DynamicBackground.kt:34-38`:
-- `neutral` — static radial gradient (`:50-59`).
-- `nature` — ⚠️ cycles **5 hardcoded Unsplash URLs** every 30 s with a 2 s crossfade; no offline fallback, failures only log and leave the last frame (`:26-32,89-122`).
-- `custom` — user photo at `filesDir/wallpaper.jpg`, falls back to the gradient if absent (`:62-87`). Cache-busted by a `wallpaperVersion` counter bumped on settings change (`LauncherActivity.kt:232-243`).
+Four modes via `Prefs.backgroundMode` and `DynamicBackground.backgroundModes`:
+- `system` — Android static or live wallpaper rendered by the system wallpaper layer.
+- `neutral` — Portal's offline Calm radial background.
+- `custom` — a locally selected image, stored privately and falling back to Calm if absent.
+- `immich` — frames supplied by the photo coordinator and its bounded offline cache.
 
 Scrim: separate darkening layer, 0–60 %, default 25 %, only when mode ≠ neutral — `LauncherActivity.kt:464-470`, `Prefs.kt:98-100`. Tuned in **OpacityPreviewActivity**: real wallpaper + frozen mock clock + vertical fill slider with 20 haptic steps, committed on release only (`OpacityPreviewScreen.kt:106-112`).
 
@@ -737,14 +739,9 @@ TalkBack/large-text/D-pad contracts.
 - Dependencies of note: Paho MQTT 1.2.5 (from a **custom Eclipse repo**, not Maven Central), OkHttp 4.12, Coil 2.7, Compose BOM 2024.09, Hilt 2.52. ⚠️ `androidx.security:security-crypto` is on **1.1.0-alpha06** and is the one dependency hardcoded outside the version catalog — an alpha for the library holding the HA token. `material-icons-extended` pulls thousands of icons for a handful of uses; `hilt-navigation-compose` is declared but there is no Compose Navigation in the app (activities are the navigation unit).
 
 ### i18n footprint
-`res/values/strings.xml` holds **3 strings**: the app name and two accessibility service labels. Everything else is a Kotlin literal — roughly **590 user-facing French strings** across ~25 files.
-
-Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59, dev-only so low priority), `PillRules.kt` (47), `SettingsScreen.kt` (41), `MediaPlayerView.kt` (40), `HaDiscovery.kt` (22, needs triage — some are HA-facing entity names), `HomeConnectionPage.kt` (21), `LightDetailPanel.kt` (21), `ClockScreen.kt` (19), `SetupWizard.kt` (17).
-
-⚠️ Extraction is **not** purely mechanical. Domain logic still generates labels without a
-`Context`, so either it takes a resource lookup or returns keys resolved at the Compose boundary.
-`ClockFont`/`ClockTint` store labels as `String` fields on an enum, and enum constructors cannot call
-`@Composable`, so those need a mapping function.
+The application now ships English defaults in `res/values/strings.xml` and French translations in
+`res/values-fr/strings.xml`. Compose surfaces resolve resource identifiers at the UI boundary;
+Home Assistant entity labels and locally supplied names remain data rather than translated literals.
 
 ---
 
@@ -774,12 +771,14 @@ Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59,
 
 - The weather entity is whichever `weather.*` HA lists first.
 - The offline banner never rolls over to hours.
-- The `nature` background has no offline fallback and its 5 image URLs are hardcoded.
+- Immich depends on the selected server while refreshing, but valid cached frames continue offline;
+  the Calm background is used when no frame is available.
 - No unavailable state on the list-based panels.
 - Silent fallback to unencrypted preferences if the Keystore is unavailable.
 
 ### Not implemented at all
-`button` / `number` / `select` HA entities · presence zones · media seek and source selection · vacuum clean modes · light theme and accent colour · comprehensive portrait/small-screen adaptation outside the new Maison/tray surfaces · complete i18n (new pill/Maison settings strings are extracted in English/French, but much of the older UI remains Kotlin-literal French).
+`button` / `number` / `select` HA entities · presence zones · media seek · light theme and accent
+colour · automated screenshot coverage for every compact/expanded panel combination.
 
 ### Verified NOT bugs
 Claims that looked like defects and were checked, then refuted — recorded so nobody re-opens them:
