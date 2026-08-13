@@ -73,6 +73,8 @@ import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.LocalHaStates
 import com.iblu01.portallauncher.ui.components.ChipActionsPanel
+import com.iblu01.portallauncher.ui.components.mediaProviderLogo
+import com.iblu01.portallauncher.ui.components.MediaProviderBadge
 import com.iblu01.portallauncher.ui.components.MediaPlayerView
 import com.iblu01.portallauncher.ui.components.StatusChip
 import com.iblu01.portallauncher.ui.components.launcherIcon
@@ -149,6 +151,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         album = "Simulation locale", state = if (fakeMediaPlaying) "playing" else "paused", coverUrl = null,
         volumePercent = fakeMediaVolume, isMuted = false, playerNames = listOf("Salon"),
         players = listOf(MediaPlayerVolume("media_player.salon", "Salon", fakeMediaVolume, false)),
+        source = "Spotify",
     )
     val playgroundMetrics = LocalContext.current.resources.displayMetrics
     val compactPlayground = isCompactClockScreen(
@@ -620,6 +623,25 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         )
         AccessoryGrid(items = accessories)
 
+        Spacer(Modifier.height(28.dp))
+
+        // 9 · Media provider badges
+        SectionTitle(stringResource(R.string.playground_section_media_providers))
+        Spacer(Modifier.height(10.dp))
+        providerBadgeGroups.forEach { (title, providers) ->
+            Text(title, style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                providers.forEach { name ->
+                    mediaProviderLogo(name)?.let { MediaProviderBadge(it, name) }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
         Spacer(Modifier.height(40.dp))
     }
 
@@ -1052,3 +1074,20 @@ private fun LabeledControl(caption: String, content: @Composable () -> Unit) {
         Text(caption, style = AppleTypography.labelSmall, color = AppleColors.tertiary)
     }
 }
+
+/** Sources média réellement rencontrées dans HA (`app_name`, `source`, domaine du lecteur). */
+private val providerBadgeGroups: List<Pair<String, List<String>>> = listOf(
+    "Audio" to listOf(
+        "Spotify", "YouTube Music", "Apple Music", "iTunes", "Tidal", "Amazon Music",
+        "SoundCloud", "Pandora", "Audible", "Pocket Casts", "Overcast", "Castro",
+    ),
+    "Vidéo / TV" to listOf(
+        "YouTube", "YouTube Kids", "Netflix", "Prime Video", "Paramount+", "HBO Max", "HBO",
+        "Apple TV", "Twitch", "Crunchyroll", "Plex", "Jellyfin", "Emby", "Kodi",
+    ),
+    "Radio" to listOf("TuneIn Radio", "iHeartRadio"),
+    "Enceintes & protocoles" to listOf(
+        "Sonos", "AirPlay", "Google Cast", "DLNA", "Bluetooth", "Roon", "Roku",
+        "Android TV", "Fire TV", "webOS TV", "Samsung TV", "Home Assistant",
+    ),
+)

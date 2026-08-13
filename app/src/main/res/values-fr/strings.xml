@@ -581,6 +581,7 @@
     <string name="playground_vacuum_in_progress">En cours</string>
     <string name="playground_vacuum_queued">En file</string>
     <string name="playground_section_accessories">Accessoires (HomeKit)</string>
+<string name="playground_section_media_providers">Badges fournisseurs média</string>
     <string name="playground_accessory_desk">Bureau</string>
     <string name="playground_accessory_off">Éteinte</string>
     <string name="playground_accessory_blinds">Volet</string>
@@ -643,6 +644,12 @@
     <string name="light_state_off">Éteinte</string>
     <string name="opening_state_open">Ouverte</string>
     <string name="opening_state_closed">Fermée</string>
+    <string name="door_opened_since">Ouverte depuis le %1$s</string>
+    <string name="door_closed_since">Fermée depuis le %1$s</string>
+    <string name="motion_state_detected">Mouvement détecté</string>
+    <string name="motion_state_clear">Aucun mouvement</string>
+    <string name="motion_detected_since">Mouvement détecté depuis le %1$s</string>
+    <string name="motion_clear_since">Aucun mouvement depuis le %1$s</string>
     <string name="pill_safety_alert">Alerte</string>
     <string name="phase_none">Aucun</string>
     <string name="phase_air_wash">Air wash</string>
@@ -1022,4 +1029,41 @@
     <string name="settings_wallpaper_android_section">ANDROID</string>
     <string name="settings_wallpaper_android_change">Choisir un autre fond d’écran Android</string>
     <string name="settings_wallpaper_sources_hint">Choisissez l’ambiance affichée derrière l’horloge et les apps.</string>
+
+    <!-- Dossiers de la grille d'applications -->
+    <string name="folder_default_label">Dossier</string>
+    <string name="folder_rename_label">Nom du dossier</string>
+    <string name="folder_rename_placeholder">Dossier</string>
+    <string name="folder_hint">Touchez le nom pour renommer. Appui long sur une application pour la sortir.</string>
+    <string name="folder_take_out">Sortir</string>
+    <string name="folder_delete">Supprimer le dossier</string>
+
+    <!-- Pastilles de notification -->
+    <string name="notification_dots_service_label">Pastilles de notification</string>
+    <string name="settings_app_toggle_notification_dots">Pastilles de notification</string>
+    <string name="settings_app_label_notification_access">Autoriser l\'accès aux notifications</string>
+    <string name="settings_app_value_notification_granted">Accordé</string>
+    <string name="settings_app_value_notification_missing">Requis</string>
+
+    <!-- Pack d'icônes -->
+    <string name="settings_app_label_icon_pack">Pack d\'icônes</string>
+    <string name="settings_app_value_icon_pack_system">Icônes du système</string>
+    <string name="icon_pack_picker_title">Pack d\'icônes</string>
+    <string name="icon_pack_picker_empty">Aucun pack d\'icônes installé</string>
+
+    <!-- Sauvegarde de la disposition -->
+    <string name="settings_app_section_layout_backup">SAUVEGARDE DE LA DISPOSITION</string>
+    <string name="settings_app_label_export_layout">Exporter la disposition</string>
+    <string name="settings_app_label_import_layout">Restaurer une disposition</string>
+    <string name="toast_layout_exported">Disposition exportée</string>
+    <string name="toast_layout_export_failed">Échec de l\'export</string>
+    <string name="toast_layout_imported_format">Disposition restaurée : %1$d icônes, %2$d dossiers</string>
+    <string name="toast_layout_import_failed">Fichier de sauvegarde illisible</string>
+    <string name="onb_setup_root_title">Root détecté</string>
+    <string name="onb_setup_root_desc">Portal peut accorder lui-même toutes les autorisations ci-dessous, activer l\'accès aux notifications et faire tourner son pont sans notification permanente.</string>
+    <string name="onb_setup_root_action">Tout configurer automatiquement</string>
+    <string name="onb_setup_root_action_busy">Configuration…</string>
+    <string name="settings_app_label_root_setup">Configuration automatique (root)</string>
+    <string name="settings_app_value_root_available">Disponible</string>
+    <string name="settings_app_value_root_done">Configuré</string>
 </resources>

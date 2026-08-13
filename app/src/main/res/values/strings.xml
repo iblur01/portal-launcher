@@ -583,6 +583,7 @@
     <string name="playground_vacuum_in_progress">In progress</string>
     <string name="playground_vacuum_queued">Queued</string>
     <string name="playground_section_accessories">Accessories (HomeKit)</string>
+<string name="playground_section_media_providers">Media provider badges</string>
     <string name="playground_accessory_desk">Desk</string>
     <string name="playground_accessory_off">Off</string>
     <string name="playground_accessory_blinds">Blinds</string>
@@ -645,6 +646,12 @@
     <string name="light_state_off">Off</string>
     <string name="opening_state_open">Open</string>
     <string name="opening_state_closed">Closed</string>
+    <string name="door_opened_since">Opened since %1$s</string>
+    <string name="door_closed_since">Closed since %1$s</string>
+    <string name="motion_state_detected">Motion detected</string>
+    <string name="motion_state_clear">No motion</string>
+    <string name="motion_detected_since">Motion detected since %1$s</string>
+    <string name="motion_clear_since">No motion since %1$s</string>
     <string name="pill_safety_alert">Alert</string>
     <string name="phase_none">None</string>
     <string name="phase_air_wash">Air wash</string>
@@ -1024,4 +1031,41 @@
     <string name="settings_wallpaper_android_section">ANDROID</string>
     <string name="settings_wallpaper_android_change">Choose another Android wallpaper</string>
     <string name="settings_wallpaper_sources_hint">Choose the atmosphere shown behind your clock and apps.</string>
+
+    <!-- Folders on the app grid -->
+    <string name="folder_default_label">Folder</string>
+    <string name="folder_rename_label">Folder name</string>
+    <string name="folder_rename_placeholder">Folder</string>
+    <string name="folder_hint">Tap the name to rename. Long-press an app to take it out.</string>
+    <string name="folder_take_out">Take out</string>
+    <string name="folder_delete">Delete folder</string>
+
+    <!-- Notification dots -->
+    <string name="notification_dots_service_label">Notification dots</string>
+    <string name="settings_app_toggle_notification_dots">Notification dots</string>
+    <string name="settings_app_label_notification_access">Grant notification access</string>
+    <string name="settings_app_value_notification_granted">Granted</string>
+    <string name="settings_app_value_notification_missing">Required</string>
+
+    <!-- Icon pack -->
+    <string name="settings_app_label_icon_pack">Icon pack</string>
+    <string name="settings_app_value_icon_pack_system">System icons</string>
+    <string name="icon_pack_picker_title">Icon pack</string>
+    <string name="icon_pack_picker_empty">No icon pack installed</string>
+
+    <!-- Layout backup -->
+    <string name="settings_app_section_layout_backup">LAYOUT BACKUP</string>
+    <string name="settings_app_label_export_layout">Export the layout</string>
+    <string name="settings_app_label_import_layout">Restore a layout</string>
+    <string name="toast_layout_exported">Layout exported</string>
+    <string name="toast_layout_export_failed">Export failed</string>
+    <string name="toast_layout_imported_format">Layout restored: %1$d icons, %2$d folders</string>
+    <string name="toast_layout_import_failed">Unreadable backup file</string>
+    <string name="onb_setup_root_title">Root detected</string>
+    <string name="onb_setup_root_desc">Portal can grant every permission below by itself, enable notification access, and run its bridge without the permanent notification.</string>
+    <string name="onb_setup_root_action">Configure everything automatically</string>
+    <string name="onb_setup_root_action_busy">Configuring…</string>
+    <string name="settings_app_label_root_setup">Automatic setup (root)</string>
+    <string name="settings_app_value_root_available">Available</string>
+    <string name="settings_app_value_root_done">Configured</string>
 </resources>

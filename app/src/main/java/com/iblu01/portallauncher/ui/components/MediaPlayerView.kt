@@ -10,11 +10,13 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -54,6 +56,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
@@ -95,6 +99,44 @@ internal fun mediaDisclosureFor(widthDp: Float, heightDp: Float): MediaDisclosur
     heightDp <= 420f -> MediaDisclosure(showAlbum = false, secondaryPlayerCount = 0, emphasizePrimary = true)
     heightDp <= 560f || widthDp <= 480f -> MediaDisclosure(showAlbum = false, secondaryPlayerCount = 1, emphasizePrimary = false)
     else -> MediaDisclosure(showAlbum = true, secondaryPlayerCount = 2, emphasizePrimary = false)
+}
+
+/** Badge de source (logo + nom) incrusté en bas de la pochette, coins alignés sur ceux de la pochette. */
+@Composable
+private fun BoxScope.CoverSourceBadge(
+    source: String?,
+    entityId: String,
+    coverCorner: Dp,
+    inset: Dp = 7.dp,
+) {
+    val label = source?.takeIf { it.isNotBlank() } ?: entityId.substringAfter('.')
+    val logo = mediaProviderLogo(label) ?: mediaProviderLogo(entityId.substringAfter('.')) ?: return
+    val shape = RoundedCornerShape((coverCorner - inset).coerceAtLeast(0.dp))
+    Row(
+        Modifier
+            .align(Alignment.BottomCenter)
+            .padding(inset)
+            .height(28.dp)
+            .clip(shape)
+            .background(Color.White.copy(alpha = 0.94f), shape)
+            .padding(horizontal = 9.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Image(
+            painter = painterResource(logo),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxHeight(),
+        )
+        Text(
+            label,
+            style = AppleTypography.labelSmall,
+            color = Color(0xFF1C1C1E),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
@@ -331,6 +373,7 @@ fun MediaPlayerView(
                                         } else {
                                             Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(64.dp))
                         }
+                        CoverSourceBadge(media.source, media.entityId, artworkCorner)
                     }
 
                     Column(
@@ -429,16 +472,16 @@ fun MediaPlayerView(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 if (onDismiss != null) {
-                    PanelHeader(
-                        title = sourceName,
-                        onNavigation = onDismiss,
-                        navigationIcon = Icons.Filled.Close,
-                        navigationContentDescription = stringResource(R.string.media_close_player_desc),
-                        titleIcon = Icons.Outlined.MusicNote,
-                        titleEntityId = media.entityId,
-                        accent = if (isPlaying) AppleColors.active else AppleColors.warning,
-                        onTitleClick = if (media.groupablePlayers.size > 1) ({ groupDialogVisible = true }) else null,
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        PanelHeader(
+                            title = sourceName,
+                            titleIcon = Icons.Outlined.MusicNote,
+                            titleEntityId = media.entityId,
+                            accent = if (isPlaying) AppleColors.active else AppleColors.warning,
+                            onTitleClick = if (media.groupablePlayers.size > 1) ({ groupDialogVisible = true }) else null,
+                            onClose = onDismiss,
+                        )
+                    }
                 } else {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -480,6 +523,7 @@ fun MediaPlayerView(
                         } else {
                             Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(82.dp))
                     }
+                    CoverSourceBadge(media.source, media.entityId, 28.dp)
                 }
 
                 Column(
