@@ -29,11 +29,6 @@ import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
-import org.json.JSONObject
-import org.json.JSONArray
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
 
 @AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {
@@ -153,9 +148,6 @@ class SettingsActivity : ComponentActivity() {
         }
         return super.dispatchTouchEvent(ev)
     }
-
-    private fun mqttSignature(host: String, port: Int, username: String, password: String, deviceName: String) =
-        "$host:$port:$username:$password:$deviceName"
 
     private val callbacks = object : SettingsCallbacks {
         override fun onSave(form: SettingsForm) {
@@ -323,15 +315,6 @@ class SettingsActivity : ComponentActivity() {
             uiState.pillCandidates.addAll(candidates)
         }
     }
-
-    private fun parseHaEntities(raw: String): List<HaEntity> = runCatching {
-        val array = JSONArray(raw)
-        (0 until array.length()).mapNotNull { i ->
-            val o = array.optJSONObject(i) ?: return@mapNotNull null
-            val id = o.optString("entity_id")
-            if (id.isBlank()) null else HaEntity(id, o.optString("state"), o.optJSONObject("attributes") ?: JSONObject(), o.optString("last_changed"))
-        }
-    }.getOrDefault(emptyList())
 
     private fun resolveInstalledApps(): List<AppEntry> {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)

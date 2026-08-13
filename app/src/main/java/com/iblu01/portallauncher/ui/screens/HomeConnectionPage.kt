@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher.ui.screens
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.HaInstance
 import com.iblu01.portallauncher.HaMdnsDiscovery
 import com.iblu01.portallauncher.R
+import com.iblu01.portallauncher.WebConfigActivity
 import com.iblu01.portallauncher.ui.components.HaDiscoveryDialog
 import com.iblu01.portallauncher.ui.components.SettingsDivider
 import com.iblu01.portallauncher.ui.components.SettingsInfoDialog
@@ -155,6 +157,13 @@ fun HomeConnectionPage(
             )
             SettingsDivider()
             SettingsRow(label = stringResource(R.string.home_connection_label_key_help), onClick = { showKeyHelp = true })
+            SettingsDivider()
+            // Typing a long-lived token on a panel's on-screen keyboard is miserable; hand the
+            // whole form to a phone instead (see WebConfigActivity).
+            SettingsRow(
+                label = stringResource(R.string.home_connection_label_web_config),
+                onClick = { context.startActivity(Intent(context, WebConfigActivity::class.java)) },
+            )
         }
 
         SettingsSection(title = stringResource(R.string.home_connection_section_status)) {

@@ -121,6 +121,15 @@
             android:exported="false"
             android:screenOrientation="fullSensor" />
 
+        <!--
+            Remote configuration. Not exported: it starts a LAN server that serves this panel's
+            Home Assistant and MQTT credentials, so only Portal itself may open it.
+        -->
+        <activity
+            android:name=".WebConfigActivity"
+            android:exported="false"
+            android:screenOrientation="fullSensor" />
+
         <activity
             android:name=".ClockThemeActivity"
             android:exported="false"

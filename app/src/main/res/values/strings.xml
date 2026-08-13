@@ -47,6 +47,16 @@
     <string name="home_connection_placeholder_paste_key">Paste your key here</string>
     <string name="home_connection_label_key_help">Where to find my key?</string>
     <string name="home_connection_section_status">CONNECTION STATUS</string>
+    <string name="home_connection_label_web_config">Set up from another device</string>
+    <string name="web_config_title">Remote setup</string>
+    <string name="web_config_subtitle">Scan this code with your phone to fill in this panel\'s settings from its keyboard.</string>
+    <string name="web_config_qr_description">QR code for the setup page</string>
+    <string name="web_config_section_manual">OR TYPE IT IN</string>
+    <string name="web_config_label_address">Address</string>
+    <string name="web_config_label_code">Code</string>
+    <string name="web_config_same_network_note">Your phone must be on the same Wi-Fi network. The page closes as soon as you leave this screen.</string>
+    <string name="web_config_unavailable">Remote setup unavailable: this panel is not on a network.</string>
+    <string name="onb_common_action_web_config">Set up from my phone</string>
     <string name="home_connection_label_connection">Connection</string>
     <string name="home_connection_section_mqtt">MQTT</string>
     <string name="home_connection_label_mqtt_server">Server address</string>

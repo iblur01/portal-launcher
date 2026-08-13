@@ -145,6 +145,22 @@ fun friendlyEntityState(e: HaEntity): String {
 
 data class PillCandidate(val primary: HaEntity, val kind: PillKind, val label: String, val related: List<HaEntity>)
 
+/** Decodes a `/api/states` payload; malformed JSON yields an empty list rather than throwing. */
+fun parseHaEntities(raw: String): List<HaEntity> = runCatching {
+    val array = JSONArray(raw)
+    (0 until array.length()).mapNotNull { i ->
+        val o = array.optJSONObject(i) ?: return@mapNotNull null
+        val id = o.optString("entity_id")
+        if (id.isBlank()) null
+        else HaEntity(
+            id,
+            o.optString("state"),
+            o.optJSONObject("attributes") ?: JSONObject(),
+            o.optString("last_changed"),
+        )
+    }
+}.getOrDefault(emptyList())
+
 object PillRuleCodec {
     fun encode(rules: List<PillRule>): String = JSONArray().apply {
         rules.forEach { r -> put(JSONObject().apply {

@@ -630,14 +630,21 @@ class MqttBridgeService : Service() {
         PowerMode.FOLLOW_PRESENCE -> getString(R.string.power_mode_follow_presence)
     }
 
-    private fun localIp(): String? = try {
-        NetworkInterface.getNetworkInterfaces()
-            .asSequence()
-            .flatMap { it.inetAddresses.asSequence() }
-            .filterIsInstance<Inet4Address>()
-            .firstOrNull { !it.isLoopbackAddress }
-            ?.hostAddress
-    } catch (_: Exception) {
-        null
-    }
+    private fun localIp(): String? = localIpv4()
 }
+
+/** This device's first non-loopback IPv4 address, or null when it is off-network. */
+fun localIpv4(): String? = try {
+    NetworkInterface.getNetworkInterfaces()
+        .asSequence()
+        .flatMap { it.inetAddresses.asSequence() }
+        .filterIsInstance<Inet4Address>()
+        .firstOrNull { !it.isLoopbackAddress }
+        ?.hostAddress
+} catch (_: Exception) {
+    null
+}
+
+/** Identity of everything the MQTT bridge connects with; a change means "reconnect". */
+fun mqttSignature(host: String, port: Int, username: String, password: String, deviceName: String) =
+    "$host:$port:$username:$password:$deviceName"

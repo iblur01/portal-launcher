@@ -129,6 +129,10 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
 
+    // Remote configuration screen: LAN HTTP server + QR code for the phone to scan.
+    implementation(libs.nanohttpd)
+    implementation(libs.zxing.core)
+
     // Installs the baseline profile (src/main/baseline-prof.txt + the Compose libraries' own
     // profiles, merged by AGP) so cold start runs AOT-compiled instead of interpreted+JIT.
     // Debuggable builds ignore AOT: measure on `productionTest` or `release`.
