@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.0
+
+Première version stable. Sortie de beta après `0.0.7-beta`.
+
+### Added
+
+- **Configuration à distance depuis un téléphone** : un serveur HTTP local embarqué sert une page de réglages sur le réseau Wi-Fi ; le panneau affiche un QR code et un code d'accès à usage unique. L'adresse Home Assistant, le jeton, le MQTT et la sélection des pills se saisissent depuis le clavier du téléphone. La page se ferme dès qu'on quitte l'écran.
+- **Onboarding « avec un téléphone »** : l'étape Home Assistant propose deux voies explicites — configuration par téléphone (QR code) ou saisie directe sur le panneau — avec un avertissement dédié sur écran compact.
+- **Dossiers dans la grille d'applications** : un dossier se crée en déposant une icône sur une autre, s'ouvre en popup centré, se renomme d'un tap sur son titre et se dissout automatiquement sous deux membres ou quand une app est désinstallée. La tuile affiche les quatre premiers membres en 2×2.
+- **Packs d'icônes tiers** : détection des packs installés (ADW / GO / Nova), lecture d'`appfilter.xml` et application aux icônes de la grille ; les apps non thémées gardent leur icône d'origine.
+- **Pastilles de notification** : un service d'écoute allume une pastille sur les applications qui ont quelque chose en attente (aucun contenu n'est lu ni conservé), y compris sur les dossiers. Les notifications permanentes n'allument rien.
+- **Sauvegarde et restauration de la disposition** : export/import d'un fichier JSON versionné et lisible contenant placements, dossiers, renommages, apps masquées, raccourcis épinglés, échelle de grille et pack d'icônes — sans aucun identifiant ni mot de passe.
+- **Provisionnement root automatique** : sur un panneau rooté, Portal s'accorde lui-même toutes les autorisations système (rôle launcher, accessibilité, accès notifications, réglages sécurisés, exclusion doze) en un bouton, dans l'onboarding comme dans les réglages.
+- **Panneaux Porte et Mouvement** : nouveaux panneaux dédiés aux ouvrants et aux détecteurs de présence, avec état et horodatage « depuis ».
+- **Nouvelle catégorie de pill Mouvement** : les détecteurs de mouvement/présence rejoignent « Sécurité & accès ».
+- **Logos de source sur les pochettes média** : 40 logos de fournisseurs (Spotify, Netflix, Plex, Sonos, YouTube, Tidal…) intégrés en vectoriel et résolus depuis `app_name`, `source` ou le domaine du lecteur.
+- **Page Maison groupée par pièce ou par type** : un sélecteur dans l'en-tête bascule entre les deux organisations, la préférence est mémorisée.
+- **Prévisions météo à onglets** : le panneau météo distingue « Heures » et « Jours », avec la plage min/max du jour.
+- **Fond d'écran personnalisé dans l'onboarding** : choix d'une photo locale pendant la configuration initiale, en plus des modes système, calme et Immich.
+- **Récapitulatif de fin d'onboarding** : l'écran final résume les choix effectués.
+
+### Changed
+
+- **Panneaux adaptatifs** : la composition d'un panneau est décidée par ses propres dimensions, pas par l'orientation de l'appareil ; les panneaux passent en pleine page sur écran compact au lieu de rester dockés au tiers de l'écran.
+- **Divulgation progressive du média** : les contrôles de lecture principaux sont conservés en priorité et le détail secondaire disparaît à mesure que la hauteur utile diminue.
+- **Horloge et bandeau compacts** : hiérarchie, marges et espacement repensés pour les petits écrans, températures intérieure/extérieure condensées dans l'en-tête et masquées quand elles sont indisponibles, séparation nette entre les pills et les points du pager.
+- **Icônes météo** : le glyphe dessiné au Canvas est remplacé par les icônes Meteocons statiques embarquées dans l'APK, disponibles hors ligne.
+- **Dépôt sur une case occupée** : le geste crée un dossier au lieu d'échanger les deux icônes ; l'échange ne subsiste que quand le regroupement est impossible (widget, tailles différentes).
+- **Textes français au vouvoiement** : l'ensemble des écrans de configuration passe du tutoiement au vouvoiement, avec des formulations plus claires.
+- **Chargement d'images unifié** : un seul `ImageLoader` Coil pour tout le processus, avec décodeur SVG, budgets mémoire/disque explicites (12 % du heap, 32 Mo), RGB565 et contournement du proxy HTTP pour le trafic local.
+- **Documentation** : README réécrit, nouveaux guides `docs/GETTING-STARTED.md`, `docs/ARCHITECTURE.md`, `docs/CONFIGURATION.md`, `docs/DEVELOPMENT.md`, `docs/TESTING.md`, et `docs/FEATURES.md` remis à jour.
+
+### Removed
+
+- Les taps ne traversent plus les panneaux : un panneau opaque absorbe tous les événements pointeur, y compris pendant son animation de fermeture.
+- Le jeu complet d'icônes météo `meteocons/fill` (plus de 120 SVG) est remplacé par un jeu réduit aux conditions réellement utilisées.
+- Suppression de `latestStates` de l'état d'interface : les états bruts Home Assistant ne transitent plus par l'état global du launcher.
+- Retrait de la mention « bientôt disponible » sur le groupement de la page Maison, désormais fonctionnel.
+
+### Performance
+
+- **Store observable par entité** : les états Home Assistant ne sont plus diffusés dans un état global recomposé en bloc. Chaque entité possède son propre slot observable ; un `state_changed` sur `light.salon` n'invalide que les composables qui lisent `light.salon`. Mesuré : de 122-145 ms par push sur petit appareil à une seule frame.
+- **Interface optimiste** : une action écrit immédiatement l'état prédit (`turn_on`, `toggle`, `lock`/`unlock`, `open_cover`/`close_cover`, `media_play_pause`…) ; le vrai état reprend la main dès qu'il apporte du nouveau, avec retour arrière automatique après 4 s sans confirmation. Les entités en `assumed_state` conservent la prédiction.
+- **Snapshot immuable côté socket** : la carte d'états devient une `PersistentMap` à écrivain unique — plus de copie défensive de 765 entrées à chaque événement, plus de verrou.
+- **Latence action → confirmation divisée par six** : la fenêtre d'échantillonnage des snapshots passe de 100 ms à 16 ms, et un flux brut non échantillonné alimente le store par entité.
+- **Découverte des pills mémoïsée** : la découverte ne dépend que de l'ensemble des identifiants et des registres, jamais des valeurs d'état ; elle n'est recalculée que quand un appareil apparaît ou disparaît.
+- **Indexation des entités en une passe** : les balayages imbriqués (765 entités × ~60 candidats à chaque push) sont remplacés par un index par appareil partagé, avec mémoïsation des slugs et des clés logiques.
+- **Identités préservées dans l'état d'interface** : une projection reconstruite mais identique conserve son instance précédente, pour que le « strong skipping » de Compose ne recompose pas les sous-arbres de la barre et de la page Maison.
+- **Profil baseline** : ajout de `baseline-prof.txt` et de `profileinstaller`, pour un démarrage à froid compilé AOT plutôt qu'interprété + JIT.
+- **Pont MQTT silencieux** : sur appareil provisionné en root, le pont tourne en service simple, sans notification permanente, avec repli automatique sur le service de premier plan ailleurs.
+- **Sonde de présence conditionnée** : le proxy d'occupation n'est exposé que sur le matériel disposant réellement d'un composant écran de veille.
+
 ## 0.0.7-beta
 
 ### Added
