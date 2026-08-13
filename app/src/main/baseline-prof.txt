@@ -1,0 +1,11 @@
+# Profil baseline (P6). Les deux appareils cibles (A53 2 cœurs / 8 cœurs) démarrent l'app en
+# interprété+JIT sans lui : le handshake HA ne représente que 0,46 s des 8,3 s de démarrage
+# mesurées — le reste est de l'exécution applicative à froid.
+#
+# Faute de device de génération fiable (les deux panneaux sont des builds non-userdebug en
+# Android 10/11, la génération automatique Macrobenchmark y est indisponible), on couvre tout le
+# code applicatif : l'app EST le chemin de démarrage (launcher kiosk, un seul écran), et le coût
+# APK de règles larges est de quelques centaines de Ko. Les profils des bibliothèques Compose
+# sont fournis par leurs AAR et fusionnés automatiquement par AGP.
+HSPLcom/iblu01/portallauncher/**;->**(**)**
+Lcom/iblu01/portallauncher/**;

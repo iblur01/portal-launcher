@@ -216,6 +216,16 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
     }
 
     /**
+     * Raw, untransformed snapshot stream for the per-entity UI store (`HaStates`): one emission
+     * per socket event, no sampling — the store's granular invalidation makes per-push apply
+     * cheap, and the UI-side collector conflates if the main thread falls behind. Re-binds to a
+     * fresh connection exactly like [snapshotFlow].
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun rawSnapshots(): Flow<com.iblu01.portallauncher.domain.model.HaSnapshot> =
+        activeRepo.flatMapLatest { repo -> repo?.states() ?: emptyFlow() }
+
+    /**
      * The single transform pipeline (Findings 6/7): raw [HaStateRepository.states] → selected chips
      * + rebuilt media + temperatures, on [Dispatchers.Default].
      *
@@ -307,7 +317,9 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
     private companion object {
         // Emit at most one transformed snapshot per window; coalesces bursts without starving
         // sustained streams (sample keeps emitting the latest, unlike debounce which would stall).
-        const val SNAPSHOT_SAMPLE_MS = 100L
+        // One frame is enough to coalesce a burst; the previous 100 ms window added a visible
+        // uniform delay on the action → confirmation path.
+        const val SNAPSHOT_SAMPLE_MS = 16L
         const val PILL_RULES_CHANGE_KEY = "pillRules"
 
         fun emptyCatalog() = PillCatalogSnapshot(

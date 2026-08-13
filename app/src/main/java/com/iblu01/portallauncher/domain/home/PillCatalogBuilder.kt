@@ -14,6 +14,24 @@ import java.util.Locale
 
 /** Builds the non-truncated device/group catalog from one atomic HA snapshot. */
 class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
+    private class Discovery(
+        val keys: Set<String>,
+        val deviceIdByEntity: Map<String, String>,
+        val entityCategoryByEntity: Map<String, String>,
+        val rules: List<PillRule>,
+    )
+
+    /**
+     * Memoized discovery (see [discoverDefaults]). Threading contract: [build] is called
+     * sequentially by a single collector — the `scan` of PillRepository.transformSnapshots, on
+     * Dispatchers.Default — so a plain field is enough here: no lock, no atomic, no volatile.
+     */
+    private var discovery: Discovery? = null
+
+    /** Number of actual discovery passes; a probe for the tests asserting the memoization holds. */
+    internal var discoveryPasses = 0
+        private set
+
     fun build(
         rules: List<PillRule>,
         states: Map<String, HaEntity>,
@@ -30,14 +48,7 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
         // dynamic home ranking below is gated by an explicitly enabled persisted rule.
         val persistedRules = rules.distinctBy { it.entityId }
         val persistedIds = persistedRules.mapTo(hashSetOf()) { it.entityId }
-        val allEntities = states.values.toList()
-        val discoveredDefaults = PillSupport.candidates(allEntities, deviceIdByEntity)
-            .map { candidate ->
-                PillSupport.defaultRule(
-                    candidate,
-                    PillSupport.isAutomaticallyEnabled(candidate, allEntities, deviceIdByEntity, entityCategoryByEntity),
-                )
-            }
+        val discoveredDefaults = discoverDefaults(states, deviceIdByEntity, entityCategoryByEntity)
             .filter { it.entityId !in persistedIds }
         val catalogRules = persistedRules + discoveredDefaults
         val allDisabledDeviceRefs = catalogRules.asSequence()
@@ -129,6 +140,48 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
         )
         val dynamic = dynamicCandidates(enabledRules, states, provisional, nowMs)
         return provisional.copy(dynamicCandidates = dynamic)
+    }
+
+    /**
+     * Discovery depends only on the set of entity ids and on the two registries — never on state
+     * values, which change several times per second. Recomputing it per push cost hundreds of
+     * thousands of iterations for a result that only moves when a device is added or removed, so it
+     * is memoized on that key; comparing 765 hashed keys is three orders of magnitude cheaper.
+     *
+     * Accepted limitation: attribute-derived data (a renamed `friendly_name`, a late `device_class`)
+     * does not refresh the discovered label or kind until the key set or a registry changes. A wall
+     * panel's entity set is otherwise stable for days, and persisted rules are unaffected.
+     */
+    private fun discoverDefaults(
+        states: Map<String, HaEntity>,
+        deviceIdByEntity: Map<String, String>,
+        entityCategoryByEntity: Map<String, String>,
+    ): List<PillRule> {
+        val cached = discovery
+        if (cached != null &&
+            cached.keys == states.keys &&
+            cached.deviceIdByEntity == deviceIdByEntity &&
+            cached.entityCategoryByEntity == entityCategoryByEntity
+        ) {
+            return cached.rules
+        }
+        val allEntities = states.values.toList()
+        val index = PillSupport.EntityIndex(allEntities, deviceIdByEntity)
+        val rules = PillSupport.candidates(allEntities, deviceIdByEntity, index).map { candidate ->
+            PillSupport.defaultRule(
+                candidate,
+                PillSupport.isAutomaticallyEnabled(
+                    candidate,
+                    allEntities,
+                    deviceIdByEntity,
+                    entityCategoryByEntity,
+                    index,
+                ),
+            )
+        }
+        discovery = Discovery(states.keys.toSet(), deviceIdByEntity, entityCategoryByEntity, rules)
+        discoveryPasses++
+        return rules
     }
 
     private fun buildGroup(

@@ -37,17 +37,28 @@ fun LockControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     if (entity == null || entity.isUnavailable()) { PanelUnavailable(); return }
     val state = entity.state.lowercase()
     val locked = state == "locked"
+    val locking = state == "locking"
+    val unlocking = state == "unlocking"
     val jammed = state == "jammed"
+    // HA emits `locking`/`unlocking` between the tap and the confirmation, so the switch stays on
+    // the target side while the motor is still turning instead of snapping back to `unlocked`.
+    val checked = locked || locking
 
     val accent = if (jammed) AppleColors.error else AppleColors.lockAccent
-    val caption = when { jammed -> stringResource(R.string.lock_state_jammed); locked -> stringResource(R.string.lock_state_locked); else -> stringResource(R.string.lock_state_unlocked) }
+    val caption = when {
+        jammed -> stringResource(R.string.lock_state_jammed)
+        locking -> stringResource(R.string.lock_state_locking)
+        unlocking -> stringResource(R.string.lock_state_unlocking)
+        locked -> stringResource(R.string.lock_state_locked)
+        else -> stringResource(R.string.lock_state_unlocked)
+    }
 
     val control: @Composable (Modifier) -> Unit = { controlModifier ->
         BoxWithConstraints(controlModifier, contentAlignment = Alignment.Center) {
             val ratio = 96f / 240f
             val controlHeight = minOf(maxHeight, maxWidth / ratio, 300.dp)
             VerticalSwitch(
-                checked = locked,
+                checked = checked,
                 onCheckedChange = { wantLocked -> callService("lock", if (wantLocked) "lock" else "unlock", chip.entityId) },
                 accent = accent,
                 icon = { on -> if (jammed) Icons.Outlined.ErrorOutline else if (on) Icons.Outlined.Lock else Icons.Outlined.LockOpen },

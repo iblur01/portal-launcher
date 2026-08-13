@@ -69,8 +69,10 @@ import com.iblu01.portallauncher.ui.LauncherViewModel
 import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.LocalHaStates
+import com.iblu01.portallauncher.ui.HaStates
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import com.iblu01.portallauncher.ui.mapper.predictState
 import com.iblu01.portallauncher.ui.mapper.toChipAction
 import com.iblu01.portallauncher.ui.mapper.toPanelKind
 import com.iblu01.portallauncher.ui.model.ChipAction
@@ -100,6 +102,7 @@ import com.iblu01.portallauncher.ui.components.AppGridPage
 import com.iblu01.portallauncher.ui.components.DraggedIconOverlay
 import com.iblu01.portallauncher.ui.components.LauncherHeaderActions
 import com.iblu01.portallauncher.ui.components.WidgetPickerDialog
+import com.iblu01.portallauncher.ui.components.rememberEntity
 import com.iblu01.portallauncher.ui.components.rememberGridDragState
 import com.iblu01.portallauncher.ui.components.returnToClockPage
 import com.iblu01.portallauncher.ui.components.AutoReturnOverlay
@@ -140,6 +143,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import androidx.compose.runtime.snapshotFlow
@@ -569,6 +573,29 @@ private fun PortalLauncherApp(
         }
     )
     val ui by vm.uiState.collectAsStateWithLifecycle()
+    // Per-entity observable store (P1): the provided instance never changes identity, so the
+    // static CompositionLocal below stops invalidating the whole launcher on every HA push.
+    val haStates = remember { HaStates() }
+    // Fed straight from the raw socket stream, bypassing the sampled transform pipeline: the
+    // store's per-entity granularity makes each apply a cheap mostly-reference-equal walk, and
+    // conflate() keeps only the latest full snapshot if the main thread falls behind a burst.
+    LaunchedEffect(pills) { pills.rawSnapshots().conflate().collect { haStates.apply(it.states) } }
+    // Single interception point for every UI-originated service call (chips, panels, media):
+    // the predicted state is written into the store *before* the network call, so the pressed
+    // control repaints on the next frame even with HA unreachable (P3). Unpredictable services
+    // (volume, colour…) predict nothing and pass straight through.
+    val callServiceProvider = remember(vm, haStates) {
+        object : CallService {
+            override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) {
+                if (entityId != null && ',' !in entityId) {
+                    haStates.applyOptimistic(entityId) { entity ->
+                        predictState(service, entity.state)?.let { entity.copy(state = it) } ?: entity
+                    }
+                }
+                vm.callService(domain, service, entityId, data)
+            }
+        }
+    }
     val pagerLayout = LauncherPagerLayout(
         homePageEnabled = ui.homePreferences.homePageEnabled,
         appPageCount = appPages.value,
@@ -644,7 +671,18 @@ private fun PortalLauncherApp(
     val chips = ui.chips
     val temperatures = ui.temperatures
     val mediaSessions = ui.mediaSessions
-    val mediaDevices = ui.latestStates.values.filter { it.domain == "media_player" }.map { entity ->
+    // Values hoisted out of the content lambdas below: reading `ui.x` inside a lambda subscribes
+    // that lambda's scope to the WHOLE uiState (any emission invalidates it); capturing the
+    // identity-preserved value keeps the lambda — and its subtree — skippable.
+    val catalog = ui.catalog
+    val homePreferences = ui.homePreferences
+    val homeComposition = ui.homeComposition
+    val homePageModel = ui.homePage
+    // Built on demand only (media panel open): reads the per-entity store, so materialising it in
+    // the body would subscribe the whole body to every media_player entity.
+    fun liveMediaDevices(): List<PlayingMedia> = haStates.entityIds()
+        .filter { it.startsWith("media_player.") }
+        .mapNotNull { id -> haStates[id] }.map { entity ->
         mediaSessions.firstOrNull { session -> session.players.any { it.entityId == entity.entityId } }
             ?: PlayingMedia(
                 entityId = entity.entityId,
@@ -785,7 +823,10 @@ private fun PortalLauncherApp(
             val session = mediaSessions.firstOrNull { it.entityId == req.key } ?: media
             session?.let { PanelContent.Media(it) }
         }
-        is PanelRequest.Chip -> resolveChipPanelContent(req, panelChip, mediaDevices)
+        is PanelRequest.Chip -> resolveChipPanelContent(
+            req, panelChip,
+            if (req.panelKind == PanelKind.MEDIA) liveMediaDevices() else emptyList(),
+        )
         is PanelRequest.Group -> (livePanelGroup ?: lastPanelGroup)?.let { group ->
             PanelContent.Group(
                 group = group,
@@ -870,17 +911,22 @@ private fun PortalLauncherApp(
     // Dumb dispatcher (design §4): the mapper resolved the action, so no chip.id/kind branching here.
     val onChipClick: (LauncherChip) -> Unit = { chip ->
         when (val action = chip.toChipAction()) {
-            is ChipAction.ServiceToggle -> vm.callService(action.domain, action.service, chip.entityId)
+            // Through the intercepting caller: immediate visual echo, HA takes over on its push.
+            is ChipAction.ServiceToggle -> callServiceProvider(action.domain, action.service, chip.entityId)
             is ChipAction.OpenPanel -> vm.onEvent(PanelEvent.OpenChip(PanelRequest.Chip(chip.id, action.panelKind)))
         }
     }
-    val pinnedRefs = ui.homePreferences.pinnedOrder.toSet()
-    val manualGroupOptions = ui.homePreferences.manualGroups.map { group ->
-        ManualGroupMenuOption(
-            groupId = group.id,
-            name = group.name,
-            memberEntityIds = group.members.mapTo(linkedSetOf()) { it.entityId },
-        )
+    // Remembered against their (identity-preserved) sources: rebuilding these collections on every
+    // pass would hand the tray/home subtrees a fresh instance per HA push and defeat their skip.
+    val pinnedRefs = remember(ui.homePreferences.pinnedOrder) { ui.homePreferences.pinnedOrder.toSet() }
+    val manualGroupOptions = remember(ui.homePreferences.manualGroups) {
+        ui.homePreferences.manualGroups.map { group ->
+            ManualGroupMenuOption(
+                groupId = group.id,
+                name = group.name,
+                memberEntityIds = group.members.mapTo(linkedSetOf()) { it.entityId },
+            )
+        }
     }
     val onOpenResolvedPill: (com.iblu01.portallauncher.domain.home.ResolvedPill) -> Unit = { pill ->
         when (pill.ref) {
@@ -896,7 +942,10 @@ private fun PortalLauncherApp(
             else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(pill.ref)))
         }
     }
-    val homePillActions = HomePillActions(
+    // One stable instance per pinned-set: the action callbacks read live values through the `ui`
+    // delegate and the state holders at invocation time, so nothing here goes stale. Without the
+    // remember, a fresh HomePillActions per pass forced ClockTray/HomePage to recompose per push.
+    val homePillActions = remember(pinnedRefs) { HomePillActions(
         onOpen = onOpenResolvedPill,
         onSetPinned = { pill, pinned -> vm.setPinned(pill.ref, pinned) },
         onAddToManualGroup = { pill, groupId ->
@@ -952,7 +1001,7 @@ private fun PortalLauncherApp(
             pillDragActive = false
             armedPillReorderKey = null
         },
-    )
+    ) }
     val onSecondaryPlayPause: (PlayingMedia) -> Unit = { session ->
         displayedSecondaryMedia = displayedSecondaryMedia.map {
             if (it.entityId == session.entityId) it.copy(
@@ -960,7 +1009,7 @@ private fun PortalLauncherApp(
             ) else it
         }
         session.players.forEach { player ->
-            vm.callService("media_player", "media_play_pause", player.entityId)
+            callServiceProvider("media_player", "media_play_pause", player.entityId)
         }
     }
 
@@ -1015,11 +1064,14 @@ private fun PortalLauncherApp(
                 onBack = { vm.onEvent(PanelEvent.Back) },
                 onDismiss = onPanelDismiss,
                 onCollectiveAction = { calls ->
-                    calls.forEach { call -> vm.callService(call.domain, call.service, call.entityId) }
+                    calls.forEach { call -> callServiceProvider(call.domain, call.service, call.entityId) }
                 },
                 fullScreen = compactScreen,
             )
             PanelContent.MediaBrowser -> {
+                // Materialised in the panel's own scope: only an open media browser subscribes
+                // to the media_player entities.
+                val mediaDevices = liveMediaDevices()
                 val selectedDevice = mediaDevices.firstOrNull { it.entityId == browsedMediaEntityId }
                 if (selectedDevice == null) {
                     MediaDevicesPanel(mediaDevices, onSelect = { browsedMediaEntityId = it.entityId }, onDismiss = onPanelDismiss)
@@ -1039,17 +1091,11 @@ private fun PortalLauncherApp(
         }
     }
 
-    // Provide the HA service caller to the whole subtree (design §8): panels read LocalCallService
-    // instead of the PillHub singleton. Remembered so the provided value stays a stable instance.
-    val callServiceProvider = remember(vm) {
-        object : CallService {
-            override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) =
-                vm.callService(domain, service, entityId, data)
-        }
-    }
+    // Provide the HA service caller (with its optimistic write, defined next to `haStates` above)
+    // and the stable per-entity state store to the whole subtree (design §8).
     CompositionLocalProvider(
         LocalCallService provides callServiceProvider,
-        LocalHaStates provides ui.latestStates,
+        LocalHaStates provides haStates,
         LocalAreas provides ui.areaByEntity,
     ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -1139,12 +1185,12 @@ private fun PortalLauncherApp(
                                     responsiveCapacity.extraCriticalPrimarySlots > 0
                                 ) {
                                     HomePillComposer.compose(
-                                        catalog = ui.catalog,
-                                        preferences = ui.homePreferences,
+                                        catalog = catalog,
+                                        preferences = homePreferences,
                                         capacity = responsiveCapacity,
                                     )
                                 } else {
-                                    ui.homeComposition
+                                    homeComposition
                                 }
                                 ClockTray(
                                     composition = responsiveComposition,
@@ -1163,13 +1209,13 @@ private fun PortalLauncherApp(
                         {
                             Box(Modifier.fillMaxSize()) {
                                 HomePage(
-                                    model = ui.homePage,
+                                    model = homePageModel,
                                     pinnedRefs = pinnedRefs,
                                     actions = homePillActions,
                                     manualGroups = manualGroupOptions,
                                     editing = homeEditing,
                                     reordering = pillDragActive,
-                                    stale = !ui.connected,
+                                    stale = !haConnected,
                                     onEditingChange = { homeEditing = it },
                                     editActions = HomePageEditActions(
                                         onMoveSection = { sectionId, move ->
@@ -1455,8 +1501,14 @@ private fun MediaPlayerPanel(
     fullScreen: Boolean = false,
 ) {
     val callService = LocalCallService.current
+    // Live overlay (P3): the optimistic write (or a push already applied to the store) repaints
+    // the play/pause state on the next frame, ahead of the sampled snapshot pipeline.
+    val liveState = rememberEntity(media.entityId)?.state
+    val shownMedia =
+        if (liveState != null && !liveState.equals(media.state, ignoreCase = true)) media.copy(state = liveState)
+        else media
     MediaPlayerView(
-        media = media,
+        media = shownMedia,
         secondaryMedia = secondaryMedia,
         haToken = prefs.haToken,
         onPlayPause = {

@@ -196,6 +196,7 @@ fun ClockHeader(
     modifier: Modifier = Modifier,
     collapse: () -> Float = { 0f },
 ) {
+
     val time by rememberClock(if (clockTheme.format24h) "HH:mm" else "h:mm a")
     val date by rememberClock("EEEE d MMMM")
     val compactDate by rememberClock("EEE d MMM")
@@ -443,44 +444,18 @@ fun ClockTray(
         } else {
             composition.primary
         }
+        // Single stable callback for every pill: capturing `pill` per item would rebuild the
+        // lambda on each pass and defeat TrayPill's equality skip.
+        val openMenu: (String) -> Unit = { key -> menuTargetKey = key }
         visible.chunked(3).forEach { rowPills ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp.scaled(), Alignment.CenterHorizontally)) {
                 rowPills.forEach { pill ->
-                    val available = pill.availability == Availability.AVAILABLE
-                    StatusChip(
-                        chip = pill.chip,
+                    TrayPill(
+                        pill = pill,
+                        pinned = pill.ref in pinnedRefs,
                         selected = pill.chip.id == selectedChipKey,
-                        // StatusChip installs its combined tap/long-press detector only when
-                        // onClick is non-null. A guarded no-op keeps long-press available on stale
-                        // pinned pills so they can still be unpinned while commands stay blocked.
-                        onClick = { if (available) actions.onOpen(pill) },
-                        onLongPress = { menuTargetKey = pill.ref.stableKey },
-                        modifier = Modifier
-                            .heightIn(min = 48.dp)
-                            .homePillReorderDrag(pill, actions)
-                            .semantics(mergeDescendants = true) {
-                                contentDescription = trayPillAccessibilityLabel(pill, pill.ref in pinnedRefs)
-                                role = Role.Button
-                                if (available) {
-                                    onClick(label = "Ouvrir ${pill.chip.label}") {
-                                        actions.onOpen(pill)
-                                        true
-                                    }
-                                }
-                                onLongClick(label = "Actions pour ${pill.chip.label}") {
-                                    menuTargetKey = pill.ref.stableKey
-                                    true
-                                }
-                            }
-                            .onKeyEvent { event ->
-                                if (available && event.type == KeyEventType.KeyUp &&
-                                    event.key in setOf(Key.Enter, Key.DirectionCenter, Key.Spacebar)
-                                ) {
-                                    actions.onOpen(pill)
-                                    true
-                                } else false
-                            }
-                            .focusable(),
+                        actions = actions,
+                        onOpenMenu = openMenu,
                     )
                 }
             }
@@ -493,6 +468,58 @@ fun ClockTray(
         manualGroups = manualGroups,
         actions = actions,
         onDismiss = { menuTargetKey = null },
+    )
+}
+
+/**
+ * One tray pill as its own restart scope. The heavy modifier chain (drag, semantics, key events)
+ * is built HERE, so a tray pass with an equal [pill] skips the whole thing — before this
+ * extraction, every HA push that touched any chip's details rebuilt these modifiers for all
+ * visible pills and recomposed each StatusChip (~16 ms per push on the small device).
+ */
+@Composable
+private fun TrayPill(
+    pill: ResolvedPill,
+    pinned: Boolean,
+    selected: Boolean,
+    actions: HomePillActions,
+    onOpenMenu: (String) -> Unit,
+) {
+    val available = pill.availability == Availability.AVAILABLE
+    StatusChip(
+        chip = pill.chip,
+        selected = selected,
+        // StatusChip installs its combined tap/long-press detector only when
+        // onClick is non-null. A guarded no-op keeps long-press available on stale
+        // pinned pills so they can still be unpinned while commands stay blocked.
+        onClick = { if (available) actions.onOpen(pill) },
+        onLongPress = { onOpenMenu(pill.ref.stableKey) },
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .homePillReorderDrag(pill, actions)
+            .semantics(mergeDescendants = true) {
+                contentDescription = trayPillAccessibilityLabel(pill, pinned)
+                role = Role.Button
+                if (available) {
+                    onClick(label = "Ouvrir ${pill.chip.label}") {
+                        actions.onOpen(pill)
+                        true
+                    }
+                }
+                onLongClick(label = "Actions pour ${pill.chip.label}") {
+                    onOpenMenu(pill.ref.stableKey)
+                    true
+                }
+            }
+            .onKeyEvent { event ->
+                if (available && event.type == KeyEventType.KeyUp &&
+                    event.key in setOf(Key.Enter, Key.DirectionCenter, Key.Spacebar)
+                ) {
+                    actions.onOpen(pill)
+                    true
+                } else false
+            }
+            .focusable(),
     )
 }
 

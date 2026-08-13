@@ -169,9 +169,11 @@ fun WasherControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     if (entity.isUnavailable()) { PanelUnavailable(); return }
     val e = entity!!
     val base = e.entityId.substringAfter('.').replace("_machine_state", "").replace("_etat_de_la_machine", "").removeSuffix("_state")
-    fun related(vararg tokens: String): HaEntity? = states.values.firstOrNull { candidate ->
-        candidate.entityId != e.entityId && candidate.entityId.substringAfter('.').startsWith(base) && tokens.any(candidate.entityId::contains)
-    }
+    // Id-pattern lookup over the (quasi-static) id set, then a per-entity read: this scope only
+    // subscribes to the entities it actually displays, not to the whole store.
+    fun related(vararg tokens: String): HaEntity? = states.entityIds().firstOrNull { id ->
+        id != e.entityId && id.substringAfter('.').startsWith(base) && tokens.any(id::contains)
+    }?.let { states[it] }
     val phaseRaw = e.attributes.optString("phase").ifBlank { related("cycle", "task_state", "etat_du_cycle")?.state.orEmpty() }.lowercase()
     val phase = when (phaseRaw) {
         "rinse", "ai_rinse" -> WasherPhase.RINSE

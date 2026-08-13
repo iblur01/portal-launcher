@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.domain.home.Availability
@@ -14,6 +15,7 @@ import com.iblu01.portallauncher.domain.home.GroupCollectiveAction
 import com.iblu01.portallauncher.domain.home.PillGroupSnapshot
 import com.iblu01.portallauncher.domain.home.PillRef
 import com.iblu01.portallauncher.domain.home.ResolvedPill
+import com.iblu01.portallauncher.ui.HaStates
 import com.iblu01.portallauncher.ui.LocalHaStates
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -87,7 +89,7 @@ class GroupBrowserPanelTest {
         val calls = mutableListOf<GroupServiceCall>()
         var dismissed = 0
         rule.setContent {
-            CompositionLocalProvider(LocalHaStates provides emptyMap()) {
+            CompositionLocalProvider(LocalHaStates provides remember { HaStates() }) {
                 GroupBrowserPanel(
                     group = snapshot,
                     selectedDevice = null,
@@ -115,7 +117,7 @@ class GroupBrowserPanelTest {
     fun `stale members remain visible but disabled and collective commands disappear`() {
         val stale = member("lock.porte", PillKind.LOCK, Availability.STALE)
         rule.setContent {
-            CompositionLocalProvider(LocalHaStates provides emptyMap()) {
+            CompositionLocalProvider(LocalHaStates provides remember { HaStates() }) {
                 GroupBrowserPanel(
                     group = group(listOf(stale), GroupCollectiveAction.LOCK),
                     selectedDevice = null,

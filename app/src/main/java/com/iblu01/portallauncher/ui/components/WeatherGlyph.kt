@@ -6,8 +6,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
-import coil.ImageLoader
-import coil.decode.SvgDecoder
 import coil.request.ImageRequest
 
 /** A bundled Meteocons asset name. Assets come from @meteocons/svg-static 0.1.0 (MIT). */
@@ -18,11 +16,6 @@ value class WeatherGlyph(val assetName: String = "not-available")
 @Composable
 fun WeatherIcon(glyph: WeatherGlyph, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val imageLoader = remember(context) {
-        ImageLoader.Builder(context.applicationContext)
-            .components { add(SvgDecoder.Factory()) }
-            .build()
-    }
     val model = remember(glyph.assetName) {
         ImageRequest.Builder(context)
             .data("file:///android_asset/meteocons/flat/${glyph.assetName}.svg")
@@ -31,7 +24,6 @@ fun WeatherIcon(glyph: WeatherGlyph, modifier: Modifier = Modifier) {
     }
     AsyncImage(
         model = model,
-        imageLoader = imageLoader,
         contentDescription = null,
         contentScale = ContentScale.Fit,
         modifier = modifier,

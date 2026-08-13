@@ -12,11 +12,6 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,24 +25,13 @@ import com.iblu01.portallauncher.R
 import androidx.compose.ui.res.stringResource
 
 /**
- * Live view of a single HA entity for a control panel. Reads [LocalHaStates] (fed by the VM),
- * so panels always reflect real device state (position, target temperature, alarm code_format, …)
- * without touching the PillHub singleton.
+ * Live view of a single HA entity for a control panel. Reads [LocalHaStates] (a stable per-entity
+ * store), so panels always reflect real device state (position, target temperature, alarm
+ * code_format, …) without touching the PillHub singleton. The `[]` read subscribes the calling
+ * recompose scope to *this entity only* — an unrelated push invalidates nothing here.
  */
 @Composable
-fun rememberEntity(entityId: String): HaEntity? {
-    val next = LocalHaStates.current[entityId]
-    // LocalHaStates yields a fresh map on every push, and HaEntity's JSONObject attributes have no
-    // equals(), so each poll is an unequal instance. Emit a new value only when *this* entity's
-    // state/attributes actually changed — otherwise open controls (e.g. the alarm keypad) would
-    // recompose on every unrelated update and lag.
-    val holder = remember(entityId) { mutableStateOf(next) }
-    val current = holder.value
-    val changed = next?.state != current?.state ||
-        next?.attributes?.toString() != current?.attributes?.toString()
-    if (changed) holder.value = next
-    return holder.value
-}
+fun rememberEntity(entityId: String): HaEntity? = LocalHaStates.current[entityId]
 
 /** True when the entity is missing or reporting an unusable state (unavailable/unknown). */
 fun HaEntity?.isUnavailable(): Boolean = this == null || state.lowercase() in setOf("unavailable", "unknown", "none", "")

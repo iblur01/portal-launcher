@@ -45,7 +45,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -69,6 +71,7 @@ import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.PlayingMedia
 import com.iblu01.portallauncher.ui.CallService
+import com.iblu01.portallauncher.ui.HaStates
 import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.LocalHaStates
@@ -139,6 +142,10 @@ fun PlaygroundScreen(onBack: () -> Unit) {
     var accent by remember { mutableStateOf(accentSwatches.first().second) }
     var selectedFakePanel by remember { mutableStateOf<FakePanelSelection?>(null) }
     val fakeEntities = rememberFakePanelEntities()
+    // Mirror the fake SnapshotStateMap into the per-entity store the panels now read; the fake
+    // service keeps mutating the map and snapshotFlow republishes each mutation.
+    val fakeHaStates = remember { HaStates() }
+    LaunchedEffect(fakeEntities) { snapshotFlow { fakeEntities.toMap() }.collect { fakeHaStates.apply(it) } }
     val fakeService = rememberFakeCallService(fakeEntities)
     val fakeTracks = remember { listOf("Midnight City" to "M83", "Nightcall" to "Kavinsky", "Genesis" to "Grimes") }
     var fakeTrackIndex by remember { mutableIntStateOf(0) }
@@ -230,7 +237,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(28.dp))
 
         CompositionLocalProvider(
-            LocalHaStates provides fakeEntities,
+            LocalHaStates provides fakeHaStates,
             LocalAreas provides emptyMap(),
         ) {
             FakePanelLab(
@@ -649,7 +656,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         selectedFakePanel?.let { selection ->
             CompositionLocalProvider(
                 LocalCallService provides fakeService,
-                LocalHaStates provides fakeEntities,
+                LocalHaStates provides fakeHaStates,
                 LocalAreas provides emptyMap(),
             ) {
                 when (selection) {

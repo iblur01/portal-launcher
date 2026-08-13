@@ -2,6 +2,7 @@ package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
@@ -19,6 +20,7 @@ import com.iblu01.portallauncher.domain.home.PillGroupSnapshot
 import com.iblu01.portallauncher.domain.home.PillRef
 import com.iblu01.portallauncher.domain.home.ResolvedPill
 import com.iblu01.portallauncher.ui.mapper.toPanelKind
+import com.iblu01.portallauncher.ui.HaStates
 import com.iblu01.portallauncher.ui.LocalHaStates
 import com.iblu01.portallauncher.ui.panel.PanelEvent
 import com.iblu01.portallauncher.ui.panel.PanelRequest
@@ -81,7 +83,7 @@ class GroupBrowserAcceptanceTest {
             reduce(PanelState(), PanelEvent.OpenGroup(PanelRequest.Group(snapshot.ref))),
         )
         rule.setContent {
-            CompositionLocalProvider(LocalHaStates provides emptyMap()) {
+            CompositionLocalProvider(LocalHaStates provides remember { HaStates() }) {
                 val request = state.request as? PanelRequest.Group
                 GroupBrowserPanel(
                     group = snapshot,
@@ -121,7 +123,7 @@ class GroupBrowserAcceptanceTest {
         val stale = device("switch.cached", Availability.STALE, PillKind.SWITCH)
         val snapshot = group(listOf(stale), GroupCollectiveAction.TURN_OFF)
         rule.setContent {
-            CompositionLocalProvider(LocalHaStates provides emptyMap()) {
+            CompositionLocalProvider(LocalHaStates provides remember { HaStates() }) {
                 GroupBrowserPanel(
                     group = snapshot,
                     selectedDevice = null,
@@ -149,7 +151,7 @@ class GroupBrowserAcceptanceTest {
         var deviceRequested by mutableStateOf(false)
 
         rule.setContent {
-            CompositionLocalProvider(LocalHaStates provides emptyMap()) {
+            CompositionLocalProvider(LocalHaStates provides remember { HaStates() }) {
                 GroupBrowserPanel(
                     group = snapshot,
                     selectedDevice = null,

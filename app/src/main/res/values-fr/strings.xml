@@ -429,6 +429,8 @@
     <string name="lock_state_jammed">Bloquée</string>
     <string name="lock_state_locked">Verrouillée</string>
     <string name="lock_state_unlocked">Déverrouillée</string>
+    <string name="lock_state_locking">Verrouillage…</string>
+    <string name="lock_state_unlocking">Déverrouillage…</string>
 
     <!-- ===== SWITCH / FAN / PURIFIER ===== -->
     <string name="switch_state_on">Allumé</string>
@@ -729,6 +731,8 @@
     <string name="pill_lock_locked">Verrouillée</string>
     <string name="pill_lock_unlocked">Déverrouillée</string>
     <string name="pill_lock_jammed">Bloquée</string>
+    <string name="pill_lock_locking">Verrouillage…</string>
+    <string name="pill_lock_unlocking">Déverrouillage…</string>
     <string name="pill_individual_energy_power">Puissance</string>
     <string name="pill_individual_energy_today">Aujourd\'hui</string>
 

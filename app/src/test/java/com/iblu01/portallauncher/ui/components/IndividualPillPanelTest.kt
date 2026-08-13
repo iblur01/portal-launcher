@@ -2,6 +2,7 @@ package com.iblu01.portallauncher.ui.components
 
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -15,6 +16,7 @@ import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.CallService
 import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
+import com.iblu01.portallauncher.ui.HaStates
 import com.iblu01.portallauncher.ui.LocalHaStates
 import org.json.JSONArray
 import org.json.JSONObject
@@ -51,7 +53,7 @@ class IndividualPillPanelTest {
         rule.setContent {
             CompositionLocalProvider(
                 LocalCallService provides noOpService,
-                LocalHaStates provides mapOf(entity.entityId to entity),
+                LocalHaStates provides remember { HaStates().also { s -> s.apply(mapOf(entity.entityId to entity)) } },
                 LocalAreas provides mapOf(entity.entityId to "Cuisine"),
             ) {
                 ChipActionsPanel(chip = chip, onDismiss = {})
@@ -87,7 +89,7 @@ class IndividualPillPanelTest {
         rule.setContent {
             CompositionLocalProvider(
                 LocalCallService provides noOpService,
-                LocalHaStates provides mapOf(entity.entityId to entity),
+                LocalHaStates provides remember { HaStates().also { s -> s.apply(mapOf(entity.entityId to entity)) } },
                 LocalAreas provides emptyMap(),
             ) {
                 ChipActionsPanel(chip = chip, onDismiss = {})
@@ -162,7 +164,7 @@ class IndividualPillPanelTest {
         rule.setContent {
             CompositionLocalProvider(
                 LocalCallService provides noOpService,
-                LocalHaStates provides mapOf(entity.entityId to entity),
+                LocalHaStates provides remember { HaStates().also { s -> s.apply(mapOf(entity.entityId to entity)) } },
                 LocalAreas provides emptyMap(),
             ) {
                 ChipActionsPanel(chip = chip, onDismiss = {})

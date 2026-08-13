@@ -70,7 +70,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.iblu01.portallauncher.R
@@ -83,9 +82,6 @@ import com.iblu01.portallauncher.ui.components.controls.controlSize
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
-import okhttp3.OkHttpClient
-import java.net.Proxy
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.launch
 
 internal data class MediaDisclosure(
@@ -160,24 +156,11 @@ fun MediaPlayerView(
     fullScreen: Boolean = false,
 ) {
     val context = LocalContext.current
-    val imageLoader = remember(context) {
-        ImageLoader.Builder(context.applicationContext)
-            .okHttpClient {
-                OkHttpClient.Builder()
-                    .proxy(Proxy.NO_PROXY)
-                    .connectTimeout(10, TimeUnit.SECONDS)
-                    .readTimeout(20, TimeUnit.SECONDS)
-                    .build()
-            }
-            .crossfade(1_000)
-            .build()
-    }
     val imageRequest = remember(media.coverUrl, haToken) {
         media.coverUrl?.takeIf { it.isNotBlank() }?.let { url ->
             ImageRequest.Builder(context)
                 .data(url)
                 .addHeader("Authorization", "Bearer $haToken")
-                .crossfade(true)
                 .build()
         }
     }
@@ -242,7 +225,6 @@ fun MediaPlayerView(
             SwipeIncomingCard(
                 media = incomingMedia,
                 haToken = haToken,
-                imageLoader = imageLoader,
                 modifier = Modifier.fillMaxSize().graphicsLayer {
                     translationX = if (swipeDirection > 0) {
                         availableWidthPx + swipeOffset.value
@@ -307,7 +289,6 @@ fun MediaPlayerView(
         if (imageRequest != null) {
             AsyncImage(
                 model = imageRequest,
-                imageLoader = imageLoader,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().blur(42.dp).alpha(0.34f)
@@ -357,7 +338,6 @@ fun MediaPlayerView(
                         if (imageRequest != null) {
                             AsyncImage(
                                 model = imageRequest,
-                                imageLoader = imageLoader,
             contentDescription = stringResource(R.string.media_cover_desc_format, media.title),
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier.fillMaxSize()
@@ -511,7 +491,7 @@ fun MediaPlayerView(
                     contentAlignment = Alignment.Center
                 ) {
                         if (imageRequest != null) {
-                            AsyncImage(model = imageRequest, imageLoader = imageLoader, contentDescription = stringResource(R.string.media_cover_desc_format, media.title), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            AsyncImage(model = imageRequest, contentDescription = stringResource(R.string.media_cover_desc_format, media.title), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         } else if (!media.hasMedia) {
                             HaEntityIcon(
                                 entityId = media.entityId,
@@ -583,7 +563,6 @@ fun MediaPlayerView(
                         MiniMediaPlayerVertical(
                             media = session,
                             haToken = haToken,
-                            imageLoader = imageLoader,
                             onPlayPause = { onSecondaryPlayPause(session) },
                             onPrevious = { onSecondaryPrevious(session) },
                             onNext = { onSecondaryNext(session) },
@@ -608,7 +587,6 @@ fun MediaPlayerView(
                     MiniMediaPlayer(
                         media = session,
                         haToken = haToken,
-                        imageLoader = imageLoader,
                         onPlayPause = { onSecondaryPlayPause(session) },
                         onPrevious = { onSecondaryPrevious(session) },
                         onNext = { onSecondaryNext(session) },
@@ -759,7 +737,6 @@ private fun MediaVolumePanel(
 private fun SwipeIncomingCard(
     media: PlayingMedia,
     haToken: String,
-    imageLoader: ImageLoader,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -780,7 +757,6 @@ private fun SwipeIncomingCard(
     ) {
         if (request != null) AsyncImage(
             model = request,
-            imageLoader = imageLoader,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize().blur(42.dp).alpha(0.3f),
@@ -799,7 +775,6 @@ private fun SwipeIncomingCard(
             ) {
                 if (request != null) AsyncImage(
                     model = request,
-                    imageLoader = imageLoader,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
@@ -815,7 +790,6 @@ private fun SwipeIncomingCard(
 private fun MiniMediaPlayer(
     media: PlayingMedia,
     haToken: String,
-    imageLoader: ImageLoader,
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
@@ -824,7 +798,7 @@ private fun MiniMediaPlayer(
     val context = LocalContext.current
     val request = remember(media.coverUrl, haToken) {
         media.coverUrl?.let {
-            ImageRequest.Builder(context).data(it).addHeader("Authorization", "Bearer $haToken").crossfade(true).build()
+            ImageRequest.Builder(context).data(it).addHeader("Authorization", "Bearer $haToken").build()
         }
     }
     val rooms = when (media.playerNames.size) {
@@ -848,7 +822,6 @@ private fun MiniMediaPlayer(
         ) {
             if (request != null) AsyncImage(
                 model = request,
-                imageLoader = imageLoader,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -881,7 +854,6 @@ private fun MiniMediaPlayer(
 private fun MiniMediaPlayerVertical(
     media: PlayingMedia,
     haToken: String,
-    imageLoader: ImageLoader,
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
@@ -891,7 +863,7 @@ private fun MiniMediaPlayerVertical(
     val context = LocalContext.current
     val request = remember(media.coverUrl, haToken) {
         media.coverUrl?.let {
-            ImageRequest.Builder(context).data(it).addHeader("Authorization", "Bearer $haToken").crossfade(true).build()
+            ImageRequest.Builder(context).data(it).addHeader("Authorization", "Bearer $haToken").build()
         }
     }
     val rooms = when (media.playerNames.size) {
@@ -924,7 +896,6 @@ private fun MiniMediaPlayerVertical(
             ) {
                 if (request != null) AsyncImage(
                     model = request,
-                    imageLoader = imageLoader,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),

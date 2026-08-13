@@ -129,6 +129,11 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
 
+    // Installs the baseline profile (src/main/baseline-prof.txt + the Compose libraries' own
+    // profiles, merged by AGP) so cold start runs AOT-compiled instead of interpreted+JIT.
+    // Debuggable builds ignore AOT: measure on `productionTest` or `release`.
+    implementation(libs.profileinstaller)
+
     // MAD architecture: structured concurrency + StateFlow/ViewModel + immutable collections.
     implementation(libs.coroutines.android)
     implementation(libs.lifecycle.viewmodel.compose)

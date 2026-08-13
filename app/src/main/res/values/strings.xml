@@ -431,6 +431,8 @@
     <string name="lock_state_jammed">Jammed</string>
     <string name="lock_state_locked">Locked</string>
     <string name="lock_state_unlocked">Unlocked</string>
+    <string name="lock_state_locking">Locking…</string>
+    <string name="lock_state_unlocking">Unlocking…</string>
 
     <!-- ===== SWITCH / FAN / PURIFIER ===== -->
     <string name="switch_state_on">On</string>
@@ -731,6 +733,8 @@
     <string name="pill_lock_locked">Locked</string>
     <string name="pill_lock_unlocked">Unlocked</string>
     <string name="pill_lock_jammed">Jammed</string>
+    <string name="pill_lock_locking">Locking…</string>
+    <string name="pill_lock_unlocking">Unlocking…</string>
     <string name="pill_individual_energy_power">Power</string>
     <string name="pill_individual_energy_today">Today</string>
 
