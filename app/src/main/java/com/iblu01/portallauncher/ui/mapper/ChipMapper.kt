@@ -18,6 +18,8 @@ fun LauncherChip.toPanelKind(): PanelKind = when {
     kind == PillKind.MEDIA -> PanelKind.MEDIA
     kind == PillKind.PURIFIER -> PanelKind.PURIFIER
     kind == PillKind.LOCK -> PanelKind.LOCK
+    kind == PillKind.OPENING -> PanelKind.OPENING
+    kind == PillKind.MOTION -> PanelKind.MOTION
     kind == PillKind.COVER -> PanelKind.COVER
     kind == PillKind.THERMOSTAT -> PanelKind.THERMOSTAT
     kind == PillKind.VACUUM -> PanelKind.VACUUM

@@ -272,7 +272,7 @@ The token is stored in `EncryptedSharedPreferences` and is never read back out b
 
 Everything is reachable from the on-device Settings screens: the first-run assistant (relaunchable from Application), HA connection, MQTT broker, per-entity pill enable/disable with search and bulk toggles, background mode + scrim opacity, clock theme, power mode, screen timeout, auto-return delay, temperature offset, and a Developer page (wireless ADB, permission grants, reboot).
 
-> The **tap-sensitivity** slider is currently inert (the accelerometer is no longer registered — see the sensors note below).
+> The **tap-sensitivity** slider is currently inert (the accelerometer is not used — see the sensors note below).
 
 
 ---
@@ -283,9 +283,11 @@ Via MQTT Discovery, the Portal registers itself as a device exposing:
 
 **Sensors:** screen state (off / screensaver / app / dreaming) · presence, with confidence + source · ambient light (lux) · temperature, on hardware that has the sensor · sound level · IP address
 
+> Presence is only published on devices that can infer it — i.e. hardware with a configured screensaver/daydream lifecycle. On devices without one, the presence entity is not exposed (its discovery config is retracted on connect).
+
 **Controls it exposes back to HA:** screen on/off · brightness · volume · volume mute · microphone mute · power mode (follow presence / always on) · screen timeout on/off + minutes · temperature offset · doorbell and alert buttons (synthesised chime + on-screen overlay) · free-text notification topic
 
-> Accelerometer X/Y/Z, the Portal's RGB light sensor and tap/tilt events were implemented and then **retired** — the sensors are no longer registered (`SensorBridge.kt:66-75`) and their discovery configs are actively retracted on connect (`HaDiscovery.kt` `staleTopics()`). The code is still there if someone wants to bring them back.
+> Accelerometer X/Y/Z, the Portal's RGB light sensor (sensor type `65537`) and tap/tilt events were implemented and then **retired** — the code was removed. Only ambient light and temperature (when present) are published today.
 
 ---
 
@@ -304,6 +306,10 @@ Legend: ✅ shipped · 🔨 in progress · ⬜ open · 🙋 **good first issue /
 - [x] Presence proxy + power modes + configurable screen timeout
 - [x] Secrets in `EncryptedSharedPreferences` (HA token, MQTT password)
 - [x] Offline / stale banner and per-panel unavailable states
+- [x] Folders on the app grid — made by dropping one icon onto another, opened as a popup
+- [x] Notification dots, via a notification-listener service the user grants access to
+- [x] Icon packs — any installed pack themes the app icons, unthemed apps keep their own
+- [x] Layout backup — export / restore the whole arrangement as JSON, secrets excluded
 
 - [x] Clock theming — fonts, weight, size, spacing, tint, 12h/24h, live preview
 - [x] Alarm keypad — masked digits, variable-length codes, shake on a wrong code (inferred, since HA reports nothing)

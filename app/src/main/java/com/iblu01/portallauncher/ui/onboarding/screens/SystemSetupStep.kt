@@ -59,6 +59,7 @@ private const val GRANT_ACKNOWLEDGE_MILLIS = 1200L
 fun SystemSetupStep(
     state: OnboardingUiState,
     onOpenSetting: (Capability) -> Unit,
+    onProvisionWithRoot: () -> Unit,
     onAcknowledgeGrant: () -> Unit,
     adbCommand: String,
     onBack: () -> Unit,
@@ -102,6 +103,12 @@ fun SystemSetupStep(
             )
         },
     ) {
+        // A rooted panel never has to walk this list: Portal grants itself everything, including
+        // the notification access, and drops its own permanent notification along the way.
+        if (state.rootAvailable) {
+            RootProvisionCard(busy = state.rootProvisioning, onProvision = onProvisionWithRoot)
+            Spacer(Modifier.height(14.dp))
+        }
         if (paged) {
             if (page > 0) {
                 CapabilityPage(
@@ -123,6 +130,38 @@ fun SystemSetupStep(
                 )
             }
         }
+    }
+}
+
+/** The one-tap path offered only when a root shell answered. */
+@Composable
+private fun RootProvisionCard(busy: Boolean, onProvision: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AppleShapes.section)
+            .background(AppleColors.frostedFill, AppleShapes.section)
+            .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.section)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            stringResource(R.string.onb_setup_root_title),
+            style = AppleTypography.titleMedium,
+            color = AppleColors.primary,
+        )
+        Text(
+            stringResource(R.string.onb_setup_root_desc),
+            style = AppleTypography.bodySmall,
+            color = AppleColors.secondary,
+        )
+        PillButton(
+            label = stringResource(
+                if (busy) R.string.onb_setup_root_action_busy else R.string.onb_setup_root_action
+            ),
+            onClick = { if (!busy) onProvision() },
+            primary = true,
+        )
     }
 }
 

@@ -170,6 +170,8 @@ private fun ChipActionsContent(
         PanelKind.COVER -> entity?.let {
             !it.supports(CoverFeature.SET_POSITION) || it.attributes.optInt("current_position", -1) !in 0..100
         } != false
+        PanelKind.OPENING -> false // The door panel owns the open/closed state itself.
+        PanelKind.MOTION -> false // The motion panel owns the detected/clear state itself.
         else -> true
     }
     Column(
@@ -206,7 +208,7 @@ private fun ChipActionsContent(
         // Center the control block vertically in the remaining space; it still scrolls if a
         // panel's content is taller than the panel (keypads, long detail lists).
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.PURIFIER, PanelKind.THERMOSTAT, PanelKind.VACUUM, PanelKind.ALARM, PanelKind.WASHER, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
+            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.OPENING, PanelKind.MOTION, PanelKind.PURIFIER, PanelKind.THERMOSTAT, PanelKind.VACUUM, PanelKind.ALARM, PanelKind.WASHER, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
                 // Vertical controls need finite panel constraints so they can fill the available
                 // height while preserving the same proportions as lights and covers.
                 when (chip.toPanelKind()) {
@@ -214,6 +216,8 @@ private fun ChipActionsContent(
                     PanelKind.FAN -> FanControl(chip, Modifier.fillMaxSize())
                     PanelKind.SWITCH -> SwitchControl(chip, Modifier.fillMaxSize())
                     PanelKind.LOCK -> LockControl(chip, Modifier.fillMaxSize())
+                    PanelKind.OPENING -> DoorControl(chip, Modifier.fillMaxSize())
+                    PanelKind.MOTION -> MotionControl(chip, Modifier.fillMaxSize())
                     PanelKind.PURIFIER -> PurifierActions(chip, Modifier.fillMaxSize())
                     PanelKind.THERMOSTAT -> ThermostatControl(chip, Modifier.fillMaxSize())
                     PanelKind.VACUUM -> VacuumControl(chip, Modifier.fillMaxSize())
@@ -244,6 +248,7 @@ private fun ChipActionsContent(
                 PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH -> Unit // Bounded branch above.
                 PanelKind.THERMOSTAT -> Unit // Bounded branch above.
                 PanelKind.VACUUM -> Unit // Bounded branch above.
+                PanelKind.OPENING, PanelKind.MOTION -> Unit // Bounded branch above.
                 PanelKind.ALARM, PanelKind.WASHER -> Unit // Bounded branch above.
                 PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
                 PanelKind.LAWN_MOWER -> Unit // Bounded branch above.
@@ -374,6 +379,8 @@ internal fun PanelHeader(
                 modifier = Modifier
                     .size(48.dp.scaled())
                     .clip(CircleShape)
+                    .background(AppleColors.frostedFill)
+                    .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
                     .clickable(onClick = onClose),
                 contentAlignment = Alignment.Center,
             ) {
@@ -381,7 +388,7 @@ internal fun PanelHeader(
                     Icons.Filled.Close,
                     contentDescription = closeContentDescription ?: stringResource(R.string.side_panel_close_desc),
                     tint = AppleColors.primary,
-                    modifier = Modifier.size(22.dp.scaled()),
+                    modifier = Modifier.size(24.dp.scaled()),
                 )
             }
         }

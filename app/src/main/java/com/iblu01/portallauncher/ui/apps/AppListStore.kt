@@ -38,6 +38,11 @@ class AppListStore(
     private val scope: CoroutineScope,
     private val launcherApps: LauncherAppsFacade = LauncherAppsFacade(context),
     private val iconSizePx: Int = ICON_SIZE_PX,
+    /**
+     * Package of the icon pack to theme icons with, read at every load rather than captured: the
+     * user can change it in the settings while the launcher is alive.
+     */
+    private val iconPackPackage: () -> String = { "" },
 ) {
     private val _apps = MutableStateFlow<List<LaunchableApp>>(emptyList())
     val apps: StateFlow<List<LaunchableApp>> = _apps.asStateFlow()
@@ -67,15 +72,21 @@ class AppListStore(
     private fun load(): List<LaunchableApp> {
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        // One pack per load, shared by every icon: parsing appfilter.xml per app would re-read the
+        // whole document a hundred times.
+        val pack = IconPack.load(context, iconPackPackage())
         return pm.queryIntentActivities(intent, 0)
             .filter { it.activityInfo?.packageName != context.packageName }
             .mapNotNull { info ->
                 val ai = info.activityInfo ?: return@mapNotNull null
+                val themed = pack?.drawableFor(IconPack.componentKey(ai.packageName, ai.name))
                 LaunchableApp(
                     label = info.loadLabel(pm).toString(),
                     packageName = ai.packageName,
                     activityName = ai.name,
-                    icon = runCatching { info.loadIcon(pm).toImageBitmap(iconSizePx) }.getOrNull(),
+                    // An app the pack does not theme keeps its own icon rather than losing one.
+                    icon = runCatching { (themed ?: info.loadIcon(pm)).toImageBitmap(iconSizePx) }
+                        .getOrNull(),
                 )
             }
             .sortedBy { it.label.lowercase(Locale.getDefault()) }

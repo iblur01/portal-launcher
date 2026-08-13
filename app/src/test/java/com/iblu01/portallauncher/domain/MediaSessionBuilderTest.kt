@@ -26,12 +26,18 @@ class MediaSessionBuilderTest {
         picture: String = "",
         ageMs: Long = 0L,
         groupMembers: List<String>? = null,
+        appName: String = "",
+        source: String = "",
+        contentId: String = "",
     ): HaEntity {
         val attrs = JSONObject()
         if (title.isNotBlank()) attrs.put("media_title", title)
         if (artist.isNotBlank()) attrs.put("media_artist", artist)
         if (picture.isNotBlank()) attrs.put("entity_picture", picture)
         if (groupMembers != null) attrs.put("group_members", JSONArray(groupMembers))
+        if (appName.isNotBlank()) attrs.put("app_name", appName)
+        if (source.isNotBlank()) attrs.put("source", source)
+        if (contentId.isNotBlank()) attrs.put("media_content_id", contentId)
         val lastChanged = base.minusMillis(ageMs).toString()
         return HaEntity(entityId = id, state = state, attributes = attrs, lastChanged = lastChanged)
     }
@@ -101,5 +107,40 @@ class MediaSessionBuilderTest {
             player("media_player.a", title = "One", groupMembers = listOf("media_player.a", "media_player.c")),
         )
         assertEquals(listOf("media_player.a", "media_player.c"), sessions.first().groupMemberIds)
+    }
+
+    @Test fun `source resolves from app_name first`() {
+        val sessions = build(
+            player("media_player.a", title = "One", appName = "Spotify", source = "Sonos"),
+        )
+        assertEquals("Spotify", sessions.first().source)
+    }
+
+    @Test fun `source falls back to source attribute when app_name is blank`() {
+        val sessions = build(
+            player("media_player.a", title = "One", source = "Line-in"),
+        )
+        assertEquals("Line-in", sessions.first().source)
+    }
+
+    @Test fun `source infers Spotify from media_content_id prefix`() {
+        val sessions = build(
+            player("media_player.a", title = "One", contentId = "spotify:track:123"),
+        )
+        assertEquals("Spotify", sessions.first().source)
+    }
+
+    @Test fun `source infers YouTube from media_content_id prefix`() {
+        val sessions = build(
+            player("media_player.a", title = "One", contentId = "https://www.youtube.com/watch?v=x"),
+        )
+        assertEquals("YouTube", sessions.first().source)
+    }
+
+    @Test fun `source is null when no hint is present`() {
+        val sessions = build(
+            player("media_player.a", title = "One"),
+        )
+        assertEquals(null, sessions.first().source)
     }
 }

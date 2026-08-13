@@ -92,7 +92,9 @@ import com.iblu01.portallauncher.ui.apps.WidgetHostController
 import com.iblu01.portallauncher.ui.apps.WidgetOffer
 import com.iblu01.portallauncher.ui.components.AlertOverlay
 import com.iblu01.portallauncher.ui.components.AmbientBackground
+import androidx.compose.ui.res.stringResource
 import com.iblu01.portallauncher.ui.components.AppContextMenu
+import com.iblu01.portallauncher.ui.components.FolderDialog
 import com.iblu01.portallauncher.ui.components.AppMenuTarget
 import com.iblu01.portallauncher.ui.components.AppGridPage
 import com.iblu01.portallauncher.ui.components.DraggedIconOverlay
@@ -184,8 +186,18 @@ class LauncherActivity : ComponentActivity() {
 
         autoReturnTimer = AutoReturnTimer(lifecycleScope, prefs)
         launcherApps = LauncherAppsFacade(applicationContext)
-        appList = AppListStore(applicationContext, lifecycleScope, launcherApps)
-        layout = LauncherLayoutStore(prefs, ShortcutIconStore(applicationContext), lifecycleScope)
+        appList = AppListStore(
+            applicationContext,
+            lifecycleScope,
+            launcherApps,
+            iconPackPackage = { prefs.iconPack },
+        )
+        layout = LauncherLayoutStore(
+            prefs,
+            ShortcutIconStore(applicationContext),
+            lifecycleScope,
+            folderLabel = getString(R.string.folder_default_label),
+        )
         widgets = WidgetHostController(applicationContext, prefs, lifecycleScope)
         // Registered for the activity's whole life, not per-resume: an uninstall happens while the
         // launcher is paused, and re-registering on resume would miss the change.
@@ -493,6 +505,18 @@ private fun PortalLauncherApp(
     var bgOverlayOpacity by remember { mutableStateOf(prefs.bgOverlayOpacity) }
     var clockTheme by remember { mutableStateOf(prefs.clockTheme) }
     var gridScale by remember { mutableStateOf(prefs.gridScale) }
+    var notificationDotsEnabled by remember { mutableStateOf(prefs.notificationDots) }
+    val folderDefaultLabel = stringResource(R.string.folder_default_label)
+    val dotPackages by NotificationDots.packages.collectAsStateWithLifecycle()
+    // A folder shows a dot when any member does — otherwise foldering an app would silence it.
+    val hasDot: (GridItem) -> Boolean = { item ->
+        notificationDotsEnabled && when {
+            item.isWidget -> false
+            item.isFolder -> item.folderMembers.any { it.packageName in dotPackages }
+            else -> item.packageName in dotPackages
+        }
+    }
+
     // Bumped on every "backgroundMode" emission (even custom->custom) so CustomWallpaper
     // re-reads the file's lastModified() and Coil busts its stale cache on replacement.
     var wallpaperVersion by remember { mutableStateOf(0) }
@@ -586,6 +610,10 @@ private fun PortalLauncherApp(
                     wallpaperVersion++
                 }
                 "haUrl", "haToken" -> pills.start(prefs)
+                "iconPack" -> appList.refresh(force = true)
+                "notificationDots" -> notificationDotsEnabled = prefs.notificationDots
+                // A restored backup rewrote the arrangement behind the store's back.
+                "launcherLayout" -> layout.reload()
                 "brokerHost", "brokerPort", "username", "password" ->
                     MqttBridgeService.reconnect(context)
             }
@@ -596,6 +624,7 @@ private fun PortalLauncherApp(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 resumed = true
+                notificationDotsEnabled = prefs.notificationDots
                 backgroundMode = prefs.backgroundMode
                 bgOverlayOpacity = prefs.bgOverlayOpacity
                 clockTheme = prefs.clockTheme
@@ -674,6 +703,9 @@ private fun PortalLauncherApp(
     var menuShortcuts by remember { mutableStateOf(emptyList<AppShortcut>()) }
     var appDragActive by remember { mutableStateOf(false) }
     var showHidden by remember { mutableStateOf(false) }
+    // The open folder, addressed by key rather than held as a value: its contents change under it
+    // (an app is uninstalled, a member is taken out) and the popup must follow.
+    var openFolderKey by remember { mutableStateOf<String?>(null) }
     // Non-null means the picker is open; the list itself is enumerated off-main on demand.
     var widgetOffers by remember { mutableStateOf<List<WidgetOffer>?>(null) }
     var widgetPickerRequested by remember { mutableStateOf(false) }
@@ -1187,7 +1219,10 @@ private fun PortalLauncherApp(
                             items = placedItems.value,
                             spec = gridSpecState.value,
                             drag = gridDrag,
-                            onLaunch = onLaunchItem,
+                            onLaunch = { item ->
+                                if (item.isFolder) openFolderKey = item.key else onLaunchItem(item)
+                            },
+                            hasDot = hasDot,
                             onLongPress = { item, span, anchor ->
                                 menuTarget = AppMenuTarget(item, anchor, span)
                             },
@@ -1195,7 +1230,8 @@ private fun PortalLauncherApp(
                             onLongPressEmpty = { overlayVisible = true },
                             onDrop = { key, placement ->
                                 appDragActive = false
-                                if (placement != null) layout.place(key, placement.cell, placement.span)
+                                // dropAt, not place: landing on another icon means "make a folder".
+                                if (placement != null) layout.dropAt(key, placement.cell, placement.span)
                             },
                             widgetView = widgets::createView,
                             cellScale = gridScale,
@@ -1285,6 +1321,7 @@ private fun PortalLauncherApp(
             onAppInfo = { menuTarget?.item?.let { onAppInfo(it.packageName) } },
             onUninstall = { menuTarget?.item?.let { onUninstall(it.packageName) } },
             onRemoveShortcut = { menuTarget?.item?.let { layout.removeShortcut(it.key) } },
+            onDeleteFolder = { menuTarget?.item?.let { layout.deleteFolder(it.key) } },
             onOpenHomeSettings = onOpenHomeSettings,
             onResize = { span -> menuTarget?.let { target ->
                 layout.resize(target.item.key, span)
@@ -1297,6 +1334,20 @@ private fun PortalLauncherApp(
                 }
             },
             maxSpan = GridSpan(gridSpecState.value.columns, gridSpecState.value.rows),
+        )
+
+        FolderDialog(
+            folder = openFolderKey?.let { key -> gridItemsState.value.firstOrNull { it.key == key } },
+            onDismiss = { openFolderKey = null },
+            onLaunch = { member -> openFolderKey = null; onLaunchItem(member) },
+            onRename = { label ->
+                openFolderKey?.let { key ->
+                    layout.rename(key, label, defaultLabel = folderDefaultLabel)
+                }
+            },
+            onRemoveMember = { member -> layout.removeFromFolder(member.key) },
+            onDelete = { openFolderKey?.let { layout.deleteFolder(it) } },
+            hasDot = hasDot,
         )
 
         HiddenAppsDialog(

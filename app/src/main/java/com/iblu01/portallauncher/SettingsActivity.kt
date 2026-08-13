@@ -8,11 +8,13 @@ import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import com.iblu01.portallauncher.ui.apps.LayoutBackup
 import com.iblu01.portallauncher.ui.components.AppEntry
 import com.iblu01.portallauncher.ui.components.ConnStatus
 import com.iblu01.portallauncher.ui.screens.SettingsCallbacks
@@ -52,6 +54,46 @@ class SettingsActivity : ComponentActivity() {
 
     /** Last persisted MQTT-relevant values, to restart the bridge only when they actually change. */
     private var savedMqttSignature = ""
+
+    /**
+     * Layout export / restore, through the storage picker rather than a fixed path: the app holds no
+     * storage permission, and the document the user picks is the only file it ever touches.
+     */
+    private val exportLayout = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        val written = runCatching {
+            contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(LayoutBackup.export(prefs).toByteArray())
+            } ?: error("no output stream for $uri")
+        }.isSuccess
+        toast(if (written) R.string.toast_layout_exported else R.string.toast_layout_export_failed)
+    }
+
+    private val importLayout = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        val result = runCatching {
+            val json = contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+                ?: error("no input stream for \$uri")
+            LayoutBackup.import(prefs, json)
+        }
+        result.onSuccess { restored ->
+            // The launcher's store holds the old arrangement in memory; tell it to re-read.
+            SettingsChangeBus.get().emit("launcherLayout")
+            Toast.makeText(
+                this,
+                getString(R.string.toast_layout_imported_format, restored.placements, restored.folders),
+                Toast.LENGTH_LONG,
+            ).show()
+        }.onFailure { toast(R.string.toast_layout_import_failed) }
+    }
+
+    private fun toast(messageRes: Int) {
+        Toast.makeText(this, getString(messageRes), Toast.LENGTH_SHORT).show()
+    }
 
     override fun attachBaseContext(newBase: android.content.Context) {
         super.attachBaseContext(LocaleHelper.wrap(newBase))
@@ -237,6 +279,16 @@ class SettingsActivity : ComponentActivity() {
             prefs.pillRules = rules
             refreshPillSettingsCatalog()
             SettingsChangeBus.get().emit("pillRules")
+        }
+
+        override fun onExportLayout() {
+            exportLayout.launch(LayoutBackup.fileName(prefs.deviceName))
+        }
+
+        override fun onImportLayout() {
+            // Any MIME type: file managers and cloud providers routinely hand back
+            // "application/octet-stream" for a .json, and a strict filter greys the file out.
+            importLayout.launch(arrayOf("application/json", "text/plain", "*/*"))
         }
 
         override fun onHomeSettingsAction(action: HomeSettingsAction) {

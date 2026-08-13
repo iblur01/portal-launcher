@@ -7,6 +7,7 @@ enum class PillKind(val label: String, val icon: String, val basePriority: Int) 
     SAFETY("Sécurité", "shield", 90),
     LOCK("Serrure", "lock", 35),
     OPENING("Porte / fenêtre", "door", 25),
+    MOTION("Mouvement", "motion", 30),
     APPLIANCE("Appareil", "washer", 58),
     VACUUM("Aspirateur", "vacuum", 58),
     BATTERY("Batterie", "battery", 20),
@@ -82,7 +83,7 @@ data class PillRule(
  * families, so the settings page doesn't expose HA jargon to the user.
  */
 enum class PillFamily(val label: String, val kinds: Set<PillKind>) {
-    SECURITY("Sécurité & accès", setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING, PillKind.SIREN)),
+    SECURITY("Sécurité & accès", setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING, PillKind.MOTION, PillKind.SIREN)),
     COMFORT("Confort", setOf(PillKind.THERMOSTAT, PillKind.PURIFIER, PillKind.FAN, PillKind.COVER, PillKind.HUMIDIFIER, PillKind.WATER_HEATER)),
     APPLIANCES("Appareils", setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.VALVE, PillKind.LAWN_MOWER)),
     LIGHTS("Lumières", setOf(PillKind.LIGHTS)),
@@ -215,7 +216,7 @@ object PillSupport {
         e.domain == "lawn_mower" -> PillKind.LAWN_MOWER
         e.domain in setOf("switch", "input_boolean") -> PillKind.SWITCH
         e.domain == "cover" -> PillKind.COVER
-        e.domain == "binary_sensor" && e.deviceClass in motionClasses -> PillKind.GENERIC
+        e.domain == "binary_sensor" && e.deviceClass in motionClasses -> PillKind.MOTION
         e.domain == "alarm_control_panel" -> PillKind.SAFETY
         e.domain == "lock" || e.deviceClass == "lock" -> PillKind.LOCK
         e.deviceClass in openingClasses -> PillKind.OPENING

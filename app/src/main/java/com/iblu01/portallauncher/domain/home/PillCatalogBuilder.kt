@@ -256,6 +256,7 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
             PillKind.SAFETY -> state in setOf("triggered", "pending", "arming", "on", "detected")
             PillKind.LOCK -> state in setOf("unlocked", "jammed", "open")
             PillKind.OPENING -> state in setOf("on", "open", "opening")
+            PillKind.MOTION -> state == "on"
             PillKind.APPLIANCE, PillKind.VACUUM -> state in setOf(
                 "on", "run", "running", "cleaning", "washing", "drying", "printing", "active",
                 "returning", "paused", "prepare", "slicing", "init", "done", "finished", "complete",

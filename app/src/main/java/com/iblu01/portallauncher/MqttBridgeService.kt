@@ -45,9 +45,27 @@ class MqttBridgeService : Service() {
         private const val CHANNEL = "portal_launcher_bridge"
         private const val NOTIF_ID = 1
         private const val ACTION_RECONNECT = "com.iblu01.portallauncher.action.RECONNECT"
+        private const val EXTRA_FOREGROUND = "foreground"
 
-        fun start(context: Context) {
+        fun start(context: Context) = launch(context, action = null)
+
+        /**
+         * Starts the bridge, silently when possible.
+         *
+         * A rooted device whitelists us from doze and background restrictions during provisioning,
+         * so the bridge can run as a plain background service — which is what removes the permanent
+         * notification. Everywhere else (and whenever that plain start is refused, e.g. when the
+         * boot receiver fires) it falls back to a foreground service with its notification.
+         */
+        private fun launch(context: Context, action: String?) {
             val intent = Intent(context, MqttBridgeService::class.java)
+            action?.let { intent.action = it }
+            if (Prefs(context).rootProvisioned &&
+                runCatching { context.startService(intent) }.isSuccess
+            ) {
+                return
+            }
+            intent.putExtra(EXTRA_FOREGROUND, true)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
             else context.startService(intent)
         }
@@ -63,9 +81,7 @@ class MqttBridgeService : Service() {
          * this simply starts it normally.
          */
         fun reconnect(context: Context) {
-            val intent = Intent(context, MqttBridgeService::class.java).setAction(ACTION_RECONNECT)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
-            else context.startService(intent)
+            launch(context, ACTION_RECONNECT)
         }
     }
 
@@ -98,6 +114,8 @@ class MqttBridgeService : Service() {
     @Volatile private var lastVolumePercent = -1
     @Volatile private var lastVolumeMuted = false
     @Volatile private var lastBrightnessPercent = -1
+    /** False in the root-provisioned silent mode, where there is no notification to update. */
+    @Volatile private var foreground = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -108,7 +126,6 @@ class MqttBridgeService : Service() {
         sessionAllowlist = prefs.appSessionAllowlist
         sessionCoordinator = createSessionCoordinator().also { it.setEnabled(prefs.appSessionsEnabled) }
         lastSessionsEnabled = prefs.appSessionsEnabled
-        startForeground(NOTIF_ID, notification(getString(R.string.app_name)))
 
         DeviceStateHub.init(this)
         DeviceStateHub.addListener(deviceStateListener)
@@ -120,6 +137,12 @@ class MqttBridgeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // A null intent is a sticky restart: the system may have started us as a foreground
+        // service, so promote to be safe. `startForeground` is idempotent.
+        if (intent == null || intent.getBooleanExtra(EXTRA_FOREGROUND, false)) {
+            startForeground(NOTIF_ID, notification(getString(R.string.app_name)))
+            foreground = true
+        }
         if (intent?.action == ACTION_RECONNECT) {
             Log.i(TAG, "Reconnect requested (broker config changed)")
             refreshSessionConfiguration(prefs)
@@ -208,7 +231,6 @@ class MqttBridgeService : Service() {
 
         HaDiscovery.commandTopics(p.deviceId).forEach { client.publish(it, emptyRetained()) }
         HaDiscovery.commandTopics(p.deviceId).forEach { client.subscribe(it, 1) }
-        HaDiscovery.staleTopics(p.deviceId).forEach { client.publish(it, emptyRetained()) }
 
         publishDiscovery(client, p)
         publishInitialStates(p)
@@ -232,7 +254,11 @@ class MqttBridgeService : Service() {
 
         pub(HaDiscovery.screenDiscoveryTopic(p.deviceId), HaDiscovery.screenConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.screenModeDiscoveryTopic(p.deviceId), HaDiscovery.screenModeConfigPayload(p.deviceId, p.deviceName))
-        pub(HaDiscovery.presenceDiscoveryTopic(p.deviceId), HaDiscovery.presenceConfigPayload(p.deviceId, p.deviceName))
+        if (DeviceStateHub.presenceCapable) {
+            pub(HaDiscovery.presenceDiscoveryTopic(p.deviceId), HaDiscovery.presenceConfigPayload(p.deviceId, p.deviceName))
+        } else {
+            client.publish(HaDiscovery.presenceDiscoveryTopic(p.deviceId), emptyRetained())
+        }
         pub(HaDiscovery.ipDiscoveryTopic(p.deviceId), HaDiscovery.ipConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.lightDiscoveryTopic(p.deviceId), HaDiscovery.lightConfigPayload(p.deviceId, p.deviceName))
         if (sensorBridge?.hasTemperature == true) {
@@ -523,6 +549,7 @@ class MqttBridgeService : Service() {
     private fun publishDeviceState(state: DeviceState) {
         val p = prefs
         publishRaw(HaDiscovery.screenModeStateTopic(p.deviceId), state.display.name.lowercase(), 1, retained = true)
+        if (!DeviceStateHub.presenceCapable) return
         val present = when (state.presence) {
             Presence.PRESENT -> true
             Presence.ABSENT -> false
@@ -588,6 +615,7 @@ class MqttBridgeService : Service() {
     }
 
     private fun updateNotification(text: String) {
+        if (!foreground) return
         getSystemService(NotificationManager::class.java).notify(NOTIF_ID, notification(text))
     }
 

@@ -1,6 +1,7 @@
 package com.iblu01.portallauncher.ui.screens
 
 import android.content.Intent
+import android.provider.Settings
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -40,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +67,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.iblu01.portallauncher.AppLanguage
 import com.iblu01.portallauncher.Prefs
+import com.iblu01.portallauncher.RootProvisioning
 import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.photo.OkHttpTransport
@@ -90,6 +93,10 @@ import com.iblu01.portallauncher.ui.components.AutoReturnOverlay
 import com.iblu01.portallauncher.ui.components.ConnStatus
 import com.iblu01.portallauncher.ui.components.PillButton
 import com.iblu01.portallauncher.ui.components.SettingsDivider
+import com.iblu01.portallauncher.NotificationDots
+import com.iblu01.portallauncher.SettingsChangeBus
+import com.iblu01.portallauncher.ui.apps.IconPackInfo
+import com.iblu01.portallauncher.ui.apps.installedIconPacks
 import com.iblu01.portallauncher.ui.components.SettingsRow
 import com.iblu01.portallauncher.ui.components.SettingsSection
 import com.iblu01.portallauncher.ui.components.SettingsSidebar
@@ -162,6 +169,10 @@ interface SettingsCallbacks {
     fun onLoadPillEntities()
     fun onSetPillEnabled(candidates: List<PillCandidate>, enabled: Boolean)
     fun onHomeSettingsAction(action: HomeSettingsAction)
+    /** Writes the current arrangement to a file the user picks. */
+    fun onExportLayout()
+    /** Replaces the arrangement with one read from a file the user picks. */
+    fun onImportLayout()
 }
 
 private enum class SettingsPage { MAIN, HOME, PILLS, WALLPAPER, APPLICATION, DEVELOPER, INFORMATION }
@@ -374,6 +385,8 @@ fun SettingsScreen(
                 },
                 gridScale = gridScale,
                 onGridScaleChange = { gridScale = it; prefs.gridScale = it },
+                onExportLayout = callbacks::onExportLayout,
+                onImportLayout = callbacks::onImportLayout,
                 onBack = { currentPage = SettingsPage.MAIN },
                 showBack = showBack,
             )
@@ -525,6 +538,8 @@ private fun AppPage(
     onSelectSessionClassification: (String) -> Unit,
     onClearSessionApps: () -> Unit,
     gridScale: Float = 1f, onGridScaleChange: (Float) -> Unit = {},
+    onExportLayout: () -> Unit = {},
+    onImportLayout: () -> Unit = {},
     onBack: () -> Unit,
     showBack: Boolean = true,
 ) {
@@ -543,8 +558,26 @@ private fun AppPage(
     var immichBusy by remember { mutableStateOf(false) }
     var immichErrorCategory by remember { mutableStateOf<String?>(null) }
     var immichConnectedAlbumCount by remember { mutableStateOf<Int?>(null) }
+    var iconPack by remember { mutableStateOf(prefs.iconPack) }
+    var iconPacks by remember { mutableStateOf<List<IconPackInfo>>(emptyList()) }
+    var showIconPackPicker by remember { mutableStateOf(false) }
+    var notificationDots by remember { mutableStateOf(prefs.notificationDots) }
+    // Granting listener access happens in another activity, so the answer is only re-read on the
+    // way back in — a value captured once would keep claiming "Required" after the user granted it.
+    var notificationAccess by remember { mutableStateOf(false) }
+    val appPageLifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val settingsContext = LocalContext.current
+    DisposableEffect(appPageLifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                notificationAccess = NotificationDots.isAccessGranted(settingsContext)
+            }
+        }
+        notificationAccess = NotificationDots.isAccessGranted(settingsContext)
+        appPageLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { appPageLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val app = settingsContext.applicationContext as PortalApp
 
     fun loadImmichAlbums(openPicker: Boolean) {
@@ -584,6 +617,20 @@ private fun AppPage(
     if (showLanguagePage) {
         LanguagePage(prefs = prefs, onBack = { showLanguagePage = false })
         return
+    }
+    if (showIconPackPicker) {
+        IconPackPickerDialog(
+            packs = iconPacks,
+            selected = iconPack,
+            onDismiss = { showIconPackPicker = false },
+            onSelect = { pack ->
+                iconPack = pack
+                prefs.iconPack = pack
+                showIconPackPicker = false
+                // The launcher rebuilds its icons from this; the settings screen has none to redraw.
+                SettingsChangeBus.get().emit("iconPack")
+            },
+        )
     }
     if (showImmichAlbumPicker) {
         ImmichAlbumPickerDialog(
@@ -855,6 +902,89 @@ private fun AppPage(
                 onValueChange = { onGridScaleChange(it / 100f) },
                 valueText = "${spec.columns} × ${spec.rows}",
             )
+            SettingsDivider()
+            SettingsRow(
+                label = stringResource(R.string.settings_app_label_icon_pack),
+                value = iconPacks.firstOrNull { it.packageName == iconPack }?.label
+                    ?: stringResource(R.string.settings_app_value_icon_pack_system),
+                onClick = {
+                    // Enumerated on demand: querying every icon-pack intent is PackageManager work
+                    // nobody should pay for on a settings screen they only came to for the clock.
+                    scope.launch {
+                        iconPacks = withContext(Dispatchers.IO) { installedIconPacks(settingsContext) }
+                        showIconPackPicker = true
+                    }
+                },
+            )
+            SettingsDivider()
+            SettingsToggle(
+                label = stringResource(R.string.settings_app_toggle_notification_dots),
+                checked = notificationDots,
+                onCheckedChange = {
+                    notificationDots = it
+                    prefs.notificationDots = it
+                    SettingsChangeBus.get().emit("notificationDots")
+                },
+            )
+            if (notificationDots) {
+                SettingsDivider()
+                // The toggle alone does nothing until the system grants listener access, so the
+                // state of that grant is shown here rather than left to be discovered.
+                SettingsRow(
+                    label = stringResource(R.string.settings_app_label_notification_access),
+                    value = if (notificationAccess) {
+                        stringResource(R.string.settings_app_value_notification_granted)
+                    } else {
+                        stringResource(R.string.settings_app_value_notification_missing)
+                    },
+                    onClick = {
+                        runCatching {
+                            settingsContext.startActivity(
+                                Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
+                    },
+                )
+            }
+            // On a rooted panel none of the trips above are needed: one tap grants everything and
+            // also drops the bridge's permanent notification.
+            var rootAvailable by remember { mutableStateOf(false) }
+            var rootDone by remember { mutableStateOf(prefs.rootProvisioned) }
+            LaunchedEffect(Unit) {
+                rootAvailable = withContext(Dispatchers.IO) { RootProvisioning.isAvailable() }
+            }
+            if (rootAvailable) {
+                SettingsDivider()
+                SettingsRow(
+                    label = stringResource(R.string.settings_app_label_root_setup),
+                    value = if (rootDone) {
+                        stringResource(R.string.settings_app_value_root_done)
+                    } else {
+                        stringResource(R.string.settings_app_value_root_available)
+                    },
+                    onClick = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) { RootProvisioning.provision(settingsContext) }
+                            rootDone = prefs.rootProvisioned
+                        }
+                    },
+                )
+            }
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_app_section_layout_backup)) {
+            SettingsRow(
+                label = stringResource(R.string.settings_app_label_export_layout),
+                value = "",
+                onClick = onExportLayout,
+            )
+            SettingsDivider()
+            SettingsRow(
+                label = stringResource(R.string.settings_app_label_import_layout),
+                value = "",
+                onClick = onImportLayout,
+            )
         }
 
         SettingsSection(title = stringResource(R.string.settings_app_section_screen_sleep)) {
@@ -876,6 +1006,50 @@ private fun AppPage(
         }
 
     }
+}
+
+/**
+ * Icon-pack chooser. "System icons" is a real entry rather than a clear button: it is the default
+ * and has to be reachable without knowing that an empty selection means anything.
+ */
+@Composable
+private fun IconPackPickerDialog(
+    packs: List<IconPackInfo>,
+    selected: String,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.icon_pack_picker_title)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                val entries = listOf("" to stringResource(R.string.settings_app_value_icon_pack_system)) +
+                    packs.map { it.packageName to it.label }
+                entries.forEach { (pkg, label) ->
+                    TextButton(onClick = { onSelect(pkg) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = if (pkg == selected) "✓ $label" else label,
+                            color = AppleColors.primary,
+                            style = AppleTypography.titleMedium,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+                if (packs.isEmpty()) {
+                    Text(
+                        stringResource(R.string.icon_pack_picker_empty),
+                        color = AppleColors.secondary,
+                        style = AppleTypography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.context_menu_confirm)) }
+        },
+        containerColor = AppleColors.elevated,
+    )
 }
 
 private fun AppClassification.labelRes(): Int = when (this) {

@@ -244,7 +244,7 @@ fun ClockHeader(
                 )
             }
         }
-        Spacer(Modifier.height((if (compactScreen) 0.dp else 4.dp) * clockTheme.elementSpacing))
+        Spacer(Modifier.height((if (compactScreen) 0.dp else 2.dp) * clockTheme.elementSpacing))
         Text(
             text = time,
             style = AppleTypography.displayLarge.copy(
@@ -327,7 +327,7 @@ private fun CompactTemperatures(
             )
             Text(
                 indoorTemperature,
-                style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
+                style = AppleTypography.bodySmall.copy(fontSize = 15.sp),
                 color = AppleColors.primary,
                 maxLines = 1,
             )
@@ -336,7 +336,7 @@ private fun CompactTemperatures(
             WeatherIcon(weather.glyph, Modifier.size(14.dp))
             Text(
                 outdoorTemperature,
-                style = AppleTypography.bodySmall.copy(fontSize = 10.sp),
+                style = AppleTypography.bodySmall.copy(fontSize = 15.sp),
                 color = AppleColors.secondary,
                 maxLines = 1,
             )

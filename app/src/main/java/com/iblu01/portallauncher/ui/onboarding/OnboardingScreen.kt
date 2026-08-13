@@ -72,6 +72,7 @@ fun OnboardingScreen(
             OnboardingStep.SYSTEM_SETUP -> SystemSetupStep(
                 state = state,
                 onOpenSetting = onOpenSystemSetting,
+                onProvisionWithRoot = viewModel::provisionWithRoot,
                 onAcknowledgeGrant = viewModel::acknowledgeGrant,
                 adbCommand = viewModel.adbSetHomeCommand(),
                 onBack = viewModel::goBack,

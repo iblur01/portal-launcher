@@ -193,6 +193,7 @@ class PillPriorityEngine(private val context: Context) {
             } else if (s in inactive) visible = false else { score = 100; visual = "critical" }
             PillKind.LOCK -> if (s == "unlocked" || s == "jammed" || s == "open") { score = 88; visual = "critical" } else { score = 9; visual = "active" }
             PillKind.OPENING -> if (s in setOf("on", "open", "opening")) { score = 55 + ageMinutes.coerceAtMost(30).toInt(); visual = if (ageMinutes >= 5) "warning" else "active" } else visible = false
+            PillKind.MOTION -> { visible = s == "on"; score = 42; visual = "active" }
             PillKind.APPLIANCE, PillKind.VACUUM -> when {
                 s in done -> {
                     val ageMs = runCatching { nowMs - (parseHaInstant(e.lastChanged)?.toEpochMilli() ?: nowMs) }.getOrDefault(0L)
@@ -357,6 +358,7 @@ class PillPriorityEngine(private val context: Context) {
             
         val display = when (rule.kind) {
             PillKind.OPENING -> when (s) { "on", "open", "opening" -> context.getString(R.string.pill_opening_open); else -> rawDisplay }
+            PillKind.MOTION -> friendlyEntityState(e)
             PillKind.LOCK -> when (s) { "locked" -> context.getString(R.string.pill_lock_locked); "unlocked" -> context.getString(R.string.pill_lock_unlocked); "jammed" -> context.getString(R.string.pill_lock_jammed); else -> rawDisplay }
             PillKind.SAFETY -> if (e.domain == "alarm_control_panel") when (s) {
                 "disarmed" -> "Désarmée"

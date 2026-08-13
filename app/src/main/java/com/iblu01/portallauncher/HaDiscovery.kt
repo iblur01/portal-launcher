@@ -38,20 +38,6 @@ object HaDiscovery {
         return """{"name":"Temperature","unique_id":"${deviceId}_temperature","device":${device(deviceId, name)},"state_topic":"${tempStateTopic(deviceId)}","device_class":"temperature","unit_of_measurement":"°C","state_class":"measurement"}"""
     }
 
-    fun accelDiscoveryTopic(deviceId: String, axis: String) = "homeassistant/sensor/${deviceId}_accel_$axis/config"
-    fun accelStateTopic(deviceId: String) = "portal/$deviceId/sensor/accelerometer"
-    fun accelConfigPayload(deviceId: String, deviceName: String, axis: String): String {
-        val name = deviceName.escape()
-        return """{"name":"Accel ${axis.uppercase()}","unique_id":"${deviceId}_accel_$axis","device":${device(deviceId, name)},"state_topic":"${accelStateTopic(deviceId)}","value_template":"{{ value_json.$axis }}","unit_of_measurement":"m/s²","state_class":"measurement"}"""
-    }
-
-    fun rgbDiscoveryTopic(deviceId: String, channel: String) = "homeassistant/sensor/${deviceId}_rgb_$channel/config"
-    fun rgbStateTopic(deviceId: String) = "portal/$deviceId/sensor/rgb"
-    fun rgbConfigPayload(deviceId: String, deviceName: String, channel: String): String {
-        val name = deviceName.escape()
-        return """{"name":"Light ${channel.uppercase()}","unique_id":"${deviceId}_rgb_$channel","device":${device(deviceId, name)},"state_topic":"${rgbStateTopic(deviceId)}","value_template":"{{ value_json.$channel }}","unit_of_measurement":"lx","state_class":"measurement","icon":"mdi:palette"}"""
-    }
-
     fun volumeDiscoveryTopic(deviceId: String) = "homeassistant/number/${deviceId}_volume/config"
     fun volumeStateTopic(deviceId: String) = "portal/$deviceId/audio/volume/state"
     fun volumeCommandTopic(deviceId: String) = "portal/$deviceId/audio/volume/set"
@@ -159,15 +145,6 @@ object HaDiscovery {
         powerModeCommandTopic(deviceId),
         notificationCommandTopic(deviceId),
         sessionCommandTopic(deviceId),
-    )
-
-    fun staleTopics(deviceId: String) = listOf(
-        accelDiscoveryTopic(deviceId, "x"),
-        accelDiscoveryTopic(deviceId, "y"),
-        accelDiscoveryTopic(deviceId, "z"),
-        rgbDiscoveryTopic(deviceId, "r"),
-        rgbDiscoveryTopic(deviceId, "g"),
-        rgbDiscoveryTopic(deviceId, "b"),
     )
 
     private fun device(deviceId: String, escapedName: String) =

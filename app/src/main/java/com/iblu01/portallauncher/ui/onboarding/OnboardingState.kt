@@ -118,6 +118,9 @@ data class OnboardingUiState(
 
     val systemCapabilities: SystemCapabilities = SystemCapabilities(),
     val justGranted: Capability? = null,
+    /** A root shell answered: every capability can be granted in one tap, no settings trip. */
+    val rootAvailable: Boolean = false,
+    val rootProvisioning: Boolean = false,
 
     val gridScale: Float = 1f,
     val gridPreset: GridPreset? = GridPreset.BALANCED,

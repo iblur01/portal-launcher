@@ -3,8 +3,10 @@ package com.iblu01.portallauncher.ui.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -103,6 +105,8 @@ fun AppGridPage(
     onCellSize: (widthDp: Float, heightDp: Float) -> Unit = { _, _ -> },
     /** User-configurable multiplier on cell size (icon size / grid density), from Prefs.gridScale. */
     cellScale: Float = 1f,
+    /** True when the item has a pending notification. See `NotificationDots`. */
+    hasDot: (GridItem) -> Boolean = { false },
     /**
      * 0 on the clock page, 1 once this page is in view. A lambda, not a value: read in the draw
      * phase it costs no recomposition, whereas a parameter would recompose every page every frame
@@ -255,14 +259,22 @@ fun AppGridPage(
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (placed.item.isWidget) {
-                        WidgetTile(widgetId = placed.item.widgetId, widgetView = widgetView)
-                    } else {
-                        AppTile(
+                    when {
+                        placed.item.isWidget ->
+                            WidgetTile(widgetId = placed.item.widgetId, widgetView = widgetView)
+                        placed.item.isFolder -> FolderTile(
+                            label = placed.item.label,
+                            members = placed.item.folderMembers,
+                            onClick = { onLaunch(placed.item) },
+                            iconSize = 56.dp * cellScale,
+                            dot = hasDot(placed.item),
+                        )
+                        else -> AppTile(
                             label = placed.item.label,
                             icon = placed.item.icon,
                             onClick = { onLaunch(placed.item) },
                             iconSize = 56.dp * cellScale,
+                            dot = hasDot(placed.item),
                         )
                     }
                 }
@@ -347,8 +359,108 @@ fun DraggedIconOverlay(drag: GridDragState, iconSize: Dp = 56.dp) {
     }
 }
 
+/**
+ * A folder, drawn the way every launcher draws one: the first few members shrunk into a 2x2 grid on
+ * a rounded plate. Four is not a cap on the folder, only on what the tile can show legibly.
+ */
 @Composable
-internal fun AppTile(label: String, icon: ImageBitmap?, onClick: () -> Unit, iconSize: Dp = 56.dp) {
+internal fun FolderTile(
+    label: String,
+    members: List<GridItem>,
+    onClick: () -> Unit,
+    iconSize: Dp = 56.dp,
+    dot: Boolean = false,
+) {
+    val scale = iconSize / 56.dp
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(AppleShapes.panel)
+            .nonConsumingClickable(onClick)
+            .padding(vertical = 6.dp, horizontal = 4.dp)
+            .testTag("folderTile"),
+    ) {
+        TileBadge(dot = dot, iconSize = iconSize) {
+            Box(
+                modifier = Modifier
+                    .size(iconSize)
+                    .clip(AppleShapes.panel)
+                    .background(AppleColors.frostedFill)
+                    .padding(iconSize * 0.1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                val preview = members.take(4)
+                Column(verticalArrangement = Arrangement.spacedBy(iconSize * 0.05f)) {
+                    preview.chunked(2).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(iconSize * 0.05f)) {
+                            row.forEach { member ->
+                                val icon = member.icon
+                                if (icon != null) {
+                                    Image(
+                                        bitmap = icon,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.size(iconSize * 0.36f),
+                                    )
+                                } else {
+                                    Box(
+                                        Modifier
+                                            .size(iconSize * 0.36f)
+                                            .clip(AppleShapes.pill)
+                                            .background(AppleColors.frostedFill)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = label,
+            style = AppleTypography.bodySmall.copy(fontSize = (13.sp.value * scale).sp),
+            color = AppleColors.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
+ * Wraps a tile's icon with the notification dot.
+ *
+ * Drawn as a badge on the icon rather than as a count: a wall panel is read from across the room,
+ * where "something is waiting" carries and "3" does not. The dot sits *outside* the icon's square
+ * so it never covers artwork.
+ */
+@Composable
+private fun TileBadge(dot: Boolean, iconSize: Dp, content: @Composable () -> Unit) {
+    Box(contentAlignment = Alignment.Center) {
+        content()
+        if (dot) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = iconSize * 0.06f, y = -iconSize * 0.04f)
+                    .size(iconSize * 0.2f)
+                    .clip(AppleShapes.pill)
+                    .background(AppleColors.accent, AppleShapes.pill)
+                    .testTag("notificationDot")
+            )
+        }
+    }
+}
+
+@Composable
+internal fun AppTile(
+    label: String,
+    icon: ImageBitmap?,
+    onClick: () -> Unit,
+    iconSize: Dp = 56.dp,
+    dot: Boolean = false,
+) {
     val scale = iconSize / 56.dp
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -357,20 +469,22 @@ internal fun AppTile(label: String, icon: ImageBitmap?, onClick: () -> Unit, ico
             .nonConsumingClickable(onClick)
             .padding(vertical = 6.dp, horizontal = 4.dp),
     ) {
-        if (icon != null) {
-            Image(
-                bitmap = icon,
-                contentDescription = label,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(iconSize),
-            )
-        } else {
-            Box(
-                Modifier
-                    .size(iconSize)
-                    .clip(AppleShapes.panel)
-                    .background(AppleColors.frostedFill)
-            )
+        TileBadge(dot = dot, iconSize = iconSize) {
+            if (icon != null) {
+                Image(
+                    bitmap = icon,
+                    contentDescription = label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(iconSize),
+                )
+            } else {
+                Box(
+                    Modifier
+                        .size(iconSize)
+                        .clip(AppleShapes.panel)
+                        .background(AppleColors.frostedFill)
+                )
+            }
         }
         Spacer(Modifier.height(6.dp))
         Text(

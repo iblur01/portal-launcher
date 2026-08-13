@@ -7,7 +7,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Speaker
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -28,7 +27,7 @@ fun MediaDevicesPanel(devices: List<PlayingMedia>, onSelect: (PlayingMedia) -> U
         Box(Modifier.fillMaxSize().clip(AppleShapes.panel).background(Color.Black.copy(alpha = 0.72f)).border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.16f), Color.Black.copy(alpha = 0.94f)))))
             Column(Modifier.fillMaxSize().padding(horizontal = 24.dp.scaled(), vertical = 20.dp.scaled())) {
-                PanelHeader("Lecteurs média", onDismiss, Icons.Filled.Close, "Fermer", titleIcon = Icons.Outlined.Speaker, accent = AppleColors.accent)
+                PanelHeader("Lecteurs média", titleIcon = Icons.Outlined.Speaker, accent = AppleColors.accent, onClose = onDismiss)
                 Spacer(Modifier.height(14.dp))
                 Text("Choisis un lecteur", style = AppleTypography.bodySmall, color = AppleColors.secondary)
                 Spacer(Modifier.height(12.dp))

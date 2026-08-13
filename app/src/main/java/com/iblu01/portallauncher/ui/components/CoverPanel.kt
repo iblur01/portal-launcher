@@ -56,16 +56,20 @@ fun CoverControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 if (canSetPosition) {
                     val ratio = 96f / 240f
                     val sliderHeight = minOf(maxHeight, maxWidth / ratio, 300.dp)
+                    // A cover's position is "openness": 100 = open, 0 = closed. The slider fills
+                    // top-down to represent the shutter panel hanging over the window, so the value
+                    // fed in is inverted (closed = full fill) and mapped back on change.
                     VerticalFillSlider(
-                        value = sliderPos,
-                        onValueChange = { sliderPos = it },
+                        value = 100f - sliderPos,
+                        onValueChange = { sliderPos = 100f - it },
                         onValueChangeFinished = {
-                            callService("cover", "set_cover_position", chip.entityId, mapOf("position" to sliderPos.roundToInt()))
+                            callService("cover", "set_cover_position", chip.entityId, mapOf("position" to (100f - it).roundToInt()))
                         },
                         valueRange = 0f..100f,
                         origin = FillOrigin.TOP,
                         accent = AppleColors.active,
                         hapticSteps = 20,
+                        label = { v -> "${(100f - v).roundToInt()} %" },
                         modifier = Modifier.size(sliderHeight * ratio, sliderHeight),
                     )
                 } else {
@@ -97,15 +101,16 @@ fun CoverControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 val sliderHeight = minOf(maxHeight, maxWidth / widthToHeightRatio)
                 val sliderWidth = sliderHeight * widthToHeightRatio
                 VerticalFillSlider(
-                    value = sliderPos,
-                    onValueChange = { sliderPos = it },
+                    value = 100f - sliderPos,
+                    onValueChange = { sliderPos = 100f - it },
                     onValueChangeFinished = {
-                        callService("cover", "set_cover_position", chip.entityId, mapOf("position" to sliderPos.roundToInt()))
+                        callService("cover", "set_cover_position", chip.entityId, mapOf("position" to (100f - it).roundToInt()))
                     },
                     valueRange = 0f..100f,
                     origin = FillOrigin.TOP,
                     accent = AppleColors.active,
                     hapticSteps = 20,
+                    label = { v -> "${(100f - v).roundToInt()} %" },
                     modifier = Modifier.size(sliderWidth, sliderHeight),
                 )
             }

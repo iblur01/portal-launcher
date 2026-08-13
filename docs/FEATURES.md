@@ -536,16 +536,52 @@ Icons sit at the exact cell they were dropped in — an absolutely-positioned gr
 
 - **Cells** come from the page size (`gridSpecFor`, min 3×2), so hit-testing is arithmetic: a point maps to a cell with no reported rectangles involved (`cellAt`). Pages report the spec they afford, and placement re-resolves against it.
 - **Nothing is compacted.** `placeItems` only moves an item in two cases: its cell no longer exists (the grid shrank, e.g. on rotation) or two items claim the same one — then it takes the first free cell instead of vanishing or overlapping. A freshly installed app sorts last, so an install never disturbs the arrangement.
-- **A drop on an occupied cell swaps** the two icons. There is no dense order to cascade along under free placement, and refusing the drop would just throw the gesture away.
+- **A drop on an occupied cell makes a folder** of the two icons, the gesture every launcher uses (`LauncherLayoutStore.dropAt` → `foldOnto`). It only swaps when foldering is impossible — a widget on either side, or mismatched spans.
 - **Cross-page drags**: hold the icon against a page edge for 450 ms and the pager flips (`EDGE_FLIP_*`), which is also how you reach the drag-only empty page and thus create one. The edges are the **pager's viewport**, not a page's rectangle: pages slide, so a scrolled-away page's edges are meaningless — reading one made every position look like "against the right edge" and none like the left, so only forward flips worked. The drag state lives *above* the pager (`GridDragState`) because a page-local one could not survive the flip; the icon is drawn by an overlay in root coordinates, and the page under the icon's centre decides the target cell.
 - The gesture belongs to the page it started on, so it must survive that page moving and being scrolled off: its `pointerInput` is keyed on `page` + `spec` only (keying it on the page's rect rebuilt the node on every flip, ending the drag exactly when it had to continue), the on-page items are read through `rememberUpdatedState`, and while an icon is in hand **every** page stays composed (`beyondViewportPageCount`). A cancel is still treated as a drop, as a last-resort safety net.
 - The hovered cell is outlined from the draw phase, so following the finger costs no recomposition.
 - **Item menu** (`AppContextMenu.kt`): the app's own shortcuts (manifest + dynamic + pinned, max 4), then Renommer / Masquer / Infos de l'application / Désinstaller. A pinned shortcut gets Retirer instead. Uninstall is hidden for system apps and for Portal itself (`ApplicationInfo.FLAG_SYSTEM`).
 - Shortcuts come from `LauncherApps.getShortcuts()`, which **throws unless Portal is the selected home app**. Every call is gated on `hasShortcutHostPermission()`, and when it is false the menu says so rather than looking like an app with no shortcuts.
 - The menu is positioned from its *measured* height (flip above the tile, clamp into the screen, scroll if still too tall). Its panel swallows taps with a raw pointer handler, **not** `clickable`, which would merge the whole panel into one semantics node and hide the rows from TalkBack.
-- Placement lives in `Prefs.appPlacements` (key → page/col/row), renames in `Prefs.appLabels`, hidden items in `Prefs.hiddenApps`. A pre-pages arrangement (`appOrder`) is converted to cells once, so upgrading does not scatter it.
+- Placement lives in `Prefs.appPlacements` (key → page/col/row), renames in `Prefs.appLabels`, hidden items in `Prefs.hiddenApps`, folders in `Prefs.appFolders`. A pre-pages arrangement (`appOrder`) is converted to cells once, so upgrading does not scatter it.
 - Hidden apps come back through the top-bar button — hiding would otherwise be a one-way trip.
 - Icons use `Modifier.nonConsumingClickable`: `appleClickable` consumes the `down`, and a consumed event cancels the container's pending long-press — which silently killed the whole item menu.
+
+### Folders
+A folder is an item like any other — same key space (`fd:<id>`), same cell, same rename — holding app and shortcut keys (`Folders.kt`, `LauncherLayoutStore`).
+
+- **Made by dropping** one icon onto another; dropping onto an existing folder joins it. An icon dragged from one folder to another is detached first, so a move is one gesture rather than take-out-then-put-in.
+- **A folder opens as a popup**, centred, not as an in-place expanding container (`FolderDialog.kt`). On a wall panel read from across the room, the folder's contents belong where the eye already is — and the folder then needs no geometry of its own: no reserved cells, no reflow. Tap the title to rename, long-press a member to take it out, and there is a delete at the bottom.
+- **It cannot survive being pointless.** Below two members a folder dissolves and its survivor falls back onto the grid with no stored cell, which `placeItems` then homes into the first free one. The same rule prunes members whose app was uninstalled, on every app-list refresh — a folder can never hold a ghost.
+- Folders carry no label of their own: renaming one goes through `Prefs.appLabels` keyed by `fd:<id>`, the same code path as renaming an app. Deleting a folder clears that entry so the next `fd:` id does not inherit a stale name.
+- The tile draws its first four members in a 2×2 plate. Four is a limit on what reads legibly at tile size, not on the folder.
+- Widgets are never foldable (`isFoldable`): a folder holds things you launch.
+
+### Notification dots
+The grid draws a dot on apps with something waiting (`NotificationDotService.kt`).
+
+- A launcher cannot ask "does this app have a notification?" — the only way is to **be** a notification listener, so this is a `NotificationListenerService` that publishes nothing but the set of packages with a visible notification. No content is read, kept or logged.
+- Bound by the system only once the user grants listener access; the settings row shows whether that grant exists rather than leaving a toggle that silently does nothing.
+- **Ongoing** notifications (media sessions, foreground services, downloads) earn no dot — they are the permanent kind and would leave a dot lit forever. Group summaries are skipped because their children already count.
+- A folder is dotted when any member is, so foldering an app never silences it.
+- A dot, not a count: read from across a room, "something is waiting" carries and "3" does not.
+
+### Icon packs
+Any installed icon pack can theme the app icons (`IconPacks.kt`, `Prefs.iconPack`).
+
+- Packs are found through the three de-facto intents (`org.adw.launcher.THEMES`, GO, Nova) — there is no official API — and their `appfilter.xml` is read from the compiled XML resource first, then from `assets/`.
+- Only the `component → drawable` mapping is honoured. An app the pack does not theme **keeps its own icon**, so a partial pack degrades into a mixed grid rather than into blanks.
+- `iconback` / `iconmask` / `iconupon` compositing (restyling *unthemed* icons to match the pack) is deliberately not implemented: it is a rendering pipeline, not a lookup. The fallback is never wrong, only inconsistent.
+- The pack is parsed once per app-list load, not per icon, and changing it in the settings triggers a forced refresh over `SettingsChangeBus`.
+
+### Layout backup
+Export and restore of the arrangement (`LayoutBackup.kt`), through the storage picker — the app holds no storage permission and touches only the document the user picks.
+
+- Versioned, readable JSON: placements, folders, renames, hidden items, pinned shortcuts, grid scale and icon pack. It is **not** a preferences dump — no HA token, no MQTT password, nothing that could leak by passing the file around. A test asserts exactly that.
+- **Widget placements are dropped on restore.** A widget id is allocated by *this* device's `AppWidgetHost` and means nothing anywhere else; the widgets already bound here keep their own cells.
+- A restore marks `appPlacementsSeeded`, so the legacy `appOrder` conversion cannot replay over what was just restored, and emits `launcherLayout` on `SettingsChangeBus` so the running launcher re-reads instead of overwriting from memory.
+- An unreadable or too-new file raises rather than half-applying: a bad file must not wipe a grid.
+- Shortcut icons stay out (they live in `ShortcutIconStore`): a shortcut restored onto a device that never pinned it shows the placeholder tile but still launches.
 
 ### Widgets
 Bound through our own `AppWidgetHost` (`WidgetHostController.kt`), added from the surface menu → **Ajouter un widget**.

@@ -83,6 +83,7 @@ fun AppContextMenu(
     onAppInfo: () -> Unit,
     onUninstall: () -> Unit,
     onRemoveShortcut: () -> Unit,
+    onDeleteFolder: () -> Unit = {},
     onOpenHomeSettings: () -> Unit = {},
     onResize: (GridSpan) -> Unit = {},
     onRemoveWidget: () -> Unit = {},
@@ -167,7 +168,7 @@ fun AppContextMenu(
                 shortcuts.forEach { shortcut ->
                     ShortcutRow(shortcut) { onShortcut(shortcut); onDismiss() }
                 }
-            } else if (!isDefaultHome && !item.isShortcut) {
+            } else if (!isDefaultHome && !item.isShortcut && !item.isFolder) {
                 MenuSeparator()
                 Text(
                     text = stringResource(R.string.context_menu_shortcuts_unavailable),
@@ -207,7 +208,13 @@ fun AppContextMenu(
                 draft = item.label
                 renaming = true
             }
-            if (item.isShortcut) {
+            if (item.isFolder) {
+                // A folder has no app behind it: no app info, no uninstall, and hiding it would
+                // hide its members with it. Deleting spills them back onto the grid instead.
+                ActionRow(Icons.Outlined.Delete, stringResource(R.string.folder_delete), danger = true) {
+                    onDeleteFolder(); onDismiss()
+                }
+            } else if (item.isShortcut) {
                 ActionRow(Icons.Outlined.Delete, stringResource(R.string.context_menu_remove_shortcut)) {
                     onRemoveShortcut(); onDismiss()
                 }
