@@ -20,8 +20,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 
 internal const val LAUNCHER_PANEL_FRACTION = 0.33f
+
+/**
+ * Avale tous les événements pointeur. Un panneau est opaque : ses zones vides ne dessinent qu'un
+ * fond, qui n'est pas hit-testable, donc sans ça les taps retombent sur le contenu recouvert
+ * (pills, grille d'apps) — visible en plein écran et pendant l'animation de fermeture.
+ */
+internal fun Modifier.consumePanelTouches(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            awaitPointerEvent().changes.forEach { it.consume() }
+        }
+    }
+}
 
 internal enum class LauncherPanelPresentation { DOCKED, FULLSCREEN }
 
@@ -76,7 +90,7 @@ internal fun LauncherPanelLayout(
                 enter = fadeIn(tween(220)),
                 exit = fadeOut(tween(180)),
             ) {
-                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                Box(Modifier.fillMaxSize().consumePanelTouches().background(Color.Black)) {
                     panel()
                 }
             }
@@ -90,7 +104,7 @@ internal fun LauncherPanelLayout(
                 enter = slideInHorizontally(tween(500)) { width -> width },
                 exit = slideOutHorizontally(tween(500)) { width -> width },
             ) {
-                panel()
+                Box(Modifier.fillMaxSize().consumePanelTouches()) { panel() }
             }
         } else {
             AnimatedVisibility(
@@ -102,7 +116,7 @@ internal fun LauncherPanelLayout(
                 enter = slideInVertically(tween(500)) { height -> height },
                 exit = slideOutVertically(tween(500)) { height -> height },
             ) {
-                panel()
+                Box(Modifier.fillMaxSize().consumePanelTouches()) { panel() }
             }
         }
     }

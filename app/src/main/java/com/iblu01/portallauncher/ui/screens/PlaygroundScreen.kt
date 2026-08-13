@@ -73,6 +73,7 @@ import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.LocalHaStates
 import com.iblu01.portallauncher.ui.components.ChipActionsPanel
+import com.iblu01.portallauncher.ui.components.consumePanelTouches
 import com.iblu01.portallauncher.ui.components.mediaProviderLogo
 import com.iblu01.portallauncher.ui.components.MediaProviderBadge
 import com.iblu01.portallauncher.ui.components.MediaPlayerView
@@ -656,9 +657,11 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                         chip = allFakeChips.firstOrNull { it.id == selection.id } ?: selection.chip,
                         onDismiss = { selectedFakePanel = null },
                         fullScreen = fullscreenPanel,
-                        modifier = if (fullscreenPanel) Modifier.fillMaxSize()
-                        else if (playgroundLandscape) Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f)
-                        else Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.33f),
+                        modifier = (
+                            if (fullscreenPanel) Modifier.fillMaxSize()
+                            else if (playgroundLandscape) Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f)
+                            else Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.33f)
+                        ).consumePanelTouches(),
                     )
                     is FakePanelSelection.Media -> MediaPlayerView(
                         media = fakeMedia,
@@ -672,13 +675,15 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                         onSelectSecondary = {}, onSwipePlayer = {}, onJoinPlayer = {}, onUnjoinPlayer = {},
                         onDismiss = { selectedFakePanel = null },
                         fullScreen = fullscreenPanel,
-                        modifier = if (fullscreenPanel) {
-                            Modifier.fillMaxSize().background(Color.Black)
-                        } else if (playgroundLandscape) {
-                            Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f)
-                        } else {
-                            Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.33f)
-                        },
+                        modifier = (
+                            if (fullscreenPanel) {
+                                Modifier.fillMaxSize().background(Color.Black)
+                            } else if (playgroundLandscape) {
+                                Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f)
+                            } else {
+                                Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.33f)
+                            }
+                        ).consumePanelTouches(),
                     )
                 }
             }
