@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +37,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -96,6 +100,7 @@ internal fun CalmSubPage(
     BackgroundSubPage(
         state = state,
         title = stringResource(R.string.onb_bg_tile_calm),
+        mode = BG_MODE_CALM,
         description = stringResource(R.string.onb_bg_calm_desc),
         onBack = onBack,
         onValidate = onValidate,
@@ -153,6 +158,7 @@ internal fun ImmichSubPage(
     BackgroundSubPage(
         state = state,
         title = stringResource(R.string.onb_bg_tile_immich),
+        mode = BG_MODE_IMMICH,
         description = stringResource(R.string.onb_bg_immich_desc),
         onBack = onBack,
         onValidate = if (connected) {
@@ -206,36 +212,6 @@ internal fun ImmichSubPage(
                 },
                 isPassword = true,
             )
-            SettingsDivider()
-            SettingsSlider(
-                label = stringResource(R.string.onb_bg_immich_field_change_frequency),
-                value = cadenceIndex.toFloat(),
-                valueRange = 0f..(IMMICH_CADENCES.size - 1).toFloat(),
-                steps = IMMICH_CADENCES.size - 2,
-                onValueChange = { cadenceIndex = it.toInt().coerceIn(IMMICH_CADENCES.indices) },
-                valueText = "${IMMICH_CADENCES[cadenceIndex]} " +
-                    stringResource(R.string.settings_seconds_short),
-                onValueChangeFinished = { prefs.immichCadenceSeconds = IMMICH_CADENCES[cadenceIndex] },
-            )
-            SettingsDivider()
-            SettingsToggle(
-                label = stringResource(R.string.onb_bg_immich_field_shuffle),
-                checked = shuffle,
-                onCheckedChange = {
-                    shuffle = it
-                    prefs.immichShuffle = it
-                },
-            )
-            SettingsDivider()
-            SettingsToggle(
-                label = stringResource(R.string.onb_bg_immich_field_allow_insecure),
-                checked = allowInsecure,
-                onCheckedChange = {
-                    allowInsecure = it
-                    prefs.immichAllowInsecure = it
-                    test = ImmichTest.Idle
-                },
-            )
         }
 
         PillButton(
@@ -259,6 +235,29 @@ internal fun ImmichSubPage(
             is ImmichTest.Failed -> ErrorText(stringResource(current.messageRes))
             is ImmichTest.Connected -> {
                 NoticeText(stringResource(R.string.onb_bg_immich_success))
+                SettingsSection(title = stringResource(R.string.onb_bg_immich_field_change_frequency)) {
+                    SettingsSlider(
+                        label = stringResource(R.string.onb_bg_immich_field_change_frequency),
+                        value = cadenceIndex.toFloat(),
+                        valueRange = 0f..(IMMICH_CADENCES.size - 1).toFloat(),
+                        steps = IMMICH_CADENCES.size - 2,
+                        onValueChange = { cadenceIndex = it.toInt().coerceIn(IMMICH_CADENCES.indices) },
+                        valueText = "${IMMICH_CADENCES[cadenceIndex]} " +
+                            stringResource(R.string.settings_seconds_short),
+                        onValueChangeFinished = {
+                            prefs.immichCadenceSeconds = IMMICH_CADENCES[cadenceIndex]
+                        },
+                    )
+                    SettingsDivider()
+                    SettingsToggle(
+                        label = stringResource(R.string.onb_bg_immich_field_shuffle),
+                        checked = shuffle,
+                        onCheckedChange = {
+                            shuffle = it
+                            prefs.immichShuffle = it
+                        },
+                    )
+                }
                 if (current.albums.isNotEmpty()) {
                     SettingsSection(title = stringResource(R.string.onb_bg_immich_field_albums)) {
                         current.albums.forEachIndexed { index, album ->
@@ -280,7 +279,7 @@ internal fun ImmichSubPage(
             ImmichTest.Idle -> Unit
         }
 
-        NoticeText(stringResource(R.string.onb_bg_immich_leave_hint))
+        if (!connected) NoticeText(stringResource(R.string.onb_bg_immich_leave_hint))
     }
 }
 
@@ -381,6 +380,7 @@ private fun immichErrorMessage(failure: Throwable): Int =
 private fun BackgroundSubPage(
     state: OnboardingUiState,
     title: String,
+    mode: String,
     description: String,
     onBack: () -> Unit,
     onValidate: (() -> Unit)?,
@@ -392,6 +392,22 @@ private fun BackgroundSubPage(
         flags = state.flags,
         title = title,
         description = description,
+        headerIcon = {
+            if (mode == BG_MODE_IMMICH) {
+                Image(
+                    painter = painterResource(R.drawable.immich_logo),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize().padding(4.dp),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.DarkMode,
+                    contentDescription = null,
+                    tint = AppleColors.secondary,
+                    modifier = Modifier.fillMaxSize().padding(6.dp),
+                )
+            }
+        },
         modifier = modifier,
         navigation = {
             OnboardingNavigationBar(
@@ -415,7 +431,7 @@ private fun BackgroundPreview(
 ) {
     Box(
         modifier
-            .then(if (compact) Modifier.width(132.dp).height(84.dp) else Modifier.fillMaxWidth().height(height))
+            .then(if (compact) Modifier.width(184.dp).height(116.dp) else Modifier.fillMaxWidth().height(height))
             .clip(AppleShapes.card)
             .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.card)
     ) {

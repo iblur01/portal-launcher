@@ -15,7 +15,7 @@
     <header class="wizard-topbar">
       <div>
         <p class="wizard-brand">Portal</p>
-        <p id="progress-label" class="wizard-progress-label">Maison · étape 1 sur 4</p>
+        <p id="progress-label" class="wizard-progress-label">Maison · étape 1 sur 3</p>
       </div>
       <div id="progress-dots" class="progress-dots" aria-label="Progression"></div>
     </header>
@@ -50,27 +50,22 @@
           </div>
         </section>
 
-        <section class="wizard-step hidden" data-step="2" aria-label="Pilules affichées">
-          <div id="pills-empty" class="empty-state">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 6h8M6 10h12M8 14h8M10 18h4"/></svg>
-            <h2>Choisissez les informations utiles</h2>
-            <p>Chargez les appareils compatibles, puis sélectionnez les pilules à afficher.</p>
-            <button id="load_pills" type="button" class="secondary-button">Charger les appareils</button>
-          </div>
-          <div id="pills" class="settings-group hidden"></div>
-          <p id="pills_status" class="status" aria-live="polite"></p>
-        </section>
-
-        <section class="wizard-step hidden" data-step="3" aria-label="Vérification">
+        <section class="wizard-step hidden" data-step="2" aria-label="Vérification">
           <div class="summary-group">
             <div class="summary-row"><span>Home Assistant</span><strong id="summary-ha"></strong></div>
             <div class="summary-row"><span>MQTT</span><strong id="summary-mqtt"></strong></div>
             <div class="summary-row"><span>Panneau</span><strong id="summary-device"></strong></div>
-            <div class="summary-row"><span>Pilules actives</span><strong id="summary-pills">Inchangées</strong></div>
           </div>
           <p id="config_status" class="status" aria-live="polite"></p>
         </section>
       </div>
+
+      <section id="saved-view" class="completion-view hidden" aria-live="polite">
+        <div class="completion-check" aria-hidden="true">✓</div>
+        <h1>Configuration enregistrée</h1>
+        <p>Le panneau a bien reçu les nouveaux réglages.</p>
+        <strong>Vous pouvez fermer cet onglet.</strong>
+      </section>
 
       <footer class="wizard-navigation">
         <button id="back" type="button" class="nav-button nav-back hidden">Précédent</button>

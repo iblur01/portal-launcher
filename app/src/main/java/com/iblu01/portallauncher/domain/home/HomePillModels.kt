@@ -24,12 +24,16 @@ sealed interface PillRef {
     }
 }
 
+/** How the Maison catalog is organized into sections: by device type or by room. */
+enum class HomeGroupingMode { BY_TYPE, BY_ROOM }
+
 data class HomePillPreferences(
     val schemaVersion: Int,
     val homePageEnabled: Boolean,
     val pinnedOrder: List<PillRef>,
     val homeSections: List<HomeSectionPreference>,
     val manualGroups: List<ManualPillGroup>,
+    val groupingMode: HomeGroupingMode = HomeGroupingMode.BY_TYPE,
 )
 
 data class HomeSectionPreference(
@@ -167,7 +171,7 @@ data class HomeComposition(
     val favoriteOverflow: List<ResolvedPill>,
 )
 
-enum class HomeSectionType { FAVORITES, AREAS, KIND, MANUAL_GROUPS }
+enum class HomeSectionType { FAVORITES, AREAS, AREA, KIND, MANUAL_GROUPS }
 
 data class HomeSectionModel(
     val sectionId: String,
@@ -186,4 +190,5 @@ object HomeSectionIds {
     const val AREAS = "areas"
     const val MANUAL_GROUPS = "manual_groups"
     fun kind(kind: PillKind): String = "kind:${kind.name}"
+    fun area(areaId: String): String = "area:$areaId"
 }

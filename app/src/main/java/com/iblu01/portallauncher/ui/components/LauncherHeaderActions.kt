@@ -2,14 +2,15 @@ package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Done
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.MeetingRoom
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Icon
@@ -23,9 +24,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.R
+import com.iblu01.portallauncher.domain.home.HomeGroupingMode
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
@@ -78,22 +81,23 @@ fun HomeHeaderTitle() {
 /**
  * Maison-specific top-bar actions.
  *
- * [onGroupingModeClick] is intentionally only an extension point for now: the button advertises
- * the future Type/Pièce switch, but the caller does not mutate the page model yet.
+ * The grouping toggle switches the page between sections organized by room or by device type; the
+ * choice is persisted in [HomePillPreferences] and applied by the domain builder.
  */
 @Composable
 fun HomeHeaderActions(
     editing: Boolean,
     onEditingChange: (Boolean) -> Unit,
-    onGroupingModeClick: () -> Unit,
+    groupingMode: HomeGroupingMode,
+    onGroupingModeChange: (HomeGroupingMode) -> Unit,
     onSettings: () -> Unit,
+    compact: Boolean = false,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        HeaderAction(
-            // The current catalog remains grouped by type; the room glyph names the future target.
-            icon = Icons.Outlined.MeetingRoom,
-            contentDescription = stringResource(R.string.home_header_grouping_content_desc),
-            onClick = onGroupingModeClick,
+        HomeGroupingToggle(
+            mode = groupingMode,
+            onModeChange = onGroupingModeChange,
+            compact = compact,
         )
         HeaderAction(
             icon = if (editing) Icons.Outlined.Done else Icons.Outlined.Edit,
@@ -108,6 +112,61 @@ fun HomeHeaderActions(
             icon = Icons.Outlined.Settings,
             contentDescription = stringResource(R.string.header_settings_content_desc),
             onClick = onSettings,
+        )
+    }
+}
+
+/**
+ * Segmented room/type switch, visually matching the weather panel's forecast switcher. Labels
+ * shrink to their short forms on compact screens so the header stays legible beside the title.
+ */
+@Composable
+private fun HomeGroupingToggle(
+    mode: HomeGroupingMode,
+    onModeChange: (HomeGroupingMode) -> Unit,
+    compact: Boolean,
+) {
+    Row(
+        modifier = Modifier
+            .clip(AppleShapes.pill)
+            .background(AppleColors.frostedFill)
+            .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
+            .padding(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GroupingOption(
+            label = stringResource(if (compact) R.string.home_grouping_by_room_short else R.string.home_grouping_by_room),
+            selected = mode == HomeGroupingMode.BY_ROOM,
+            compact = compact,
+            onClick = { onModeChange(HomeGroupingMode.BY_ROOM) },
+        )
+        GroupingOption(
+            label = stringResource(if (compact) R.string.home_grouping_by_type_short else R.string.home_grouping_by_type),
+            selected = mode == HomeGroupingMode.BY_TYPE,
+            compact = compact,
+            onClick = { onModeChange(HomeGroupingMode.BY_TYPE) },
+        )
+    }
+}
+
+@Composable
+private fun GroupingOption(label: String, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(AppleShapes.pill)
+            .background(if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = if (compact) 12.dp else 18.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = AppleTypography.labelSmall.copy(
+                fontSize = if (compact) 12.sp else 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+            color = if (selected) AppleColors.primary else AppleColors.secondary,
+            maxLines = 1,
         )
     }
 }

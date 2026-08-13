@@ -120,6 +120,22 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
+    /** Pulls values written by the short-lived web configurator back into the resumed assistant. */
+    fun refreshExternalConfiguration() {
+        _state.update {
+            it.copy(
+                haUrl = prefs.haUrl,
+                haToken = prefs.haToken,
+                mqttHost = prefs.brokerHost,
+                mqttPort = prefs.brokerPort,
+                mqttAuthEnabled = prefs.username.isNotBlank(),
+                mqttUsername = prefs.username,
+                mqttPassword = prefs.password,
+                mqttDeviceName = prefs.deviceName,
+            )
+        }
+    }
+
     /** Clears the "just granted" check once its animation has played. */
     fun acknowledgeGrant() = _state.update { it.copy(justGranted = null) }
 

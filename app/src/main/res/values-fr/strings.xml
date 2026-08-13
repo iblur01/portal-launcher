@@ -54,6 +54,9 @@
     <string name="web_config_label_code">Code</string>
     <string name="web_config_same_network_note">Le téléphone et le panneau doivent utiliser le même réseau Wi-Fi. La page se ferme lorsque vous quittez cet écran.</string>
     <string name="web_config_unavailable">Configuration à distance indisponible : ce panneau n\'est pas sur un réseau.</string>
+    <string name="web_config_saved_title">Configuration enregistrée</string>
+    <string name="web_config_saved_body">Les réglages ont bien été reçus par ce panneau.</string>
+    <string name="web_config_saved_action">Tester et continuer</string>
     <string name="onb_common_action_web_config">Configurer depuis mon téléphone</string>
     <string name="home_connection_label_connection">Connexion</string>
     <string name="home_connection_section_mqtt">MQTT</string>
@@ -241,7 +244,10 @@
     <string name="header_hidden_apps_content_desc">Applications masquées (%1$d)</string>
     <string name="header_settings_content_desc">Réglages</string>
     <string name="home_header_title">Maison</string>
-    <string name="home_header_grouping_content_desc">Grouper par pièce (bientôt disponible)</string>
+    <string name="home_grouping_by_room">Par pièce</string>
+    <string name="home_grouping_by_type">Par type</string>
+    <string name="home_grouping_by_room_short">Pièce</string>
+    <string name="home_grouping_by_type_short">Type</string>
     <string name="home_header_edit_content_desc">Modifier Maison</string>
     <string name="home_header_finish_content_desc">Terminer la modification de Maison</string>
     <string name="auto_return_pill_label">Fermeture auto</string>
@@ -818,6 +824,7 @@
     <string name="onb_bg_tile_my_photo">Ma photo</string>
     <string name="onb_bg_tile_immich">Immich</string>
     <string name="onb_bg_android_desc">Utiliser le fond d’écran statique ou animé d’Android.</string>
+    <string name="onb_bg_custom_desc">Choisir une photo que le launcher affiche lui-même.</string>
     <string name="onb_bg_calm_desc">Un dégradé sombre, entièrement hors ligne.</string>
     <string name="onb_bg_calm_opacity_label">Opacité de l\'interface</string>
     <string name="onb_bg_calm_preview_action">Aperçu plein écran</string>
@@ -844,7 +851,7 @@
     <!-- ===== ONBOARDING — HOME_ASSISTANT_INTRO ===== -->
     <string name="onb_ha_intro_title">Portal est encore meilleur avec Home Assistant</string>
     <string name="onb_ha_intro_body">Connectez votre maison pour afficher et piloter vos lumières, ouvertures, alarmes, médias, températures et autres appareils importants.</string>
-    <string name="onb_ha_intro_question">Voulez-vous connecter votre maison maintenant&#160;?</string>
+    <string name="onb_ha_intro_question">Comment souhaitez-vous continuer&#160;?</string>
     <string name="onb_ha_intro_discovery_searching">Recherche de votre maison sur le réseau…</string>
     <string name="onb_ha_intro_discovery_found_none">Aucune maison détectée sur ce réseau.</string>
     <plurals name="onb_ha_intro_discovery_found_count">
@@ -853,6 +860,16 @@
     </plurals>
     <string name="onb_ha_intro_action_continue">Continuer avec cette maison</string>
     <string name="onb_ha_intro_action_manual">Ajouter manuellement</string>
+    <string name="onb_ha_intro_action_phone">Configurer avec un téléphone</string>
+    <string name="onb_ha_intro_action_manual_compact">Configurer manuellement sur ce panneau</string>
+    <string name="onb_ha_manual_warning_title">Écran compact</string>
+    <string name="onb_ha_manual_warning_body">La saisie reste possible, mais le clavier occupera une grande partie de l’écran. Pour une configuration plus confortable, utilisez un téléphone.</string>
+    <string name="onb_ha_manual_warning_phone">Utiliser un téléphone</string>
+    <string name="onb_ha_manual_warning_continue">Continuer ici</string>
+    <string name="onb_ha_intro_phone_title">Avec un téléphone</string>
+    <string name="onb_ha_intro_phone_body">Scannez un QR code et saisissez les réglages depuis un clavier confortable.</string>
+    <string name="onb_ha_intro_manual_title">Sur ce panneau</string>
+    <string name="onb_ha_intro_manual_body">Poursuivez directement ici avec le clavier du panneau.</string>
 
     <!-- ===== ONBOARDING — HOME_ASSISTANT_CREDENTIALS ===== -->
     <string name="onb_ha_creds_title">Connectez Portal à votre maison</string>

@@ -56,6 +56,9 @@
     <string name="web_config_label_code">Code</string>
     <string name="web_config_same_network_note">Your phone must be on the same Wi-Fi network. The page closes as soon as you leave this screen.</string>
     <string name="web_config_unavailable">Remote setup unavailable: this panel is not on a network.</string>
+    <string name="web_config_saved_title">Configuration saved</string>
+    <string name="web_config_saved_body">This panel has received the new settings.</string>
+    <string name="web_config_saved_action">Test and continue</string>
     <string name="onb_common_action_web_config">Set up from my phone</string>
     <string name="home_connection_label_connection">Connection</string>
     <string name="home_connection_section_mqtt">MQTT</string>
@@ -243,7 +246,10 @@
     <string name="header_hidden_apps_content_desc">Hidden apps (%1$d)</string>
     <string name="header_settings_content_desc">Settings</string>
     <string name="home_header_title">Home</string>
-    <string name="home_header_grouping_content_desc">Group by room (coming soon)</string>
+    <string name="home_grouping_by_room">By room</string>
+    <string name="home_grouping_by_type">By type</string>
+    <string name="home_grouping_by_room_short">Room</string>
+    <string name="home_grouping_by_type_short">Type</string>
     <string name="home_header_edit_content_desc">Edit Home</string>
     <string name="home_header_finish_content_desc">Finish editing Home</string>
     <string name="auto_return_pill_label">Auto close</string>
@@ -820,6 +826,7 @@
     <string name="onb_bg_tile_my_photo">My photo</string>
     <string name="onb_bg_tile_immich">Immich</string>
     <string name="onb_bg_android_desc">Use Android’s static or live wallpaper.</string>
+    <string name="onb_bg_custom_desc">Pick a photo the launcher draws itself.</string>
     <string name="onb_bg_calm_desc">A dark gradient, entirely offline.</string>
     <string name="onb_bg_calm_opacity_label">Interface opacity</string>
     <string name="onb_bg_calm_preview_action">Full-screen preview</string>
@@ -855,6 +862,16 @@
     </plurals>
     <string name="onb_ha_intro_action_continue">Continue with this home</string>
     <string name="onb_ha_intro_action_manual">Add manually</string>
+    <string name="onb_ha_intro_action_phone">Set up with a phone</string>
+    <string name="onb_ha_intro_action_manual_compact">Set up manually on this panel</string>
+    <string name="onb_ha_manual_warning_title">Compact screen</string>
+    <string name="onb_ha_manual_warning_body">You can continue here, but the keyboard will cover much of the screen. For a more comfortable setup, use a phone.</string>
+    <string name="onb_ha_manual_warning_phone">Use a phone</string>
+    <string name="onb_ha_manual_warning_continue">Continue here</string>
+    <string name="onb_ha_intro_phone_title">With a phone</string>
+    <string name="onb_ha_intro_phone_body">Scan a QR code and enter the settings with a comfortable keyboard.</string>
+    <string name="onb_ha_intro_manual_title">On this panel</string>
+    <string name="onb_ha_intro_manual_body">Continue here using the panel keyboard.</string>
 
     <!-- ===== ONBOARDING — HOME_ASSISTANT_CREDENTIALS ===== -->
     <string name="onb_ha_creds_title">Connect Portal to your home</string>

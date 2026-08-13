@@ -41,6 +41,7 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel,
     onOpenSystemSetting: (Capability) -> Unit,
     onFinish: (openSettings: Boolean) -> Unit,
+    onConfigureWithPhone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedContent(
@@ -100,9 +101,9 @@ fun OnboardingScreen(
                 state = state,
                 onStartDiscovery = viewModel::startHomeDiscovery,
                 onStopDiscovery = viewModel::stopHomeDiscovery,
-                onDiscoveryTimeout = viewModel::markDiscoveryEmpty,
                 onSelectHome = viewModel::selectDiscoveredHome,
                 onManual = viewModel::chooseManualHome,
+                onConfigureWithPhone = onConfigureWithPhone,
                 onBack = viewModel::goBack,
                 onSkip = viewModel::skipHomeAssistant,
             )

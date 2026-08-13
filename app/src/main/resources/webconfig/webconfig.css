@@ -70,6 +70,11 @@ button, input { font: inherit; }
 .nav-back { background: #2c2c2e; }
 .nav-primary { background: #0a84ff; }
 .nav-primary:hover { background: #2997ff; }
+.completion-view { grid-column: 1 / -1; align-self: center; justify-self: center; max-width: 520px; padding: 48px 24px; text-align: center; }
+.completion-check { display: grid; width: 64px; height: 64px; margin: 0 auto 22px; place-items: center; border-radius: 50%; background: #30d158; color: #000; font-size: 2rem; font-weight: 750; }
+.completion-view h1 { margin: 0; font-size: clamp(1.8rem, 5vw, 2.5rem); letter-spacing: -.035em; }
+.completion-view p { margin: 14px 0 8px; color: rgb(255 255 255 / 60%); line-height: 1.55; }
+.completion-view strong { display: block; color: #fff; font-size: 1.05rem; }
 
 @media (max-width: 839px) {
   .wizard-shell { padding: 18px max(18px, env(safe-area-inset-left)) max(18px, env(safe-area-inset-bottom)); }

@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher.ui.onboarding.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,13 +18,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.Image as ImageIconVector
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -32,15 +38,21 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.components.AmbientBackground
+import com.iblu01.portallauncher.ui.components.copyWallpaper
+import com.iblu01.portallauncher.ui.components.systemWallpaperSupported
 import com.iblu01.portallauncher.ui.onboarding.OnboardingUiState
 import com.iblu01.portallauncher.ui.onboarding.components.ChoiceTile
 import com.iblu01.portallauncher.ui.onboarding.components.LocalOnboardingLayout
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingNavigationBar
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingScaffold
 import com.iblu01.portallauncher.ui.theme.AppleColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal const val BG_MODE_SYSTEM = "system"
 internal const val BG_MODE_CALM = "neutral"
+internal const val BG_MODE_CUSTOM = "custom"
 internal const val BG_MODE_IMMICH = "immich"
 
 @Composable
@@ -52,6 +64,8 @@ fun BackgroundStep(
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var branch by rememberSaveable { mutableStateOf<String?>(null) }
     var validated by rememberSaveable {
         mutableStateOf(state.backgroundConfigured || state.backgroundMode == BG_MODE_SYSTEM)
@@ -61,6 +75,16 @@ fun BackgroundStep(
         onSelectBackground(mode, true)
         validated = true
         branch = null
+    }
+
+    // A device without a wallpaper service draws nothing behind the launcher, so the Android tile
+    // is replaced by a photo the launcher renders itself.
+    val systemSupported = remember(context) { systemWallpaperSupported(context) }
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            if (withContext(Dispatchers.IO) { copyWallpaper(context, uri) }) validate(BG_MODE_CUSTOM)
+        }
     }
 
     when (branch) {
@@ -82,8 +106,13 @@ fun BackgroundStep(
         else -> BackgroundTiles(
             state = state,
             validated = validated,
+            systemSupported = systemSupported,
             onSelect = { mode ->
-                if (mode == BG_MODE_SYSTEM) validate(mode) else branch = mode
+                when (mode) {
+                    BG_MODE_SYSTEM -> validate(mode)
+                    BG_MODE_CUSTOM -> pickPhoto.launch("image/*")
+                    else -> branch = mode
+                }
             },
             onBack = onBack,
             onContinue = onContinue.takeIf { validated },
@@ -96,14 +125,17 @@ fun BackgroundStep(
 private fun BackgroundTiles(
     state: OnboardingUiState,
     validated: Boolean,
+    systemSupported: Boolean,
     onSelect: (String) -> Unit,
     onBack: () -> Unit,
     onContinue: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    val tiles = listOf(
-        BG_MODE_SYSTEM to (R.string.bg_mode_system to R.string.onb_bg_android_desc),
+    val tiles = listOfNotNull(
+        (BG_MODE_SYSTEM to (R.string.bg_mode_system to R.string.onb_bg_android_desc))
+            .takeIf { systemSupported },
         BG_MODE_CALM to (R.string.onb_bg_tile_calm to R.string.onb_bg_calm_desc),
+        BG_MODE_CUSTOM to (R.string.bg_mode_custom to R.string.onb_bg_custom_desc),
         BG_MODE_IMMICH to (R.string.onb_bg_tile_immich to R.string.onb_bg_immich_desc),
     )
 
@@ -125,7 +157,7 @@ private fun BackgroundTiles(
         val compact = layout.short || layout.size == com.iblu01.portallauncher.ui.onboarding.components.OnboardingSize.COMPACT
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val columns = if (maxWidth >= 480.dp) 3 else if (maxWidth >= 300.dp) 2 else 1
-            val tileHeight = if (compact) 72.dp else if (!layout.showPreview) 132.dp else 196.dp
+            val tileHeight = if (compact) 142.dp else if (!layout.showPreview) 132.dp else 196.dp
             Column(verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)) {
                 tiles.chunked(columns).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)) {
@@ -135,10 +167,10 @@ private fun BackgroundTiles(
                                 subtitle = stringResource(labels.second),
                                 selected = validated && state.backgroundMode == mode,
                                 onClick = { onSelect(mode) },
-                                icon = backgroundModeIcon(mode).takeIf { compact },
                                 compact = compact,
-                                previewFillsHeight = !compact,
-                                preview = if (compact) null else ({ TilePreview(mode, state) }),
+                                previewFillsHeight = true,
+                                preview = if (compact) ({ CompactModeMark(mode) })
+                                else ({ TilePreview(mode, state) }),
                                 modifier = Modifier.weight(1f).height(tileHeight),
                             )
                         }
@@ -150,8 +182,29 @@ private fun BackgroundTiles(
     }
 }
 
+@Composable
+private fun CompactModeMark(mode: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        if (mode == BG_MODE_IMMICH) {
+            Image(
+                painterResource(R.drawable.immich_logo),
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+            )
+        } else {
+            Icon(
+                imageVector = backgroundModeIcon(mode),
+                contentDescription = null,
+                tint = if (mode == BG_MODE_SYSTEM) AppleColors.active else AppleColors.secondary,
+                modifier = Modifier.size(46.dp),
+            )
+        }
+    }
+}
+
 private fun backgroundModeIcon(mode: String): ImageVector = when (mode) {
     BG_MODE_SYSTEM -> Icons.Outlined.Android
+    BG_MODE_CUSTOM -> Icons.Outlined.ImageIconVector
     BG_MODE_IMMICH -> Icons.Outlined.Cloud
     else -> Icons.Outlined.DarkMode
 }

@@ -1264,7 +1264,7 @@ private fun InformationPage(
         updateState = UpdateState.CHECKING
         scope.launch(Dispatchers.IO) {
             val result = runCatching {
-                val url = URL("https://api.github.com/repos/iblu01/portal-launcher/releases/latest")
+                val url = URL("https://api.github.com/repos/iblur01/portal-launcher/releases/latest")
                 val conn = url.openConnection() as java.net.HttpURLConnection
                 conn.setRequestProperty("Accept", "application/vnd.github+json")
                 conn.connectTimeout = 10_000
@@ -1273,7 +1273,10 @@ private fun InformationPage(
                 val json = org.json.JSONObject(body)
                 val tag = json.optString("tag_name", "")
                 val assets = json.optJSONArray("assets")
-                val apkUrl = assets?.optJSONObject(0)?.optString("browser_download_url", "") ?: ""
+                val apkUrl = (0 until (assets?.length() ?: 0))
+                    .mapNotNull { assets?.optJSONObject(it) }
+                    .firstOrNull { it.optString("name", "").endsWith(".apk", ignoreCase = true) }
+                    ?.optString("browser_download_url", "") ?: ""
                 Pair(tag, apkUrl)
             }
             withContext(Dispatchers.Main) {

@@ -18,6 +18,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -93,6 +94,8 @@ import com.iblu01.portallauncher.ui.apps.ShortcutIconStore
 import com.iblu01.portallauncher.ui.apps.WidgetHostController
 import com.iblu01.portallauncher.ui.apps.WidgetOffer
 import com.iblu01.portallauncher.ui.components.AlertOverlay
+import com.iblu01.portallauncher.ui.components.copyWallpaper
+import com.iblu01.portallauncher.ui.components.systemWallpaperSupported
 import com.iblu01.portallauncher.ui.components.AmbientBackground
 import androidx.compose.ui.res.stringResource
 import com.iblu01.portallauncher.ui.components.AppContextMenu
@@ -388,7 +391,37 @@ class LauncherActivity : ComponentActivity() {
         openFromLauncher(Intent(Settings.ACTION_HOME_SETTINGS))
     }
 
+    /** Copies the picked photo in and switches to the source the launcher draws itself. */
+    private val pickWallpaperPhoto = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        lifecycleScope.launch {
+            val copied = withContext(Dispatchers.IO) { copyWallpaper(this@LauncherActivity, uri) }
+            if (copied) {
+                prefs.backgroundMode = "custom"
+                SettingsChangeBus.get().emit("backgroundMode")
+            } else {
+                Toast.makeText(
+                    this@LauncherActivity,
+                    R.string.settings_wallpaper_photo_error,
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
     private fun setWallpaper() {
+        // No wallpaper service means the Android picker would apply a wallpaper nothing ever draws;
+        // pick a photo the launcher renders itself instead.
+        if (!systemWallpaperSupported(this)) {
+            openingFromLauncher = true
+            runCatching { pickWallpaperPhoto.launch("image/*") }.onFailure {
+                openingFromLauncher = false
+                Toast.makeText(this, R.string.toast_cannot_open_wallpaper_picker, Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         // The Android picker changes the system wallpaper, so switch Portal to the matching source
         // before leaving. This also makes live wallpapers visible as soon as their preview applies.
         prefs.backgroundMode = "system"
@@ -1305,9 +1338,12 @@ private fun PortalLauncherApp(
                         HomeHeaderActions(
                             editing = homeEditing,
                             onEditingChange = { homeEditing = it },
-                            // UI placeholder only: grouping still follows the saved section model.
-                            onGroupingModeClick = {},
+                            groupingMode = ui.homePreferences.groupingMode,
+                            onGroupingModeChange = { mode ->
+                                vm.updateHomePillPreferences { it.copy(groupingMode = mode) }
+                            },
                             onSettings = onOpenSettings,
+                            compact = compactScreen,
                         )
                     },
                     dragOverlay = { DraggedIconOverlay(gridDrag, iconSize = 56.dp * gridScale) },

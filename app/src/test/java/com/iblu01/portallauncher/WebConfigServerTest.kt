@@ -64,13 +64,16 @@ class WebConfigServerTest {
     }
 
     @Test
-    fun `configuration page exposes the four guided steps`() {
+    fun `configuration page exposes three guided steps then a close-tab confirmation`() {
         val page = WebConfigPage.render("AB2C-D3EF")
 
         assertTrue(page.contains("data-step=\"0\""))
         assertTrue(page.contains("data-step=\"1\""))
         assertTrue(page.contains("data-step=\"2\""))
-        assertTrue(page.contains("data-step=\"3\""))
+        assertFalse(page.contains("data-step=\"3\""))
+        assertFalse(page.contains("id=\"load_pills\""))
+        assertTrue(page.contains("id=\"saved-view\""))
+        assertTrue(page.contains("Vous pouvez fermer cet onglet"))
         assertTrue(page.contains("id=\"next\""))
         assertTrue(page.contains("id=\"back\""))
     }

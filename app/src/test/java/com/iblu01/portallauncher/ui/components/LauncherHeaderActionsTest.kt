@@ -57,24 +57,25 @@ class LauncherHeaderActionsTest {
     }
 
     @Test
-    fun `Maison header replaces hidden apps with grouping and edit actions`() {
-        var grouping = 0
+    fun `Maison header replaces hidden apps with grouping toggle and edit actions`() {
+        var mode = com.iblu01.portallauncher.domain.home.HomeGroupingMode.BY_TYPE
         var editing = false
         rule.setContent {
             HomeHeaderActions(
                 editing = editing,
                 onEditingChange = { editing = it },
-                onGroupingModeClick = { grouping++ },
+                groupingMode = mode,
+                onGroupingModeChange = { mode = it },
                 onSettings = {},
             )
         }
 
         rule.onNodeWithContentDescription("Hidden apps (2)").assertDoesNotExist()
-        rule.onNodeWithContentDescription("Group by room (coming soon)").performClick()
+        rule.onNodeWithText("By room").performClick()
         rule.onNodeWithContentDescription("Edit Home").performClick()
         rule.waitForIdle()
 
-        assertEquals(1, grouping)
+        assertEquals(com.iblu01.portallauncher.domain.home.HomeGroupingMode.BY_ROOM, mode)
         assertEquals(true, editing)
     }
 

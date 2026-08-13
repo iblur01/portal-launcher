@@ -6,12 +6,10 @@
   var steps = [
     { chapter: 'Maison', title: 'Connectez Home Assistant', description: 'Indiquez l’adresse de votre maison et son jeton d’accès.' },
     { chapter: 'Contrôle', title: 'Configurez MQTT', description: 'Ajoutez le serveur utilisé pour piloter le panneau à distance.' },
-    { chapter: 'Accueil', title: 'Choisissez vos pilules', description: 'Gardez uniquement les informations utiles au quotidien.' },
-    { chapter: 'Terminé', title: 'Vérifiez la configuration', description: 'Tout est prêt. Confirmez pour appliquer les modifications.' }
+    { chapter: 'Vérification', title: 'Vérifiez la configuration', description: 'Tout est prêt. Confirmez pour appliquer les modifications.' }
   ];
   var sample = { ha_url: 'http://homeassistant.local:8123', ha_token: 'demo-token', broker_host: '192.168.1.10', broker_port: 1883, username: 'portal', password: '', device_name: 'Panneau salon' };
   var current = 0;
-  var pillsLoaded = false;
   var saving = false;
 
   function el(id) { return document.getElementById(id); }
@@ -35,7 +33,7 @@
     el('progress-label').textContent = steps[current].chapter + ' · étape ' + (current + 1) + ' sur ' + steps.length;
     setHidden(el('back'), current === 0);
     el('next').textContent = current === steps.length - 1 ? 'Enregistrer' : 'Continuer';
-    if (current === 3) updateSummary();
+    if (current === 2) updateSummary();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -60,7 +58,6 @@
     el('summary-ha').textContent = el('ha_url').value.replace(/^https?:\/\//, '');
     el('summary-mqtt').textContent = el('broker_host').value + ':' + el('broker_port').value;
     el('summary-device').textContent = el('device_name').value || 'Portal';
-    if (pillsLoaded) el('summary-pills').textContent = document.querySelectorAll('#pills input:checked').length.toString();
   }
 
   function configBody() {
@@ -69,38 +66,27 @@
 
   function saveAll() {
     if (saving) return;
-    if (demo) { say('config_status', 'Aperçu local — aucune modification envoyée', 'ok'); el('next').textContent = 'Enregistré'; return; }
+    if (demo) { showCompletion(); return; }
     saving = true; el('next').disabled = true; el('next').textContent = 'Enregistrement…';
     fetch(url('/api/config'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(configBody()) })
       .then(function (response) { return response.json(); })
-      .then(function (result) { if (!result.ok) throw new Error(); return pillsLoaded ? savePills() : null; })
-      .then(function () { say('config_status', 'Configuration enregistrée sur le panneau', 'ok'); el('next').textContent = 'Enregistré'; })
+      .then(function (result) { if (!result.ok) throw new Error(); showCompletion(); })
       .catch(function () { saving = false; el('next').disabled = false; el('next').textContent = 'Réessayer'; say('config_status', 'L’enregistrement a échoué. Vérifiez la connexion.', 'err'); });
   }
 
-  function savePills() {
-    var body = Array.prototype.map.call(document.querySelectorAll('#pills input'), function (box) { return { entity_id: box.dataset.entity, enabled: box.checked }; });
-    return fetch(url('/api/pills'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (response) { return response.json(); }).then(function (result) { if (!result.ok) throw new Error(); });
-  }
-
-  function renderPills(items) {
-    var host = el('pills'); host.innerHTML = ''; pillsLoaded = true; setHidden(host, false); setHidden(el('pills-empty'), true);
-    items.forEach(function (item) {
-      var row = document.createElement('label'), text = document.createElement('span'), name = document.createElement('strong'), id = document.createElement('small'), box = document.createElement('input');
-      row.className = 'pill-row'; name.textContent = item.label; id.textContent = item.entity_id; box.type = 'checkbox'; box.checked = item.enabled; box.dataset.entity = item.entity_id;
-      text.appendChild(name); text.appendChild(id); row.appendChild(text); row.appendChild(box); host.appendChild(row);
-    });
-    say('pills_status', items.length + ' appareils compatibles', 'ok');
+  function showCompletion() {
+    setHidden(document.querySelector('.wizard-context'), true);
+    setHidden(document.querySelector('.wizard-workspace'), true);
+    setHidden(document.querySelector('.wizard-navigation'), true);
+    setHidden(el('saved-view'), false);
+    el('progress-label').textContent = 'Terminé';
+    document.querySelectorAll('.progress-dot').forEach(function (dot) { dot.classList.add('done'); dot.classList.remove('active'); });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   el('next').addEventListener('click', function () { if (!validCurrentStep()) return; if (current < steps.length - 1) showStep(current + 1); else saveAll(); });
   el('back').addEventListener('click', function () { if (current > 0 && !saving) showStep(current - 1); });
   el('toggle-ha-token').addEventListener('click', function () { var input = el('ha_token'); var visible = input.type === 'text'; input.type = visible ? 'password' : 'text'; this.textContent = visible ? 'Afficher le jeton' : 'Masquer le jeton'; });
-  el('load_pills').addEventListener('click', function () {
-    this.disabled = true; this.textContent = 'Chargement…';
-    if (demo) { renderPills([{ entity_id: 'light.salon', label: 'Salon', enabled: true }, { entity_id: 'climate.maison', label: 'Thermostat', enabled: false }]); return; }
-    fetch(url('/api/entities')).then(function (response) { return response.json(); }).then(function (result) { if (!result.ok) throw new Error(); renderPills(result.items); }).catch(function () { el('load_pills').disabled = false; el('load_pills').textContent = 'Réessayer'; say('pills_status', 'Home Assistant est injoignable', 'err'); });
-  });
 
   buildProgress(); showStep(0);
   if (demo) fill(sample); else fetch(url('/api/config')).then(function (response) { return response.json(); }).then(fill).catch(function () { say('config_status', 'Le panneau est injoignable', 'err'); });

@@ -28,6 +28,21 @@ class HomePageBuilderTest {
         return PillCatalogSnapshot(byRef.mapValues { it.value.chip }, kindGroups, byRef.mapValues { Availability.AVAILABLE } + kindGroups.mapValues { Availability.AVAILABLE }, emptyList(), byRef)
     }
 
+    private fun catalogByRoom(vararg rooms: Pair<ResolvedPill, String>): PillCatalogSnapshot {
+        val byRef = rooms.map { it.first }.associateBy { it.ref as PillRef.Device }
+        val areaGroups: Map<PillRef, PillGroupSnapshot> = rooms.groupBy { it.second }.map { (areaId, members) ->
+            val ref = PillRef.AreaGroup(areaId)
+            val pills = members.map { it.first }
+            ref to PillGroupSnapshot(
+                ref,
+                LauncherChip(ref.stableKey, "home", areaId, "${members.size}", kind = PillKind.GENERIC),
+                pills.map { it.ref as PillRef.Device },
+                pills,
+            )
+        }.toMap()
+        return PillCatalogSnapshot(byRef.mapValues { it.value.chip }, areaGroups, byRef.mapValues { Availability.AVAILABLE } + areaGroups.mapValues { Availability.AVAILABLE }, emptyList(), byRef)
+    }
+
     @Test fun `sections follow configured order and item order`() {
         val lightA = device("light.a", PillKind.LIGHTS)
         val lightB = device("light.b", PillKind.LIGHTS)
@@ -57,6 +72,34 @@ class HomePageBuilderTest {
         val page = HomePageBuilder.build(catalog(), preferences())
         assertFalse(page.hasCompatibleDevices)
         assertTrue(page.sections.isEmpty())
+    }
+
+    @Test fun `by room groups devices into one section per room instead of type rails`() {
+        val salonLight = device("light.salon", PillKind.LIGHTS)
+        val salonSwitch = device("switch.salon", PillKind.SWITCH)
+        val cuisineLight = device("light.cuisine", PillKind.LIGHTS)
+        val prefs = preferences().copy(groupingMode = HomeGroupingMode.BY_ROOM)
+        val page = HomePageBuilder.build(
+            catalogByRoom(
+                salonLight to "salon",
+                salonSwitch to "salon",
+                cuisineLight to "cuisine",
+            ),
+            prefs,
+        )
+
+        assertEquals(listOf("area:cuisine", "area:salon"), page.sections.filter { it.type == HomeSectionType.AREA }.map { it.sectionId })
+        assertTrue(page.sections.none { it.type == HomeSectionType.KIND || it.type == HomeSectionType.AREAS })
+        val salon = page.sections.first { it.sectionId == "area:salon" }
+        assertEquals(setOf(salonLight.ref, salonSwitch.ref), salon.items.map { it.ref }.toSet())
+    }
+
+    @Test fun `by type shows only per-kind rails`() {
+        val light = device("light.salon", PillKind.LIGHTS)
+        val page = HomePageBuilder.build(catalogByRoom(light to "salon"), preferences())
+        assertTrue(page.sections.none { it.type == HomeSectionType.AREAS })
+        assertTrue(page.sections.any { it.type == HomeSectionType.KIND })
+        assertTrue(page.sections.none { it.type == HomeSectionType.AREA })
     }
 
     @Test fun `column count follows the available width and never exceeds four`() {

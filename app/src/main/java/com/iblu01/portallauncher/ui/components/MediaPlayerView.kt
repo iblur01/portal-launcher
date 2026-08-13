@@ -688,46 +688,71 @@ private fun MediaVolumePanel(
                 titleIcon = if (selected.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
                 accent = if (position > 0f) AppleColors.accent else AppleColors.inactive,
             )
-            if (players.size > 1) {
-                Spacer(Modifier.height(14.dp))
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    players.forEach { player ->
-                        val active = player.entityId == selected.entityId
-                        Row(
-                            Modifier.clip(AppleShapes.pill)
-                                .background(if (active) AppleColors.accent.copy(alpha = 0.20f) else AppleColors.frostedFill, AppleShapes.pill)
-                                .border(0.5.dp, if (active) AppleColors.accent.copy(alpha = 0.65f) else AppleColors.frostedBorder, AppleShapes.pill)
-                                .clickable { selectedId = player.entityId }
-                                .padding(horizontal = 13.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        ) {
-                            Box(Modifier.size(7.dp).background(if (player.volumePercent > 0) AppleColors.accent else AppleColors.inactive, CircleShape))
-                            Text(player.name, style = AppleTypography.bodySmall, color = if (active) AppleColors.primary else AppleColors.secondary, maxLines = 1)
-                            Text("${player.volumePercent} %", style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                val horizontal = maxWidth > maxHeight && maxHeight <= 520.dp
+                val selector: @Composable () -> Unit = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(selected.name, style = AppleTypography.titleLarge, color = AppleColors.primary)
+                        Text(
+                            "${position.toInt()} %",
+                            style = AppleTypography.headlineLarge.copy(fontSize = if (horizontal) 44.sp else 34.sp),
+                            color = AppleColors.primary,
+                        )
+                        if (players.size > 1) {
+                            Spacer(Modifier.height(12.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                players.forEach { player ->
+                                    val active = player.entityId == selected.entityId
+                                    Row(
+                                        Modifier.fillMaxWidth().clip(AppleShapes.pill)
+                                            .background(if (active) AppleColors.accent.copy(alpha = 0.20f) else AppleColors.frostedFill, AppleShapes.pill)
+                                            .border(0.5.dp, if (active) AppleColors.accent.copy(alpha = 0.65f) else AppleColors.frostedBorder, AppleShapes.pill)
+                                            .clickable { selectedId = player.entityId }
+                                            .padding(horizontal = 13.dp, vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                    ) {
+                                        Box(Modifier.size(7.dp).background(if (player.volumePercent > 0) AppleColors.accent else AppleColors.inactive, CircleShape))
+                                        Text(player.name, modifier = Modifier.weight(1f), style = AppleTypography.bodySmall, color = if (active) AppleColors.primary else AppleColors.secondary, maxLines = 1)
+                                        Text("${player.volumePercent} %", style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-            }
-            Spacer(Modifier.height(18.dp))
-            Text(selected.name, style = AppleTypography.titleLarge, color = AppleColors.primary)
-            Text("${position.toInt()} %", style = AppleTypography.headlineLarge.copy(fontSize = 34.sp), color = AppleColors.primary)
-            Spacer(Modifier.height(14.dp))
-            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                VerticalFillSlider(
-                    value = position,
-                    onValueChange = { position = it },
-                    valueRange = 0f..100f,
-                    accent = AppleColors.accent,
-                    icon = if (position <= 0f) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
-                    label = { "${it.toInt()} %" },
-                    hapticSteps = 20,
-                    onValueChangeFinished = { onVolumeChange(selected.entityId, it / 100f) },
-                    modifier = Modifier.controlSize(104.dp),
-                )
+                val slider: @Composable () -> Unit = {
+                    VerticalFillSlider(
+                        value = position,
+                        onValueChange = { position = it },
+                        valueRange = 0f..100f,
+                        accent = AppleColors.accent,
+                        icon = if (position <= 0f) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                        label = { "${it.toInt()} %" },
+                        hapticSteps = 20,
+                        onValueChangeFinished = { onVolumeChange(selected.entityId, it / 100f) },
+                        modifier = Modifier.controlSize(if (horizontal) 112.dp else 104.dp),
+                    )
+                }
+                if (horizontal) {
+                    Row(
+                        Modifier.fillMaxSize().padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(28.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.weight(1.15f), contentAlignment = Alignment.Center) { selector() }
+                        Box(Modifier.weight(0.85f).fillMaxHeight(), contentAlignment = Alignment.Center) { slider() }
+                    }
+                } else {
+                    Column(
+                        Modifier.fillMaxSize().padding(top = 14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        selector()
+                        Spacer(Modifier.height(14.dp))
+                        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { slider() }
+                    }
+                }
             }
         }
     }

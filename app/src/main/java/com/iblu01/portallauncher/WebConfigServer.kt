@@ -2,7 +2,6 @@ package com.iblu01.portallauncher
 
 import android.util.Log
 import fi.iki.elonen.NanoHTTPD
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.security.MessageDigest
@@ -44,14 +43,11 @@ internal fun mergePillSelection(
 class WebConfigServer private constructor(
     port: Int,
     private val prefs: Prefs,
-    private val deviceIds: () -> Map<String, String>,
     private val onMqttConfigChanged: () -> Unit,
+    private val onConfigSaved: () -> Unit,
 ) : NanoHTTPD(BIND_ADDRESS, port) {
 
     val token: String = mintToken()
-
-    /** Candidates from the last `/api/entities` call, so saving pills needs no second HA round-trip. */
-    @Volatile private var cachedCandidates: List<PillCandidate> = emptyList()
 
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri.ifEmpty { "/" }
@@ -73,8 +69,6 @@ class WebConfigServer private constructor(
                 uri == "/" -> html(WebConfigPage.render(token))
                 uri == "/api/config" && session.method == Method.GET -> json(configJson())
                 uri == "/api/config" && session.method == Method.POST -> applyConfig(readBody(session))
-                uri == "/api/entities" && session.method == Method.GET -> json(entitiesJson())
-                uri == "/api/pills" && session.method == Method.POST -> applyPills(readBody(session))
                 else -> text(Response.Status.NOT_FOUND, "not found")
             }
         }.getOrElse { failure ->
@@ -119,56 +113,10 @@ class WebConfigServer private constructor(
 
         val after = mqttSignature(prefs.brokerHost, prefs.brokerPort, prefs.username, prefs.password, prefs.deviceName)
         if (after != before) onMqttConfigChanged()
+        onConfigSaved()
 
         return json("""{"ok":true}""")
     }
-
-    private fun entitiesJson(): String {
-        val result = HaApiClient(prefs.haUrl, prefs.haToken).getStates()
-        if (!result.ok) {
-            return JSONObject().put("ok", false).put("status", result.statusCode).toString()
-        }
-        val candidates = sortedCandidates(result.body.orEmpty()).also { cachedCandidates = it }
-
-        val enabledIds = prefs.pillRules.filter { it.enabled }.map { it.entityId }.toSet()
-        val items = JSONArray()
-        candidates.forEach { candidate ->
-            items.put(
-                JSONObject()
-                    .put("entity_id", candidate.primary.entityId)
-                    .put("label", candidate.label)
-                    .put("domain", candidate.primary.domain)
-                    .put("enabled", candidate.primary.entityId in enabledIds)
-            )
-        }
-        return JSONObject().put("ok", true).put("items", items).toString()
-    }
-
-    private fun applyPills(body: String): Response {
-        val requested = runCatching { JSONArray(body) }.getOrNull()
-            ?: return errorJson(Response.Status.BAD_REQUEST, "invalid_json")
-
-        // Normally already warm from the page's own /api/entities call; refetch only if it is not.
-        val candidates = cachedCandidates.ifEmpty {
-            val result = HaApiClient(prefs.haUrl, prefs.haToken).getStates()
-            if (!result.ok) return errorJson(Response.Status.SERVICE_UNAVAILABLE, "home_unreachable")
-            sortedCandidates(result.body.orEmpty()).also { cachedCandidates = it }
-        }
-
-        val selection = (0 until requested.length()).mapNotNull { i ->
-            val item = requested.optJSONObject(i) ?: return@mapNotNull null
-            val entityId = item.optString("entity_id").trim()
-            if (entityId.isBlank()) null else entityId to item.optBoolean("enabled", false)
-        }
-
-        prefs.pillRules = mergePillSelection(prefs.pillRules, selection, candidates)
-        SettingsChangeBus.get().emit("pillRules")
-        return json("""{"ok":true}""")
-    }
-
-    private fun sortedCandidates(statesBody: String): List<PillCandidate> =
-        PillSupport.candidates(parseHaEntities(statesBody), deviceIds())
-            .sortedWith(compareBy({ it.kind.ordinal }, { it.label.lowercase() }))
 
     private fun readBody(session: IHTTPSession): String {
         val files = HashMap<String, String>()
@@ -236,11 +184,11 @@ class WebConfigServer private constructor(
          */
         fun launch(
             prefs: Prefs,
-            deviceIds: () -> Map<String, String>,
             onMqttConfigChanged: () -> Unit,
+            onConfigSaved: () -> Unit = {},
         ): WebConfigServer? {
             intArrayOf(PREFERRED_PORT, 0).forEach { port ->
-                val server = WebConfigServer(port, prefs, deviceIds, onMqttConfigChanged)
+                val server = WebConfigServer(port, prefs, onMqttConfigChanged, onConfigSaved)
                 val started = runCatching { server.start(SOCKET_READ_TIMEOUT_MS, true) }
                 if (started.isSuccess) return server
                 server.stop()

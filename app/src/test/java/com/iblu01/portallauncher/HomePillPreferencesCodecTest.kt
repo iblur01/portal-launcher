@@ -73,6 +73,20 @@ class HomePillPreferencesCodecTest {
         assertEquals("manual:uuid", HomePillPreferencesCodec.encodeRef(PillRef.ManualGroup("uuid")))
     }
 
+    @Test fun `grouping mode round trips and defaults to by type`() {
+        val byRoom = HomePillPreferencesCodec.defaults().copy(
+            groupingMode = com.iblu01.portallauncher.domain.home.HomeGroupingMode.BY_ROOM,
+        )
+        assertEquals(
+            com.iblu01.portallauncher.domain.home.HomeGroupingMode.BY_ROOM,
+            HomePillPreferencesCodec.decode(HomePillPreferencesCodec.encode(byRoom))?.groupingMode,
+        )
+        assertEquals(
+            com.iblu01.portallauncher.domain.home.HomeGroupingMode.BY_TYPE,
+            HomePillPreferencesCodec.decode("{\"schema_version\":1}")?.groupingMode,
+        )
+    }
+
     @Test fun `corrupt and unsupported future JSON do not decode`() {
         assertNull(HomePillPreferencesCodec.decode("not-json"))
         assertNull(HomePillPreferencesCodec.decode("{\"schema_version\":999}"))

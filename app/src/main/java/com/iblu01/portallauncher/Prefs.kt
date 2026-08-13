@@ -14,6 +14,10 @@ import com.iblu01.portallauncher.ui.theme.ClockFont
 import com.iblu01.portallauncher.ui.theme.ClockTheme
 import com.iblu01.portallauncher.ui.theme.ClockTint
 import com.iblu01.portallauncher.photo.TransportPolicy
+import com.iblu01.portallauncher.ui.components.systemWallpaperSupported
+import com.iblu01.portallauncher.ui.components.wallpaperFile
+
+private val backgroundModeKeys = setOf("system", "neutral", "custom", "immich")
 
 class Prefs(private val context: Context) {
     private val sp = plainPrefs(context)
@@ -102,13 +106,24 @@ class Prefs(private val context: Context) {
         get() = sp.getInt("screen_timeout_minutes", 10)
         set(value) = sp.edit().putInt("screen_timeout_minutes", value.coerceIn(1, 240)).apply()
 
+    /** Queried once: whether the OS has a wallpaper service at all cannot change while we run. */
+    private val wallpaperSupported: Boolean by lazy { systemWallpaperSupported(context) }
+
+    /**
+     * The background source. On devices whose OS draws no wallpaper (Portal), "system" would mean a
+     * permanently black screen, so it resolves to the launcher-drawn photo — or the neutral
+     * gradient while no photo has been chosen — whatever the stored value says.
+     */
     var backgroundMode: String
-        get() = sp.getString("background_mode", "system")
-            ?.takeIf { it in setOf("system", "neutral", "immich") }
-            ?: "system"
+        get() {
+            val stored = sp.getString("background_mode", "system")
+                ?.takeIf { it in backgroundModeKeys } ?: "system"
+            if (stored != "system" || wallpaperSupported) return stored
+            return if (wallpaperFile(context).exists()) "custom" else "neutral"
+        }
         set(value) = sp.edit().putString(
             "background_mode",
-            value.takeIf { it in setOf("system", "neutral", "immich") } ?: "system",
+            value.takeIf { it in backgroundModeKeys } ?: "system",
         ).apply()
 
     /**

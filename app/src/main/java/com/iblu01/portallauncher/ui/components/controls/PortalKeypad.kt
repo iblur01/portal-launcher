@@ -151,7 +151,13 @@ fun PinKeypad(
             .fillMaxWidth()
             .then(if (!enabled) Modifier.alpha(0.35f) else Modifier),
     ) {
-        val keyDiameter = ((maxWidth - 40.dp) / 3).coerceIn(48.dp, 74.dp)
+        val widthDiameter = (maxWidth - 40.dp) / 3
+        // Four rows, three gaps, entry/prompt and (for variable codes) the cancel action all have
+        // to fit. Width alone made landscape keypads choose 74dp keys and disappear below short
+        // panels, so height now has an equal vote.
+        val verticalChrome = if (!fixed && onCancel != null) 112.dp else 82.dp
+        val heightDiameter = (maxHeight - verticalChrome) / 4.65f
+        val keyDiameter = minOf(widthDiameter, heightDiameter).coerceIn(38.dp, 74.dp)
         val contentScale = (keyDiameter / 74.dp).coerceIn(0.65f, 1f)
         Column(
         modifier = Modifier.fillMaxWidth(),
