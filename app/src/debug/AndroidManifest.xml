@@ -39,6 +39,25 @@
             </intent-filter>
         </activity-alias>
 
+        <!--
+            Remote-configuration screen, for testing the QR code and the LAN server without
+            walking the settings on a keyboard-less panel:
+
+              adb shell am start -a com.iblu01.portallauncher.action.WEB_CONFIG
+
+            Debug-only: on a real panel WebConfigActivity stays android:exported="false", so no
+            third-party app can make it serve this home's credentials on the network.
+        -->
+        <activity-alias
+            android:name=".WebConfigDevTrigger"
+            android:targetActivity=".WebConfigActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.iblu01.portallauncher.action.WEB_CONFIG" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- Debug-only ADB entry point used by the Playground option in dev.sh. -->
         <activity-alias
             android:name=".PlaygroundDevTrigger"

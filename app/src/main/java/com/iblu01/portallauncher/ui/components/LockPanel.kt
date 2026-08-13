@@ -2,6 +2,9 @@ package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,32 +37,49 @@ fun LockControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     if (entity == null || entity.isUnavailable()) { PanelUnavailable(); return }
     val state = entity.state.lowercase()
     val locked = state == "locked"
+    val locking = state == "locking"
+    val unlocking = state == "unlocking"
     val jammed = state == "jammed"
+    // HA emits `locking`/`unlocking` between the tap and the confirmation, so the switch stays on
+    // the target side while the motor is still turning instead of snapping back to `unlocked`.
+    val checked = locked || locking
 
     val accent = if (jammed) AppleColors.error else AppleColors.lockAccent
-    val caption = when { jammed -> stringResource(R.string.lock_state_jammed); locked -> stringResource(R.string.lock_state_locked); else -> stringResource(R.string.lock_state_unlocked) }
+    val caption = when {
+        jammed -> stringResource(R.string.lock_state_jammed)
+        locking -> stringResource(R.string.lock_state_locking)
+        unlocking -> stringResource(R.string.lock_state_unlocking)
+        locked -> stringResource(R.string.lock_state_locked)
+        else -> stringResource(R.string.lock_state_unlocked)
+    }
 
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    val control: @Composable (Modifier) -> Unit = { controlModifier ->
+        BoxWithConstraints(controlModifier, contentAlignment = Alignment.Center) {
+            val ratio = 96f / 240f
+            val controlHeight = minOf(maxHeight, maxWidth / ratio, 300.dp)
+            VerticalSwitch(
+                checked = checked,
+                onCheckedChange = { wantLocked -> callService("lock", if (wantLocked) "lock" else "unlock", chip.entityId) },
+                accent = accent,
+                icon = { on -> if (jammed) Icons.Outlined.ErrorOutline else if (on) Icons.Outlined.Lock else Icons.Outlined.LockOpen },
+                modifier = Modifier.size(controlHeight * ratio, controlHeight),
+            )
+        }
+    }
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        Row(modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.CenterVertically) {
+            control(Modifier.weight(0.52f).fillMaxSize())
+            Column(Modifier.weight(0.48f).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Text(caption, style = AppleTypography.headlineLarge, color = AppleColors.primary)
+                Spacer(Modifier.height(18.dp))
+                chip.details.take(4).forEach { PanelDetailRow(it) }
+            }
+        }
+    } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(6.dp))
         Text(caption, style = AppleTypography.headlineLarge, color = AppleColors.primary)
         Spacer(Modifier.height(16.dp))
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxWidth(0.54f).weight(1f),
-            contentAlignment = Alignment.Center,
-        ) {
-            val ratio = 96f / 240f
-            val controlHeight = minOf(maxHeight, maxWidth / ratio)
-            val controlWidth = controlHeight * ratio
-            VerticalSwitch(
-                checked = locked,
-                onCheckedChange = { wantLocked ->
-                    callService("lock", if (wantLocked) "lock" else "unlock", chip.entityId)
-                },
-                accent = accent,
-                icon = { on -> if (jammed) Icons.Outlined.ErrorOutline else if (on) Icons.Outlined.Lock else Icons.Outlined.LockOpen },
-                modifier = Modifier.size(controlWidth, controlHeight),
-            )
-        }
+        control(Modifier.fillMaxWidth(0.54f).weight(1f))
         Spacer(Modifier.height(20.dp))
         chip.details.forEach { PanelDetailRow(it) }
     }

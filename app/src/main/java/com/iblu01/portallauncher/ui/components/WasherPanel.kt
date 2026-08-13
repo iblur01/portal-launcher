@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -61,8 +62,25 @@ data class WasherUiState(
 fun WasherStatus(state: WasherUiState, modifier: Modifier = Modifier) {
     val accent = if (state.running && !state.paused) Color(0xFF7C8CFF) else AppleColors.inactive
     val progress = state.progress?.coerceIn(0f, 1f)
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(190.dp), contentAlignment = Alignment.Center) {
+    val primary: @Composable (Modifier) -> Unit = { area ->
+        Column(area, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            WasherProgress(state, progress, accent)
+            Text(phaseLabel(state.phase, state.paused), style = AppleTypography.titleLarge, color = if (state.paused) AppleColors.secondary else accent)
+        }
+    }
+    val secondary: @Composable (Modifier) -> Unit = { area ->
+        Column(area, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            WasherTimeline(state.phase, accent)
+            Spacer(Modifier.height(20.dp))
+            WasherFacts(state)
+        }
+    }
+    AdaptivePanelSplit(modifier = modifier, primaryWeight = 0.44f, primary = primary, secondary = secondary)
+}
+
+@Composable
+private fun WasherProgress(state: WasherUiState, progress: Float?, accent: Color) {
+        Box(Modifier.size(if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) 220.dp else 190.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(176.dp)) {
                 val stroke = 15.dp.toPx()
                 val inset = stroke / 2f
@@ -83,12 +101,10 @@ fun WasherStatus(state: WasherUiState, modifier: Modifier = Modifier) {
                 }
             }
         }
+}
 
-        Text(phaseLabel(state.phase, state.paused), style = AppleTypography.titleLarge, color = if (state.paused) AppleColors.secondary else accent)
-        Spacer(Modifier.height(18.dp))
-        WasherTimeline(state.phase, accent)
-        Spacer(Modifier.height(20.dp))
-
+@Composable
+private fun WasherFacts(state: WasherUiState) {
         val facts = listOfNotNull(
             state.program?.let { "Programme" to it },
             state.temperature?.let { "Température" to it },
@@ -108,7 +124,6 @@ fun WasherStatus(state: WasherUiState, modifier: Modifier = Modifier) {
                 }
             }
         }
-    }
 }
 
 @Composable
@@ -154,9 +169,11 @@ fun WasherControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     if (entity.isUnavailable()) { PanelUnavailable(); return }
     val e = entity!!
     val base = e.entityId.substringAfter('.').replace("_machine_state", "").replace("_etat_de_la_machine", "").removeSuffix("_state")
-    fun related(vararg tokens: String): HaEntity? = states.values.firstOrNull { candidate ->
-        candidate.entityId != e.entityId && candidate.entityId.substringAfter('.').startsWith(base) && tokens.any(candidate.entityId::contains)
-    }
+    // Id-pattern lookup over the (quasi-static) id set, then a per-entity read: this scope only
+    // subscribes to the entities it actually displays, not to the whole store.
+    fun related(vararg tokens: String): HaEntity? = states.entityIds().firstOrNull { id ->
+        id != e.entityId && id.substringAfter('.').startsWith(base) && tokens.any(id::contains)
+    }?.let { states[it] }
     val phaseRaw = e.attributes.optString("phase").ifBlank { related("cycle", "task_state", "etat_du_cycle")?.state.orEmpty() }.lowercase()
     val phase = when (phaseRaw) {
         "rinse", "ai_rinse" -> WasherPhase.RINSE

@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher
 
+import com.iblu01.portallauncher.domain.home.HomeGroupingMode
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
 import com.iblu01.portallauncher.domain.home.HomeSectionIds
 import com.iblu01.portallauncher.domain.home.HomeSectionPreference
@@ -61,6 +62,7 @@ object HomePillPreferencesCodec {
     fun encode(preferences: HomePillPreferences): String = JSONObject().apply {
         put("schema_version", CURRENT_SCHEMA_VERSION)
         put("home_page_enabled", preferences.homePageEnabled)
+        put("grouping_mode", encodeGroupingMode(preferences.groupingMode))
         put("pinned_order", JSONArray().apply {
             preferences.pinnedOrder.forEach { put(encodeRef(it)) }
         })
@@ -105,6 +107,7 @@ object HomePillPreferencesCodec {
             pinnedOrder = root.optJSONArray("pinned_order").decodeRefs(),
             homeSections = root.optJSONArray("home_sections").decodeSections(),
             manualGroups = root.optJSONArray("manual_groups").decodeManualGroups(),
+            groupingMode = decodeGroupingMode(root.optString("grouping_mode", "")),
         )
     }.getOrNull()
 
@@ -115,6 +118,16 @@ object HomePillPreferencesCodec {
         is PillRef.AreaGroup -> "area:${ref.areaId}"
         is PillRef.KindGroup -> "kind:${ref.kind.name}"
         is PillRef.ManualGroup -> "manual:${ref.groupId}"
+    }
+
+    fun encodeGroupingMode(mode: HomeGroupingMode): String = when (mode) {
+        HomeGroupingMode.BY_TYPE -> "type"
+        HomeGroupingMode.BY_ROOM -> "room"
+    }
+
+    fun decodeGroupingMode(raw: String): HomeGroupingMode = when (raw) {
+        "room" -> HomeGroupingMode.BY_ROOM
+        else -> HomeGroupingMode.BY_TYPE
     }
 
     fun decodeRef(raw: String): PillRef? {

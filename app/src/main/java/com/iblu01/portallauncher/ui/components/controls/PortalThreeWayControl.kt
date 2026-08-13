@@ -26,7 +26,7 @@ import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 
 /** Visual density for [PortalThreeWayControl]. */
-enum class ThreeWayControlSize { Compact, Regular }
+enum class ThreeWayControlSize { Compact, Regular, Large }
 
 /**
  * Shared two/three-action capsule used by media playback and directional devices such as covers.
@@ -61,6 +61,10 @@ fun PortalThreeWayControl(
         ThreeWayControlSize.Regular -> ThreeWayMetrics(
             sideButton = 46.dp, centerButton = 58.dp, sideIcon = 26.dp,
             centerIcon = 32.dp, horizontalPadding = 14.dp, verticalPadding = 8.dp, gap = 18.dp,
+        )
+        ThreeWayControlSize.Large -> ThreeWayMetrics(
+            sideButton = 54.dp, centerButton = 70.dp, sideIcon = 30.dp,
+            centerIcon = 38.dp, horizontalPadding = 18.dp, verticalPadding = 9.dp, gap = 22.dp,
         )
     }
 

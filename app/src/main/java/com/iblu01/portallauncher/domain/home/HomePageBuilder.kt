@@ -21,40 +21,31 @@ object HomePageBuilder {
             items = favoriteItems,
         )
 
-        val areaItems = catalog.groups.keys.filterIsInstance<PillRef.AreaGroup>()
-            .mapNotNull(catalog::resolve)
-            .filter { it.availability.isRenderable }
-            .stableOrder()
-        addSection(
-            target = candidates,
-            preference = preferenceById[HomeSectionIds.AREAS],
-            defaultOrder = 100,
-            sectionId = HomeSectionIds.AREAS,
-            type = HomeSectionType.AREAS,
-            title = "Pièces",
-            items = areaItems,
-        )
-
-        PillKind.values().forEachIndexed { index, kind ->
-            val sectionId = HomeSectionIds.kind(kind)
-            val devices = catalog.resolvedDevices.values
-                .filter {
-                    catalog.isVisible(it.ref) &&
-                        it.chip.kind == kind &&
-                        it.availability.isRenderable
+        when (preferences.groupingMode) {
+            HomeGroupingMode.BY_ROOM -> addRoomSections(catalog, candidates, preferenceById)
+            HomeGroupingMode.BY_TYPE -> {
+                PillKind.values().forEachIndexed { index, kind ->
+                    val sectionId = HomeSectionIds.kind(kind)
+                    val devices = catalog.resolvedDevices.values
+                        .filter {
+                            catalog.isVisible(it.ref) &&
+                                it.chip.kind == kind &&
+                                it.availability.isRenderable
+                        }
+                        .stableOrder()
+                    addSection(
+                        target = candidates,
+                        preference = preferenceById[sectionId],
+                        defaultOrder = 100 + index,
+                        sectionId = sectionId,
+                        type = HomeSectionType.KIND,
+                        title = kind.label,
+                        // The rail title already expresses the type. Repeating an aggregate "all" pill
+                        // before the individual devices adds no information and opens the wrong level.
+                        items = devices,
+                    )
                 }
-                .stableOrder()
-            addSection(
-                target = candidates,
-                preference = preferenceById[sectionId],
-                defaultOrder = 200 + index,
-                sectionId = sectionId,
-                type = HomeSectionType.KIND,
-                title = kind.label,
-                // The rail title already expresses the type. Repeating an aggregate "all" pill
-                // before the individual devices adds no information and opens the wrong level.
-                items = devices,
-            )
+            }
         }
 
         val manualItems = preferences.manualGroups.mapNotNull { manual ->
@@ -92,6 +83,36 @@ object HomePageBuilder {
             order = preference?.order ?: defaultOrder,
             model = HomeSectionModel(sectionId, type, title, ordered),
         )
+    }
+
+    /**
+     * "Par pièce" mode: one section per Home Assistant room, listing that room's individual
+     * devices. Mirrors the by-type logic ([PillKind] sections) with rooms instead of kinds, so the
+     * aggregate "Pièces" rail and the per-kind rails are replaced by the room sections.
+     */
+    private fun addRoomSections(
+        catalog: PillCatalogSnapshot,
+        target: MutableList<OrderedSection>,
+        preferenceById: Map<String, HomeSectionPreference>,
+    ) {
+        val areaGroups = catalog.groups.filterKeys { it is PillRef.AreaGroup }
+            .map { (ref, group) -> (ref as PillRef.AreaGroup).areaId to group }
+            .sortedBy { (_, group) -> group.chip.label.trim().lowercase(Locale.ROOT) }
+
+        areaGroups.forEachIndexed { index, (areaId, group) ->
+            val devices = group.resolvedMembers
+                .filter { catalog.isVisible(it.ref) && it.availability.isRenderable }
+                .stableOrder()
+            addSection(
+                target = target,
+                preference = preferenceById[HomeSectionIds.area(areaId)],
+                defaultOrder = 100 + index,
+                sectionId = HomeSectionIds.area(areaId),
+                type = HomeSectionType.AREA,
+                title = group.chip.label,
+                items = devices,
+            )
+        }
     }
 
     private fun applyItemOrder(items: List<ResolvedPill>, preferred: List<PillRef>): List<ResolvedPill> {

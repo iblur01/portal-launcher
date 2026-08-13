@@ -150,7 +150,7 @@ class PillRulesTest {
 
     @Test fun `only movement and opening binary sensors are supported`() {
         listOf("motion", "occupancy", "moving").forEach {
-            assertEquals(PillKind.GENERIC, PillSupport.kind(entity("binary_sensor.x", "on", it)))
+            assertEquals(PillKind.MOTION, PillSupport.kind(entity("binary_sensor.x", "on", it)))
             assertTrue(PillSupport.isSupported(entity("binary_sensor.x", "on", it)))
         }
         listOf("door", "window", "opening", "garage_door").forEach {

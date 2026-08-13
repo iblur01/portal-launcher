@@ -42,13 +42,30 @@ class LauncherPanelLayoutTest {
         assertEquals(900f, panel.bottom.value, 0.5f)
     }
 
-    private fun render() {
+    @Test fun `fullscreen panel covers the available surface without shrinking launcher`() {
+        render(LauncherPanelPresentation.FULLSCREEN)
+
+        val content = rule.onNodeWithTag("launcherContent").getUnclippedBoundsInRoot()
+        val panel = rule.onNodeWithTag("launcherPanel").getUnclippedBoundsInRoot()
+        assertEquals(900f, content.right.value, 0.5f)
+        assertEquals(600f, content.bottom.value, 0.5f)
+        assertEquals(content, panel)
+    }
+
+    @Test fun `only supported compact panels use fullscreen presentation`() {
+        assertEquals(LauncherPanelPresentation.FULLSCREEN, panelPresentation(true, true))
+        assertEquals(LauncherPanelPresentation.DOCKED, panelPresentation(false, true))
+        assertEquals(LauncherPanelPresentation.DOCKED, panelPresentation(true, false))
+    }
+
+    private fun render(presentation: LauncherPanelPresentation = LauncherPanelPresentation.DOCKED) {
         rule.setContent {
             LauncherPanelLayout(
                 panelVisible = true,
                 modifier = Modifier.fillMaxSize(),
                 content = { Box(Modifier.fillMaxSize().testTag("launcherContent")) },
                 panel = { Box(Modifier.fillMaxSize().testTag("launcherPanel")) },
+                presentation = presentation,
             )
         }
     }

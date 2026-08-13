@@ -3,6 +3,7 @@ package com.iblu01.portallauncher.ui.onboarding.components
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,8 +32,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -112,7 +112,9 @@ fun ProvideOnboardingLayout(modifier: Modifier = Modifier, content: @Composable 
             maxWidth >= 600.dp -> OnboardingSize.MEDIUM
             else -> OnboardingSize.COMPACT
         }
-        val short = maxHeight < 480.dp
+        // Height is independent from width. Echo Show 5 is 960x480: technically medium-height at
+        // the Android breakpoint, but after system insets it needs the compact-height treatment.
+        val short = maxHeight <= 520.dp
         val horizontalPadding = when (size) {
             OnboardingSize.COMPACT -> 18.dp
             OnboardingSize.MEDIUM -> 28.dp
@@ -120,7 +122,7 @@ fun ProvideOnboardingLayout(modifier: Modifier = Modifier, content: @Composable 
         }
         // Two columns are a large-display composition, not a fallback for missing height. A short
         // phone / small panel gets a focused, paged flow instead of a squeezed tablet layout.
-        val twoColumn = size == OnboardingSize.EXPANDED
+        val twoColumn = size == OnboardingSize.EXPANDED && !short
         val widthBudget = when {
             twoColumn -> minOf(maxWidth * 0.42f, 460.dp)
             size == OnboardingSize.COMPACT -> maxWidth - horizontalPadding * 2
@@ -167,6 +169,8 @@ fun OnboardingScaffold(
     showHeader: Boolean = true,
     /** A visual that belongs next to the text rather than inside the interactive column. */
     aside: (@Composable () -> Unit)? = null,
+    /** Optional identity mark kept beside the title across a mode's sub-pages. */
+    headerIcon: (@Composable () -> Unit)? = null,
     navigation: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -174,12 +178,7 @@ fun OnboardingScaffold(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(Color(0xFF14181D), AppleColors.background),
-                    radius = 1800f,
-                )
-            )
+            .background(AppleColors.background)
     ) {
         Column(
             Modifier
@@ -187,30 +186,40 @@ fun OnboardingScaffold(
                 // Very wide wall panels: keep the flow at a readable measure, centred.
                 .widthIn(max = 1280.dp)
                 .align(Alignment.TopCenter)
-                .padding(
-                    horizontal = layout.horizontalPadding,
-                    vertical = layout.verticalPadding,
-                )
+                .padding(horizontal = layout.horizontalPadding, vertical = layout.verticalPadding)
         ) {
-            if (showProgress) {
-                OnboardingProgress(step = step, flags = flags)
-                Spacer(Modifier.height(if (layout.short) 14.dp else 24.dp))
+            if (showProgress) OnboardingProgress(step = step, flags = flags)
+
+            if (showHeader) {
+                Spacer(Modifier.height(if (layout.short) 10.dp else 20.dp))
+                OnboardingHeader(title, description, headerIcon)
             }
 
+            Spacer(Modifier.height(if (layout.short) 10.dp else 18.dp))
+
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                if (layout.twoColumn) {
+                if (layout.twoColumn && aside != null) {
                     Row(
                         Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy(if (layout.short) 24.dp else 36.dp),
+                        horizontalArrangement = Arrangement.spacedBy(36.dp),
                     ) {
-                        ScrollingColumn(Modifier.weight(0.42f), layout.spacing) {
-                            if (showHeader) OnboardingHeader(title, description, aside)
+                        Box(
+                            Modifier.weight(0.46f).fillMaxHeight(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(Modifier.widthIn(max = layout.previewMaxWidth)) { aside() }
                         }
-                        ScrollingColumn(Modifier.weight(0.58f), layout.spacing) { content() }
+                        ScrollingColumn(Modifier.weight(0.54f), layout.spacing, content)
                     }
                 } else {
-                    ScrollingColumn(Modifier.fillMaxWidth(), layout.spacing) {
-                        if (showHeader) OnboardingHeader(title, description, aside)
+                    ScrollingColumn(
+                        Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = if (layout.short) 920.dp else 720.dp)
+                            .align(Alignment.TopCenter),
+                        layout.spacing,
+                    ) {
+                        if (aside != null && layout.showPreview && !layout.short) aside()
                         content()
                     }
                 }
@@ -225,8 +234,8 @@ fun OnboardingScaffold(
 }
 
 /**
- * A column that scrolls only when it has to, and centres its content otherwise — which is what
- * keeps a short step from floating at the top of a tall panel with a hole underneath it.
+ * A column that scrolls only when it has to. The header lives outside this area, so the step's
+ * controls can be centred in the remaining stage without making the title jump between screens.
  */
 @Composable
 private fun ScrollingColumn(
@@ -246,29 +255,33 @@ private fun ScrollingColumn(
 private fun OnboardingHeader(
     title: String,
     description: String?,
-    aside: (@Composable () -> Unit)?,
+    icon: (@Composable () -> Unit)?,
 ) {
     val layout = LocalOnboardingLayout.current
     // The type steps down on a small or short window: a headline that takes four lines is what
     // pushes the rest of the step off the screen.
     val cramped = layout.size == OnboardingSize.COMPACT || layout.short
-    Column {
-        Text(
-            title,
-            style = if (cramped) AppleTypography.titleLarge else AppleTypography.headlineLarge,
-            color = AppleColors.primary,
-        )
-        if (description != null) {
-            Spacer(Modifier.height(if (cramped) 6.dp else 12.dp))
-            Text(
-                description,
-                style = if (cramped) AppleTypography.bodySmall else AppleTypography.bodyLarge,
-                color = AppleColors.secondary,
-            )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (icon != null) {
+            Box(Modifier.size(if (cramped) 40.dp else 48.dp), contentAlignment = Alignment.Center) {
+                icon()
+            }
+            Spacer(Modifier.width(14.dp))
         }
-        if (aside != null && layout.showPreview) {
-            Spacer(Modifier.height(if (layout.short) 12.dp else 24.dp))
-            Box(Modifier.widthIn(max = layout.previewMaxWidth)) { aside() }
+        Column {
+            Text(
+                title,
+                style = if (cramped) AppleTypography.titleLarge else AppleTypography.headlineLarge,
+                color = AppleColors.primary,
+            )
+            if (description != null) {
+                Spacer(Modifier.height(if (cramped) 4.dp else 8.dp))
+                Text(
+                    description,
+                    style = if (cramped) AppleTypography.bodySmall else AppleTypography.bodyLarge,
+                    color = AppleColors.secondary,
+                )
+            }
         }
     }
 }
@@ -437,12 +450,13 @@ fun OnboardingNavigationBar(
             if (onBack != null) {
                 Box(Modifier.weight(1f)) { PillButton(label = back, onClick = onBack) }
             }
-            if (skipLabel != null && onSkip != null) {
-                Box(Modifier.weight(1f)) { PillButton(label = skipLabel, onClick = onSkip) }
-            }
-            if (secondaryLabel != null && onSecondary != null) {
-                Box(Modifier.weight(1f)) { PillButton(label = secondaryLabel, onClick = onSecondary) }
-            }
+            val quietLabel = secondaryLabel ?: skipLabel
+            val quietAction = onSecondary ?: onSkip
+            if (quietLabel != null && quietAction != null) QuietAction(
+                label = quietLabel,
+                onClick = quietAction,
+                modifier = Modifier.weight(1f),
+            )
             primary(Modifier.weight(1.6f))
         }
         return
@@ -468,6 +482,19 @@ fun OnboardingNavigationBar(
             Box(Modifier.weight(1.4f)) { PillButton(label = secondaryLabel, onClick = onSecondary) }
         }
         primary(Modifier.weight(1.8f))
+    }
+}
+
+/** A secondary escape hatch that remains tappable without competing visually with the CTA. */
+@Composable
+private fun QuietAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = AppleTypography.titleMedium, color = AppleColors.secondary)
     }
 }
 

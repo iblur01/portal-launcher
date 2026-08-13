@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -214,6 +213,7 @@ fun LightDetailContent(
                     onPreset = onPreset,
                     onOpenWheel = onOpenWheel,
                     entityId = detail.entityId,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -239,13 +239,10 @@ fun LightDetailContent(
 private fun DetailHeader(label: String, onBack: () -> Unit, closePanel: Boolean = false) {
     PanelHeader(
         title = label,
-        onNavigation = onBack,
-        navigationIcon = if (closePanel) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
-        navigationContentDescription = if (closePanel) {
-            stringResource(R.string.side_panel_close_desc)
-        } else {
-            "Retour aux lumières"
-        },
+        onNavigation = if (closePanel) null else onBack,
+        navigationIcon = if (closePanel) null else Icons.AutoMirrored.Filled.ArrowBack,
+        navigationContentDescription = if (closePanel) null else "Retour aux lumières",
+        onClose = if (closePanel) onBack else null,
     )
 }
 
@@ -267,7 +264,37 @@ internal fun LauncherChip.individualLightDetailOrNull(): PillDetail? =
     }
 
 @Composable
-private fun ColumnScope.AdaptiveLightDetail(
+private fun AdaptiveLightDetail(
+    brightness: Float, onBrightnessChange: (Float) -> Unit, onBrightnessCommit: (Float) -> Unit,
+    trackColor: Color, isOn: Boolean, sliderMode: LightSliderMode, onSliderModeChange: (LightSliderMode) -> Unit,
+    supportsBrightness: Boolean, supportsColor: Boolean, supportsWhite: Boolean,
+    kelvin: Int, minKelvin: Int, maxKelvin: Int,
+    onKelvinChange: (Int) -> Unit, onKelvinCommit: (Int) -> Unit,
+    currentColor: Color, onPreset: (Color, () -> Unit) -> Unit, onOpenWheel: (Color?) -> Unit,
+    entityId: String,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        if (maxWidth <= maxHeight) {
+            VerticalLightDetail(
+                brightness, onBrightnessChange, onBrightnessCommit, trackColor, isOn,
+                sliderMode, onSliderModeChange, supportsBrightness, supportsColor, supportsWhite,
+                kelvin, minKelvin, maxKelvin, onKelvinChange, onKelvinCommit, currentColor,
+                onPreset, onOpenWheel, entityId,
+            )
+        } else {
+            HorizontalLightDetail(
+                brightness, onBrightnessChange, onBrightnessCommit, trackColor, isOn,
+                sliderMode, onSliderModeChange, supportsBrightness, supportsColor, supportsWhite,
+                kelvin, minKelvin, maxKelvin, onKelvinChange, onKelvinCommit, currentColor,
+                onPreset, onOpenWheel, entityId,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HorizontalLightDetail(
     brightness: Float, onBrightnessChange: (Float) -> Unit, onBrightnessCommit: (Float) -> Unit,
     trackColor: Color, isOn: Boolean, sliderMode: LightSliderMode, onSliderModeChange: (LightSliderMode) -> Unit,
     supportsBrightness: Boolean, supportsColor: Boolean, supportsWhite: Boolean,
@@ -276,69 +303,203 @@ private fun ColumnScope.AdaptiveLightDetail(
     currentColor: Color, onPreset: (Color, () -> Unit) -> Unit, onOpenWheel: (Color?) -> Unit,
     entityId: String,
 ) {
-    BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val showTemperature = sliderMode == LightSliderMode.COLOR_TEMPERATURE && supportsWhite
         val sliderCount = (if (supportsBrightness) 1 else 0) + (if (showTemperature) 1 else 0)
-        val gap = 18.dp
-        val widthFraction = if (sliderCount > 1) 0.78f else 0.54f
-        val availableWidth = maxWidth * widthFraction - gap * (sliderCount - 1).coerceAtLeast(0)
-        val sliderWidthFromSpace = if (sliderCount > 0) availableWidth / sliderCount else 0.dp
+        val compactWide = maxHeight <= 430.dp
+        val columnGap = if (compactWide) 28.dp else 22.dp
+        val sliderGap = if (compactWide) 22.dp else 18.dp
+        val controlsWidth = maxWidth * if (compactWide) 0.52f else 0.5f
+        val availableSliderWidth = controlsWidth - sliderGap * (sliderCount - 1).coerceAtLeast(0)
+        val sliderWidthFromSpace = if (sliderCount > 0) availableSliderWidth / sliderCount else 0.dp
         val ratio = 96f / 240f
-        val sliderHeight = minOf(maxHeight, sliderWidthFromSpace / ratio)
+        val sliderHeight = minOf(
+            maxHeight - if (compactWide) 12.dp else 20.dp,
+            sliderWidthFromSpace / ratio,
+            if (compactWide) 290.dp else 320.dp,
+        )
         val sliderWidth = sliderHeight * ratio
 
         Row(
             modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(columnGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (supportsBrightness) {
-                VerticalFillSlider(
-                    value = if (isOn) brightness else 0f,
-                    onValueChange = onBrightnessChange,
-                    onValueChangeFinished = onBrightnessCommit,
-                    accent = trackColor,
-                    icon = Icons.Filled.WbSunny,
-                    iconContent = { tint, size ->
-                        HaEntityIcon(
-                            entityId = entityId,
-                            contentDescription = null,
-                            tint = tint,
-                            size = size,
-                            fallback = Icons.Filled.WbSunny,
-                        )
-                    },
-                    hapticSteps = 10,
-                    modifier = Modifier.size(sliderWidth, sliderHeight),
-                )
+            Row(
+                modifier = Modifier.width(controlsWidth).fillMaxHeight(),
+                horizontalArrangement = Arrangement.spacedBy(sliderGap, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (supportsBrightness) {
+                    VerticalFillSlider(
+                        value = if (isOn) brightness else 0f,
+                        onValueChange = onBrightnessChange,
+                        onValueChangeFinished = onBrightnessCommit,
+                        accent = trackColor,
+                        icon = Icons.Filled.WbSunny,
+                        iconContent = { tint, size ->
+                            HaEntityIcon(
+                                entityId = entityId,
+                                contentDescription = null,
+                                tint = tint,
+                                size = size,
+                                fallback = Icons.Filled.WbSunny,
+                            )
+                        },
+                        hapticSteps = 10,
+                        modifier = Modifier.size(sliderWidth, sliderHeight),
+                    )
+                }
+                if (showTemperature) {
+                    VerticalColorTempSlider(
+                        kelvin = kelvin,
+                        onKelvinChange = onKelvinChange,
+                        onKelvinChangeFinished = onKelvinCommit,
+                        minKelvin = minKelvin,
+                        maxKelvin = maxKelvin,
+                        modifier = Modifier.size(sliderWidth, sliderHeight),
+                    )
+                }
             }
-            if (showTemperature) {
-                VerticalColorTempSlider(
-                    kelvin = kelvin,
-                    onKelvinChange = onKelvinChange,
-                    onKelvinChangeFinished = onKelvinCommit,
-                    minKelvin = minKelvin,
-                    maxKelvin = maxKelvin,
-                    modifier = Modifier.size(sliderWidth, sliderHeight),
-                )
-            }
+            LightSelectorsPane(
+                mode = sliderMode,
+                onModeChange = onSliderModeChange,
+                supportsColor = supportsColor,
+                supportsWhite = supportsWhite,
+                currentColor = currentColor,
+                minKelvin = minKelvin,
+                maxKelvin = maxKelvin,
+                entityId = entityId,
+                onPreset = onPreset,
+                onOpenWheel = onOpenWheel,
+                compact = compactWide,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
         }
     }
-    Spacer(Modifier.height(14.dp))
-    LightPresetsBar(
-        mode = sliderMode,
-        supportsColor = supportsColor,
-        supportsWhite = supportsWhite,
-        currentColor = currentColor,
-        minKelvin = minKelvin,
-        maxKelvin = maxKelvin,
-        entityId = entityId,
-        onPreset = onPreset,
-        onOpenWheel = onOpenWheel,
-    )
-    if (supportsColor && supportsWhite) {
-        Spacer(Modifier.height(10.dp))
-        SliderModeSwitch(sliderMode, onSliderModeChange)
+}
+
+@Composable
+private fun VerticalLightDetail(
+    brightness: Float, onBrightnessChange: (Float) -> Unit, onBrightnessCommit: (Float) -> Unit,
+    trackColor: Color, isOn: Boolean, sliderMode: LightSliderMode, onSliderModeChange: (LightSliderMode) -> Unit,
+    supportsBrightness: Boolean, supportsColor: Boolean, supportsWhite: Boolean,
+    kelvin: Int, minKelvin: Int, maxKelvin: Int,
+    onKelvinChange: (Int) -> Unit, onKelvinCommit: (Int) -> Unit,
+    currentColor: Color, onPreset: (Color, () -> Unit) -> Unit, onOpenWheel: (Color?) -> Unit,
+    entityId: String,
+) {
+    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+            val showTemperature = sliderMode == LightSliderMode.COLOR_TEMPERATURE && supportsWhite
+            val sliderCount = (if (supportsBrightness) 1 else 0) + (if (showTemperature) 1 else 0)
+            val gap = 18.dp
+            val widthFraction = if (sliderCount > 1) 0.78f else 0.54f
+            val availableWidth = maxWidth * widthFraction - gap * (sliderCount - 1).coerceAtLeast(0)
+            val sliderWidthFromSpace = if (sliderCount > 0) availableWidth / sliderCount else 0.dp
+            val ratio = 96f / 240f
+            val sliderHeight = minOf(maxHeight, sliderWidthFromSpace / ratio)
+            val sliderWidth = sliderHeight * ratio
+            Row(
+                Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (supportsBrightness) {
+                    VerticalFillSlider(
+                        value = if (isOn) brightness else 0f,
+                        onValueChange = onBrightnessChange,
+                        onValueChangeFinished = onBrightnessCommit,
+                        accent = trackColor,
+                        icon = Icons.Filled.WbSunny,
+                        iconContent = { tint, size ->
+                            HaEntityIcon(entityId, null, tint, size, Icons.Filled.WbSunny)
+                        },
+                        hapticSteps = 10,
+                        modifier = Modifier.size(sliderWidth, sliderHeight),
+                    )
+                }
+                if (showTemperature) {
+                    VerticalColorTempSlider(
+                        kelvin = kelvin,
+                        onKelvinChange = onKelvinChange,
+                        minKelvin = minKelvin,
+                        maxKelvin = maxKelvin,
+                        modifier = Modifier.size(sliderWidth, sliderHeight),
+                        onKelvinChangeFinished = onKelvinCommit,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        LightPresetsBar(
+            sliderMode, supportsColor, supportsWhite, currentColor, minKelvin, maxKelvin,
+            entityId, onPreset, onOpenWheel,
+        )
+        if (supportsColor && supportsWhite) {
+            Spacer(Modifier.height(10.dp))
+            SliderModeSwitch(sliderMode, onSliderModeChange)
+        }
+    }
+}
+
+@Composable
+private fun LightSelectorsPane(
+    mode: LightSliderMode,
+    onModeChange: (LightSliderMode) -> Unit,
+    supportsColor: Boolean,
+    supportsWhite: Boolean,
+    currentColor: Color,
+    minKelvin: Int,
+    maxKelvin: Int,
+    entityId: String,
+    onPreset: (Color, () -> Unit) -> Unit,
+    onOpenWheel: (Color?) -> Unit,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val callService = LocalCallService.current
+    val dotSize = if (compact) 58.dp else 52.dp
+    val presets: List<Pair<Color, () -> Unit>> = when {
+        mode == LightSliderMode.COLOR && supportsColor -> colorPresets.map { (r, g, b) ->
+            val color = Color(r, g, b)
+            color to { onPreset(color) { callService("light", "turn_on", entityId, mapOf("rgb_color" to listOf(r, g, b))) } }
+        }
+        supportsWhite -> whitePresets.map { (rawKelvin, swatch) ->
+            val value = rawKelvin.coerceIn(minKelvin, maxKelvin)
+            swatch to { onPreset(swatch) { callService("light", "turn_on", entityId, mapOf("color_temp_kelvin" to value)) } }
+        }
+        else -> emptyList()
+    }
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (supportsColor && supportsWhite) {
+            SliderModeSwitch(mode, onModeChange, compact = false)
+            Spacer(Modifier.height(if (compact) 20.dp else 16.dp))
+        }
+        presets.chunked(4).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+            ) {
+                row.forEach { (color, action) ->
+                    ColorDot(
+                        color = color,
+                        active = colorsNear(color, currentColor),
+                        onClick = action,
+                        onLongClick = if (mode == LightSliderMode.COLOR) ({ onOpenWheel(color) }) else null,
+                        size = dotSize,
+                    )
+                }
+            }
+            Spacer(Modifier.height(if (compact) 14.dp else 12.dp))
+        }
+        if (mode == LightSliderMode.COLOR && supportsColor) {
+            PaletteButton(size = dotSize) { onOpenWheel(null) }
+        }
     }
 }
 
@@ -376,12 +537,12 @@ private fun LightPresetsBar(
 }
 
 @Composable
-private fun PaletteButton(onClick: () -> Unit) {
+private fun PaletteButton(size: Dp = 46.dp, onClick: () -> Unit) {
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, AppleMotion.spring(), label = "paletteScale")
     val colorWheelDesc = stringResource(R.string.light_open_color_wheel_desc)
     Box(
-        Modifier.scale(scale).size(46.dp).clip(CircleShape).background(AppleColors.frostedFill)
+        Modifier.scale(scale).size(size).clip(CircleShape).background(AppleColors.frostedFill)
             .border(1.dp, AppleColors.frostedBorder, CircleShape).semantics { contentDescription = colorWheelDesc }
             .pointerInput(onClick) { detectTapGestures(onPress = { pressed = true; tryAwaitRelease(); pressed = false }, onTap = { onClick() }) },
         contentAlignment = Alignment.Center,
@@ -392,13 +553,13 @@ private fun PaletteButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun ColorDot(color: Color, active: Boolean, onClick: () -> Unit, onLongClick: (() -> Unit)?) {
+private fun ColorDot(color: Color, active: Boolean, onClick: () -> Unit, onLongClick: (() -> Unit)?, size: Dp = 46.dp) {
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (pressed) 0.92f else 1f, AppleMotion.spring(), label = "dotScale")
     val activeDesc = stringResource(R.string.light_color_active_desc)
     val applyDesc = stringResource(R.string.light_color_apply_desc)
     Box(
-        Modifier.scale(scale).size(46.dp)
+        Modifier.scale(scale).size(size)
             .then(if (active) Modifier.shadow(10.dp, CircleShape, ambientColor = color, spotColor = color) else Modifier)
             .clip(CircleShape).background(color).border(if (active) 2.dp else 1.dp, Color.White.copy(alpha = if (active) 0.95f else 0.35f), CircleShape)
             .semantics { contentDescription = if (active) activeDesc else applyDesc }
@@ -617,7 +778,7 @@ fun LightsActions(chip: LauncherChip, onOpenLight: (PillDetail) -> Unit) {
     val rooms = lightRooms(actionableChip) { areas[it] }
     // Fewer than two rooms (or registries not loaded yet): keep the plain flat list.
     if (rooms.size <= 1) {
-        lights.forEach { LightRow(it, onOpen = { onOpenLight(it) }) }
+        LightRows(lights, onOpenLight)
         AllOffRow(lights, "Tout éteindre")
         return
     }
@@ -630,19 +791,37 @@ fun LightsActions(chip: LauncherChip, onOpenLight: (PillDetail) -> Unit) {
     } else {
         DetailHeader(current.first, onBack = { selectedRoom = null })
         Spacer(Modifier.height(12.dp))
-        current.second.forEach { LightRow(it, onOpen = { onOpenLight(it) }) }
+        LightRows(current.second, onOpenLight)
         AllOffRow(current.second, "Éteindre la pièce")
     }
 }
 
 @Composable
+private fun LightRows(details: List<PillDetail>, onOpen: (PillDetail) -> Unit) {
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL && details.size > 1) {
+        details.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { detail ->
+                    Box(Modifier.weight(1f)) { LightRow(detail, onOpen = { onOpen(detail) }) }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+    } else {
+        details.forEach { detail -> LightRow(detail, onOpen = { onOpen(detail) }) }
+    }
+}
+
+@Composable
 private fun RoomGrid(rooms: List<Pair<String, List<PillDetail>>>, onSelect: (String) -> Unit) {
-    rooms.chunked(2).forEach { row ->
+    val columns = if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) 3 else 2
+    rooms.chunked(columns).forEach { row ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             row.forEach { (name, details) ->
                 RoomCard(name, details, Modifier.weight(1f), onClick = { onSelect(name) })
             }
-            if (row.size == 1) Spacer(Modifier.weight(1f))
+            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
         }
     }
 }

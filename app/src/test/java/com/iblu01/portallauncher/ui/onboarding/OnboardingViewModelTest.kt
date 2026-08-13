@@ -139,6 +139,22 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun `returning from phone setup reloads externally saved connection values`() {
+        val model = viewModel()
+        prefs.haUrl = "http://192.168.1.44:8123"
+        prefs.haToken = "phone-token"
+        prefs.brokerHost = "192.168.1.45"
+        prefs.brokerPort = 1884
+
+        model.refreshExternalConfiguration()
+
+        assertEquals("http://192.168.1.44:8123", model.state.value.haUrl)
+        assertEquals("phone-token", model.state.value.haToken)
+        assertEquals("192.168.1.45", model.state.value.mqttHost)
+        assertEquals(1884, model.state.value.mqttPort)
+    }
+
+    @Test
     fun `an unfinished flow never claims to be complete`() {
         val model = viewModel()
         model.continueFromWelcome()

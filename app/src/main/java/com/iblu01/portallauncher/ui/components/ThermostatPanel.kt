@@ -88,10 +88,10 @@ fun ThermostatControl(chip: LauncherChip, modifier: Modifier = Modifier) {
         else -> null
     }
 
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    val temperature: @Composable (Modifier) -> Unit = { temperatureModifier ->
         if (climate.hasTemperatureControl && displayedMode !in setOf("dry", "fan_only")) {
-            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                val dialSize = minOf(maxWidth, maxHeight)
+            BoxWithConstraints(temperatureModifier, contentAlignment = Alignment.Center) {
+                val dialSize = minOf(maxWidth, maxHeight, 320.dp)
                 TemperatureArcControl(
                     mode = dialMode,
                     activity = activity,
@@ -115,9 +115,8 @@ fun ThermostatControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                     },
                 )
             }
-            Spacer(Modifier.height(12.dp))
         } else if (climate.currentTemperature != null) {
-            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+            Box(temperatureModifier, contentAlignment = Alignment.Center) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     val formatted = formatTemperatureNumber(climate.currentTemperature, climate.temperatureStep)
                     Text(
@@ -133,9 +132,10 @@ fun ThermostatControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            Spacer(Modifier.height(12.dp))
         }
-
+    }
+    val modes: @Composable (Modifier) -> Unit = { modeModifier ->
+        Column(modeModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
         if (climate.availableModes.isNotEmpty()) {
             val labels = climate.availableModes.associateWith { mode ->
                 hvacModePresentation(mode).label?.let { stringResource(it) }
@@ -158,9 +158,17 @@ fun ThermostatControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 },
                 label = { labels.getValue(it) },
                 accent = modeAccent,
-                modifier = Modifier.fillMaxWidth(0.72f),
+                modifier = Modifier.fillMaxWidth(if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) 0.84f else 0.72f),
             )
         }
+        }
+    }
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        AdaptivePanelSplit(modifier, primaryWeight = 0.56f, primary = { temperature(it) }, secondary = { modes(it) })
+    } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        temperature(Modifier.fillMaxWidth().weight(1f))
+        Spacer(Modifier.height(12.dp))
+        modes(Modifier.fillMaxWidth())
     }
 }
 

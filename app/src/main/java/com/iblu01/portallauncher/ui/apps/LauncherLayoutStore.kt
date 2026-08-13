@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import com.iblu01.portallauncher.AppPlacement
+import com.iblu01.portallauncher.FolderRecord
 import com.iblu01.portallauncher.PinnedShortcut
 import com.iblu01.portallauncher.Prefs
 import kotlinx.coroutines.CoroutineScope
@@ -35,9 +36,14 @@ data class GridItem(
     val widgetId: Int = NO_WIDGET,
     /** Size the item asks for when it has never been placed. Icons are 1x1; widgets vary. */
     val defaultSpan: GridSpan = GridSpan(),
+    /** Folder id for folders, empty otherwise. */
+    val folderId: String = "",
+    /** The items a folder holds, in order. Empty for anything that is not a folder. */
+    val folderMembers: List<GridItem> = emptyList(),
 ) {
     val isShortcut: Boolean get() = shortcutId.isNotEmpty()
     val isWidget: Boolean get() = widgetId != NO_WIDGET
+    val isFolder: Boolean get() = folderId.isNotEmpty()
 
     companion object {
         /** `AppWidgetManager.INVALID_APPWIDGET_ID`, without dragging the framework in here. */
@@ -46,6 +52,7 @@ data class GridItem(
         fun appKey(packageName: String, activityName: String) = "app:$packageName/$activityName"
         fun shortcutKey(packageName: String, shortcutId: String) = "sc:$packageName#$shortcutId"
         fun widgetKey(widgetId: Int) = "wg:$widgetId"
+        fun folderKey(folderId: String) = "fd:$folderId"
     }
 }
 
@@ -64,33 +71,74 @@ class LauncherLayoutStore(
     private val prefs: Prefs,
     private val icons: ShortcutIconStore,
     private val scope: CoroutineScope,
+    /** Name a folder carries until it is renamed. Injected because this class has no Context. */
+    private val folderLabel: String = "Folder",
 ) {
     private val placements = MutableStateFlow(prefs.appPlacements.toPlacementMap())
     private val hidden = MutableStateFlow(prefs.hiddenApps)
     private val labels = MutableStateFlow(prefs.appLabels)
     private val pinned = MutableStateFlow(prefs.pinnedShortcuts)
+    private val folders = MutableStateFlow(prefs.appFolders.toFolders())
 
     /** Keys hidden from the grid, exposed so the restore list can offer them back. */
     val hiddenKeys: StateFlow<Set<String>> = hidden
 
+    /** The folders, as stored. The grid reads them through [items], resolved to real icons. */
+    val folderList: StateFlow<List<Folder>> = folders
+
     /**
      * The grid contents, before placement. Arranging is cheap, but shortcut icons are read from
      * disk, so the whole combine runs off the main thread.
+     *
+     * Folders are resolved here rather than by the grid: an item inside a folder is *not* on the
+     * grid, and the folder that replaced it is an item like any other — same key space, same
+     * placement, same rename.
      */
     fun items(
         apps: Flow<List<LaunchableApp>>,
         widgets: Flow<List<GridItem>>,
     ): StateFlow<List<GridItem>> =
-        combine(apps, widgets, hidden, labels, pinned) { installed, widgets, hidden, labels, pinned ->
+        combine(apps, widgets, hidden, pinned) { installed, widgets, hidden, pinned ->
             val all = installed.map { it.toGridItem() } +
                 pinned.map { it.toGridItem(icons.load(it.key())) } +
                 widgets
             all.filterNot { it.key in hidden }
-                .map { item -> labels[item.key]?.let { item.copy(label = it) } ?: item }
-                .sortedBy { it.label.lowercase(Locale.getDefault()) }
         }
+            .combine(folders) { visible, folders -> groupIntoFolders(visible, folders) }
+            .combine(labels) { items, labels ->
+                items
+                    .map { item -> labels[item.key]?.let { item.copy(label = it) } ?: item }
+                    .sortedBy { it.label.lowercase(Locale.getDefault()) }
+            }
             .flowOn(Dispatchers.IO)
             .stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    /**
+     * Replaces every foldered item with the folder holding it.
+     *
+     * This is also where a folder heals: members that no longer exist (app uninstalled) are dropped
+     * and a folder left with fewer than two members dissolves, its survivor falling back onto the
+     * grid with no stored cell — which [placeItems] then homes into the first free one.
+     */
+    private fun groupIntoFolders(visible: List<GridItem>, folders: List<Folder>): List<GridItem> {
+        if (folders.isEmpty()) return visible
+        val byKey = visible.associateBy { it.key }
+        val pruned = pruneFolders(folders, byKey.keys.filter(::isFoldable).toSet())
+        if (pruned.folders != folders) commitFolders(pruned.folders)
+        val members = pruned.folders.flatMap { it.members }.toSet()
+        val folderItems = pruned.folders.map { folder ->
+            GridItem(
+                key = folder.key,
+                label = folderLabel,
+                defaultLabel = folderLabel,
+                icon = null,
+                packageName = "",
+                folderId = folder.id,
+                folderMembers = folder.members.mapNotNull { byKey[it] },
+            )
+        }
+        return visible.filterNot { it.key in members } + folderItems
+    }
 
     /** Stored placement per item key. Combine with [placeItems] for the resolved arrangement. */
     val storedCells: StateFlow<Map<String, GridPlacement>> = placements
@@ -135,6 +183,82 @@ class LauncherLayoutStore(
             }
         }
         commit(next)
+    }
+
+    /**
+     * A drop, with the folder gesture applied: landing on another icon makes a folder of the two,
+     * landing on a folder joins it, and anything else is a plain [place].
+     *
+     * This is the one place the two behaviours are arbitrated, so the grid never has to know what a
+     * folder is: it reports where the finger let go, and this decides what that means.
+     */
+    fun dropAt(key: String, cell: GridCell, span: GridSpan = placements.value[key]?.span ?: GridSpan()) {
+        val occupant = occupantOf(cell, ignoring = key)
+        if (occupant == null || !isFoldable(key) || !(isFoldable(occupant) || occupant.startsWith("fd:"))) {
+            place(key, cell, span)
+            return
+        }
+        val edit = foldOnto(folders.value, dragged = key, target = occupant)
+        if (edit.folders == folders.value) {
+            place(key, cell, span)
+            return
+        }
+        val next = placements.value.toMutableMap()
+        // The dragged item is inside a folder now: it has no cell of its own any more.
+        next.remove(key)
+        val created = edit.folders.singleOrNull { it.key !in folders.value.map(Folder::key) }
+        if (created != null) {
+            // A brand-new folder takes over the cell of the icon it swallowed.
+            val targetCell = next.remove(occupant)?.cell ?: cell
+            next[created.key] = GridPlacement(targetCell)
+        }
+        // Anything released by the move (a folder that fell below two members) is left unplaced on
+        // purpose: placeItems() homes it into the first free cell.
+        edit.released.forEach { next.remove(it) }
+        commit(next)
+        commitFolders(edit.folders)
+    }
+
+    /** Takes [key] out of its folder and back onto the grid. */
+    fun removeFromFolder(key: String) {
+        val owner = folders.value.holding(key)
+        val edit = removeMember(folders.value, key)
+        if (edit.folders == folders.value) return
+        val next = placements.value.toMutableMap()
+        // The item and any released survivor land wherever there is room.
+        next.remove(key)
+        edit.released.forEach { next.remove(it) }
+        // A folder that dissolved keeps no cell. Compared by id: a folder that merely lost a member
+        // is still the same folder and must not lose its place on the grid.
+        if (owner != null && edit.folders.none { it.id == owner.id }) next.remove(owner.key)
+        commit(next)
+        commitFolders(edit.folders)
+    }
+
+    /** Deletes a folder, spilling its members back onto the grid. */
+    fun deleteFolder(folderKey: String) {
+        val edit = dissolveFolder(folders.value, folderKey)
+        if (edit.folders == folders.value) return
+        val next = placements.value.toMutableMap()
+        next.remove(folderKey)
+        edit.released.forEach { next.remove(it) }
+        commit(next)
+        commitFolders(edit.folders)
+        // A deleted folder must not leave its user-chosen name behind for the next `fd:` id.
+        rename(folderKey, label = "", defaultLabel = folderLabel)
+    }
+
+    /** The key of whatever covers [cell] today, ignoring the item being dragged. */
+    private fun occupantOf(cell: GridCell, ignoring: String): String? =
+        placements.value.entries
+            .firstOrNull { (key, placement) ->
+                key != ignoring && footprint(placement.cell, placement.span).contains(cell)
+            }
+            ?.key
+
+    private fun commitFolders(value: List<Folder>) {
+        prefs.appFolders = value.map { FolderRecord(it.id, it.members) }
+        folders.value = value
     }
 
     /** Resizes an already-placed item, keeping its origin. Used by the widget resize frame. */
@@ -210,6 +334,7 @@ class LauncherLayoutStore(
         hidden.value = prefs.hiddenApps
         labels.value = prefs.appLabels
         pinned.value = prefs.pinnedShortcuts
+        folders.value = prefs.appFolders.toFolders()
     }
 
     /**
@@ -248,6 +373,8 @@ class LauncherLayoutStore(
         placements.value = cells
     }
 }
+
+private fun List<FolderRecord>.toFolders(): List<Folder> = map { Folder(it.id, it.members) }
 
 private fun List<AppPlacement>.toPlacementMap(): Map<String, GridPlacement> =
     associate {

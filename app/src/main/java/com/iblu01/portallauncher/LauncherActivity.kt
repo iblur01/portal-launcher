@@ -18,6 +18,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -69,8 +70,10 @@ import com.iblu01.portallauncher.ui.LauncherViewModel
 import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.LocalHaStates
+import com.iblu01.portallauncher.ui.HaStates
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import com.iblu01.portallauncher.ui.mapper.predictState
 import com.iblu01.portallauncher.ui.mapper.toChipAction
 import com.iblu01.portallauncher.ui.mapper.toPanelKind
 import com.iblu01.portallauncher.ui.model.ChipAction
@@ -91,13 +94,18 @@ import com.iblu01.portallauncher.ui.apps.ShortcutIconStore
 import com.iblu01.portallauncher.ui.apps.WidgetHostController
 import com.iblu01.portallauncher.ui.apps.WidgetOffer
 import com.iblu01.portallauncher.ui.components.AlertOverlay
+import com.iblu01.portallauncher.ui.components.copyWallpaper
+import com.iblu01.portallauncher.ui.components.systemWallpaperSupported
 import com.iblu01.portallauncher.ui.components.AmbientBackground
+import androidx.compose.ui.res.stringResource
 import com.iblu01.portallauncher.ui.components.AppContextMenu
+import com.iblu01.portallauncher.ui.components.FolderDialog
 import com.iblu01.portallauncher.ui.components.AppMenuTarget
 import com.iblu01.portallauncher.ui.components.AppGridPage
 import com.iblu01.portallauncher.ui.components.DraggedIconOverlay
 import com.iblu01.portallauncher.ui.components.LauncherHeaderActions
 import com.iblu01.portallauncher.ui.components.WidgetPickerDialog
+import com.iblu01.portallauncher.ui.components.rememberEntity
 import com.iblu01.portallauncher.ui.components.rememberGridDragState
 import com.iblu01.portallauncher.ui.components.returnToClockPage
 import com.iblu01.portallauncher.ui.components.AutoReturnOverlay
@@ -122,6 +130,8 @@ import com.iblu01.portallauncher.ui.components.MediaPlayerView
 import com.iblu01.portallauncher.ui.components.MediaDevicesPanel
 import com.iblu01.portallauncher.ui.components.PanelContent
 import com.iblu01.portallauncher.ui.components.LauncherPanelLayout
+import com.iblu01.portallauncher.ui.components.isCompactClockScreen
+import com.iblu01.portallauncher.ui.components.panelPresentation
 import com.iblu01.portallauncher.ui.components.QuickActionsOverlay
 import com.iblu01.portallauncher.ui.components.WeatherController
 import com.iblu01.portallauncher.ui.components.WeatherPanel
@@ -136,6 +146,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import androidx.compose.runtime.snapshotFlow
@@ -182,8 +193,18 @@ class LauncherActivity : ComponentActivity() {
 
         autoReturnTimer = AutoReturnTimer(lifecycleScope, prefs)
         launcherApps = LauncherAppsFacade(applicationContext)
-        appList = AppListStore(applicationContext, lifecycleScope, launcherApps)
-        layout = LauncherLayoutStore(prefs, ShortcutIconStore(applicationContext), lifecycleScope)
+        appList = AppListStore(
+            applicationContext,
+            lifecycleScope,
+            launcherApps,
+            iconPackPackage = { prefs.iconPack },
+        )
+        layout = LauncherLayoutStore(
+            prefs,
+            ShortcutIconStore(applicationContext),
+            lifecycleScope,
+            folderLabel = getString(R.string.folder_default_label),
+        )
         widgets = WidgetHostController(applicationContext, prefs, lifecycleScope)
         // Registered for the activity's whole life, not per-resume: an uninstall happens while the
         // launcher is paused, and re-registering on resume would miss the change.
@@ -370,7 +391,37 @@ class LauncherActivity : ComponentActivity() {
         openFromLauncher(Intent(Settings.ACTION_HOME_SETTINGS))
     }
 
+    /** Copies the picked photo in and switches to the source the launcher draws itself. */
+    private val pickWallpaperPhoto = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@registerForActivityResult
+        lifecycleScope.launch {
+            val copied = withContext(Dispatchers.IO) { copyWallpaper(this@LauncherActivity, uri) }
+            if (copied) {
+                prefs.backgroundMode = "custom"
+                SettingsChangeBus.get().emit("backgroundMode")
+            } else {
+                Toast.makeText(
+                    this@LauncherActivity,
+                    R.string.settings_wallpaper_photo_error,
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
     private fun setWallpaper() {
+        // No wallpaper service means the Android picker would apply a wallpaper nothing ever draws;
+        // pick a photo the launcher renders itself instead.
+        if (!systemWallpaperSupported(this)) {
+            openingFromLauncher = true
+            runCatching { pickWallpaperPhoto.launch("image/*") }.onFailure {
+                openingFromLauncher = false
+                Toast.makeText(this, R.string.toast_cannot_open_wallpaper_picker, Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         // The Android picker changes the system wallpaper, so switch Portal to the matching source
         // before leaving. This also makes live wallpapers visible as soon as their preview applies.
         prefs.backgroundMode = "system"
@@ -491,6 +542,18 @@ private fun PortalLauncherApp(
     var bgOverlayOpacity by remember { mutableStateOf(prefs.bgOverlayOpacity) }
     var clockTheme by remember { mutableStateOf(prefs.clockTheme) }
     var gridScale by remember { mutableStateOf(prefs.gridScale) }
+    var notificationDotsEnabled by remember { mutableStateOf(prefs.notificationDots) }
+    val folderDefaultLabel = stringResource(R.string.folder_default_label)
+    val dotPackages by NotificationDots.packages.collectAsStateWithLifecycle()
+    // A folder shows a dot when any member does — otherwise foldering an app would silence it.
+    val hasDot: (GridItem) -> Boolean = { item ->
+        notificationDotsEnabled && when {
+            item.isWidget -> false
+            item.isFolder -> item.folderMembers.any { it.packageName in dotPackages }
+            else -> item.packageName in dotPackages
+        }
+    }
+
     // Bumped on every "backgroundMode" emission (even custom->custom) so CustomWallpaper
     // re-reads the file's lastModified() and Coil busts its stale cache on replacement.
     var wallpaperVersion by remember { mutableStateOf(0) }
@@ -498,6 +561,14 @@ private fun PortalLauncherApp(
     // not idle — letting the countdown run there would drag the page home behind the user's back.
     var resumed by remember { mutableStateOf(true) }
     val context = LocalContext.current
+    val compactScreen = context.resources.displayMetrics.let { metrics ->
+        isCompactClockScreen(
+            metrics.widthPixels,
+            metrics.heightPixels,
+            metrics.xdpi,
+            metrics.ydpi,
+        )
+    }
     // Grid geometry is discovered by the pages themselves (they know their size); until the first
     // layout a sane default keeps placement resolvable.
     val gridSpecState = remember { mutableStateOf(GridSpec(4, 3)) }
@@ -535,6 +606,29 @@ private fun PortalLauncherApp(
         }
     )
     val ui by vm.uiState.collectAsStateWithLifecycle()
+    // Per-entity observable store (P1): the provided instance never changes identity, so the
+    // static CompositionLocal below stops invalidating the whole launcher on every HA push.
+    val haStates = remember { HaStates() }
+    // Fed straight from the raw socket stream, bypassing the sampled transform pipeline: the
+    // store's per-entity granularity makes each apply a cheap mostly-reference-equal walk, and
+    // conflate() keeps only the latest full snapshot if the main thread falls behind a burst.
+    LaunchedEffect(pills) { pills.rawSnapshots().conflate().collect { haStates.apply(it.states) } }
+    // Single interception point for every UI-originated service call (chips, panels, media):
+    // the predicted state is written into the store *before* the network call, so the pressed
+    // control repaints on the next frame even with HA unreachable (P3). Unpredictable services
+    // (volume, colour…) predict nothing and pass straight through.
+    val callServiceProvider = remember(vm, haStates) {
+        object : CallService {
+            override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) {
+                if (entityId != null && ',' !in entityId) {
+                    haStates.applyOptimistic(entityId) { entity ->
+                        predictState(service, entity.state)?.let { entity.copy(state = it) } ?: entity
+                    }
+                }
+                vm.callService(domain, service, entityId, data)
+            }
+        }
+    }
     val pagerLayout = LauncherPagerLayout(
         homePageEnabled = ui.homePreferences.homePageEnabled,
         appPageCount = appPages.value,
@@ -576,6 +670,10 @@ private fun PortalLauncherApp(
                     wallpaperVersion++
                 }
                 "haUrl", "haToken" -> pills.start(prefs)
+                "iconPack" -> appList.refresh(force = true)
+                "notificationDots" -> notificationDotsEnabled = prefs.notificationDots
+                // A restored backup rewrote the arrangement behind the store's back.
+                "launcherLayout" -> layout.reload()
                 "brokerHost", "brokerPort", "username", "password" ->
                     MqttBridgeService.reconnect(context)
             }
@@ -586,6 +684,7 @@ private fun PortalLauncherApp(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 resumed = true
+                notificationDotsEnabled = prefs.notificationDots
                 backgroundMode = prefs.backgroundMode
                 bgOverlayOpacity = prefs.bgOverlayOpacity
                 clockTheme = prefs.clockTheme
@@ -605,7 +704,18 @@ private fun PortalLauncherApp(
     val chips = ui.chips
     val temperatures = ui.temperatures
     val mediaSessions = ui.mediaSessions
-    val mediaDevices = ui.latestStates.values.filter { it.domain == "media_player" }.map { entity ->
+    // Values hoisted out of the content lambdas below: reading `ui.x` inside a lambda subscribes
+    // that lambda's scope to the WHOLE uiState (any emission invalidates it); capturing the
+    // identity-preserved value keeps the lambda — and its subtree — skippable.
+    val catalog = ui.catalog
+    val homePreferences = ui.homePreferences
+    val homeComposition = ui.homeComposition
+    val homePageModel = ui.homePage
+    // Built on demand only (media panel open): reads the per-entity store, so materialising it in
+    // the body would subscribe the whole body to every media_player entity.
+    fun liveMediaDevices(): List<PlayingMedia> = haStates.entityIds()
+        .filter { it.startsWith("media_player.") }
+        .mapNotNull { id -> haStates[id] }.map { entity ->
         mediaSessions.firstOrNull { session -> session.players.any { it.entityId == entity.entityId } }
             ?: PlayingMedia(
                 entityId = entity.entityId,
@@ -664,6 +774,9 @@ private fun PortalLauncherApp(
     var menuShortcuts by remember { mutableStateOf(emptyList<AppShortcut>()) }
     var appDragActive by remember { mutableStateOf(false) }
     var showHidden by remember { mutableStateOf(false) }
+    // The open folder, addressed by key rather than held as a value: its contents change under it
+    // (an app is uninstalled, a member is taken out) and the popup must follow.
+    var openFolderKey by remember { mutableStateOf<String?>(null) }
     // Non-null means the picker is open; the list itself is enumerated off-main on demand.
     var widgetOffers by remember { mutableStateOf<List<WidgetOffer>?>(null) }
     var widgetPickerRequested by remember { mutableStateOf(false) }
@@ -743,7 +856,10 @@ private fun PortalLauncherApp(
             val session = mediaSessions.firstOrNull { it.entityId == req.key } ?: media
             session?.let { PanelContent.Media(it) }
         }
-        is PanelRequest.Chip -> resolveChipPanelContent(req, panelChip, mediaDevices)
+        is PanelRequest.Chip -> resolveChipPanelContent(
+            req, panelChip,
+            if (req.panelKind == PanelKind.MEDIA) liveMediaDevices() else emptyList(),
+        )
         is PanelRequest.Group -> (livePanelGroup ?: lastPanelGroup)?.let { group ->
             PanelContent.Group(
                 group = group,
@@ -828,17 +944,22 @@ private fun PortalLauncherApp(
     // Dumb dispatcher (design §4): the mapper resolved the action, so no chip.id/kind branching here.
     val onChipClick: (LauncherChip) -> Unit = { chip ->
         when (val action = chip.toChipAction()) {
-            is ChipAction.ServiceToggle -> vm.callService(action.domain, action.service, chip.entityId)
+            // Through the intercepting caller: immediate visual echo, HA takes over on its push.
+            is ChipAction.ServiceToggle -> callServiceProvider(action.domain, action.service, chip.entityId)
             is ChipAction.OpenPanel -> vm.onEvent(PanelEvent.OpenChip(PanelRequest.Chip(chip.id, action.panelKind)))
         }
     }
-    val pinnedRefs = ui.homePreferences.pinnedOrder.toSet()
-    val manualGroupOptions = ui.homePreferences.manualGroups.map { group ->
-        ManualGroupMenuOption(
-            groupId = group.id,
-            name = group.name,
-            memberEntityIds = group.members.mapTo(linkedSetOf()) { it.entityId },
-        )
+    // Remembered against their (identity-preserved) sources: rebuilding these collections on every
+    // pass would hand the tray/home subtrees a fresh instance per HA push and defeat their skip.
+    val pinnedRefs = remember(ui.homePreferences.pinnedOrder) { ui.homePreferences.pinnedOrder.toSet() }
+    val manualGroupOptions = remember(ui.homePreferences.manualGroups) {
+        ui.homePreferences.manualGroups.map { group ->
+            ManualGroupMenuOption(
+                groupId = group.id,
+                name = group.name,
+                memberEntityIds = group.members.mapTo(linkedSetOf()) { it.entityId },
+            )
+        }
     }
     val onOpenResolvedPill: (com.iblu01.portallauncher.domain.home.ResolvedPill) -> Unit = { pill ->
         when (pill.ref) {
@@ -854,7 +975,10 @@ private fun PortalLauncherApp(
             else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(pill.ref)))
         }
     }
-    val homePillActions = HomePillActions(
+    // One stable instance per pinned-set: the action callbacks read live values through the `ui`
+    // delegate and the state holders at invocation time, so nothing here goes stale. Without the
+    // remember, a fresh HomePillActions per pass forced ClockTray/HomePage to recompose per push.
+    val homePillActions = remember(pinnedRefs) { HomePillActions(
         onOpen = onOpenResolvedPill,
         onSetPinned = { pill, pinned -> vm.setPinned(pill.ref, pinned) },
         onAddToManualGroup = { pill, groupId ->
@@ -910,7 +1034,7 @@ private fun PortalLauncherApp(
             pillDragActive = false
             armedPillReorderKey = null
         },
-    )
+    ) }
     val onSecondaryPlayPause: (PlayingMedia) -> Unit = { session ->
         displayedSecondaryMedia = displayedSecondaryMedia.map {
             if (it.entityId == session.entityId) it.copy(
@@ -918,7 +1042,7 @@ private fun PortalLauncherApp(
             ) else it
         }
         session.players.forEach { player ->
-            vm.callService("media_player", "media_play_pause", player.entityId)
+            callServiceProvider("media_player", "media_play_pause", player.entityId)
         }
     }
 
@@ -947,14 +1071,17 @@ private fun PortalLauncherApp(
                 onSelectSession = { selectedMediaEntityId = it },
                 onDismiss = onPanelDismiss,
                 onSecondaryPlayPause = onSecondaryPlayPause,
+                fullScreen = compactScreen,
             )
             is PanelContent.ChipActions -> ChipActionsPanel(
                 chip = content.chip,
                 onDismiss = onPanelDismiss,
+                fullScreen = compactScreen,
             )
             is PanelContent.Weather -> WeatherPanel(
                 weather = content.weather,
                 onDismiss = onPanelDismiss,
+                fullScreen = compactScreen,
             )
             is PanelContent.Group -> GroupBrowserPanel(
                 group = content.group,
@@ -970,10 +1097,14 @@ private fun PortalLauncherApp(
                 onBack = { vm.onEvent(PanelEvent.Back) },
                 onDismiss = onPanelDismiss,
                 onCollectiveAction = { calls ->
-                    calls.forEach { call -> vm.callService(call.domain, call.service, call.entityId) }
+                    calls.forEach { call -> callServiceProvider(call.domain, call.service, call.entityId) }
                 },
+                fullScreen = compactScreen,
             )
             PanelContent.MediaBrowser -> {
+                // Materialised in the panel's own scope: only an open media browser subscribes
+                // to the media_player entities.
+                val mediaDevices = liveMediaDevices()
                 val selectedDevice = mediaDevices.firstOrNull { it.entityId == browsedMediaEntityId }
                 if (selectedDevice == null) {
                     MediaDevicesPanel(mediaDevices, onSelect = { browsedMediaEntityId = it.entityId }, onDismiss = onPanelDismiss)
@@ -986,23 +1117,18 @@ private fun PortalLauncherApp(
                         onSelectSession = { browsedMediaEntityId = it },
                         onDismiss = { browsedMediaEntityId = null },
                         onSecondaryPlayPause = onSecondaryPlayPause,
+                        fullScreen = compactScreen,
                     )
                 }
             }
         }
     }
 
-    // Provide the HA service caller to the whole subtree (design §8): panels read LocalCallService
-    // instead of the PillHub singleton. Remembered so the provided value stays a stable instance.
-    val callServiceProvider = remember(vm) {
-        object : CallService {
-            override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) =
-                vm.callService(domain, service, entityId, data)
-        }
-    }
+    // Provide the HA service caller (with its optimistic write, defined next to `haStates` above)
+    // and the stable per-entity state store to the whole subtree (design §8).
     CompositionLocalProvider(
         LocalCallService provides callServiceProvider,
-        LocalHaStates provides ui.latestStates,
+        LocalHaStates provides haStates,
         LocalAreas provides ui.areaByEntity,
     ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -1092,12 +1218,12 @@ private fun PortalLauncherApp(
                                     responsiveCapacity.extraCriticalPrimarySlots > 0
                                 ) {
                                     HomePillComposer.compose(
-                                        catalog = ui.catalog,
-                                        preferences = ui.homePreferences,
+                                        catalog = catalog,
+                                        preferences = homePreferences,
                                         capacity = responsiveCapacity,
                                     )
                                 } else {
-                                    ui.homeComposition
+                                    homeComposition
                                 }
                                 ClockTray(
                                     composition = responsiveComposition,
@@ -1116,13 +1242,13 @@ private fun PortalLauncherApp(
                         {
                             Box(Modifier.fillMaxSize()) {
                                 HomePage(
-                                    model = ui.homePage,
+                                    model = homePageModel,
                                     pinnedRefs = pinnedRefs,
                                     actions = homePillActions,
                                     manualGroups = manualGroupOptions,
                                     editing = homeEditing,
                                     reordering = pillDragActive,
-                                    stale = !ui.connected,
+                                    stale = !haConnected,
                                     onEditingChange = { homeEditing = it },
                                     editActions = HomePageEditActions(
                                         onMoveSection = { sectionId, move ->
@@ -1172,7 +1298,10 @@ private fun PortalLauncherApp(
                             items = placedItems.value,
                             spec = gridSpecState.value,
                             drag = gridDrag,
-                            onLaunch = onLaunchItem,
+                            onLaunch = { item ->
+                                if (item.isFolder) openFolderKey = item.key else onLaunchItem(item)
+                            },
+                            hasDot = hasDot,
                             onLongPress = { item, span, anchor ->
                                 menuTarget = AppMenuTarget(item, anchor, span)
                             },
@@ -1180,7 +1309,8 @@ private fun PortalLauncherApp(
                             onLongPressEmpty = { overlayVisible = true },
                             onDrop = { key, placement ->
                                 appDragActive = false
-                                if (placement != null) layout.place(key, placement.cell, placement.span)
+                                // dropAt, not place: landing on another icon means "make a folder".
+                                if (placement != null) layout.dropAt(key, placement.cell, placement.span)
                             },
                             widgetView = widgets::createView,
                             cellScale = gridScale,
@@ -1208,9 +1338,12 @@ private fun PortalLauncherApp(
                         HomeHeaderActions(
                             editing = homeEditing,
                             onEditingChange = { homeEditing = it },
-                            // UI placeholder only: grouping still follows the saved section model.
-                            onGroupingModeClick = {},
+                            groupingMode = ui.homePreferences.groupingMode,
+                            onGroupingModeChange = { mode ->
+                                vm.updateHomePillPreferences { it.copy(groupingMode = mode) }
+                            },
                             onSettings = onOpenSettings,
+                            compact = compactScreen,
                         )
                     },
                     dragOverlay = { DraggedIconOverlay(gridDrag, iconSize = 56.dp * gridScale) },
@@ -1221,6 +1354,10 @@ private fun PortalLauncherApp(
             LauncherPanelLayout(
                 panelVisible = panelContent != null,
                 modifier = Modifier.fillMaxSize(),
+                presentation = panelPresentation(
+                    compactScreen = compactScreen,
+                    supportsFullscreen = true,
+                ),
                 content = clockScreen,
                 panel = {
                     (panelContent ?: retainedPanelContent)?.let { sidePanel(it) }
@@ -1266,6 +1403,7 @@ private fun PortalLauncherApp(
             onAppInfo = { menuTarget?.item?.let { onAppInfo(it.packageName) } },
             onUninstall = { menuTarget?.item?.let { onUninstall(it.packageName) } },
             onRemoveShortcut = { menuTarget?.item?.let { layout.removeShortcut(it.key) } },
+            onDeleteFolder = { menuTarget?.item?.let { layout.deleteFolder(it.key) } },
             onOpenHomeSettings = onOpenHomeSettings,
             onResize = { span -> menuTarget?.let { target ->
                 layout.resize(target.item.key, span)
@@ -1278,6 +1416,20 @@ private fun PortalLauncherApp(
                 }
             },
             maxSpan = GridSpan(gridSpecState.value.columns, gridSpecState.value.rows),
+        )
+
+        FolderDialog(
+            folder = openFolderKey?.let { key -> gridItemsState.value.firstOrNull { it.key == key } },
+            onDismiss = { openFolderKey = null },
+            onLaunch = { member -> openFolderKey = null; onLaunchItem(member) },
+            onRename = { label ->
+                openFolderKey?.let { key ->
+                    layout.rename(key, label, defaultLabel = folderDefaultLabel)
+                }
+            },
+            onRemoveMember = { member -> layout.removeFromFolder(member.key) },
+            onDelete = { openFolderKey?.let { layout.deleteFolder(it) } },
+            hasDot = hasDot,
         )
 
         HiddenAppsDialog(
@@ -1382,10 +1534,17 @@ private fun MediaPlayerPanel(
     onSelectSession: (String?) -> Unit,
     onDismiss: () -> Unit,
     onSecondaryPlayPause: (PlayingMedia) -> Unit,
+    fullScreen: Boolean = false,
 ) {
     val callService = LocalCallService.current
+    // Live overlay (P3): the optimistic write (or a push already applied to the store) repaints
+    // the play/pause state on the next frame, ahead of the sampled snapshot pipeline.
+    val liveState = rememberEntity(media.entityId)?.state
+    val shownMedia =
+        if (liveState != null && !liveState.equals(media.state, ignoreCase = true)) media.copy(state = liveState)
+        else media
     MediaPlayerView(
-        media = media,
+        media = shownMedia,
         secondaryMedia = secondaryMedia,
         haToken = prefs.haToken,
         onPlayPause = {
@@ -1435,6 +1594,7 @@ private fun MediaPlayerPanel(
         onUnjoinPlayer = { entityId ->
             callService("media_player", "unjoin", entityId)
         },
-        onDismiss = onDismiss
+        onDismiss = onDismiss,
+        fullScreen = fullScreen,
     )
 }

@@ -57,7 +57,7 @@ import com.iblu01.portallauncher.ui.theme.ClockTint
 import com.iblu01.portallauncher.ui.theme.clockFontFamily
 import kotlin.math.roundToInt
 
-private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", city = "Appartement", condition = "Dégagé", glyph = WeatherGlyph())
+private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", city = "Appartement", condition = "Dégagé", glyph = WeatherGlyph("clear-day"))
 private val previewTemperatures = TemperatureSummary("22,5°", "24,5°", "19°")
 private val previewChips = listOf(
     LauncherChip("doors", "door", "Portes & fenêtres", "2 ouvertes", "warning"),

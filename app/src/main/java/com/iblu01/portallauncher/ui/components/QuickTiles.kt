@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.ui.icons.HaIcon
+import com.iblu01.portallauncher.ui.mapper.withLiveState
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -100,6 +101,13 @@ fun launcherChipAccent(chip: LauncherChip): Color = when {
 
 @Composable
 fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Boolean = false, onClick: (() -> Unit)? = null, onLongPress: (() -> Unit)? = null) {
+    // Live per-entity overlay (P3): an optimistic write or a push already applied to the store
+    // repaints this one chip on the next frame, ahead of the sampled snapshot pipeline. Group
+    // chips (comma-joined ids) and stateless chips keep their pipeline model untouched.
+    val live = if (chip.deviceState != null && chip.entityId.isNotBlank() && ',' !in chip.entityId) {
+        rememberEntity(chip.entityId)
+    } else null
+    @Suppress("NAME_SHADOWING") val chip = chip.withLiveState(live)
     val target = selectedChipAccent(launcherChipAccent(chip), selected)
     val accent by animateColorAsState(target, AppleMotion.spring(), label = "chipAccent")
     val animatedProgress by animateFloatAsState(chip.progress, AppleMotion.spring(), label = "chipProgress")

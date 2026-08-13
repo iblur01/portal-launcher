@@ -7,6 +7,7 @@ enum class PillKind(val label: String, val icon: String, val basePriority: Int) 
     SAFETY("Sécurité", "shield", 90),
     LOCK("Serrure", "lock", 35),
     OPENING("Porte / fenêtre", "door", 25),
+    MOTION("Mouvement", "motion", 30),
     APPLIANCE("Appareil", "washer", 58),
     VACUUM("Aspirateur", "vacuum", 58),
     BATTERY("Batterie", "battery", 20),
@@ -82,7 +83,7 @@ data class PillRule(
  * families, so the settings page doesn't expose HA jargon to the user.
  */
 enum class PillFamily(val label: String, val kinds: Set<PillKind>) {
-    SECURITY("Sécurité & accès", setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING, PillKind.SIREN)),
+    SECURITY("Sécurité & accès", setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING, PillKind.MOTION, PillKind.SIREN)),
     COMFORT("Confort", setOf(PillKind.THERMOSTAT, PillKind.PURIFIER, PillKind.FAN, PillKind.COVER, PillKind.HUMIDIFIER, PillKind.WATER_HEATER)),
     APPLIANCES("Appareils", setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.VALVE, PillKind.LAWN_MOWER)),
     LIGHTS("Lumières", setOf(PillKind.LIGHTS)),
@@ -107,7 +108,7 @@ fun friendlyEntityState(e: HaEntity): String {
         s == "unavailable" -> "Indisponible"
         s in setOf("unknown", "none", "") -> "—"
         e.domain in setOf("person", "device_tracker") -> when (s) { "home" -> "À la maison"; "not_home" -> "Absente"; else -> raw.replaceFirstChar { it.uppercase() } }
-        e.domain == "lock" -> if (s == "locked") "Verrouillée" else "Déverrouillée"
+        e.domain == "lock" -> when (s) { "locked" -> "Verrouillée"; "unlocked" -> "Déverrouillée"; "locking" -> "Verrouillage…"; "unlocking" -> "Déverrouillage…"; else -> raw.replaceFirstChar { it.uppercase() } }
         s == "on" -> when (e.deviceClass) {
             "door", "window", "opening", "garage_door" -> "Ouverte"
             "motion", "occupancy", "presence" -> "Mouvement"
@@ -143,6 +144,22 @@ fun friendlyEntityState(e: HaEntity): String {
 }
 
 data class PillCandidate(val primary: HaEntity, val kind: PillKind, val label: String, val related: List<HaEntity>)
+
+/** Decodes a `/api/states` payload; malformed JSON yields an empty list rather than throwing. */
+fun parseHaEntities(raw: String): List<HaEntity> = runCatching {
+    val array = JSONArray(raw)
+    (0 until array.length()).mapNotNull { i ->
+        val o = array.optJSONObject(i) ?: return@mapNotNull null
+        val id = o.optString("entity_id")
+        if (id.isBlank()) null
+        else HaEntity(
+            id,
+            o.optString("state"),
+            o.optJSONObject("attributes") ?: JSONObject(),
+            o.optString("last_changed"),
+        )
+    }
+}.getOrDefault(emptyList())
 
 object PillRuleCodec {
     fun encode(rules: List<PillRule>): String = JSONArray().apply {
@@ -215,7 +232,7 @@ object PillSupport {
         e.domain == "lawn_mower" -> PillKind.LAWN_MOWER
         e.domain in setOf("switch", "input_boolean") -> PillKind.SWITCH
         e.domain == "cover" -> PillKind.COVER
-        e.domain == "binary_sensor" && e.deviceClass in motionClasses -> PillKind.GENERIC
+        e.domain == "binary_sensor" && e.deviceClass in motionClasses -> PillKind.MOTION
         e.domain == "alarm_control_panel" -> PillKind.SAFETY
         e.domain == "lock" || e.deviceClass == "lock" -> PillKind.LOCK
         e.deviceClass in openingClasses -> PillKind.OPENING
@@ -230,33 +247,92 @@ object PillSupport {
         listOf("_machine_state", "_etat_de_la_machine", "_state", "_contact", "_temperature", "_humidity", "_humidite", "_etat_de_l_impression").forEach { if (slug.endsWith(it)) slug = slug.removeSuffix(it) }
         return slug
     }
+
+    /** True when [child] is [parent] plus an `_` suffix — same as startsWith on an interpolated prefix, without the allocation. */
+    private fun isSuffixed(child: String, parent: String): Boolean =
+        child.length > parent.length && child[parent.length] == '_' && child.startsWith(parent)
+
+    private val relatedOnlyClasses = setOf("humidity", "battery", "timestamp", "duration")
+    private val relatedDomains = setOf("sensor", "binary_sensor")
+    private val principalOwnerDomains = setOf(
+        "media_player", "vacuum", "camera", "fan", "humidifier", "climate", "cover",
+        "lock", "lawn_mower", "water_heater",
+    )
+
+    /**
+     * One pass over an entity snapshot, so [candidates] and [isAutomaticallyEnabled] stop rescanning
+     * the whole list once per candidate (765 entities × ~60 candidates, on every HA push).
+     *
+     * Both views keep the snapshot iteration order, which the full scans they replace also produced.
+     * Build it from the very list and registry handed to those functions, and share the same
+     * instance across the candidates of one snapshot.
+     */
+    class EntityIndex(entities: List<HaEntity>, deviceIdByEntity: Map<String, String>) {
+        val byDevice: Map<String, List<HaEntity>>
+        val withoutDevice: List<HaEntity>
+
+        init {
+            val grouped = HashMap<String, MutableList<HaEntity>>()
+            val orphans = ArrayList<HaEntity>()
+            entities.forEach { e ->
+                val device = deviceIdByEntity[e.entityId]
+                if (device == null) orphans += e else grouped.getOrPut(device) { ArrayList() } += e
+            }
+            byDevice = grouped
+            withoutDevice = orphans
+        }
+    }
+
     fun candidates(
         entities: List<HaEntity>,
         deviceIdByEntity: Map<String, String> = emptyMap(),
+        index: EntityIndex = EntityIndex(entities, deviceIdByEntity),
     ): List<PillCandidate> {
         val supported = entities.filter(::isPrimary)
-        val relatedOnlyClasses = setOf("humidity", "battery", "timestamp", "duration")
+        // Slugs and logical keys are compared in the nested scans below; each is derived at most
+        // once instead of allocating a fresh string per comparison.
+        val slugs = HashMap<String, String>()
+        fun slugOf(e: HaEntity) = slugs.getOrPut(e.entityId) { e.entityId.substringAfter('.') }
+        val keys = HashMap<String, String>()
+        fun keyOf(e: HaEntity) = keys.getOrPut(e.entityId) { logicalKey(e) }
+
+        // A related-only entity (humidity, battery…) is demoted when another supported entity owns
+        // it; only those possible owners are indexed, so related-only ones are skipped up front.
+        val ownersByDevice = HashMap<String, MutableList<HaEntity>>()
+        val ownersWithoutDevice = ArrayList<HaEntity>()
+        supported.forEach { owner ->
+            if (owner.deviceClass in relatedOnlyClasses) return@forEach
+            val device = deviceIdByEntity[owner.entityId]
+            if (device == null) ownersWithoutDevice += owner
+            else ownersByDevice.getOrPut(device) { ArrayList() } += owner
+        }
+
         val primaries = supported.filterNot { entity ->
-            entity.deviceClass in relatedOnlyClasses && supported.any { owner ->
-                    if (owner.entityId == entity.entityId || owner.deviceClass in relatedOnlyClasses) return@any false
-                    val entityDevice = deviceIdByEntity[entity.entityId]
-                    val ownerDevice = deviceIdByEntity[owner.entityId]
-                    if (entityDevice != null) entityDevice == ownerDevice
-                    else ownerDevice == null &&
-                        (entity.entityId.substringAfter('.').startsWith("${logicalKey(owner)}_") ||
-                            logicalKey(owner).startsWith(entity.entityId.substringAfter('.') + "_"))
+            if (entity.deviceClass !in relatedOnlyClasses) return@filterNot false
+            val entityDevice = deviceIdByEntity[entity.entityId]
+            if (entityDevice != null) {
+                ownersByDevice[entityDevice]?.any { it.entityId != entity.entityId } == true
+            } else {
+                val slug = slugOf(entity)
+                ownersWithoutDevice.any { owner ->
+                    if (owner.entityId == entity.entityId) return@any false
+                    val ownerKey = keyOf(owner)
+                    isSuffixed(slug, ownerKey) || isSuffixed(ownerKey, slug)
                 }
+            }
         }
         return primaries.map { primary ->
-            val key = logicalKey(primary)
+            val key = keyOf(primary)
             val primaryDevice = deviceIdByEntity[primary.entityId]
-            val related = entities.filter { e ->
+            val pool = if (primaryDevice != null) index.byDevice[primaryDevice].orEmpty() else index.withoutDevice
+            val related = pool.filter { e ->
                 if (e.entityId == primary.entityId) return@filter false
-                if (primaryDevice != null) deviceIdByEntity[e.entityId] == primaryDevice
-                else deviceIdByEntity[e.entityId] == null &&
-                    (e.entityId.substringAfter('.').startsWith("${key}_") || key.startsWith(e.entityId.substringAfter('.') + "_"))
+                if (primaryDevice == null) {
+                    val slug = slugOf(e)
+                    if (!isSuffixed(slug, key) && !isSuffixed(key, slug)) return@filter false
+                }
+                e.domain in relatedDomains
             }
-                .filter { it.domain in setOf("sensor", "binary_sensor") }
             val label = primary.name
                 .replace(Regex(" (État de la machine|État de la tâche|Porte)$", RegexOption.IGNORE_CASE), "")
                 .replace(Regex("^Capteur ", RegexOption.IGNORE_CASE), "")
@@ -268,12 +344,16 @@ object PillSupport {
     /**
      * Conservative launcher default: expose the appliance, not every configuration toggle owned
      * by it. Users can still enable any compatible entity explicitly from Settings.
+     *
+     * [index] is optional: pass the one shared with [candidates] when walking every candidate of a
+     * snapshot, leave it null for a one-off call (a single scan is cheaper than building an index).
      */
     fun isAutomaticallyEnabled(
         candidate: PillCandidate,
         entities: List<HaEntity>,
         deviceIdByEntity: Map<String, String> = emptyMap(),
         entityCategoryByEntity: Map<String, String> = emptyMap(),
+        index: EntityIndex? = null,
     ): Boolean {
         val primary = candidate.primary
         if (entityCategoryByEntity[primary.entityId] in setOf("config", "diagnostic")) return false
@@ -283,12 +363,12 @@ object PillSupport {
         if (auxiliarySwitchTokens.any(slug::contains)) return false
 
         val deviceId = deviceIdByEntity[primary.entityId] ?: return true
-        val siblings = entities.filter { it.entityId != primary.entityId && deviceIdByEntity[it.entityId] == deviceId }
+        val siblings = index?.byDevice?.get(deviceId)
+            ?: entities.filter { deviceIdByEntity[it.entityId] == deviceId }
         val hasPrincipalOwner = siblings.any { sibling ->
-            sibling.domain in setOf(
-                "media_player", "vacuum", "camera", "fan", "humidifier", "climate", "cover",
-                "lock", "lawn_mower", "water_heater",
-            ) || (sibling.domain == "sensor" && sibling.deviceClass == "enum" && isPrimary(sibling))
+            if (sibling.entityId == primary.entityId) return@any false
+            sibling.domain in principalOwnerDomains ||
+                (sibling.domain == "sensor" && sibling.deviceClass == "enum" && isPrimary(sibling))
         }
         return !hasPrincipalOwner
     }

@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,6 +44,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -72,6 +74,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 @Composable
 fun ClockScreen(
@@ -149,6 +152,32 @@ private val COMPACT_DATE_LIFT = 28.dp
 internal fun clockDetailAlpha(collapse: Float): Float =
     (1f - collapse.coerceIn(0f, 1f) * 2f).coerceIn(0f, 1f)
 
+private const val COMPACT_SCREEN_MAX_DIAGONAL_INCHES = 6f
+
+internal fun isCompactClockScreen(
+    widthPixels: Int,
+    heightPixels: Int,
+    xdpi: Float,
+    ydpi: Float,
+): Boolean {
+    if (widthPixels <= 0 || heightPixels <= 0 || xdpi <= 0f || ydpi <= 0f) return false
+    val widthInches = widthPixels / xdpi
+    val heightInches = heightPixels / ydpi
+    return sqrt(widthInches * widthInches + heightInches * heightInches) <=
+        COMPACT_SCREEN_MAX_DIAGONAL_INCHES
+}
+
+@Composable
+private fun rememberCompactClockScreen(): Boolean {
+    val metrics = LocalContext.current.resources.displayMetrics
+    return isCompactClockScreen(
+        widthPixels = metrics.widthPixels,
+        heightPixels = metrics.heightPixels,
+        xdpi = metrics.xdpi,
+        ydpi = metrics.ydpi,
+    )
+}
+
 /**
  * The clock block (date, time, weather pill, stale banner). Pinned above the pager, it shrinks
  * toward the top as [collapse] goes 0→1 so the apps grid gets the room back.
@@ -167,8 +196,16 @@ fun ClockHeader(
     modifier: Modifier = Modifier,
     collapse: () -> Float = { 0f },
 ) {
+
     val time by rememberClock(if (clockTheme.format24h) "HH:mm" else "h:mm a")
     val date by rememberClock("EEEE d MMMM")
+    val compactDate by rememberClock("EEE d MMM")
+    val compactScreen = rememberCompactClockScreen()
+    val useCompactTemperatureHeader = connected && compactScreen
+    val compactTemperaturesAvailable = compactIndoorTemperature(
+        temperatures.indoorMin,
+        temperatures.indoorMax,
+    ) != null || compactOutdoorTemperature(temperatures.outdoor, weather.temp) != null
     Column(
         modifier = modifier
             .graphicsLayer {
@@ -177,24 +214,38 @@ fun ClockHeader(
                 scaleX = scale
                 scaleY = scale
             }
-            .padding(top = 44.dp),
+            .padding(top = if (compactScreen) 24.dp else 44.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val timeWeight = FontWeight(clockTheme.weight)
-        Text(
-            text = titleCase(date).uppercase(Locale.getDefault()),
-            style = AppleTypography.titleMedium.copy(
-                fontFamily = clockFontFamily(clockTheme.font, FontWeight.Medium),
-                fontWeight = FontWeight.Medium,
-                fontSize = 20.sp,
-                letterSpacing = 2.3.sp,
-            ),
-            color = clockTheme.tint.color.copy(alpha = 0.7f),
-            // The compact launcher header only needs the time. Keep the node measured throughout
-            // the swipe, but fade its pixels in the layer phase to avoid text relayout per frame.
+        Row(
             modifier = Modifier.graphicsLayer { alpha = clockDetailAlpha(collapse()) },
-        )
-        Spacer(Modifier.height(4.dp * clockTheme.elementSpacing))
+            horizontalArrangement = Arrangement.spacedBy(
+                if (useCompactTemperatureHeader && compactTemperaturesAvailable) 7.dp else 0.dp,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = titleCase(if (useCompactTemperatureHeader) compactDate else date)
+                    .uppercase(Locale.getDefault()),
+                style = AppleTypography.titleMedium.copy(
+                    fontFamily = clockFontFamily(clockTheme.font, FontWeight.Medium),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = if (useCompactTemperatureHeader) 15.sp else 20.sp,
+                    letterSpacing = if (useCompactTemperatureHeader) 1.35.sp else 2.3.sp,
+                ),
+                color = clockTheme.tint.color.copy(alpha = 0.7f),
+            )
+            if (useCompactTemperatureHeader && compactTemperaturesAvailable) {
+                Text("•", style = AppleTypography.bodySmall.copy(fontSize = 10.sp), color = AppleColors.secondary)
+                CompactTemperatures(
+                    temperatures = temperatures,
+                    weather = weather,
+                    onClick = onWeatherClick,
+                )
+            }
+        }
+        Spacer(Modifier.height((if (compactScreen) 0.dp else 2.dp) * clockTheme.elementSpacing))
         Text(
             text = time,
             style = AppleTypography.displayLarge.copy(
@@ -219,20 +270,22 @@ fun ClockHeader(
         )
         // Keep these nodes composed throughout the gesture. Removing them when alpha reaches zero
         // causes a structural recomposition and a text remeasure exactly halfway through the swipe.
-        Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
-        Row(
-            modifier = Modifier
-                .graphicsLayer { alpha = clockDetailAlpha(collapse()) }
-                .clip(AppleShapes.pill)
-                .background(Color.White.copy(alpha = 0.15f), AppleShapes.pill)
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                .appleClickable(onWeatherClick)
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
-            Text(stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
+        if (connected && !useCompactTemperatureHeader) {
+            Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
+            Row(
+                modifier = Modifier
+                    .graphicsLayer { alpha = clockDetailAlpha(collapse()) }
+                    .clip(AppleShapes.pill)
+                    .background(Color.White.copy(alpha = 0.15f), AppleShapes.pill)
+                    .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
+                    .appleClickable(onWeatherClick)
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
+                Text(stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
+            }
         }
         if (!connected && lastUpdateAt > 0L) {
             Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
@@ -241,6 +294,75 @@ fun ClockHeader(
             }
         }
     }
+}
+
+@Composable
+private fun CompactTemperatures(
+    temperatures: TemperatureSummary,
+    weather: WeatherUi,
+    onClick: () -> Unit,
+) {
+    val indoorTemperature = compactIndoorTemperature(temperatures.indoorMin, temperatures.indoorMax)
+    val outdoorTemperature = compactOutdoorTemperature(temperatures.outdoor, weather.temp)
+    val indoorDescription = indoorTemperature?.let {
+        stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax)
+    }
+    val outdoorDescription = outdoorTemperature?.let {
+        stringResource(R.string.clock_outdoor_temp_format, it)
+    }
+    Row(
+        modifier = Modifier
+            .appleClickable(onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = listOfNotNull(indoorDescription, outdoorDescription).joinToString(", ")
+            },
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (indoorTemperature != null) {
+            Icon(
+                imageVector = Icons.Outlined.Home,
+                contentDescription = null,
+                tint = AppleColors.primary,
+                modifier = Modifier.size(11.dp),
+            )
+            Text(
+                indoorTemperature,
+                style = AppleTypography.bodySmall.copy(fontSize = 15.sp),
+                color = AppleColors.primary,
+                maxLines = 1,
+            )
+        }
+        if (outdoorTemperature != null) {
+            WeatherIcon(weather.glyph, Modifier.size(14.dp))
+            Text(
+                outdoorTemperature,
+                style = AppleTypography.bodySmall.copy(fontSize = 15.sp),
+                color = AppleColors.secondary,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+private fun isTemperatureAvailable(value: String): Boolean =
+    value.isNotBlank() && value !in setOf("—", "--", "—°", "--°")
+
+internal fun compactIndoorTemperature(minimum: String, maximum: String): String? = when {
+    !isTemperatureAvailable(minimum) && !isTemperatureAvailable(maximum) -> null
+    !isTemperatureAvailable(minimum) -> maximum
+    !isTemperatureAvailable(maximum) -> minimum
+    minimum == maximum -> minimum
+    else -> "${minimum.removeSuffix("°")}–$maximum"
+}
+
+internal fun compactOutdoorTemperature(outdoor: String, weather: String): String? =
+    outdoor.takeIf(::isTemperatureAvailable) ?: weather.takeIf(::isTemperatureAvailable)
+
+internal fun compactTrayItemLimit(compactScreen: Boolean, expanded: Boolean): Int = when {
+    !expanded -> 3
+    compactScreen -> 6
+    else -> 9
 }
 
 /** The bottom chip tray: the "voir plus" toggle plus up to 3 (collapsed) or 9 (expanded) chips. */
@@ -254,13 +376,14 @@ fun ClockTray(
     selectedChipKey: String?,
     modifier: Modifier = Modifier,
 ) {
+    val compactScreen = rememberCompactClockScreen()
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp.scaled())
-            .padding(bottom = 36.dp.scaled()),
+            .padding(bottom = (if (compactScreen) 40.dp else 36.dp).scaled()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp.scaled()),
+        verticalArrangement = Arrangement.spacedBy((if (compactScreen) 4.dp else 8.dp).scaled()),
     ) {
         if (chips.size > 3) {
             ClockTrayControls(
@@ -269,7 +392,7 @@ fun ClockTray(
                 onPillsExpandedChange = onPillsExpandedChange,
             )
         }
-        val visible = if (pillsExpanded) chips.take(9) else chips.take(3)
+        val visible = chips.take(compactTrayItemLimit(compactScreen, pillsExpanded))
         visible.chunked(3).forEach { rowChips ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp.scaled(), Alignment.CenterHorizontally)) {
                 rowChips.forEach { chip ->
@@ -295,6 +418,7 @@ fun ClockTray(
     selectedChipKey: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    val compactScreen = rememberCompactClockScreen()
     val allVisible = composition.primary + composition.secondary
     var menuTargetKey by rememberSaveable { mutableStateOf<String?>(null) }
     val menuTarget = allVisible.firstOrNull { it.ref.stableKey == menuTargetKey }
@@ -303,9 +427,9 @@ fun ClockTray(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp.scaled())
-            .padding(bottom = 36.dp.scaled()),
+            .padding(bottom = (if (compactScreen) 40.dp else 36.dp).scaled()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp.scaled()),
+        verticalArrangement = Arrangement.spacedBy((if (compactScreen) 4.dp else 8.dp).scaled()),
     ) {
         if (composition.secondary.isNotEmpty()) {
             ClockTrayControls(
@@ -315,48 +439,23 @@ fun ClockTray(
             )
         }
         val visible = if (pillsExpanded) {
-            composition.primary + composition.secondary.take(6)
+            val totalLimit = compactTrayItemLimit(compactScreen, expanded = true)
+            composition.primary + composition.secondary.take((totalLimit - composition.primary.size).coerceAtLeast(0))
         } else {
             composition.primary
         }
+        // Single stable callback for every pill: capturing `pill` per item would rebuild the
+        // lambda on each pass and defeat TrayPill's equality skip.
+        val openMenu: (String) -> Unit = { key -> menuTargetKey = key }
         visible.chunked(3).forEach { rowPills ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp.scaled(), Alignment.CenterHorizontally)) {
                 rowPills.forEach { pill ->
-                    val available = pill.availability == Availability.AVAILABLE
-                    StatusChip(
-                        chip = pill.chip,
+                    TrayPill(
+                        pill = pill,
+                        pinned = pill.ref in pinnedRefs,
                         selected = pill.chip.id == selectedChipKey,
-                        // StatusChip installs its combined tap/long-press detector only when
-                        // onClick is non-null. A guarded no-op keeps long-press available on stale
-                        // pinned pills so they can still be unpinned while commands stay blocked.
-                        onClick = { if (available) actions.onOpen(pill) },
-                        onLongPress = { menuTargetKey = pill.ref.stableKey },
-                        modifier = Modifier
-                            .heightIn(min = 48.dp)
-                            .homePillReorderDrag(pill, actions)
-                            .semantics(mergeDescendants = true) {
-                                contentDescription = trayPillAccessibilityLabel(pill, pill.ref in pinnedRefs)
-                                role = Role.Button
-                                if (available) {
-                                    onClick(label = "Ouvrir ${pill.chip.label}") {
-                                        actions.onOpen(pill)
-                                        true
-                                    }
-                                }
-                                onLongClick(label = "Actions pour ${pill.chip.label}") {
-                                    menuTargetKey = pill.ref.stableKey
-                                    true
-                                }
-                            }
-                            .onKeyEvent { event ->
-                                if (available && event.type == KeyEventType.KeyUp &&
-                                    event.key in setOf(Key.Enter, Key.DirectionCenter, Key.Spacebar)
-                                ) {
-                                    actions.onOpen(pill)
-                                    true
-                                } else false
-                            }
-                            .focusable(),
+                        actions = actions,
+                        onOpenMenu = openMenu,
                     )
                 }
             }
@@ -369,6 +468,58 @@ fun ClockTray(
         manualGroups = manualGroups,
         actions = actions,
         onDismiss = { menuTargetKey = null },
+    )
+}
+
+/**
+ * One tray pill as its own restart scope. The heavy modifier chain (drag, semantics, key events)
+ * is built HERE, so a tray pass with an equal [pill] skips the whole thing — before this
+ * extraction, every HA push that touched any chip's details rebuilt these modifiers for all
+ * visible pills and recomposed each StatusChip (~16 ms per push on the small device).
+ */
+@Composable
+private fun TrayPill(
+    pill: ResolvedPill,
+    pinned: Boolean,
+    selected: Boolean,
+    actions: HomePillActions,
+    onOpenMenu: (String) -> Unit,
+) {
+    val available = pill.availability == Availability.AVAILABLE
+    StatusChip(
+        chip = pill.chip,
+        selected = selected,
+        // StatusChip installs its combined tap/long-press detector only when
+        // onClick is non-null. A guarded no-op keeps long-press available on stale
+        // pinned pills so they can still be unpinned while commands stay blocked.
+        onClick = { if (available) actions.onOpen(pill) },
+        onLongPress = { onOpenMenu(pill.ref.stableKey) },
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .homePillReorderDrag(pill, actions)
+            .semantics(mergeDescendants = true) {
+                contentDescription = trayPillAccessibilityLabel(pill, pinned)
+                role = Role.Button
+                if (available) {
+                    onClick(label = "Ouvrir ${pill.chip.label}") {
+                        actions.onOpen(pill)
+                        true
+                    }
+                }
+                onLongClick(label = "Actions pour ${pill.chip.label}") {
+                    onOpenMenu(pill.ref.stableKey)
+                    true
+                }
+            }
+            .onKeyEvent { event ->
+                if (available && event.type == KeyEventType.KeyUp &&
+                    event.key in setOf(Key.Enter, Key.DirectionCenter, Key.Spacebar)
+                ) {
+                    actions.onOpen(pill)
+                    true
+                } else false
+            }
+            .focusable(),
     )
 }
 
@@ -467,7 +618,7 @@ private fun ClockScreenPreview() {
     PortalTheme {
         ClockScreen(
             backgroundMode = "neutral",
-            weather = WeatherUi(temp = "21°", indoorTemp = "18°", city = "Nantes", condition = "Nuageux", glyph = WeatherGlyph()),
+            weather = WeatherUi(temp = "21°", indoorTemp = "18°", city = "Nantes", condition = "Nuageux", glyph = WeatherGlyph("partly-cloudy-day")),
             temperatures = TemperatureSummary("18°", "22°", "21°"),
             chips = listOf(
                 LauncherChip("washer", "washer", "Machine", "Rinçage", "active"),

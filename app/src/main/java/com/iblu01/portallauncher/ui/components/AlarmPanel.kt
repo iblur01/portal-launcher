@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -84,7 +85,7 @@ internal fun alarmPanelPhase(state: String): AlarmPanelPhase = when (state.lower
  * - disarming: progress feedback replaces controls until HA confirms the new state.
  */
 @Composable
-fun AlarmControl(chip: LauncherChip) {
+fun AlarmControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val callService = LocalCallService.current
     val entity = rememberEntity(chip.entityId)
     if (entity == null || entity.isUnavailable()) {
@@ -103,25 +104,30 @@ fun AlarmControl(chip: LauncherChip) {
     }
 
     Column(
-        Modifier.fillMaxWidth(),
+        modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val requestedMode = pendingArmOption
         if (requestedMode != null) {
-            AlarmStatusCard(
-                title = stringResource(R.string.alarm_code_to_arm_title, stringResource(requestedMode.labelRes)),
-                subtitle = stringResource(R.string.alarm_code_to_arm_subtitle),
-                icon = requestedMode.icon,
-                accent = AppleColors.accent,
-            )
-            Spacer(Modifier.height(12.dp))
-            AlarmKeypad(
-                entityId = chip.entityId,
-                service = requestedMode.service,
-                currentState = state,
-                prompt = stringResource(R.string.alarm_arm_prompt),
-                accent = AppleColors.accent,
-                onCancel = { pendingArmOption = null },
+            AlarmStatusAndAction(
+                status = {
+                    AlarmStatusCard(
+                        title = stringResource(R.string.alarm_code_to_arm_title, stringResource(requestedMode.labelRes)),
+                        subtitle = stringResource(R.string.alarm_code_to_arm_subtitle),
+                        icon = requestedMode.icon,
+                        accent = AppleColors.accent,
+                    )
+                },
+                action = {
+                    AlarmKeypad(
+                        entityId = chip.entityId,
+                        service = requestedMode.service,
+                        currentState = state,
+                        prompt = stringResource(R.string.alarm_arm_prompt),
+                        accent = AppleColors.accent,
+                        onCancel = { pendingArmOption = null },
+                    )
+                },
             )
             return@Column
         }
@@ -129,43 +135,56 @@ fun AlarmControl(chip: LauncherChip) {
         when (phase) {
             AlarmPanelPhase.DISARMED -> {
                 val options = ArmOption.entries.filter { entity.supports(it.feature) }
-                Text(
-                    stringResource(R.string.alarm_choose_mode_title),
-                    style = AppleTypography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = AppleColors.primary,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(5.dp))
-                Text(
-                    stringResource(R.string.alarm_disarmed_subtitle),
-                    style = AppleTypography.bodySmall,
-                    color = AppleColors.secondary,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(18.dp))
-                if (options.isEmpty()) {
-                    PanelUnavailable(stringResource(R.string.alarm_no_modes_available))
-                } else {
-                    val labels = options.associateWith { stringResource(it.labelRes) }
-                    AccessoryGrid(
-                        items = options.map { option ->
-                            AccessoryItem(
-                                id = option.service,
-                                title = labels.getValue(option),
-                                icon = option.icon,
-                                on = false,
-                                accent = AppleColors.active,
-                                onToggle = {
-                                    if (entity.alarmCodeRequired(arming = true)) {
-                                        pendingArmOption = option
-                                    } else {
-                                        callService(ALARM_DOMAIN, option.service, chip.entityId)
-                                    }
-                                },
-                            )
-                        },
-                        tileHeight = 72.dp,
+                val intro: @Composable () -> Unit = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            stringResource(R.string.alarm_choose_mode_title),
+                            style = AppleTypography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = AppleColors.primary,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(5.dp))
+                        Text(
+                            stringResource(R.string.alarm_disarmed_subtitle),
+                            style = AppleTypography.bodySmall,
+                            color = AppleColors.secondary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+                val modes: @Composable () -> Unit = {
+                    if (options.isEmpty()) {
+                        PanelUnavailable(stringResource(R.string.alarm_no_modes_available))
+                    } else {
+                        val labels = options.associateWith { stringResource(it.labelRes) }
+                        AccessoryGrid(
+                            items = options.map { option ->
+                                AccessoryItem(
+                                    id = option.service,
+                                    title = labels.getValue(option),
+                                    icon = option.icon,
+                                    on = false,
+                                    accent = AppleColors.active,
+                                    onToggle = {
+                                        if (entity.alarmCodeRequired(arming = true)) pendingArmOption = option
+                                        else callService(ALARM_DOMAIN, option.service, chip.entityId)
+                                    },
+                                )
+                            },
+                            tileHeight = 72.dp,
+                        )
+                    }
+                }
+                if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+                    AdaptivePanelSplit(
+                        primaryWeight = 0.36f,
+                        primary = { area -> Box(area, contentAlignment = Alignment.Center) { intro() } },
+                        secondary = { area -> Box(area, contentAlignment = Alignment.Center) { modes() } },
                     )
+                } else {
+                    intro()
+                    Spacer(Modifier.height(18.dp))
+                    modes()
                 }
             }
 
@@ -182,31 +201,48 @@ fun AlarmControl(chip: LauncherChip) {
             AlarmPanelPhase.TRIGGERED,
             AlarmPanelPhase.OTHER -> {
                 val visual = alarmVisual(phase, state)
-                AlarmStatusCard(
-                    title = visual.title,
-                    subtitle = visual.subtitle,
-                    icon = visual.icon,
-                    accent = visual.accent,
+                AlarmStatusAndAction(
+                    status = { AlarmStatusCard(visual.title, visual.subtitle, visual.icon, visual.accent) },
+                    action = {
+                        if (entity.alarmCodeRequired(arming = false)) {
+                            AlarmKeypad(
+                                entityId = chip.entityId,
+                                service = "alarm_disarm",
+                                currentState = state,
+                                prompt = stringResource(R.string.alarm_disarm_prompt),
+                                accent = visual.accent,
+                                onCancel = null,
+                            )
+                        } else {
+                            PillButton(
+                                label = stringResource(R.string.alarm_disarm_button),
+                                onClick = { callService(ALARM_DOMAIN, "alarm_disarm", chip.entityId) },
+                                primary = true,
+                            )
+                        }
+                    },
                 )
-                Spacer(Modifier.height(12.dp))
-                if (entity.alarmCodeRequired(arming = false)) {
-                    AlarmKeypad(
-                        entityId = chip.entityId,
-                        service = "alarm_disarm",
-                        currentState = state,
-                        prompt = stringResource(R.string.alarm_disarm_prompt),
-                        accent = visual.accent,
-                        onCancel = null,
-                    )
-                } else {
-                    PillButton(
-                        label = stringResource(R.string.alarm_disarm_button),
-                        onClick = { callService(ALARM_DOMAIN, "alarm_disarm", chip.entityId) },
-                        primary = true,
-                    )
-                }
             }
         }
+    }
+}
+
+@Composable
+private fun AlarmStatusAndAction(
+    status: @Composable () -> Unit,
+    action: @Composable () -> Unit,
+) {
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        AdaptivePanelSplit(
+            modifier = Modifier.fillMaxSize(),
+            primaryWeight = 0.4f,
+            primary = { area -> Box(area, contentAlignment = Alignment.Center) { status() } },
+            secondary = { area -> Box(area, contentAlignment = Alignment.Center) { action() } },
+        )
+    } else {
+        status()
+        Spacer(Modifier.height(12.dp))
+        action()
     }
 }
 

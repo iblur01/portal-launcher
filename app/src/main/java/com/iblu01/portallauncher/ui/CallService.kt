@@ -1,7 +1,6 @@
 package com.iblu01.portallauncher.ui
 
 import androidx.compose.runtime.staticCompositionLocalOf
-import com.iblu01.portallauncher.HaEntity
 
 /**
  * Injected Home Assistant service caller (design §8). Composables read it from the composition
@@ -18,13 +17,13 @@ val LocalCallService = staticCompositionLocalOf<CallService> {
 }
 
 /**
- * Live raw HA states provided to the panel subtree (design §8), fed from the VM's
- * `uiState.latestStates`. Composables read this instead of `PillHub.latestStates`. A new map
- * instance arrives on every HA push; per-entity change-guarding lives in `rememberEntity`.
+ * Live per-entity HA state store provided to the panel subtree (design §8). The instance is
+ * stable for the whole life of the screen (safe under `staticCompositionLocalOf`): a HA push
+ * rewrites individual `MutableState` slots, so only the composables reading the touched entity
+ * recompose — providing a fresh `Map` here used to invalidate the entire launcher on every push.
+ * The default empty store keeps previews and unprovided trees rendering (entities resolve null).
  */
-val LocalHaStates = staticCompositionLocalOf<Map<String, HaEntity>> {
-    error("LocalHaStates not provided")
-}
+val LocalHaStates = staticCompositionLocalOf { HaStates() }
 
 /** entity_id -> area display name, provided at the launcher root (from the VM's snapshot).
  *  Read by the light-rooms grouping instead of touching the repository singleton. */

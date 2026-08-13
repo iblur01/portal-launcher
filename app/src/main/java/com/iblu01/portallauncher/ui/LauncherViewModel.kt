@@ -2,7 +2,6 @@ package com.iblu01.portallauncher.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.domain.model.PillSnapshot
 import com.iblu01.portallauncher.domain.model.PlayingMedia
@@ -41,9 +40,12 @@ data class LauncherUiState(
     val temperatures: TemperatureSummary = TemperatureSummary(),
     val mediaSessions: List<PlayingMedia> = emptyList(),
     val connected: Boolean = true,
+    /**
+     * Only meaningful while disconnected (drives the stale banner). Kept at 0 while connected:
+     * carrying the per-push timestamp here would make every state_changed emit a new UI state,
+     * recomposing the launcher body — raw per-entity state lives in the `HaStates` store instead.
+     */
     val lastUpdateAt: Long = 0L,
-    /** Raw states, for detail panels. */
-    val latestStates: Map<String, HaEntity> = emptyMap(),
     /** entity_id -> area name, for the light rooms grouping. */
     val areaByEntity: Map<String, String> = emptyMap(),
     val areaIdByEntity: Map<String, String> = emptyMap(),
@@ -74,7 +76,7 @@ private val ALERTING_ALARM_STATES = setOf("pending", "triggered")
 private fun LauncherUiState.alarmAlert(): PanelRequest.Chip? {
     val chip = chips.firstOrNull {
         it.toPanelKind() == PanelKind.ALARM &&
-            latestStates[it.entityId]?.state?.lowercase() in ALERTING_ALARM_STATES
+            (it.deviceState?.lowercase() ?: "") in ALERTING_ALARM_STATES
     } ?: return null
     return PanelRequest.Chip(chip.id, PanelKind.ALARM)
 }
@@ -94,15 +96,24 @@ class LauncherViewModel(
     private val callServiceFn: (domain: String, service: String, entityId: String?, data: Map<String, Any>?) -> Unit,
     private val updateHomePreferencesFn: (((HomePillPreferences) -> HomePillPreferences) -> HomePillPreferences)? = null,
 ) : ViewModel() {
+    /** Last emitted state; used to keep the previous *instance* of any content-equal projection. */
+    private var previousUi: LauncherUiState? = null
+
+    /** Content-equal keeps the old instance: several projections carry `List`s, which Compose's
+     *  strong skipping compares by reference — a rebuilt-but-identical catalog must not recompose
+     *  the tray/home subtrees. Runs on the (sequential) transform pipeline, off the main thread. */
+    private fun <T> keep(old: T, new: T): T = if (old == new) old else new
+
     val uiState: StateFlow<LauncherUiState> = snapshots
         .map { s ->
-            LauncherUiState(
+            val next = LauncherUiState(
                 chips = s.chips,
                 temperatures = s.temperatures,
                 mediaSessions = s.media,
                 connected = s.connected,
-                lastUpdateAt = s.lastUpdateAt,
-                latestStates = s.latestStates,
+                // Frozen while connected (see the field's doc): the value only matters once the
+                // connection drops, and the disconnect emission carries it.
+                lastUpdateAt = if (s.connected) 0L else s.lastUpdateAt,
                 areaByEntity = s.areaByEntity,
                 areaIdByEntity = s.areaIdByEntity,
                 areaNameById = s.areaNameById,
@@ -111,6 +122,23 @@ class LauncherViewModel(
                 homeComposition = s.homeComposition,
                 homePage = s.homePage,
             )
+            val previous = previousUi
+            val merged = if (previous == null) next else LauncherUiState(
+                chips = keep(previous.chips, next.chips),
+                temperatures = keep(previous.temperatures, next.temperatures),
+                mediaSessions = keep(previous.mediaSessions, next.mediaSessions),
+                connected = next.connected,
+                lastUpdateAt = next.lastUpdateAt,
+                areaByEntity = keep(previous.areaByEntity, next.areaByEntity),
+                areaIdByEntity = keep(previous.areaIdByEntity, next.areaIdByEntity),
+                areaNameById = keep(previous.areaNameById, next.areaNameById),
+                catalog = keep(previous.catalog, next.catalog),
+                homePreferences = keep(previous.homePreferences, next.homePreferences),
+                homeComposition = keep(previous.homeComposition, next.homeComposition),
+                homePage = keep(previous.homePage, next.homePage),
+            )
+            previousUi = merged
+            merged
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LauncherUiState())
 

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.DeviceThermostat
+import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.Eco
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Home
@@ -40,6 +41,7 @@ fun launcherIcon(key: String): ImageVector = when (key.lowercase()) {
     "washer", "timer" -> Icons.Outlined.CleaningServices
     "window", "opening", "cover", "shutter", "blind" -> Icons.Outlined.SensorDoor
     "door", "porte" -> Icons.Outlined.SensorDoor
+    "motion", "movement", "occupancy" -> Icons.Outlined.DirectionsRun
     "air", "air_purifier", "purifier", "fan" -> Icons.Outlined.Air
     "lock" -> Icons.Outlined.Lock
     "unlock", "lock_open" -> Icons.Outlined.LockOpen

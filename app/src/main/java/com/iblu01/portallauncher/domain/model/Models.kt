@@ -119,4 +119,6 @@ data class PlayingMedia(
     val groupablePlayers: List<MediaPlayerVolume> = emptyList(),
     val groupMemberIds: List<String> = emptyList(),
     val hasMedia: Boolean = true,
+    /** Résolu depuis `app_name`, `source` puis le préfixe de `media_content_id` (Spotify, Cast, …). */
+    val source: String? = null,
 )

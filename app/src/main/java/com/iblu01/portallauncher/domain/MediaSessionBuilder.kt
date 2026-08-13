@@ -3,6 +3,7 @@ package com.iblu01.portallauncher.domain
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.PlayingMedia
+import org.json.JSONObject
 
 /**
  * Pure media-session rebuild extracted from the `PillHub` listener
@@ -54,6 +55,7 @@ object MediaSessionBuilder {
                     album = entity.attributes.optString("media_album_name").takeIf { it.isNotBlank() },
                     state = entity.state,
                     coverUrl = fullCoverUrl,
+                    source = resolveSource(entity.attributes),
                     volumePercent = volume,
                     isMuted = muted,
                     playerNames = matchingPlayers
@@ -89,5 +91,28 @@ object MediaSessionBuilder {
                 session.players.mapNotNull { player -> states[player.entityId]?.lastChanged }.minOrNull().orEmpty()
             }.thenBy { it.entityId }
         )
+    }
+
+    /**
+     * Résout la source du flux multimédia à partir des attributs exposés par HA, dans l'ordre de
+     * fiabilité décroissant : `app_name` (Cast), `source` (Sonos, etc.), puis inférence par préfixe
+     * de `media_content_id` (spotify:, youtube…). Retourne null quand aucune source n'est décelable.
+     */
+    private fun resolveSource(attributes: JSONObject): String? {
+        val appName = attributes.optString("app_name").trim()
+        if (appName.isNotBlank()) return appName
+
+        val source = attributes.optString("source").trim()
+        if (source.isNotBlank()) return source
+
+        val contentId = attributes.optString("media_content_id").trim()
+        return when {
+            contentId.startsWith("spotify:") -> "Spotify"
+            contentId.startsWith("https://open.spotify.com") -> "Spotify"
+            contentId.startsWith("yt:") -> "YouTube"
+            contentId.startsWith("youtube:") -> "YouTube"
+            contentId.startsWith("https://www.youtube.com") -> "YouTube"
+            else -> null
+        }
     }
 }

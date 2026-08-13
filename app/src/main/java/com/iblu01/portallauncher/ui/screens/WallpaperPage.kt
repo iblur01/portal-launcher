@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +48,9 @@ import com.iblu01.portallauncher.ui.components.SettingsRow
 import com.iblu01.portallauncher.ui.components.SettingsSection
 import com.iblu01.portallauncher.ui.components.SettingsSubPageHeader
 import com.iblu01.portallauncher.ui.components.SettingsTextField
+import com.iblu01.portallauncher.ui.components.copyWallpaper
+import com.iblu01.portallauncher.ui.components.systemWallpaperSupported
+import com.iblu01.portallauncher.ui.components.wallpaperFile
 import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.onboarding.components.ChoiceTile
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -88,9 +94,27 @@ internal fun WallpaperPage(
     var immichErrorCategory by remember { mutableStateOf<String?>(null) }
     var immichConnectedAlbumCount by remember { mutableStateOf<Int?>(null) }
 
-    val selectedMode = bgMode.takeIf { mode -> wallpaperSettingsModes.any { it.key == mode } } ?: "system"
+    // Devices without a wallpaper service (Portal) would show a black screen in "system" mode, so
+    // the Android source disappears there and the launcher-drawn photo takes its place.
+    val systemSupported = remember(context) { systemWallpaperSupported(context) }
+    val modes = remember(systemSupported) { wallpaperSettingsModes(systemSupported) }
+    val selectedMode = bgMode.takeIf { mode -> modes.any { it.key == mode } }
+        ?: if (systemSupported) "system" else "custom"
     LaunchedEffect(bgMode) {
         if (selectedMode != bgMode) onBgModeChange(selectedMode)
+    }
+
+    var wallpaperError by remember { mutableStateOf(false) }
+    var wallpaperPresent by remember { mutableStateOf(wallpaperFile(context).exists()) }
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val copied = withContext(Dispatchers.IO) { copyWallpaper(context, uri) }
+            wallpaperError = !copied
+            wallpaperPresent = wallpaperFile(context).exists()
+            // Re-emitting even for custom -> custom is what makes the launcher re-read the file.
+            if (copied) onBgModeChange("custom")
+        }
     }
 
     fun loadImmichAlbums(openPicker: Boolean) {
@@ -182,9 +206,30 @@ internal fun WallpaperPage(
         )
 
         WallpaperSourceGrid(
+            modes = modes,
             bgMode = selectedMode,
             onSelect = onBgModeChange,
         )
+
+        if (selectedMode == "custom") {
+            SettingsSection(title = stringResource(R.string.bg_mode_custom)) {
+                SettingsRow(
+                    label = stringResource(
+                        if (wallpaperPresent) {
+                            R.string.settings_wallpaper_replace_photo
+                        } else {
+                            R.string.settings_wallpaper_choose_photo
+                        },
+                    ),
+                    value = when {
+                        wallpaperError -> stringResource(R.string.settings_wallpaper_photo_error)
+                        !wallpaperPresent -> stringResource(R.string.settings_wallpaper_photo_missing)
+                        else -> null
+                    },
+                    onClick = { pickPhoto.launch("image/*") },
+                )
+            }
+        }
 
         if (selectedMode == "system") {
             SettingsSection(title = stringResource(R.string.settings_wallpaper_android_section)) {
@@ -341,15 +386,18 @@ private data class WallpaperSettingsMode(
     val icon: ImageVector? = null,
 )
 
-private val wallpaperSettingsModes = listOf(
-    WallpaperSettingsMode("system", R.string.bg_mode_system, Icons.Outlined.Android),
+private fun wallpaperSettingsModes(systemSupported: Boolean) = listOfNotNull(
+    WallpaperSettingsMode("system", R.string.bg_mode_system, Icons.Outlined.Android)
+        .takeIf { systemSupported },
     WallpaperSettingsMode("neutral", R.string.bg_mode_neutral, Icons.Outlined.DarkMode),
+    WallpaperSettingsMode("custom", R.string.bg_mode_custom, Icons.Outlined.Image),
     WallpaperSettingsMode("immich", R.string.bg_mode_immich, Icons.Outlined.Cloud),
 )
 
-/** The three wallpaper sources available from settings, kept deliberately compact. */
+/** The wallpaper sources available from settings, kept deliberately compact. */
 @Composable
 private fun WallpaperSourceGrid(
+    modes: List<WallpaperSettingsMode>,
     bgMode: String,
     onSelect: (String) -> Unit,
 ) {
@@ -357,7 +405,7 @@ private fun WallpaperSourceGrid(
         val columns = if (maxWidth >= 480.dp) 3 else if (maxWidth >= 300.dp) 2 else 1
         val tileHeight = 78.dp
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            wallpaperSettingsModes.chunked(columns).forEach { row ->
+            modes.chunked(columns).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     row.forEach { mode ->
                         ChoiceTile(

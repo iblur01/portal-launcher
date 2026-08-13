@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -42,25 +43,22 @@ fun ValveControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val canClose = "close_valve" in contract.actions
     val canStop = "stop_valve" in contract.actions
     val canPosition = "set_valve_position" in contract.actions
+    val hasPrimaryControl = canPosition || (canOpen && canClose && !canStop)
     var position by remember(entity.entityId, contract.value) { mutableFloatStateOf(contract.value ?: if (entity.state == "closed") 0f else 100f) }
     val openLabel = stringResource(R.string.valve_action_open)
     val closeLabel = stringResource(R.string.valve_action_close)
 
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text(
-            when (entity.state.lowercase()) {
+    val stateLabel = when (entity.state.lowercase()) {
                 "opening" -> stringResource(R.string.valve_state_opening)
                 "closing" -> stringResource(R.string.valve_state_closing)
                 "open" -> stringResource(R.string.valve_state_open)
                 else -> stringResource(R.string.valve_state_closed)
-            },
-            style = AppleTypography.titleMedium, color = AppleColors.primary,
-        )
-        Spacer(Modifier.height(14.dp))
+            }
+    val primaryControl: @Composable (Modifier) -> Unit = { controlModifier ->
         if (canPosition) {
-            BoxWithConstraints(Modifier.fillMaxWidth(0.54f).weight(1f), contentAlignment = Alignment.Center) {
+            BoxWithConstraints(controlModifier, contentAlignment = Alignment.Center) {
                 val widthToHeightRatio = 96f / 240f
-                val height = minOf(maxHeight, maxWidth / widthToHeightRatio)
+                val height = minOf(maxHeight, maxWidth / widthToHeightRatio, 300.dp)
                 val width = height * widthToHeightRatio
                 VerticalFillSlider(
                     value = position, onValueChange = { position = contract.normalized(it) },
@@ -71,9 +69,9 @@ fun ValveControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 )
             }
         } else if (canOpen && canClose && !canStop) {
-            BoxWithConstraints(Modifier.fillMaxWidth(0.54f).weight(1f), contentAlignment = Alignment.Center) {
+            BoxWithConstraints(controlModifier, contentAlignment = Alignment.Center) {
                 val widthToHeightRatio = 96f / 240f
-                val controlHeight = minOf(maxHeight, maxWidth / widthToHeightRatio)
+                val controlHeight = minOf(maxHeight, maxWidth / widthToHeightRatio, 300.dp)
                 val controlWidth = controlHeight * widthToHeightRatio
                 VerticalSwitch(
                     checked = entity.state.lowercase() in setOf("open", "opening"),
@@ -84,6 +82,34 @@ fun ValveControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 )
             }
         }
+    }
+    val actions: @Composable (Modifier) -> Unit = { actionModifier ->
+        Column(actionModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text(stateLabel, style = AppleTypography.headlineLarge, color = AppleColors.primary)
+        if (canOpen || canStop || canClose) {
+            Spacer(Modifier.height(16.dp))
+            PortalThreeWayControl(
+                leadingIcon = Icons.Outlined.Plumbing, leadingContentDescription = stringResource(R.string.valve_action_open),
+                onLeadingClick = { callService("valve", "open_valve", entity.entityId) }, leadingLabel = stringResource(R.string.valve_action_open), leadingEnabled = canOpen,
+                centerIcon = Icons.Outlined.Stop, centerContentDescription = stringResource(R.string.valve_action_stop),
+                onCenterClick = { callService("valve", "stop_valve", entity.entityId) }, centerEnabled = canStop,
+                trailingIcon = Icons.Outlined.Block, trailingContentDescription = stringResource(R.string.valve_action_close),
+                onTrailingClick = { callService("valve", "close_valve", entity.entityId) }, trailingLabel = stringResource(R.string.valve_action_close), trailingEnabled = canClose,
+                size = if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) com.iblu01.portallauncher.ui.components.controls.ThreeWayControlSize.Large else com.iblu01.portallauncher.ui.components.controls.ThreeWayControlSize.Regular,
+            )
+        }
+        }
+    }
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        if (hasPrimaryControl) {
+            AdaptivePanelSplit(modifier, primary = { primaryControl(it) }, secondary = { actions(it) })
+        } else {
+            actions(modifier.fillMaxSize())
+        }
+    } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Text(stateLabel, style = AppleTypography.titleMedium, color = AppleColors.primary)
+        Spacer(Modifier.height(14.dp))
+        primaryControl(Modifier.fillMaxWidth(0.54f).weight(1f))
         if (canOpen || canStop || canClose) {
             Spacer(Modifier.height(16.dp))
             PortalThreeWayControl(

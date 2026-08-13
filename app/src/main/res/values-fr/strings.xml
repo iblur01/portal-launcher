@@ -5,34 +5,34 @@
 
     <!-- ===== SETUP WIZARD ===== -->
     <string name="setup_welcome_title">Bienvenue</string>
-    <string name="setup_welcome_subtitle">Commençons par trouver ta maison. Assure-toi que Home Assistant est allumé sur le même réseau.</string>
+    <string name="setup_welcome_subtitle">Commençons par trouver votre maison. Assurez-vous que Home Assistant est actif sur le même réseau.</string>
     <string name="setup_scanning_network">Recherche sur le réseau…</string>
-    <string name="setup_section_manual_address">OU SAISIS L\'ADRESSE</string>
+    <string name="setup_section_manual_address">OU SAISISSEZ L\'ADRESSE</string>
     <string name="setup_label_address">Adresse</string>
     <string name="setup_placeholder_address">http://homeassistant.local:8123</string>
     <string name="setup_button_continue">Continuer</string>
     <string name="setup_button_configure_later">Configurer plus tard</string>
-    <string name="setup_access_key_title">Ta clé d\'accès</string>
-    <string name="setup_access_key_subtitle">Pour laisser Portal lire l\'état de ta maison, colle une clé d\'accès créée dans Home Assistant.</string>
+    <string name="setup_access_key_title">Votre clé d\'accès</string>
+    <string name="setup_access_key_subtitle">Pour permettre à Portal de lire l\'état de votre maison, collez une clé d\'accès créée dans Home Assistant.</string>
     <string name="setup_section_access_key">CLÉ D\'ACCÈS</string>
     <string name="setup_label_access_key">Clé d\'accès</string>
-    <string name="setup_placeholder_paste_key">Colle ta clé ici</string>
+    <string name="setup_placeholder_paste_key">Collez votre clé ici</string>
     <string name="setup_label_where_to_find_key">Où trouver ma clé ?</string>
     <string name="setup_label_connection">Connexion</string>
     <string name="setup_button_test_connection">Vérifier la connexion</string>
     <string name="setup_button_back">Retour</string>
     <string name="setup_done_title">Tout est prêt !</string>
-    <string name="setup_done_subtitle">Portal va maintenant afficher l\'état de ta maison.</string>
+    <string name="setup_done_subtitle">Portal va maintenant afficher l\'état de votre maison.</string>
     <string name="setup_button_start">Commencer</string>
-    <string name="setup_access_key_help_step_1">1. Ouvre Home Assistant → Paramètres → Utilisateurs</string>
-    <string name="setup_access_key_help_step_2">2. Sélectionne ton utilisateur</string>
+    <string name="setup_access_key_help_step_1">1. Ouvrez Home Assistant → Paramètres → Utilisateurs</string>
+    <string name="setup_access_key_help_step_2">2. Sélectionnez votre utilisateur</string>
     <string name="setup_access_key_help_step_3">3. Touche « Jetons d\'accès longue durée »</string>
     <string name="setup_access_key_help_step_4">4. Crée un jeton nommé « Portal »</string>
-    <string name="setup_access_key_help_step_5">5. Copie-le et colle-le ici</string>
+    <string name="setup_access_key_help_step_5">5. Copiez-la et collez-la ici</string>
 
     <!-- ===== HOME CONNECTION PAGE ===== -->
     <string name="home_connection_title">Ma maison</string>
-    <string name="home_connection_subtitle">Portal se connecte à ton serveur Home Assistant pour afficher l\'état de ta maison.</string>
+    <string name="home_connection_subtitle">Portal se connecte à votre serveur Home Assistant pour afficher l\'état de votre maison.</string>
     <string name="home_connection_section_address">ADRESSE</string>
     <string name="home_connection_ha_detected">Home Assistant détecté</string>
     <string name="home_connection_label_address">Adresse</string>
@@ -42,9 +42,22 @@
     <string name="home_connection_scan_found_format">%1$d trouvé(s)</string>
     <string name="home_connection_section_access_key">CLÉ D\'ACCÈS</string>
     <string name="home_connection_label_access_key">Clé d\'accès</string>
-    <string name="home_connection_placeholder_paste_key">Colle ta clé ici</string>
+    <string name="home_connection_placeholder_paste_key">Collez votre clé ici</string>
     <string name="home_connection_label_key_help">Où trouver ma clé ?</string>
     <string name="home_connection_section_status">STATUT DE LA CONNEXION</string>
+    <string name="home_connection_label_web_config">Configurer depuis un autre appareil</string>
+    <string name="web_config_title">Configuration à distance</string>
+    <string name="web_config_subtitle">Scannez ce code avec votre téléphone pour configurer le panneau.</string>
+    <string name="web_config_qr_description">QR code de la page de configuration</string>
+    <string name="web_config_section_manual">OU SAISISSEZ-LE MANUELLEMENT</string>
+    <string name="web_config_label_address">Adresse</string>
+    <string name="web_config_label_code">Code</string>
+    <string name="web_config_same_network_note">Le téléphone et le panneau doivent utiliser le même réseau Wi-Fi. La page se ferme lorsque vous quittez cet écran.</string>
+    <string name="web_config_unavailable">Configuration à distance indisponible : ce panneau n\'est pas sur un réseau.</string>
+    <string name="web_config_saved_title">Configuration enregistrée</string>
+    <string name="web_config_saved_body">Les réglages ont bien été reçus par ce panneau.</string>
+    <string name="web_config_saved_action">Tester et continuer</string>
+    <string name="onb_common_action_web_config">Configurer depuis mon téléphone</string>
     <string name="home_connection_label_connection">Connexion</string>
     <string name="home_connection_section_mqtt">MQTT</string>
     <string name="home_connection_label_mqtt_server">Adresse du serveur</string>
@@ -147,11 +160,11 @@
     <!-- ===== PILL SETTINGS PAGE ===== -->
     <string name="pills_page_title">Informations affichées</string>
     <string name="pills_page_description">Active ce que Portal peut afficher en haut de l\'écran. Les éléments désactivés ne sont jamais montrés même s\'ils sont détectés.</string>
-    <string name="pills_loading">Chargement depuis ta maison…</string>
+    <string name="pills_loading">Chargement depuis votre maison…</string>
     <string name="pills_section_connection">CONNEXION</string>
     <string name="pills_error_fallback">Erreur</string>
     <string name="pills_retry">Réessayer</string>
-    <string name="pills_no_devices">Aucun appareil compatible détecté. Vérifie la connexion dans « Ma maison ».</string>
+    <string name="pills_no_devices">Aucun appareil compatible détecté. Vérifiez la connexion dans « Ma maison ».</string>
     <string name="pills_no_results_format">Aucun résultat pour « %1$s ».</string>
     <string name="pills_section_results">RÉSULTATS</string>
     <string name="pills_section_categories">CATÉGORIES</string>
@@ -231,7 +244,10 @@
     <string name="header_hidden_apps_content_desc">Applications masquées (%1$d)</string>
     <string name="header_settings_content_desc">Réglages</string>
     <string name="home_header_title">Maison</string>
-    <string name="home_header_grouping_content_desc">Grouper par pièce (bientôt disponible)</string>
+    <string name="home_grouping_by_room">Par pièce</string>
+    <string name="home_grouping_by_type">Par type</string>
+    <string name="home_grouping_by_room_short">Pièce</string>
+    <string name="home_grouping_by_type_short">Type</string>
     <string name="home_header_edit_content_desc">Modifier Maison</string>
     <string name="home_header_finish_content_desc">Terminer la modification de Maison</string>
     <string name="auto_return_pill_label">Fermeture auto</string>
@@ -293,6 +309,9 @@
     <string name="weather_panel_title">Météo</string>
     <string name="weather_section_hourly">PROCHAINES HEURES</string>
     <string name="weather_section_daily">PROCHAINS JOURS</string>
+    <string name="weather_tab_hourly">Heures</string>
+    <string name="weather_tab_daily">Jours</string>
+    <string name="weather_today_range_format">Min %1$d° · Max %2$d°</string>
 
     <!-- ===== AIR QUALITY PANEL ===== -->
     <string name="air_quality_back_desc">Retour</string>
@@ -317,7 +336,7 @@
     <string name="media_volume_dialog_title">Volumes</string>
     <string name="media_volume_dialog_close">Fermer</string>
     <string name="media_group_dialog_title">Diffuser dans</string>
-    <string name="media_group_dialog_subtitle_format">Sélectionne les appareils à coupler avec %1$s</string>
+    <string name="media_group_dialog_subtitle_format">Sélectionnez les appareils à coupler avec %1$s</string>
     <string name="media_group_leader_label">Principal</string>
     <string name="media_group_dialog_close">Fermer</string>
     <string name="media_mini_previous_desc_format">Titre précédent dans %1$s</string>
@@ -426,6 +445,8 @@
     <string name="lock_state_jammed">Bloquée</string>
     <string name="lock_state_locked">Verrouillée</string>
     <string name="lock_state_unlocked">Déverrouillée</string>
+    <string name="lock_state_locking">Verrouillage…</string>
+    <string name="lock_state_unlocking">Déverrouillage…</string>
 
     <!-- ===== SWITCH / FAN / PURIFIER ===== -->
     <string name="switch_state_on">Allumé</string>
@@ -578,6 +599,7 @@
     <string name="playground_vacuum_in_progress">En cours</string>
     <string name="playground_vacuum_queued">En file</string>
     <string name="playground_section_accessories">Accessoires (HomeKit)</string>
+<string name="playground_section_media_providers">Badges fournisseurs média</string>
     <string name="playground_accessory_desk">Bureau</string>
     <string name="playground_accessory_off">Éteinte</string>
     <string name="playground_accessory_blinds">Volet</string>
@@ -640,6 +662,12 @@
     <string name="light_state_off">Éteinte</string>
     <string name="opening_state_open">Ouverte</string>
     <string name="opening_state_closed">Fermée</string>
+    <string name="door_opened_since">Ouverte depuis le %1$s</string>
+    <string name="door_closed_since">Fermée depuis le %1$s</string>
+    <string name="motion_state_detected">Mouvement détecté</string>
+    <string name="motion_state_clear">Aucun mouvement</string>
+    <string name="motion_detected_since">Mouvement détecté depuis le %1$s</string>
+    <string name="motion_clear_since">Aucun mouvement depuis le %1$s</string>
     <string name="pill_safety_alert">Alerte</string>
     <string name="phase_none">Aucun</string>
     <string name="phase_air_wash">Air wash</string>
@@ -719,6 +747,8 @@
     <string name="pill_lock_locked">Verrouillée</string>
     <string name="pill_lock_unlocked">Déverrouillée</string>
     <string name="pill_lock_jammed">Bloquée</string>
+    <string name="pill_lock_locking">Verrouillage…</string>
+    <string name="pill_lock_unlocking">Déverrouillage…</string>
     <string name="pill_individual_energy_power">Puissance</string>
     <string name="pill_individual_energy_today">Aujourd\'hui</string>
 
@@ -794,6 +824,7 @@
     <string name="onb_bg_tile_my_photo">Ma photo</string>
     <string name="onb_bg_tile_immich">Immich</string>
     <string name="onb_bg_android_desc">Utiliser le fond d’écran statique ou animé d’Android.</string>
+    <string name="onb_bg_custom_desc">Choisir une photo que le launcher affiche lui-même.</string>
     <string name="onb_bg_calm_desc">Un dégradé sombre, entièrement hors ligne.</string>
     <string name="onb_bg_calm_opacity_label">Opacité de l\'interface</string>
     <string name="onb_bg_calm_preview_action">Aperçu plein écran</string>
@@ -820,7 +851,7 @@
     <!-- ===== ONBOARDING — HOME_ASSISTANT_INTRO ===== -->
     <string name="onb_ha_intro_title">Portal est encore meilleur avec Home Assistant</string>
     <string name="onb_ha_intro_body">Connectez votre maison pour afficher et piloter vos lumières, ouvertures, alarmes, médias, températures et autres appareils importants.</string>
-    <string name="onb_ha_intro_question">Voulez-vous connecter votre maison maintenant&#160;?</string>
+    <string name="onb_ha_intro_question">Comment souhaitez-vous continuer&#160;?</string>
     <string name="onb_ha_intro_discovery_searching">Recherche de votre maison sur le réseau…</string>
     <string name="onb_ha_intro_discovery_found_none">Aucune maison détectée sur ce réseau.</string>
     <plurals name="onb_ha_intro_discovery_found_count">
@@ -829,6 +860,16 @@
     </plurals>
     <string name="onb_ha_intro_action_continue">Continuer avec cette maison</string>
     <string name="onb_ha_intro_action_manual">Ajouter manuellement</string>
+    <string name="onb_ha_intro_action_phone">Configurer avec un téléphone</string>
+    <string name="onb_ha_intro_action_manual_compact">Configurer manuellement sur ce panneau</string>
+    <string name="onb_ha_manual_warning_title">Écran compact</string>
+    <string name="onb_ha_manual_warning_body">La saisie reste possible, mais le clavier occupera une grande partie de l’écran. Pour une configuration plus confortable, utilisez un téléphone.</string>
+    <string name="onb_ha_manual_warning_phone">Utiliser un téléphone</string>
+    <string name="onb_ha_manual_warning_continue">Continuer ici</string>
+    <string name="onb_ha_intro_phone_title">Avec un téléphone</string>
+    <string name="onb_ha_intro_phone_body">Scannez un QR code et saisissez les réglages depuis un clavier confortable.</string>
+    <string name="onb_ha_intro_manual_title">Sur ce panneau</string>
+    <string name="onb_ha_intro_manual_body">Poursuivez directement ici avec le clavier du panneau.</string>
 
     <!-- ===== ONBOARDING — HOME_ASSISTANT_CREDENTIALS ===== -->
     <string name="onb_ha_creds_title">Connectez Portal à votre maison</string>
@@ -900,7 +941,7 @@
 
     <!-- ===== ONBOARDING — PILLS_INTRO ===== -->
     <string name="onb_pills_title">Les informations importantes viennent à vous</string>
-    <string name="onb_pills_body">Portal utilise des pills pour afficher, en un regard, ce qui compte dans votre maison.</string>
+    <string name="onb_pills_body">Portal utilise des pilules pour afficher, en un regard, ce qui compte dans votre maison.</string>
     <string name="onb_pills_demo_caption_normal">Situation normale</string>
     <string name="onb_pills_demo_caption_door">Une porte s\'ouvre</string>
     <string name="onb_pills_demo_caption_alarm">Une alarme est déclenchée</string>
@@ -1019,4 +1060,41 @@
     <string name="settings_wallpaper_android_section">ANDROID</string>
     <string name="settings_wallpaper_android_change">Choisir un autre fond d’écran Android</string>
     <string name="settings_wallpaper_sources_hint">Choisissez l’ambiance affichée derrière l’horloge et les apps.</string>
+
+    <!-- Dossiers de la grille d'applications -->
+    <string name="folder_default_label">Dossier</string>
+    <string name="folder_rename_label">Nom du dossier</string>
+    <string name="folder_rename_placeholder">Dossier</string>
+    <string name="folder_hint">Touchez le nom pour renommer. Appui long sur une application pour la sortir.</string>
+    <string name="folder_take_out">Sortir</string>
+    <string name="folder_delete">Supprimer le dossier</string>
+
+    <!-- Pastilles de notification -->
+    <string name="notification_dots_service_label">Pastilles de notification</string>
+    <string name="settings_app_toggle_notification_dots">Pastilles de notification</string>
+    <string name="settings_app_label_notification_access">Autoriser l\'accès aux notifications</string>
+    <string name="settings_app_value_notification_granted">Accordé</string>
+    <string name="settings_app_value_notification_missing">Requis</string>
+
+    <!-- Pack d'icônes -->
+    <string name="settings_app_label_icon_pack">Pack d\'icônes</string>
+    <string name="settings_app_value_icon_pack_system">Icônes du système</string>
+    <string name="icon_pack_picker_title">Pack d\'icônes</string>
+    <string name="icon_pack_picker_empty">Aucun pack d\'icônes installé</string>
+
+    <!-- Sauvegarde de la disposition -->
+    <string name="settings_app_section_layout_backup">SAUVEGARDE DE LA DISPOSITION</string>
+    <string name="settings_app_label_export_layout">Exporter la disposition</string>
+    <string name="settings_app_label_import_layout">Restaurer une disposition</string>
+    <string name="toast_layout_exported">Disposition exportée</string>
+    <string name="toast_layout_export_failed">Échec de l\'export</string>
+    <string name="toast_layout_imported_format">Disposition restaurée : %1$d icônes, %2$d dossiers</string>
+    <string name="toast_layout_import_failed">Fichier de sauvegarde illisible</string>
+    <string name="onb_setup_root_title">Root détecté</string>
+    <string name="onb_setup_root_desc">Portal peut accorder lui-même toutes les autorisations ci-dessous, activer l\'accès aux notifications et faire tourner son pont sans notification permanente.</string>
+    <string name="onb_setup_root_action">Tout configurer automatiquement</string>
+    <string name="onb_setup_root_action_busy">Configuration…</string>
+    <string name="settings_app_label_root_setup">Configuration automatique (root)</string>
+    <string name="settings_app_value_root_available">Disponible</string>
+    <string name="settings_app_value_root_done">Configuré</string>
 </resources>

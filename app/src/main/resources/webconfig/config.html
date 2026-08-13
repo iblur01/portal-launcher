@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr" class="h-full bg-black">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#000000">
+  <meta name="portal-token" content="%TOKEN%">
+  <title>Configuration du panneau</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="webconfig.css">
+</head>
+<body class="min-h-full bg-black text-white antialiased">
+  <main class="wizard-shell">
+    <header class="wizard-topbar">
+      <div>
+        <p class="wizard-brand">Portal</p>
+        <p id="progress-label" class="wizard-progress-label">Maison · étape 1 sur 3</p>
+      </div>
+      <div id="progress-dots" class="progress-dots" aria-label="Progression"></div>
+    </header>
+
+    <form id="config-form" class="wizard-body" novalidate>
+      <div class="wizard-context" aria-live="polite">
+        <p id="step-chapter" class="wizard-chapter">Maison</p>
+        <h1 id="step-title">Connectez Home Assistant</h1>
+        <p id="step-description">Indiquez l’adresse de votre maison et son jeton d’accès.</p>
+      </div>
+
+      <div class="wizard-workspace">
+        <section class="wizard-step" data-step="0" aria-label="Home Assistant">
+          <div class="settings-group">
+            <label class="wizard-field" for="ha_url"><span>Adresse</span><input id="ha_url" type="url" inputmode="url" placeholder="http://homeassistant.local:8123" required></label>
+            <p id="ha_url_error" class="field-error hidden">Saisissez une adresse commençant par http:// ou https://.</p>
+            <label class="wizard-field" for="ha_token"><span>Jeton longue durée</span><input id="ha_token" type="password" autocomplete="off" placeholder="Jeton Home Assistant" required></label>
+            <p id="ha_token_error" class="field-error hidden">Le jeton d’accès est nécessaire.</p>
+          </div>
+          <button id="toggle-ha-token" class="text-action" type="button">Afficher le jeton</button>
+        </section>
+
+        <section class="wizard-step hidden" data-step="1" aria-label="MQTT">
+          <p class="step-note">Les identifiants MQTT sont distincts de ceux de Home Assistant.</p>
+          <div class="settings-group">
+            <label class="wizard-field" for="broker_host"><span>Serveur</span><input id="broker_host" type="text" autocomplete="off" placeholder="192.168.1.10" required></label>
+            <label class="wizard-field" for="broker_port"><span>Port</span><input id="broker_port" type="number" min="1" max="65535" inputmode="numeric" required></label>
+            <p id="mqtt_error" class="field-error hidden">Renseignez un serveur et un port compris entre 1 et 65535.</p>
+            <label class="wizard-field" for="username"><span>Utilisateur</span><input id="username" type="text" autocomplete="off"></label>
+            <label class="wizard-field" for="password"><span>Mot de passe</span><input id="password" type="password" autocomplete="off"></label>
+            <label class="wizard-field" for="device_name"><span>Nom du panneau</span><input id="device_name" type="text" autocomplete="off" placeholder="Panneau salon"></label>
+          </div>
+        </section>
+
+        <section class="wizard-step hidden" data-step="2" aria-label="Vérification">
+          <div class="summary-group">
+            <div class="summary-row"><span>Home Assistant</span><strong id="summary-ha"></strong></div>
+            <div class="summary-row"><span>MQTT</span><strong id="summary-mqtt"></strong></div>
+            <div class="summary-row"><span>Panneau</span><strong id="summary-device"></strong></div>
+          </div>
+          <p id="config_status" class="status" aria-live="polite"></p>
+        </section>
+      </div>
+
+      <section id="saved-view" class="completion-view hidden" aria-live="polite">
+        <div class="completion-check" aria-hidden="true">✓</div>
+        <h1>Configuration enregistrée</h1>
+        <p>Le panneau a bien reçu les nouveaux réglages.</p>
+        <strong>Vous pouvez fermer cet onglet.</strong>
+      </section>
+
+      <footer class="wizard-navigation">
+        <button id="back" type="button" class="nav-button nav-back hidden">Précédent</button>
+        <button id="next" type="button" class="nav-button nav-primary">Continuer</button>
+      </footer>
+    </form>
+  </main>
+  <script src="config.js"></script>
+</body>
+</html>

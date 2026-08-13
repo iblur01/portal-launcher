@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher.ui.onboarding.screens
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -26,12 +27,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.iblu01.portallauncher.R
+import com.iblu01.portallauncher.WebConfigActivity
 import com.iblu01.portallauncher.ui.components.PillButton
 import com.iblu01.portallauncher.ui.components.SettingsInfoDialog
 import com.iblu01.portallauncher.ui.components.SettingsTextField
@@ -66,6 +69,7 @@ fun HomeAssistantCredentialsStep(
     var showHelp by remember { mutableStateOf(false) }
     var confirmAbandon by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val detected = state.selectedHome
     val addressValid = OnboardingUrls.isValidHaUrl(state.haUrl)
@@ -149,6 +153,11 @@ fun HomeAssistantCredentialsStep(
                 TextAction(
                     label = stringResource(R.string.onb_ha_creds_action_find_token),
                     onClick = { showHelp = true },
+                )
+                // The token lives in a browser on another device anyway — let that device type it.
+                TextAction(
+                    label = stringResource(R.string.onb_common_action_web_config),
+                    onClick = { context.startActivity(Intent(context, WebConfigActivity::class.java)) },
                 )
             }
         }

@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import com.iblu01.portallauncher.RootProvisioning
 import com.iblu01.portallauncher.ScreenControl
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -79,6 +80,12 @@ class OnboardingCapabilities @Inject constructor(
      * service can be enabled without leaving the app. Returns true when that worked.
      */
     fun tryEnableScreenControlDirectly(): Boolean = ScreenControl.enableAccessibility(context)
+
+    /** True when a root shell answers, i.e. Portal can grant itself everything. */
+    fun isRootAvailable(): Boolean = RootProvisioning.isAvailable()
+
+    /** Grants every capability from a root shell. Blocking: call it off the main thread. */
+    fun provisionWithRoot(): Boolean = RootProvisioning.provision(context)
 
     /** The command shown when no system screen can set the launcher role. */
     fun adbSetHomeCommand(): String =

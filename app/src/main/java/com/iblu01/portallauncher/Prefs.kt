@@ -2,6 +2,7 @@ package com.iblu01.portallauncher
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -13,6 +14,10 @@ import com.iblu01.portallauncher.ui.theme.ClockFont
 import com.iblu01.portallauncher.ui.theme.ClockTheme
 import com.iblu01.portallauncher.ui.theme.ClockTint
 import com.iblu01.portallauncher.photo.TransportPolicy
+import com.iblu01.portallauncher.ui.components.systemWallpaperSupported
+import com.iblu01.portallauncher.ui.components.wallpaperFile
+
+private val backgroundModeKeys = setOf("system", "neutral", "custom", "immich")
 
 class Prefs(private val context: Context) {
     private val sp = plainPrefs(context)
@@ -60,8 +65,18 @@ class Prefs(private val context: Context) {
         set(value) = secure.edit().putString("password", value).apply()
 
     var deviceName: String
-        get() = sp.getString("device_name", "Portal") ?: "Portal"
-        set(value) = sp.edit().putString("device_name", value.trim().ifEmpty { "Portal" }).apply()
+        get() = sp.getString("device_name", null)
+            ?.takeIf { it.isNotBlank() }
+            ?: androidDeviceName(context)
+        set(value) = sp.edit().putString("device_name", value.trim().ifEmpty { androidDeviceName(context) }).apply()
+
+    /** Resolves the OS-level device name (Settings.Global.DEVICE_NAME, else Build.MODEL). */
+    private fun androidDeviceName(context: Context): String =
+        runCatching {
+            Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+        }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+            ?: Build.MODEL?.trim()?.takeIf { it.isNotEmpty() }
+            ?: "Android"
 
     val deviceId: String
         get() {
@@ -91,13 +106,24 @@ class Prefs(private val context: Context) {
         get() = sp.getInt("screen_timeout_minutes", 10)
         set(value) = sp.edit().putInt("screen_timeout_minutes", value.coerceIn(1, 240)).apply()
 
+    /** Queried once: whether the OS has a wallpaper service at all cannot change while we run. */
+    private val wallpaperSupported: Boolean by lazy { systemWallpaperSupported(context) }
+
+    /**
+     * The background source. On devices whose OS draws no wallpaper (Portal), "system" would mean a
+     * permanently black screen, so it resolves to the launcher-drawn photo — or the neutral
+     * gradient while no photo has been chosen — whatever the stored value says.
+     */
     var backgroundMode: String
-        get() = sp.getString("background_mode", "system")
-            ?.takeIf { it in setOf("system", "neutral", "immich") }
-            ?: "system"
+        get() {
+            val stored = sp.getString("background_mode", "system")
+                ?.takeIf { it in backgroundModeKeys } ?: "system"
+            if (stored != "system" || wallpaperSupported) return stored
+            return if (wallpaperFile(context).exists()) "custom" else "neutral"
+        }
         set(value) = sp.edit().putString(
             "background_mode",
-            value.takeIf { it in setOf("system", "neutral", "immich") } ?: "system",
+            value.takeIf { it in backgroundModeKeys } ?: "system",
         ).apply()
 
     /**
@@ -438,6 +464,58 @@ class Prefs(private val context: Context) {
         get() = sp.getBoolean("app_placements_seeded", false)
         set(value) = sp.edit().putBoolean("app_placements_seeded", value).apply()
 
+    /**
+     * Folders on the app grid: id -> member item keys. Labels are *not* stored here — a folder is
+     * renamed through [appLabels] like any other item, keyed by its `fd:<id>` grid key.
+     */
+    var appFolders: List<FolderRecord>
+        get() = runCatching {
+            val arr = org.json.JSONArray(sp.getString("app_folders", "[]") ?: "[]")
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                val id = o.optString("id")
+                val members = o.optJSONArray("m") ?: org.json.JSONArray()
+                val keys = (0 until members.length()).mapNotNull {
+                    members.optString(it).takeIf(String::isNotBlank)
+                }
+                if (id.isBlank() || keys.isEmpty()) null else FolderRecord(id, keys)
+            }
+        }.getOrDefault(emptyList())
+        set(value) {
+            val arr = org.json.JSONArray()
+            value.forEach { folder ->
+                val members = org.json.JSONArray()
+                folder.members.forEach { members.put(it) }
+                arr.put(org.json.JSONObject().put("id", folder.id).put("m", members))
+            }
+            sp.edit().putString("app_folders", arr.toString()).apply()
+        }
+
+    /**
+     * Package name of the installed icon pack applied to app icons, or "" for the system icons.
+     * See `ui.apps.IconPack`.
+     */
+    var iconPack: String
+        get() = sp.getString("icon_pack", "") ?: ""
+        set(value) = sp.edit().putString("icon_pack", value.trim()).apply()
+
+    /**
+     * Whether the grid draws a dot on apps with a pending notification. Off by default: it needs
+     * notification-listener access, which the user has to grant in the system settings.
+     */
+    var notificationDots: Boolean
+        get() = sp.getBoolean("notification_dots", false)
+        set(value) = sp.edit().putBoolean("notification_dots", value).apply()
+
+    /**
+     * Set once a root shell granted every system capability. It also means the app was exempted
+     * from background restrictions, so the MQTT bridge runs without a foreground-service
+     * notification — no permanent entry in the notification shade.
+     */
+    var rootProvisioned: Boolean
+        get() = sp.getBoolean("root_provisioned", false)
+        set(value) = sp.edit().putBoolean("root_provisioned", value).apply()
+
     /** Item keys hidden from the grid. */
     var hiddenApps: Set<String>
         get() = decodeStringList(sp.getString("hidden_apps", "[]")).toSet()
@@ -564,6 +642,9 @@ data class AppPlacement(
     val spanX: Int = 1,
     val spanY: Int = 1,
 )
+
+/** A folder as persisted: its id and the item keys it holds. See `ui.apps.Folder`. */
+data class FolderRecord(val id: String, val members: List<String>)
 
 /** A shortcut an app asked the launcher to pin. Its icon lives in `ShortcutIconStore`. */
 data class PinnedShortcut(val packageName: String, val shortcutId: String, val label: String)

@@ -5,8 +5,9 @@ Exhaustive inventory of what the app actually does, derived from the code (not f
 Scope note: this is a **launcher** that takes the home role on any Android 9+ device, whose default
 screen is a clock and whose Home Assistant integration is optional. Portal-specific behaviour (the
 dream/sleep presence proxy, the API 28 blur fallback) is called out where it appears.
-Every non-obvious claim carries a `file:line`. Updated 2026-08-08 against branch
-`feature/home-assistant-extended-support`.
+Every non-obvious claim carries a source reference. Updated 2026-08-13 against the current
+`preapre-0.08` worktree, including its uncommitted onboarding, remote-configuration, background and
+Home-grouping changes. Line numbers inherited from the earlier audit are indicative and can drift.
 
 Conventions used below:
 - **Interactive** = issues Home Assistant service calls. **Read-only** = display only.
@@ -57,10 +58,11 @@ Editor: Settings → Application → "Thème de l'horloge" → `ClockThemeActivi
 - ⚠️ UI ranges are narrower than the persisted clamps (`Prefs` allows size 60–200, spacing −5..15) — `Prefs.kt:113,117`.
 
 ### Background
-Three modes via `Prefs.backgroundMode` — `DynamicBackground.kt:34-38`:
-- `neutral` — static radial gradient (`:50-59`).
-- `nature` — ⚠️ cycles **5 hardcoded Unsplash URLs** every 30 s with a 2 s crossfade; no offline fallback, failures only log and leave the last frame (`:26-32,89-122`).
-- `custom` — user photo at `filesDir/wallpaper.jpg`, falls back to the gradient if absent (`:62-87`). Cache-busted by a `wallpaperVersion` counter bumped on settings change (`LauncherActivity.kt:232-243`).
+Four modes via `Prefs.backgroundMode` and `DynamicBackground.backgroundModes`:
+- `system` — Android static or live wallpaper rendered by the system wallpaper layer.
+- `neutral` — Portal's offline Calm radial background.
+- `custom` — a locally selected image, stored privately and falling back to Calm if absent.
+- `immich` — frames supplied by the photo coordinator and its bounded offline cache.
 
 Scrim: separate darkening layer, 0–60 %, default 25 %, only when mode ≠ neutral — `LauncherActivity.kt:464-470`, `Prefs.kt:98-100`. Tuned in **OpacityPreviewActivity**: real wallpaper + frozen mock clock + vertical fill slider with 20 haptic steps, committed on release only (`OpacityPreviewScreen.kt:106-112`).
 
@@ -536,16 +538,52 @@ Icons sit at the exact cell they were dropped in — an absolutely-positioned gr
 
 - **Cells** come from the page size (`gridSpecFor`, min 3×2), so hit-testing is arithmetic: a point maps to a cell with no reported rectangles involved (`cellAt`). Pages report the spec they afford, and placement re-resolves against it.
 - **Nothing is compacted.** `placeItems` only moves an item in two cases: its cell no longer exists (the grid shrank, e.g. on rotation) or two items claim the same one — then it takes the first free cell instead of vanishing or overlapping. A freshly installed app sorts last, so an install never disturbs the arrangement.
-- **A drop on an occupied cell swaps** the two icons. There is no dense order to cascade along under free placement, and refusing the drop would just throw the gesture away.
+- **A drop on an occupied cell makes a folder** of the two icons, the gesture every launcher uses (`LauncherLayoutStore.dropAt` → `foldOnto`). It only swaps when foldering is impossible — a widget on either side, or mismatched spans.
 - **Cross-page drags**: hold the icon against a page edge for 450 ms and the pager flips (`EDGE_FLIP_*`), which is also how you reach the drag-only empty page and thus create one. The edges are the **pager's viewport**, not a page's rectangle: pages slide, so a scrolled-away page's edges are meaningless — reading one made every position look like "against the right edge" and none like the left, so only forward flips worked. The drag state lives *above* the pager (`GridDragState`) because a page-local one could not survive the flip; the icon is drawn by an overlay in root coordinates, and the page under the icon's centre decides the target cell.
 - The gesture belongs to the page it started on, so it must survive that page moving and being scrolled off: its `pointerInput` is keyed on `page` + `spec` only (keying it on the page's rect rebuilt the node on every flip, ending the drag exactly when it had to continue), the on-page items are read through `rememberUpdatedState`, and while an icon is in hand **every** page stays composed (`beyondViewportPageCount`). A cancel is still treated as a drop, as a last-resort safety net.
 - The hovered cell is outlined from the draw phase, so following the finger costs no recomposition.
 - **Item menu** (`AppContextMenu.kt`): the app's own shortcuts (manifest + dynamic + pinned, max 4), then Renommer / Masquer / Infos de l'application / Désinstaller. A pinned shortcut gets Retirer instead. Uninstall is hidden for system apps and for Portal itself (`ApplicationInfo.FLAG_SYSTEM`).
 - Shortcuts come from `LauncherApps.getShortcuts()`, which **throws unless Portal is the selected home app**. Every call is gated on `hasShortcutHostPermission()`, and when it is false the menu says so rather than looking like an app with no shortcuts.
 - The menu is positioned from its *measured* height (flip above the tile, clamp into the screen, scroll if still too tall). Its panel swallows taps with a raw pointer handler, **not** `clickable`, which would merge the whole panel into one semantics node and hide the rows from TalkBack.
-- Placement lives in `Prefs.appPlacements` (key → page/col/row), renames in `Prefs.appLabels`, hidden items in `Prefs.hiddenApps`. A pre-pages arrangement (`appOrder`) is converted to cells once, so upgrading does not scatter it.
+- Placement lives in `Prefs.appPlacements` (key → page/col/row), renames in `Prefs.appLabels`, hidden items in `Prefs.hiddenApps`, folders in `Prefs.appFolders`. A pre-pages arrangement (`appOrder`) is converted to cells once, so upgrading does not scatter it.
 - Hidden apps come back through the top-bar button — hiding would otherwise be a one-way trip.
 - Icons use `Modifier.nonConsumingClickable`: `appleClickable` consumes the `down`, and a consumed event cancels the container's pending long-press — which silently killed the whole item menu.
+
+### Folders
+A folder is an item like any other — same key space (`fd:<id>`), same cell, same rename — holding app and shortcut keys (`Folders.kt`, `LauncherLayoutStore`).
+
+- **Made by dropping** one icon onto another; dropping onto an existing folder joins it. An icon dragged from one folder to another is detached first, so a move is one gesture rather than take-out-then-put-in.
+- **A folder opens as a popup**, centred, not as an in-place expanding container (`FolderDialog.kt`). On a wall panel read from across the room, the folder's contents belong where the eye already is — and the folder then needs no geometry of its own: no reserved cells, no reflow. Tap the title to rename, long-press a member to take it out, and there is a delete at the bottom.
+- **It cannot survive being pointless.** Below two members a folder dissolves and its survivor falls back onto the grid with no stored cell, which `placeItems` then homes into the first free one. The same rule prunes members whose app was uninstalled, on every app-list refresh — a folder can never hold a ghost.
+- Folders carry no label of their own: renaming one goes through `Prefs.appLabels` keyed by `fd:<id>`, the same code path as renaming an app. Deleting a folder clears that entry so the next `fd:` id does not inherit a stale name.
+- The tile draws its first four members in a 2×2 plate. Four is a limit on what reads legibly at tile size, not on the folder.
+- Widgets are never foldable (`isFoldable`): a folder holds things you launch.
+
+### Notification dots
+The grid draws a dot on apps with something waiting (`NotificationDotService.kt`).
+
+- A launcher cannot ask "does this app have a notification?" — the only way is to **be** a notification listener, so this is a `NotificationListenerService` that publishes nothing but the set of packages with a visible notification. No content is read, kept or logged.
+- Bound by the system only once the user grants listener access; the settings row shows whether that grant exists rather than leaving a toggle that silently does nothing.
+- **Ongoing** notifications (media sessions, foreground services, downloads) earn no dot — they are the permanent kind and would leave a dot lit forever. Group summaries are skipped because their children already count.
+- A folder is dotted when any member is, so foldering an app never silences it.
+- A dot, not a count: read from across a room, "something is waiting" carries and "3" does not.
+
+### Icon packs
+Any installed icon pack can theme the app icons (`IconPacks.kt`, `Prefs.iconPack`).
+
+- Packs are found through the three de-facto intents (`org.adw.launcher.THEMES`, GO, Nova) — there is no official API — and their `appfilter.xml` is read from the compiled XML resource first, then from `assets/`.
+- Only the `component → drawable` mapping is honoured. An app the pack does not theme **keeps its own icon**, so a partial pack degrades into a mixed grid rather than into blanks.
+- `iconback` / `iconmask` / `iconupon` compositing (restyling *unthemed* icons to match the pack) is deliberately not implemented: it is a rendering pipeline, not a lookup. The fallback is never wrong, only inconsistent.
+- The pack is parsed once per app-list load, not per icon, and changing it in the settings triggers a forced refresh over `SettingsChangeBus`.
+
+### Layout backup
+Export and restore of the arrangement (`LayoutBackup.kt`), through the storage picker — the app holds no storage permission and touches only the document the user picks.
+
+- Versioned, readable JSON: placements, folders, renames, hidden items, pinned shortcuts, grid scale and icon pack. It is **not** a preferences dump — no HA token, no MQTT password, nothing that could leak by passing the file around. A test asserts exactly that.
+- **Widget placements are dropped on restore.** A widget id is allocated by *this* device's `AppWidgetHost` and means nothing anywhere else; the widgets already bound here keep their own cells.
+- A restore marks `appPlacementsSeeded`, so the legacy `appOrder` conversion cannot replay over what was just restored, and emits `launcherLayout` on `SettingsChangeBus` so the running launcher re-reads instead of overwriting from memory.
+- An unreadable or too-new file raises rather than half-applying: a bad file must not wipe a grid.
+- Shortcut icons stay out (they live in `ShortcutIconStore`): a shortcut restored onto a device that never pinned it shows the placeholder tile but still launches.
 
 ### Widgets
 Bound through our own `AppWidgetHost` (`WidgetHostController.kt`), added from the surface menu → **Ajouter un widget**.
@@ -701,14 +739,9 @@ TalkBack/large-text/D-pad contracts.
 - Dependencies of note: Paho MQTT 1.2.5 (from a **custom Eclipse repo**, not Maven Central), OkHttp 4.12, Coil 2.7, Compose BOM 2024.09, Hilt 2.52. ⚠️ `androidx.security:security-crypto` is on **1.1.0-alpha06** and is the one dependency hardcoded outside the version catalog — an alpha for the library holding the HA token. `material-icons-extended` pulls thousands of icons for a handful of uses; `hilt-navigation-compose` is declared but there is no Compose Navigation in the app (activities are the navigation unit).
 
 ### i18n footprint
-`res/values/strings.xml` holds **3 strings**: the app name and two accessibility service labels. Everything else is a Kotlin literal — roughly **590 user-facing French strings** across ~25 files.
-
-Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59, dev-only so low priority), `PillRules.kt` (47), `SettingsScreen.kt` (41), `MediaPlayerView.kt` (40), `HaDiscovery.kt` (22, needs triage — some are HA-facing entity names), `HomeConnectionPage.kt` (21), `LightDetailPanel.kt` (21), `ClockScreen.kt` (19), `SetupWizard.kt` (17).
-
-⚠️ Extraction is **not** purely mechanical. Domain logic still generates labels without a
-`Context`, so either it takes a resource lookup or returns keys resolved at the Compose boundary.
-`ClockFont`/`ClockTint` store labels as `String` fields on an enum, and enum constructors cannot call
-`@Composable`, so those need a mapping function.
+The application now ships English defaults in `res/values/strings.xml` and French translations in
+`res/values-fr/strings.xml`. Compose surfaces resolve resource identifiers at the UI boundary;
+Home Assistant entity labels and locally supplied names remain data rather than translated literals.
 
 ---
 
@@ -738,12 +771,14 @@ Biggest concentrations: `PillPriorityEngine.kt` (72), `PlaygroundScreen.kt` (59,
 
 - The weather entity is whichever `weather.*` HA lists first.
 - The offline banner never rolls over to hours.
-- The `nature` background has no offline fallback and its 5 image URLs are hardcoded.
+- Immich depends on the selected server while refreshing, but valid cached frames continue offline;
+  the Calm background is used when no frame is available.
 - No unavailable state on the list-based panels.
 - Silent fallback to unencrypted preferences if the Keystore is unavailable.
 
 ### Not implemented at all
-`button` / `number` / `select` HA entities · presence zones · media seek and source selection · vacuum clean modes · light theme and accent colour · comprehensive portrait/small-screen adaptation outside the new Maison/tray surfaces · complete i18n (new pill/Maison settings strings are extracted in English/French, but much of the older UI remains Kotlin-literal French).
+`button` / `number` / `select` HA entities · presence zones · media seek · light theme and accent
+colour · automated screenshot coverage for every compact/expanded panel combination.
 
 ### Verified NOT bugs
 Claims that looked like defects and were checked, then refuted — recorded so nobody re-opens them:

@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -55,9 +56,19 @@ object DeviceStateHub {
     )
         private set
 
+    /**
+     * Whether this device can meaningfully infer occupancy. The presence proxy relies on the
+     * screensaver/daydream lifecycle, so it is only exposed on hardware that has a dream component
+     * configured. Detected once at init; read by the MQTT bridge to gate presence discovery/state.
+     */
+    @Volatile
+    var presenceCapable = false
+        private set
+
     fun init(context: Context) {
         if (app != null) return
         app = context.applicationContext
+        presenceCapable = hasDreamComponent(context.applicationContext)
         context.applicationContext.registerReceiver(
             object : BroadcastReceiver() {
                 override fun onReceive(c: Context, intent: Intent) {
@@ -185,6 +196,17 @@ object DeviceStateHub {
         if (!isInteractive(context)) return DisplayMode.OFF
         return if (launcherForeground) DisplayMode.SCREENSAVER else DisplayMode.APP
     }
+
+    /** True when the device has a screensaver/daydream component configured to run. */
+    private fun hasDreamComponent(context: Context): Boolean =
+        runCatching {
+            // Raw key: Settings.Secure.SCREENSAVER_COMPONENTS was removed from the public SDK in
+            // API 33, but the underlying setting name is unchanged since API 17.
+            !Settings.Secure.getString(
+                context.contentResolver,
+                "screensaver_components",
+            ).isNullOrBlank()
+        }.getOrDefault(false)
 
     private fun isInteractive(context: Context): Boolean =
         runCatching {

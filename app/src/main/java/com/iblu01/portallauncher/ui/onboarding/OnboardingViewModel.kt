@@ -106,6 +106,7 @@ class OnboardingViewModel @Inject constructor(
 
     /** Re-reads every capability. Called from `onResume`, i.e. after each system-settings trip. */
     fun refreshCapabilities() {
+        probeRoot()
         val fresh = capabilities.read()
         _state.update { previous ->
             val newlyGranted = Capability.values().firstOrNull {
@@ -115,6 +116,22 @@ class OnboardingViewModel @Inject constructor(
             previous.copy(
                 systemCapabilities = fresh,
                 justGranted = newlyGranted ?: previous.justGranted,
+            )
+        }
+    }
+
+    /** Pulls values written by the short-lived web configurator back into the resumed assistant. */
+    fun refreshExternalConfiguration() {
+        _state.update {
+            it.copy(
+                haUrl = prefs.haUrl,
+                haToken = prefs.haToken,
+                mqttHost = prefs.brokerHost,
+                mqttPort = prefs.brokerPort,
+                mqttAuthEnabled = prefs.username.isNotBlank(),
+                mqttUsername = prefs.username,
+                mqttPassword = prefs.password,
+                mqttDeviceName = prefs.deviceName,
             )
         }
     }
@@ -129,6 +146,26 @@ class OnboardingViewModel @Inject constructor(
     fun settingsIntentFor(capability: Capability): Intent? = capabilities.settingsIntentFor(capability)
 
     fun tryEnableScreenControlDirectly(): Boolean = capabilities.tryEnableScreenControlDirectly()
+
+    /** Probes for root off the main thread; the answer is cached by the shell itself. */
+    private fun probeRoot() {
+        if (_state.value.rootAvailable) return
+        viewModelScope.launch {
+            val rooted = withContext(Dispatchers.IO) { capabilities.isRootAvailable() }
+            if (rooted) _state.update { it.copy(rootAvailable = true) }
+        }
+    }
+
+    /** One tap on a rooted panel: grants everything, then re-reads what actually landed. */
+    fun provisionWithRoot() {
+        if (_state.value.rootProvisioning) return
+        _state.update { it.copy(rootProvisioning = true) }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { capabilities.provisionWithRoot() }
+            _state.update { it.copy(rootProvisioning = false) }
+            refreshCapabilities()
+        }
+    }
 
     fun adbSetHomeCommand(): String = capabilities.adbSetHomeCommand()
 

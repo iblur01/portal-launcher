@@ -37,7 +37,7 @@ import com.iblu01.portallauncher.R
 import androidx.compose.ui.res.stringResource
 
 /** Frozen mock content used to judge the overlay against a real wallpaper — no HA dependency. */
-private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", city = "Appartement", condition = "Dégagé", glyph = WeatherGlyph())
+private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", city = "Appartement", condition = "Dégagé", glyph = WeatherGlyph("clear-day"))
 private val previewTemperatures = TemperatureSummary("22,5°", "24,5°", "19°")
 private val previewChips = listOf(
     LauncherChip("doors", "door", "Portes & fenêtres", "2 ouvertes", "warning"),

@@ -25,8 +25,8 @@ android {
         applicationId = "com.iblu01.portallauncher"
         minSdk = 28
         targetSdk = 28
-        versionCode = 7
-        versionName = "0.0.7-beta"
+        versionCode = 8
+        versionName = "1.0"
     }
 
     signingConfigs {
@@ -127,6 +127,16 @@ dependencies {
     testImplementation(libs.json)
 
     implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
+
+    // Remote configuration screen: LAN HTTP server + QR code for the phone to scan.
+    implementation(libs.nanohttpd)
+    implementation(libs.zxing.core)
+
+    // Installs the baseline profile (src/main/baseline-prof.txt + the Compose libraries' own
+    // profiles, merged by AGP) so cold start runs AOT-compiled instead of interpreted+JIT.
+    // Debuggable builds ignore AOT: measure on `productionTest` or `release`.
+    implementation(libs.profileinstaller)
 
     // MAD architecture: structured concurrency + StateFlow/ViewModel + immutable collections.
     implementation(libs.coroutines.android)

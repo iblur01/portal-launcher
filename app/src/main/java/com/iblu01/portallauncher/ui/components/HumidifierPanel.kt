@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -69,9 +70,9 @@ internal fun HumidifierControl(entity: HaEntity, modifier: Modifier = Modifier) 
         val pickerItemHeight = maxHeight * 0.075f
         val compactIconSize = minOf(maxWidth, maxHeight) * 0.055f
 
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        val target: @Composable (Modifier) -> Unit = { area ->
             BoxWithConstraints(
-                Modifier.fillMaxWidth(0.54f).weight(1f),
+                area,
                 contentAlignment = Alignment.Center,
             ) {
                 val ratio = 96f / 240f
@@ -90,7 +91,9 @@ internal fun HumidifierControl(entity: HaEntity, modifier: Modifier = Modifier) 
                     modifier = Modifier.size(sliderHeight * ratio, sliderHeight),
                 )
             }
-            Spacer(Modifier.height(spacing))
+        }
+        val modes: @Composable (Modifier) -> Unit = { area ->
+            Box(area, contentAlignment = Alignment.Center) {
             if (hasModes) {
                 key(selectedChoice) {
                     WheelPicker(
@@ -110,7 +113,7 @@ internal fun HumidifierControl(entity: HaEntity, modifier: Modifier = Modifier) 
                         visibleCount = 3,
                         itemHeight = pickerItemHeight,
                         accent = AppleColors.accent,
-                        modifier = Modifier.fillMaxWidth(0.72f),
+                        modifier = Modifier.fillMaxWidth(if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) 0.9f else 0.72f),
                     )
                 }
             } else {
@@ -147,6 +150,16 @@ internal fun HumidifierControl(entity: HaEntity, modifier: Modifier = Modifier) 
                         }
                     }
                 }
+            }
+            }
+        }
+        if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+            AdaptivePanelSplit(Modifier.fillMaxSize(), primaryWeight = 0.45f, primary = target, secondary = modes)
+        } else {
+            Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                target(Modifier.fillMaxWidth(0.54f).weight(1f))
+                Spacer(Modifier.height(spacing))
+                modes(Modifier.fillMaxWidth())
             }
         }
     }

@@ -58,6 +58,7 @@ fun ChoiceTile(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     icon: ImageVector? = null,
+    leadingIcon: (@Composable () -> Unit)? = null,
     /** Dense horizontal treatment for short onboarding windows. */
     compact: Boolean = false,
     /** True when the tile has a fixed height and the preview should absorb the leftover space. */
@@ -95,12 +96,17 @@ fun ChoiceTile(
             ) { preview() }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (icon != null) {
+            if (leadingIcon != null) {
+                Box(Modifier.size(if (compact) 30.dp else 36.dp), contentAlignment = Alignment.Center) {
+                    leadingIcon()
+                }
+                Spacer(Modifier.width(12.dp))
+            } else if (icon != null) {
                 Icon(
                     icon,
                     contentDescription = null,
                     tint = if (selected) AppleColors.accent else AppleColors.secondary,
-                    modifier = Modifier.size(if (compact) 20.dp else 22.dp),
+                    modifier = Modifier.size(if (compact) 28.dp else 32.dp),
                 )
                 Spacer(Modifier.width(12.dp))
             }

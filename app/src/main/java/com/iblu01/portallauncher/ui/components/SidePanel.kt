@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,20 +84,27 @@ fun ChipActionsPanel(
     navigationIcon: ImageVector = Icons.Filled.Close,
     navigationContentDescription: String? = null,
     onClose: (() -> Unit)? = null,
+    fullScreen: Boolean = false,
 ) {
     val accent = launcherChipAccent(chip)
     // Same large frosted card as the media player panel.
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 14.dp.scaled(), vertical = 16.dp.scaled())
+            .then(
+                if (fullScreen) Modifier
+                else Modifier.padding(horizontal = 14.dp.scaled(), vertical = 16.dp.scaled())
+            )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(AppleShapes.panel)
-                .background(Color.Black.copy(alpha = 0.72f))
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
+                .background(if (fullScreen) Color.Black else Color.Black.copy(alpha = 0.72f))
+                .then(
+                    if (fullScreen) Modifier
+                    else Modifier.border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
+                )
         ) {
             Box(
                 Modifier.fillMaxSize().background(
@@ -106,25 +115,30 @@ fun ChipActionsPanel(
                     )
                 )
             )
-            val directLightDetail = chip.individualLightDetailOrNull()
-            var lightDetail by remember(chip.id) { mutableStateOf(directLightDetail) }
-            val detail = lightDetail
-            if (detail != null) {
-                LightDetailContent(
-                    detail = detail,
-                    onBack = if (directLightDetail != null) onDismiss else fun() { lightDetail = null },
-                    closePanel = directLightDetail != null,
-                )
-            } else {
-                ChipActionsContent(
-                    chip = chip,
-                    accent = accent,
-                    onDismiss = onDismiss,
-                    navigationIcon = navigationIcon,
-                    navigationContentDescription = navigationContentDescription,
-                    onClose = onClose,
-                    onOpenLight = { lightDetail = it },
-                )
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val layoutMode = panelLayoutModeFor(maxWidth.value, maxHeight.value)
+                CompositionLocalProvider(LocalPanelLayoutMode provides layoutMode) {
+                    val directLightDetail = chip.individualLightDetailOrNull()
+                    var lightDetail by remember(chip.id) { mutableStateOf(directLightDetail) }
+                    val detail = lightDetail
+                    if (detail != null) {
+                        LightDetailContent(
+                            detail = detail,
+                            onBack = if (directLightDetail != null) onDismiss else fun() { lightDetail = null },
+                            closePanel = directLightDetail != null,
+                        )
+                    } else {
+                        ChipActionsContent(
+                            chip = chip,
+                            accent = accent,
+                            onDismiss = onDismiss,
+                            navigationIcon = navigationIcon,
+                            navigationContentDescription = navigationContentDescription,
+                            onClose = onClose,
+                            onOpenLight = { lightDetail = it },
+                        )
+                    }
+                }
             }
         }
     }
@@ -156,6 +170,8 @@ private fun ChipActionsContent(
         PanelKind.COVER -> entity?.let {
             !it.supports(CoverFeature.SET_POSITION) || it.attributes.optInt("current_position", -1) !in 0..100
         } != false
+        PanelKind.OPENING -> false // The door panel owns the open/closed state itself.
+        PanelKind.MOTION -> false // The motion panel owns the detected/clear state itself.
         else -> true
     }
     Column(
@@ -166,15 +182,15 @@ private fun ChipActionsContent(
     ) {
         PanelHeader(
             title = chip.label,
-            onNavigation = onDismiss,
-            navigationIcon = navigationIcon,
+            onNavigation = if (onClose != null) onDismiss else null,
+            navigationIcon = if (onClose != null) navigationIcon else null,
             navigationContentDescription = navigationContentDescription
                 ?: stringResource(R.string.side_panel_close_desc),
             titleIcon = launcherIcon(chip.icon),
             titleEntityId = chip.entityId,
             accent = accent,
             batteryPercent = batteryPercent,
-            onClose = onClose,
+            onClose = onClose ?: onDismiss,
         )
 
         Spacer(Modifier.height(if (showHeadlineValue) 14.dp.scaled() else 8.dp.scaled()))
@@ -192,7 +208,7 @@ private fun ChipActionsContent(
         // Center the control block vertically in the remaining space; it still scrolls if a
         // panel's content is taller than the panel (keypads, long detail lists).
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.PURIFIER, PanelKind.THERMOSTAT, PanelKind.VACUUM, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
+            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.OPENING, PanelKind.MOTION, PanelKind.PURIFIER, PanelKind.THERMOSTAT, PanelKind.VACUUM, PanelKind.ALARM, PanelKind.WASHER, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
                 // Vertical controls need finite panel constraints so they can fill the available
                 // height while preserving the same proportions as lights and covers.
                 when (chip.toPanelKind()) {
@@ -200,9 +216,13 @@ private fun ChipActionsContent(
                     PanelKind.FAN -> FanControl(chip, Modifier.fillMaxSize())
                     PanelKind.SWITCH -> SwitchControl(chip, Modifier.fillMaxSize())
                     PanelKind.LOCK -> LockControl(chip, Modifier.fillMaxSize())
+                    PanelKind.OPENING -> DoorControl(chip, Modifier.fillMaxSize())
+                    PanelKind.MOTION -> MotionControl(chip, Modifier.fillMaxSize())
                     PanelKind.PURIFIER -> PurifierActions(chip, Modifier.fillMaxSize())
                     PanelKind.THERMOSTAT -> ThermostatControl(chip, Modifier.fillMaxSize())
                     PanelKind.VACUUM -> VacuumControl(chip, Modifier.fillMaxSize())
+                    PanelKind.ALARM -> AlarmControl(chip, Modifier.fillMaxSize())
+                    PanelKind.WASHER -> WasherControl(chip, Modifier.fillMaxSize())
                     PanelKind.HUMIDIFIER -> GenericHaEntityControl(chip, Modifier.fillMaxSize())
                     PanelKind.WATER_HEATER -> WaterHeaterControl(chip, Modifier.fillMaxSize())
                     PanelKind.VALVE -> ValveControl(chip, Modifier.fillMaxSize())
@@ -228,8 +248,8 @@ private fun ChipActionsContent(
                 PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH -> Unit // Bounded branch above.
                 PanelKind.THERMOSTAT -> Unit // Bounded branch above.
                 PanelKind.VACUUM -> Unit // Bounded branch above.
-                PanelKind.ALARM -> AlarmControl(chip)
-                PanelKind.WASHER -> WasherControl(chip)
+                PanelKind.OPENING, PanelKind.MOTION -> Unit // Bounded branch above.
+                PanelKind.ALARM, PanelKind.WASHER -> Unit // Bounded branch above.
                 PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
                 PanelKind.LAWN_MOWER -> Unit // Bounded branch above.
                 // Direct media pills are routed to MediaPlayerPanel upstream. A media member opened
@@ -239,7 +259,7 @@ private fun ChipActionsContent(
                     .ifEmpty { listOf(PillDetail("État", chip.value, chip.entityId)) }
                     .forEach { PanelDetailRow(it) }
                 PanelKind.WEATHER, PanelKind.GENERIC_DETAILS ->
-                    chip.details.forEach { PanelDetailRow(it) }
+                    PanelDetails(chip.details)
                     }
                 }
             }
@@ -247,13 +267,28 @@ private fun ChipActionsContent(
     }
 }
 
+@Composable
+private fun PanelDetails(details: List<PillDetail>) {
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL && details.size > 1) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(2) { column ->
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    details.filterIndexed { index, _ -> index % 2 == column }.forEach { PanelDetailRow(it) }
+                }
+            }
+        }
+    } else {
+        details.forEach { PanelDetailRow(it) }
+    }
+}
+
 /** Large, background-free header shared by full panels and nested panel pages. */
 @Composable
 internal fun PanelHeader(
     title: String,
-    onNavigation: () -> Unit,
-    navigationIcon: ImageVector,
-    navigationContentDescription: String,
+    onNavigation: (() -> Unit)? = null,
+    navigationIcon: ImageVector? = null,
+    navigationContentDescription: String? = null,
     modifier: Modifier = Modifier,
     titleIcon: ImageVector? = null,
     /** When the panel is about one entity, its Home Assistant icon replaces [titleIcon]. */
@@ -263,6 +298,8 @@ internal fun PanelHeader(
     onTitleClick: (() -> Unit)? = null,
     /** Optional second action used by nested group pages: Back pops, Close dismisses the stack. */
     onClose: (() -> Unit)? = null,
+    /** Accessibility label for the close action; defaults to the generic close description. */
+    closeContentDescription: String? = null,
 ) {
     val batteryColor = when {
         batteryPercent == null -> AppleColors.secondary
@@ -274,23 +311,25 @@ internal fun PanelHeader(
         modifier = modifier.fillMaxWidth().height(52.dp.scaled()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp.scaled())
-                .clip(CircleShape)
-                .background(AppleColors.frostedFill)
-                .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
-                .clickable(onClick = onNavigation),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                navigationIcon,
-                contentDescription = navigationContentDescription,
-                tint = AppleColors.primary,
-                modifier = Modifier.size(24.dp.scaled()),
-            )
+        if (onNavigation != null && navigationIcon != null) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp.scaled())
+                    .clip(CircleShape)
+                    .background(AppleColors.frostedFill)
+                    .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
+                    .clickable(onClick = onNavigation),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    navigationIcon,
+                    contentDescription = navigationContentDescription,
+                    tint = AppleColors.primary,
+                    modifier = Modifier.size(24.dp.scaled()),
+                )
+            }
+            Spacer(Modifier.size(14.dp.scaled()))
         }
-        Spacer(Modifier.size(14.dp.scaled()))
         Row(
             modifier = Modifier
                 .weight(1f)
@@ -340,14 +379,16 @@ internal fun PanelHeader(
                 modifier = Modifier
                     .size(48.dp.scaled())
                     .clip(CircleShape)
+                    .background(AppleColors.frostedFill)
+                    .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
                     .clickable(onClick = onClose),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Filled.Close,
-                    contentDescription = stringResource(R.string.side_panel_close_desc),
-                    tint = AppleColors.secondary,
-                    modifier = Modifier.size(22.dp.scaled()),
+                    contentDescription = closeContentDescription ?: stringResource(R.string.side_panel_close_desc),
+                    tint = AppleColors.primary,
+                    modifier = Modifier.size(24.dp.scaled()),
                 )
             }
         }

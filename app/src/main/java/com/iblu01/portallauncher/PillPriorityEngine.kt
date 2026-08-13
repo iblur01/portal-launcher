@@ -191,8 +191,9 @@ class PillPriorityEngine(private val context: Context) {
                     else -> { score = 12; visual = "info" }
                 }
             } else if (s in inactive) visible = false else { score = 100; visual = "critical" }
-            PillKind.LOCK -> if (s == "unlocked" || s == "jammed" || s == "open") { score = 88; visual = "critical" } else { score = 9; visual = "active" }
+            PillKind.LOCK -> if (s == "unlocked" || s == "unlocking" || s == "jammed" || s == "open") { score = 88; visual = "critical" } else { score = 9; visual = "active" }
             PillKind.OPENING -> if (s in setOf("on", "open", "opening")) { score = 55 + ageMinutes.coerceAtMost(30).toInt(); visual = if (ageMinutes >= 5) "warning" else "active" } else visible = false
+            PillKind.MOTION -> { visible = s == "on"; score = 42; visual = "active" }
             PillKind.APPLIANCE, PillKind.VACUUM -> when {
                 s in done -> {
                     val ageMs = runCatching { nowMs - (parseHaInstant(e.lastChanged)?.toEpochMilli() ?: nowMs) }.getOrDefault(0L)
@@ -277,7 +278,11 @@ class PillPriorityEngine(private val context: Context) {
                     val totalDuration = endInstant.toEpochMilli() - startInstant.toEpochMilli()
                     val elapsed = nowMs - startInstant.toEpochMilli()
                     if (totalDuration > 0 && elapsed >= 0) {
+                        // Quantized to whole percent: this value is wall-clock-derived, and a
+                        // continuous float made the rebuilt chip unequal on EVERY push, defeating
+                        // equality-based recomposition skipping for the whole tray downstream.
                         (elapsed.toDouble() / totalDuration.toDouble() * 100.0).coerceIn(0.0, 100.0)
+                            .roundToInt().toDouble()
                     } else null
                 } else null
             } else null
@@ -357,7 +362,8 @@ class PillPriorityEngine(private val context: Context) {
             
         val display = when (rule.kind) {
             PillKind.OPENING -> when (s) { "on", "open", "opening" -> context.getString(R.string.pill_opening_open); else -> rawDisplay }
-            PillKind.LOCK -> when (s) { "locked" -> context.getString(R.string.pill_lock_locked); "unlocked" -> context.getString(R.string.pill_lock_unlocked); "jammed" -> context.getString(R.string.pill_lock_jammed); else -> rawDisplay }
+            PillKind.MOTION -> friendlyEntityState(e)
+            PillKind.LOCK -> when (s) { "locked" -> context.getString(R.string.pill_lock_locked); "unlocked" -> context.getString(R.string.pill_lock_unlocked); "jammed" -> context.getString(R.string.pill_lock_jammed); "locking" -> context.getString(R.string.pill_lock_locking); "unlocking" -> context.getString(R.string.pill_lock_unlocking); else -> rawDisplay }
             PillKind.SAFETY -> if (e.domain == "alarm_control_panel") when (s) {
                 "disarmed" -> "Désarmée"
                 "armed_away" -> "Armée · absence"

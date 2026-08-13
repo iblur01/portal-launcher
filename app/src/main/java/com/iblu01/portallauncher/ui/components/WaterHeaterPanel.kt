@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -33,10 +34,9 @@ fun WaterHeaterControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     var selectedMode by remember(entity.entityId, contract.selectedOption) { mutableStateOf(contract.selectedOption) }
     val canSetTemperature = "set_temperature" in contract.actions
 
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (canSetTemperature) {
-            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                val dialSize = minOf(maxWidth, maxHeight)
+    val dial: @Composable (Modifier) -> Unit = { dialModifier ->
+        if (canSetTemperature) BoxWithConstraints(dialModifier, contentAlignment = Alignment.Center) {
+                val dialSize = minOf(maxWidth, maxHeight, 320.dp)
                 TemperatureArcControl(
                     target = target, current = current,
                     valueRange = contract.min..contract.max, step = contract.step, unit = contract.unit.ifBlank { "°" },
@@ -50,9 +50,10 @@ fun WaterHeaterControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                     },
                     modifier = Modifier.size(dialSize),
                 )
-            }
-            Spacer(Modifier.height(12.dp))
         }
+    }
+    val modes: @Composable (Modifier) -> Unit = { modeModifier ->
+        Column(modeModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
         if ("set_operation_mode" in contract.actions && contract.options.isNotEmpty()) {
             WheelPicker(
                 options = contract.options,
@@ -60,8 +61,22 @@ fun WaterHeaterControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 onSelect = { mode -> selectedMode = mode; callService("water_heater", "set_operation_mode", entity.entityId, mapOf("operation_mode" to mode)) },
                 label = { it.replace('_', ' ').replaceFirstChar(Char::uppercase) },
                 accent = AppleColors.thermostatHeat,
-                modifier = Modifier.fillMaxWidth(0.72f),
+                modifier = Modifier.fillMaxWidth(if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) 0.84f else 0.72f),
             )
         }
+        }
+    }
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        if (canSetTemperature) {
+            AdaptivePanelSplit(modifier, primary = { dial(it) }, secondary = { modes(it) })
+        } else {
+            modes(modifier.fillMaxSize())
+        }
+    } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (canSetTemperature) {
+            dial(Modifier.fillMaxWidth().weight(1f))
+            Spacer(Modifier.height(12.dp))
+        }
+        modes(Modifier.fillMaxWidth())
     }
 }

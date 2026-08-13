@@ -1,12 +1,18 @@
 # Pills personnalisables et page Maison — Spécification technique
 
-**Statut :** contrat fonctionnel et technique prêt pour planification
+**Statut :** spécification d'origine, mise en œuvre depuis `0.0.7-beta` et encore en évolution
 
 **Date :** 2026-08-08
 
 **Portée :** composition dynamique du plateau de pills, épinglage, page Maison, groupes et réglages
 
 **Ordre du document :** logique métier d'abord, interface ensuite
+
+> Ce document conserve les décisions et critères d'acceptation ayant guidé l'implémentation. Pour
+> l'état réellement livré, consulter `HomePillModels`, `HomePillComposer`, `HomePageBuilder` et
+> [FEATURES.md](FEATURES.md). Les sections rédigées au futur décrivent l'intention historique.
+> L'implémentation actuelle ajoute notamment le choix persistant `Par pièce` / `Par type`; en mode
+> `Par type`, la rangée agrégée « Pièces » n'est plus affichée.
 
 ## 1. Objectif
 
@@ -25,7 +31,8 @@ Le résultat doit rester un lanceur calme : l'accueil continue de montrer au max
 ### 2.1 Existant à préserver
 
 - `PillSupport` découvre les entités Home Assistant compatibles et les transforme en `PillCandidate`/`PillRule`.
-- `PillPriorityEngine.select` fabrique les `LauncherChip`, les classe par priorité décroissante puis applique `take(9)`.
+- À l'époque de la rédaction, `PillPriorityEngine.select` appliquait `take(9)`; l'implémentation
+  actuelle retourne le classement complet et laisse `HomePillComposer` appliquer la capacité.
 - Plusieurs familles sont agrégées globalement avant classement : ouvertures, températures, lumières, médias, purificateurs, air, scènes, présence et énergie.
 - `ClockTray` affiche trois pills replié et neuf développé, en lignes de trois.
 - Un toucher route vers le service direct ou le panel via `ChipMapper` ; le panel ouvert est géré par `PanelState`.
@@ -164,7 +171,8 @@ Le compositeur applique cette précédence :
 1. alertes critiques disponibles ;
 2. pills épinglées disponibles, dans `pinnedOrder` ;
 3. pills dynamiques pertinentes, par score décroissant puis clé stable ;
-4. aucune pill de remplissage calme non épinglée.
+4. appareils individuels calmes et activés, utilisés comme remplissage déterministe lorsque les
+   alertes, épingles et candidats pertinents ne suffisent pas.
 
 Une même `PillRef` ne peut apparaître qu'une fois dans le plateau, même si elle est à la fois critique, épinglée et dynamique.
 
@@ -189,7 +197,8 @@ Les places non occupées par une alerte ou un pin sont alimentées par le classe
 - média actif, minuteur actif, batterie faible et autres états pertinents existants ;
 - ordre alphabétique stable seulement comme dernier départage.
 
-Une pill dynamique calme ne doit pas être affichée uniquement pour remplir un emplacement. Une pill épinglée, elle, reste visible dans un état calme.
+Une pill épinglée reste visible dans un état calme. L'implémentation actuelle peut aussi employer un
+appareil individuel calme et activé pour conserver la capacité lisible du plateau.
 
 Le score doit rester calculé dans une fonction pure et testable. Le système conserve les règles de récence existantes pour les événements transitoires et évite les permutations visuelles à chaque push HA sans changement de priorité réel.
 

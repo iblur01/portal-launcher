@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -15,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.iblu01.portallauncher.LauncherActivity
 import com.iblu01.portallauncher.LocaleHelper
 import com.iblu01.portallauncher.Prefs
+import com.iblu01.portallauncher.WebConfigActivity
 import com.iblu01.portallauncher.ui.onboarding.components.ProvideOnboardingLayout
 import com.iblu01.portallauncher.ui.theme.PortalTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -32,6 +34,14 @@ class OnboardingActivity : ComponentActivity() {
     @Inject lateinit var prefs: Prefs
 
     private val viewModel: OnboardingViewModel by viewModels()
+    private val webConfigLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            viewModel.refreshExternalConfiguration()
+            viewModel.testHomeAssistant()
+        }
+    }
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleHelper.wrap(newBase))
@@ -63,6 +73,9 @@ class OnboardingActivity : ComponentActivity() {
                         viewModel = viewModel,
                         onOpenSystemSetting = ::openSystemSetting,
                         onFinish = ::finishOnboarding,
+                        onConfigureWithPhone = {
+                            webConfigLauncher.launch(Intent(this, WebConfigActivity::class.java))
+                        },
                     )
                 }
             }
@@ -76,6 +89,7 @@ class OnboardingActivity : ComponentActivity() {
         // Every capability is re-read here, so a trip into Android's settings shows up as soon as
         // the user comes back — with its own check animation, without advancing the flow.
         viewModel.refreshCapabilities()
+        viewModel.refreshExternalConfiguration()
     }
 
     private fun openSystemSetting(capability: Capability) {

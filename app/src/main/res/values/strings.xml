@@ -47,6 +47,19 @@
     <string name="home_connection_placeholder_paste_key">Paste your key here</string>
     <string name="home_connection_label_key_help">Where to find my key?</string>
     <string name="home_connection_section_status">CONNECTION STATUS</string>
+    <string name="home_connection_label_web_config">Set up from another device</string>
+    <string name="web_config_title">Remote setup</string>
+    <string name="web_config_subtitle">Scan this code with your phone to fill in this panel\'s settings from its keyboard.</string>
+    <string name="web_config_qr_description">QR code for the setup page</string>
+    <string name="web_config_section_manual">OR TYPE IT IN</string>
+    <string name="web_config_label_address">Address</string>
+    <string name="web_config_label_code">Code</string>
+    <string name="web_config_same_network_note">Your phone must be on the same Wi-Fi network. The page closes as soon as you leave this screen.</string>
+    <string name="web_config_unavailable">Remote setup unavailable: this panel is not on a network.</string>
+    <string name="web_config_saved_title">Configuration saved</string>
+    <string name="web_config_saved_body">This panel has received the new settings.</string>
+    <string name="web_config_saved_action">Test and continue</string>
+    <string name="onb_common_action_web_config">Set up from my phone</string>
     <string name="home_connection_label_connection">Connection</string>
     <string name="home_connection_section_mqtt">MQTT</string>
     <string name="home_connection_label_mqtt_server">Server address</string>
@@ -233,7 +246,10 @@
     <string name="header_hidden_apps_content_desc">Hidden apps (%1$d)</string>
     <string name="header_settings_content_desc">Settings</string>
     <string name="home_header_title">Home</string>
-    <string name="home_header_grouping_content_desc">Group by room (coming soon)</string>
+    <string name="home_grouping_by_room">By room</string>
+    <string name="home_grouping_by_type">By type</string>
+    <string name="home_grouping_by_room_short">Room</string>
+    <string name="home_grouping_by_type_short">Type</string>
     <string name="home_header_edit_content_desc">Edit Home</string>
     <string name="home_header_finish_content_desc">Finish editing Home</string>
     <string name="auto_return_pill_label">Auto close</string>
@@ -295,6 +311,9 @@
     <string name="weather_panel_title">Weather</string>
     <string name="weather_section_hourly">NEXT HOURS</string>
     <string name="weather_section_daily">NEXT DAYS</string>
+    <string name="weather_tab_hourly">Hours</string>
+    <string name="weather_tab_daily">Days</string>
+    <string name="weather_today_range_format">Min %1$d° · Max %2$d°</string>
 
     <!-- ===== AIR QUALITY PANEL ===== -->
     <string name="air_quality_back_desc">Back</string>
@@ -428,6 +447,8 @@
     <string name="lock_state_jammed">Jammed</string>
     <string name="lock_state_locked">Locked</string>
     <string name="lock_state_unlocked">Unlocked</string>
+    <string name="lock_state_locking">Locking…</string>
+    <string name="lock_state_unlocking">Unlocking…</string>
 
     <!-- ===== SWITCH / FAN / PURIFIER ===== -->
     <string name="switch_state_on">On</string>
@@ -580,6 +601,7 @@
     <string name="playground_vacuum_in_progress">In progress</string>
     <string name="playground_vacuum_queued">Queued</string>
     <string name="playground_section_accessories">Accessories (HomeKit)</string>
+<string name="playground_section_media_providers">Media provider badges</string>
     <string name="playground_accessory_desk">Desk</string>
     <string name="playground_accessory_off">Off</string>
     <string name="playground_accessory_blinds">Blinds</string>
@@ -642,6 +664,12 @@
     <string name="light_state_off">Off</string>
     <string name="opening_state_open">Open</string>
     <string name="opening_state_closed">Closed</string>
+    <string name="door_opened_since">Opened since %1$s</string>
+    <string name="door_closed_since">Closed since %1$s</string>
+    <string name="motion_state_detected">Motion detected</string>
+    <string name="motion_state_clear">No motion</string>
+    <string name="motion_detected_since">Motion detected since %1$s</string>
+    <string name="motion_clear_since">No motion since %1$s</string>
     <string name="pill_safety_alert">Alert</string>
     <string name="phase_none">None</string>
     <string name="phase_air_wash">Air wash</string>
@@ -721,6 +749,8 @@
     <string name="pill_lock_locked">Locked</string>
     <string name="pill_lock_unlocked">Unlocked</string>
     <string name="pill_lock_jammed">Jammed</string>
+    <string name="pill_lock_locking">Locking…</string>
+    <string name="pill_lock_unlocking">Unlocking…</string>
     <string name="pill_individual_energy_power">Power</string>
     <string name="pill_individual_energy_today">Today</string>
 
@@ -796,6 +826,7 @@
     <string name="onb_bg_tile_my_photo">My photo</string>
     <string name="onb_bg_tile_immich">Immich</string>
     <string name="onb_bg_android_desc">Use Android’s static or live wallpaper.</string>
+    <string name="onb_bg_custom_desc">Pick a photo the launcher draws itself.</string>
     <string name="onb_bg_calm_desc">A dark gradient, entirely offline.</string>
     <string name="onb_bg_calm_opacity_label">Interface opacity</string>
     <string name="onb_bg_calm_preview_action">Full-screen preview</string>
@@ -831,6 +862,16 @@
     </plurals>
     <string name="onb_ha_intro_action_continue">Continue with this home</string>
     <string name="onb_ha_intro_action_manual">Add manually</string>
+    <string name="onb_ha_intro_action_phone">Set up with a phone</string>
+    <string name="onb_ha_intro_action_manual_compact">Set up manually on this panel</string>
+    <string name="onb_ha_manual_warning_title">Compact screen</string>
+    <string name="onb_ha_manual_warning_body">You can continue here, but the keyboard will cover much of the screen. For a more comfortable setup, use a phone.</string>
+    <string name="onb_ha_manual_warning_phone">Use a phone</string>
+    <string name="onb_ha_manual_warning_continue">Continue here</string>
+    <string name="onb_ha_intro_phone_title">With a phone</string>
+    <string name="onb_ha_intro_phone_body">Scan a QR code and enter the settings with a comfortable keyboard.</string>
+    <string name="onb_ha_intro_manual_title">On this panel</string>
+    <string name="onb_ha_intro_manual_body">Continue here using the panel keyboard.</string>
 
     <!-- ===== ONBOARDING — HOME_ASSISTANT_CREDENTIALS ===== -->
     <string name="onb_ha_creds_title">Connect Portal to your home</string>
@@ -1021,4 +1062,41 @@
     <string name="settings_wallpaper_android_section">ANDROID</string>
     <string name="settings_wallpaper_android_change">Choose another Android wallpaper</string>
     <string name="settings_wallpaper_sources_hint">Choose the atmosphere shown behind your clock and apps.</string>
+
+    <!-- Folders on the app grid -->
+    <string name="folder_default_label">Folder</string>
+    <string name="folder_rename_label">Folder name</string>
+    <string name="folder_rename_placeholder">Folder</string>
+    <string name="folder_hint">Tap the name to rename. Long-press an app to take it out.</string>
+    <string name="folder_take_out">Take out</string>
+    <string name="folder_delete">Delete folder</string>
+
+    <!-- Notification dots -->
+    <string name="notification_dots_service_label">Notification dots</string>
+    <string name="settings_app_toggle_notification_dots">Notification dots</string>
+    <string name="settings_app_label_notification_access">Grant notification access</string>
+    <string name="settings_app_value_notification_granted">Granted</string>
+    <string name="settings_app_value_notification_missing">Required</string>
+
+    <!-- Icon pack -->
+    <string name="settings_app_label_icon_pack">Icon pack</string>
+    <string name="settings_app_value_icon_pack_system">System icons</string>
+    <string name="icon_pack_picker_title">Icon pack</string>
+    <string name="icon_pack_picker_empty">No icon pack installed</string>
+
+    <!-- Layout backup -->
+    <string name="settings_app_section_layout_backup">LAYOUT BACKUP</string>
+    <string name="settings_app_label_export_layout">Export the layout</string>
+    <string name="settings_app_label_import_layout">Restore a layout</string>
+    <string name="toast_layout_exported">Layout exported</string>
+    <string name="toast_layout_export_failed">Export failed</string>
+    <string name="toast_layout_imported_format">Layout restored: %1$d icons, %2$d folders</string>
+    <string name="toast_layout_import_failed">Unreadable backup file</string>
+    <string name="onb_setup_root_title">Root detected</string>
+    <string name="onb_setup_root_desc">Portal can grant every permission below by itself, enable notification access, and run its bridge without the permanent notification.</string>
+    <string name="onb_setup_root_action">Configure everything automatically</string>
+    <string name="onb_setup_root_action_busy">Configuring…</string>
+    <string name="settings_app_label_root_setup">Automatic setup (root)</string>
+    <string name="settings_app_value_root_available">Available</string>
+    <string name="settings_app_value_root_done">Configured</string>
 </resources>

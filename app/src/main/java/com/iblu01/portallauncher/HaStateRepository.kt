@@ -18,6 +18,9 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toPersistentMap
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.CopyOnWriteArraySet
@@ -46,7 +49,15 @@ class HaStateRepository(appContext: Context, private val url: String, private va
     private fun newIconExecutor() = Executors.newSingleThreadExecutor { r ->
         Thread(r, "ha-icon-packs").apply { isDaemon = true }
     }
-    private val states = linkedMapOf<String, HaEntity>()
+    /**
+     * Persistent (immutable) map, single writer = the socket thread. Each mutation produces a new
+     * O(log n) version instead of the previous per-event 765-entry defensive copy: listeners can
+     * hold their snapshot forever without a lock, and every push still hands out a fresh identity
+     * (flow conflation and equality keep working). Iteration order is hash order, not insertion
+     * order — nothing downstream depends on it (the only "first" lookup, weatherEntityId, already
+     * tolerated an arbitrary get_states order).
+     */
+    @Volatile private var states: PersistentMap<String, HaEntity> = persistentMapOf()
     private var socket: WebSocket? = null
     private var connected = false
     private var enabled = false
@@ -88,7 +99,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
     private var entityDeviceId: Map<String, String?> = emptyMap()  // entity_id -> device_id
     private var deviceAreaId: Map<String, String?> = emptyMap()    // device_id -> area_id
 
-    fun addListener(listener: Listener) { listeners += listener; listener.onStates(states.toMap(), connected) }
+    fun addListener(listener: Listener) { listeners += listener; listener.onStates(states, connected) }
     fun removeListener(listener: Listener) { listeners -= listener }
 
     /**
@@ -175,8 +186,9 @@ class HaStateRepository(appContext: Context, private val url: String, private va
     }
     private fun notifyListeners() {
         com.iblu01.portallauncher.ui.ConnectionStatus.haConnected = connected
-        val copy = synchronized(states) { states.toMap() }
-        listeners.forEach { it.onStates(copy, connected) }
+        // The persistent map IS the snapshot: no copy, no lock. Contract: listeners run on the
+        // socket thread and must stay lightweight (cache-field writes, channel offers).
+        listeners.forEach { it.onStates(states, connected) }
     }
     private fun parseAreaNames(arr: JSONArray): Map<String, String> =
         (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
@@ -224,7 +236,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         runCatching {
             iconExecutor.execute {
                 iconSyncPending.set(false)
-                val snapshot = synchronized(states) { states.values.toList() }
+                val snapshot = states.values
                 val wanted = snapshot.mapNotNullTo(mutableSetOf<IconRef>()) {
                     HaIcons.resolver.refFor(it)?.takeUnless { ref -> ref.isMdi }
                 }
@@ -292,12 +304,15 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                     val id = msg.optInt("id")
                     if (id == 1 && msg.optBoolean("success")) {
                         val result = msg.optJSONArray("result") ?: JSONArray()
-                        synchronized(states) { states.clear(); for (i in 0 until result.length()) parseState(result.optJSONObject(i) ?: continue)?.let { states[it.entityId] = it } }
+                        // Built off-line then swapped in: readers never observe a half-filled map.
+                        states = buildMap {
+                            for (i in 0 until result.length()) parseState(result.optJSONObject(i) ?: continue)?.let { put(it.entityId, it) }
+                        }.toPersistentMap()
                         lastUpdateAt = System.currentTimeMillis()
                         Log.i(TAG, "received ${result.length()} states; subscribing to changes")
                         // Id must exceed the registry list ids (3,4,5) — HA requires per-connection ids to strictly increase.
                         notifyListeners(); webSocket.send("{\"id\":6,\"type\":\"subscribe_events\",\"event_type\":\"state_changed\"}")
-                        weatherEntityId = synchronized(states) { states.keys.firstOrNull { it.startsWith("weather.") } }
+                        weatherEntityId = states.keys.firstOrNull { it.startsWith("weather.") }
                         weatherEntityId?.let { w ->
                             webSocket.send("{\"id\":$FORECAST_HOURLY_ID,\"type\":\"weather/subscribe_forecast\",\"forecast_type\":\"hourly\",\"entity_id\":\"$w\"}")
                             webSocket.send("{\"id\":$FORECAST_DAILY_ID,\"type\":\"weather/subscribe_forecast\",\"forecast_type\":\"daily\",\"entity_id\":\"$w\"}")
@@ -356,7 +371,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                     val data = event.optJSONObject("data") ?: return
                     val entity = data.optJSONObject("new_state")?.let(::parseState)
                     val id = data.optString("entity_id")
-                    synchronized(states) { if (entity == null) states.remove(id) else states[entity.entityId] = entity }
+                    states = if (entity == null) states.remove(id) else states.put(entity.entityId, entity)
                     lastUpdateAt = System.currentTimeMillis()
                     notifyListeners()
                     // An entity that just started pointing at a custom namespace needs its icon

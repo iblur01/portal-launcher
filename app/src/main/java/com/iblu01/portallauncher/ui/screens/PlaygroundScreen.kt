@@ -45,7 +45,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -55,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -68,14 +71,19 @@ import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.PlayingMedia
 import com.iblu01.portallauncher.ui.CallService
+import com.iblu01.portallauncher.ui.HaStates
 import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.LocalHaStates
 import com.iblu01.portallauncher.ui.components.ChipActionsPanel
+import com.iblu01.portallauncher.ui.components.consumePanelTouches
+import com.iblu01.portallauncher.ui.components.mediaProviderLogo
+import com.iblu01.portallauncher.ui.components.MediaProviderBadge
 import com.iblu01.portallauncher.ui.components.MediaPlayerView
 import com.iblu01.portallauncher.ui.components.StatusChip
 import com.iblu01.portallauncher.ui.components.launcherIcon
 import com.iblu01.portallauncher.ui.components.appleClickable
+import com.iblu01.portallauncher.ui.components.isCompactClockScreen
 import com.iblu01.portallauncher.ui.components.controls.AccessoryGrid
 import com.iblu01.portallauncher.ui.components.controls.AccessoryItem
 import com.iblu01.portallauncher.ui.components.controls.ControlContentLayout
@@ -134,6 +142,10 @@ fun PlaygroundScreen(onBack: () -> Unit) {
     var accent by remember { mutableStateOf(accentSwatches.first().second) }
     var selectedFakePanel by remember { mutableStateOf<FakePanelSelection?>(null) }
     val fakeEntities = rememberFakePanelEntities()
+    // Mirror the fake SnapshotStateMap into the per-entity store the panels now read; the fake
+    // service keeps mutating the map and snapshotFlow republishes each mutation.
+    val fakeHaStates = remember { HaStates() }
+    LaunchedEffect(fakeEntities) { snapshotFlow { fakeEntities.toMap() }.collect { fakeHaStates.apply(it) } }
     val fakeService = rememberFakeCallService(fakeEntities)
     val fakeTracks = remember { listOf("Midnight City" to "M83", "Nightcall" to "Kavinsky", "Genesis" to "Grimes") }
     var fakeTrackIndex by remember { mutableIntStateOf(0) }
@@ -147,9 +159,19 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         album = "Simulation locale", state = if (fakeMediaPlaying) "playing" else "paused", coverUrl = null,
         volumePercent = fakeMediaVolume, isMuted = false, playerNames = listOf("Salon"),
         players = listOf(MediaPlayerVolume("media_player.salon", "Salon", fakeMediaVolume, false)),
+        source = "Spotify",
     )
+    val playgroundMetrics = LocalContext.current.resources.displayMetrics
+    val compactPlayground = isCompactClockScreen(
+        playgroundMetrics.widthPixels,
+        playgroundMetrics.heightPixels,
+        playgroundMetrics.xdpi,
+        playgroundMetrics.ydpi,
+    )
+    val playgroundLandscape = playgroundMetrics.widthPixels > playgroundMetrics.heightPixels
+    val fullscreenPanel = compactPlayground && selectedFakePanel != null
     val contentWidth by animateFloatAsState(
-        targetValue = if (selectedFakePanel == null) 1f else 0.67f,
+        targetValue = if (selectedFakePanel == null || fullscreenPanel || !playgroundLandscape) 1f else 0.67f,
         animationSpec = tween(500),
         label = "playgroundPanelWidth",
     )
@@ -215,7 +237,7 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(28.dp))
 
         CompositionLocalProvider(
-            LocalHaStates provides fakeEntities,
+            LocalHaStates provides fakeHaStates,
             LocalAreas provides emptyMap(),
         ) {
             FakePanelLab(
@@ -609,20 +631,44 @@ fun PlaygroundScreen(onBack: () -> Unit) {
         )
         AccessoryGrid(items = accessories)
 
+        Spacer(Modifier.height(28.dp))
+
+        // 9 · Media provider badges
+        SectionTitle(stringResource(R.string.playground_section_media_providers))
+        Spacer(Modifier.height(10.dp))
+        providerBadgeGroups.forEach { (title, providers) ->
+            Text(title, style = AppleTypography.labelSmall, color = AppleColors.tertiary)
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                providers.forEach { name ->
+                    mediaProviderLogo(name)?.let { MediaProviderBadge(it, name) }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
         Spacer(Modifier.height(40.dp))
     }
 
         selectedFakePanel?.let { selection ->
             CompositionLocalProvider(
                 LocalCallService provides fakeService,
-                LocalHaStates provides fakeEntities,
+                LocalHaStates provides fakeHaStates,
                 LocalAreas provides emptyMap(),
             ) {
                 when (selection) {
                     is FakePanelSelection.Chip -> ChipActionsPanel(
                         chip = allFakeChips.firstOrNull { it.id == selection.id } ?: selection.chip,
                         onDismiss = { selectedFakePanel = null },
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f),
+                        fullScreen = fullscreenPanel,
+                        modifier = (
+                            if (fullscreenPanel) Modifier.fillMaxSize()
+                            else if (playgroundLandscape) Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f)
+                            else Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.33f)
+                        ).consumePanelTouches(),
                     )
                     is FakePanelSelection.Media -> MediaPlayerView(
                         media = fakeMedia,
@@ -635,7 +681,16 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                         onSecondaryPlayPause = {}, onSecondaryPrevious = {}, onSecondaryNext = {},
                         onSelectSecondary = {}, onSwipePlayer = {}, onJoinPlayer = {}, onUnjoinPlayer = {},
                         onDismiss = { selectedFakePanel = null },
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f),
+                        fullScreen = fullscreenPanel,
+                        modifier = (
+                            if (fullscreenPanel) {
+                                Modifier.fillMaxSize().background(Color.Black)
+                            } else if (playgroundLandscape) {
+                                Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.33f)
+                            } else {
+                                Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.33f)
+                            }
+                        ).consumePanelTouches(),
                     )
                 }
             }
@@ -1031,3 +1086,20 @@ private fun LabeledControl(caption: String, content: @Composable () -> Unit) {
         Text(caption, style = AppleTypography.labelSmall, color = AppleColors.tertiary)
     }
 }
+
+/** Sources média réellement rencontrées dans HA (`app_name`, `source`, domaine du lecteur). */
+private val providerBadgeGroups: List<Pair<String, List<String>>> = listOf(
+    "Audio" to listOf(
+        "Spotify", "YouTube Music", "Apple Music", "iTunes", "Tidal", "Amazon Music",
+        "SoundCloud", "Pandora", "Audible", "Pocket Casts", "Overcast", "Castro",
+    ),
+    "Vidéo / TV" to listOf(
+        "YouTube", "YouTube Kids", "Netflix", "Prime Video", "Paramount+", "HBO Max", "HBO",
+        "Apple TV", "Twitch", "Crunchyroll", "Plex", "Jellyfin", "Emby", "Kodi",
+    ),
+    "Radio" to listOf("TuneIn Radio", "iHeartRadio"),
+    "Enceintes & protocoles" to listOf(
+        "Sonos", "AirPlay", "Google Cast", "DLNA", "Bluetooth", "Roon", "Roku",
+        "Android TV", "Fire TV", "webOS TV", "Samsung TV", "Home Assistant",
+    ),
+)

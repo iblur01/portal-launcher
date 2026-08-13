@@ -121,6 +121,15 @@
             android:exported="false"
             android:screenOrientation="fullSensor" />
 
+        <!--
+            Remote configuration. Not exported: it starts a LAN server that serves this panel's
+            Home Assistant and MQTT credentials, so only Portal itself may open it.
+        -->
+        <activity
+            android:name=".WebConfigActivity"
+            android:exported="false"
+            android:screenOrientation="fullSensor" />
+
         <activity
             android:name=".ClockThemeActivity"
             android:exported="false"
@@ -129,6 +138,20 @@
         <service
             android:name=".MqttBridgeService"
             android:exported="false" />
+
+        <!--
+            Notification dots. Bound by the system only after the user grants listener access in
+            the system settings; it reads which packages have a notification and nothing else.
+        -->
+        <service
+            android:name=".NotificationDotService"
+            android:exported="false"
+            android:label="@string/notification_dots_service_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".ScreenAccessibility"

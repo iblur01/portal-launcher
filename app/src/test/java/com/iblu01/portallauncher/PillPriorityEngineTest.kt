@@ -52,7 +52,7 @@ class PillPriorityEngineTest {
         )
         val active = engine.select(rules, listOf(motion, person).associateBy { it.entityId })
         assertEquals(listOf("binary_sensor.hall_motion"), active.map { it.entityId })
-        assertEquals(listOf(PillKind.GENERIC), active.map { it.kind })
+        assertEquals(listOf(PillKind.MOTION), active.map { it.kind })
 
         val idleMotion = entity("binary_sensor.hall_motion", "off", "motion")
         val idle = engine.select(rules, listOf(idleMotion, person).associateBy { it.entityId })
@@ -65,7 +65,7 @@ class PillPriorityEngineTest {
 
         val chip = engine.select(listOf(staleRule), mapOf(motion.entityId to motion)).single()
 
-        assertEquals(PillKind.GENERIC, chip.kind)
+        assertEquals(PillKind.MOTION, chip.kind)
         assertEquals(motion.entityId, chip.entityId)
     }
 

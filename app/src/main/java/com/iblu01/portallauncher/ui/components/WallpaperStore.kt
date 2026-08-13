@@ -1,8 +1,22 @@
 package com.iblu01.portallauncher.ui.components
 
+import android.app.WallpaperManager
 import android.content.Context
 import android.net.Uri
 import java.io.File
+
+/**
+ * True when the OS actually draws a wallpaper behind the launcher.
+ *
+ * Portal-class devices ship without a wallpaper service: the picker may even exist, but the
+ * wallpaper window stays black whatever the user chooses. `isWallpaperSupported` is the AOSP signal
+ * for exactly that, and `isSetWallpaperAllowed` covers the managed-device restriction. When the
+ * query itself fails we assume support, since the "custom photo" source stays available anyway.
+ */
+internal fun systemWallpaperSupported(context: Context): Boolean = runCatching {
+    val manager = WallpaperManager.getInstance(context)
+    manager.isWallpaperSupported && manager.isSetWallpaperAllowed
+}.getOrDefault(true)
 
 /**
  * The single custom wallpaper the launcher renders in "custom" mode.

@@ -65,16 +65,9 @@ fun VacuumControl(chip: LauncherChip, modifier: Modifier = Modifier) {
         }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        if (status.isNotBlank()) VacuumStatusChip(status, prominent = true)
-        Spacer(Modifier.height(20.dp))
-
-        BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            val buttonSize = (maxWidth * 0.38f).coerceIn(104.dp, 148.dp)
+    val runControl: @Composable (Modifier) -> Unit = { runModifier ->
+        BoxWithConstraints(runModifier, contentAlignment = Alignment.Center) {
+            val buttonSize = minOf(maxWidth, maxHeight).coerceIn(128.dp, 190.dp)
             VacuumRunButton(
                 running = running,
                 onToggle = { wasRunning ->
@@ -89,9 +82,12 @@ fun VacuumControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 size = buttonSize,
             )
         }
-
+    }
+    val options: @Composable (Modifier) -> Unit = { optionsModifier ->
+        Column(optionsModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        if (status.isNotBlank()) VacuumStatusChip(status, prominent = true)
         if (speedOptions.isNotEmpty() && selectedSpeed != null) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             WheelPicker(
                 options = speedOptions,
                 selected = selectedSpeed,
@@ -103,13 +99,34 @@ fun VacuumControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 label = { value -> value.replace('_', ' ').replaceFirstChar { it.uppercase() } },
                 accent = AppleColors.primary,
                 visibleCount = 3,
-                modifier = Modifier.fillMaxWidth(0.72f),
+                modifier = Modifier.fillMaxWidth(if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) 0.84f else 0.72f),
             )
         }
 
         if (actions.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             VacuumActionChips(actions, modifier = Modifier.fillMaxWidth(), accent = AppleColors.active)
+        }
+        }
+    }
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        AdaptivePanelSplit(modifier, primary = { runControl(it) }, secondary = { options(it) })
+    } else Column(modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        if (status.isNotBlank()) VacuumStatusChip(status, prominent = true)
+        Spacer(Modifier.height(20.dp))
+        runControl(Modifier.fillMaxWidth())
+        if (speedOptions.isNotEmpty() && selectedSpeed != null) {
+            Spacer(Modifier.height(12.dp))
+            WheelPicker(
+                options = speedOptions, selected = selectedSpeed,
+                onSelect = { speed -> if (speed != selectedSpeed) callService("vacuum", "set_fan_speed", chip.entityId, mapOf("fan_speed" to speed)) },
+                label = { value -> value.replace('_', ' ').replaceFirstChar { it.uppercase() } },
+                accent = AppleColors.primary, visibleCount = 3, modifier = Modifier.fillMaxWidth(0.72f),
+            )
+        }
+        if (actions.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            VacuumActionChips(actions, Modifier.fillMaxWidth(), AppleColors.active)
         }
     }
 }

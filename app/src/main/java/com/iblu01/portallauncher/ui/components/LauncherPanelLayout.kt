@@ -7,6 +7,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,8 +19,34 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 
 internal const val LAUNCHER_PANEL_FRACTION = 0.33f
+
+/**
+ * Avale tous les événements pointeur. Un panneau est opaque : ses zones vides ne dessinent qu'un
+ * fond, qui n'est pas hit-testable, donc sans ça les taps retombent sur le contenu recouvert
+ * (pills, grille d'apps) — visible en plein écran et pendant l'animation de fermeture.
+ */
+internal fun Modifier.consumePanelTouches(): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            awaitPointerEvent().changes.forEach { it.consume() }
+        }
+    }
+}
+
+internal enum class LauncherPanelPresentation { DOCKED, FULLSCREEN }
+
+internal fun panelPresentation(
+    compactScreen: Boolean,
+    supportsFullscreen: Boolean,
+): LauncherPanelPresentation = if (compactScreen && supportsFullscreen) {
+    LauncherPanelPresentation.FULLSCREEN
+} else {
+    LauncherPanelPresentation.DOCKED
+}
 
 /**
  * Reserves layout space for the panel while leaving the launcher's wallpaper/scrims full-screen.
@@ -30,16 +59,18 @@ internal fun LauncherPanelLayout(
     panel: @Composable () -> Unit,
     content: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    presentation: LauncherPanelPresentation = LauncherPanelPresentation.DOCKED,
 ) {
     BoxWithConstraints(modifier = modifier) {
+        val fullscreen = presentation == LauncherPanelPresentation.FULLSCREEN
         val landscape = maxWidth > maxHeight
         val reservedWidth = animateDpAsState(
-            targetValue = if (panelVisible && landscape) maxWidth * LAUNCHER_PANEL_FRACTION else maxWidth * 0f,
+            targetValue = if (panelVisible && landscape && !fullscreen) maxWidth * LAUNCHER_PANEL_FRACTION else maxWidth * 0f,
             animationSpec = tween(500),
             label = "panelReservedWidth",
         )
         val reservedHeight = animateDpAsState(
-            targetValue = if (panelVisible && !landscape) maxHeight * LAUNCHER_PANEL_FRACTION else maxHeight * 0f,
+            targetValue = if (panelVisible && !landscape && !fullscreen) maxHeight * LAUNCHER_PANEL_FRACTION else maxHeight * 0f,
             animationSpec = tween(500),
             label = "panelReservedHeight",
         )
@@ -52,7 +83,18 @@ internal fun LauncherPanelLayout(
             content()
         }
 
-        if (landscape) {
+        if (fullscreen) {
+            AnimatedVisibility(
+                visible = panelVisible,
+                modifier = Modifier.fillMaxSize(),
+                enter = fadeIn(tween(220)),
+                exit = fadeOut(tween(180)),
+            ) {
+                Box(Modifier.fillMaxSize().consumePanelTouches().background(Color.Black)) {
+                    panel()
+                }
+            }
+        } else if (landscape) {
             AnimatedVisibility(
                 visible = panelVisible,
                 modifier = Modifier
@@ -62,7 +104,7 @@ internal fun LauncherPanelLayout(
                 enter = slideInHorizontally(tween(500)) { width -> width },
                 exit = slideOutHorizontally(tween(500)) { width -> width },
             ) {
-                panel()
+                Box(Modifier.fillMaxSize().consumePanelTouches()) { panel() }
             }
         } else {
             AnimatedVisibility(
@@ -74,7 +116,7 @@ internal fun LauncherPanelLayout(
                 enter = slideInVertically(tween(500)) { height -> height },
                 exit = slideOutVertically(tween(500)) { height -> height },
             ) {
-                panel()
+                Box(Modifier.fillMaxSize().consumePanelTouches()) { panel() }
             }
         }
     }

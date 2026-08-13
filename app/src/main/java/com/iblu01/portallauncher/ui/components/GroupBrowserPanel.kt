@@ -103,6 +103,7 @@ fun GroupBrowserPanel(
     onDismiss: () -> Unit,
     onCollectiveAction: (List<GroupServiceCall>) -> Unit,
     modifier: Modifier = Modifier,
+    fullScreen: Boolean = false,
 ) {
     if (deviceRequested) {
         if (selectedDevice != null) {
@@ -113,6 +114,7 @@ fun GroupBrowserPanel(
                 navigationContentDescription = "Retour au groupe ${group.chip.label}",
                 onClose = onDismiss,
                 modifier = modifier.testTag("groupDevicePanel"),
+                fullScreen = fullScreen,
             )
         } else {
             UnavailableGroupDevice(
@@ -129,23 +131,28 @@ fun GroupBrowserPanel(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 14.dp.scaled(), vertical = 16.dp.scaled())
+            .then(
+                if (fullScreen) Modifier
+                else Modifier.padding(horizontal = 14.dp.scaled(), vertical = 16.dp.scaled())
+            )
             .testTag("groupBrowserPanel"),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.82f), AppleShapes.panel)
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
+                .then(
+                    if (fullScreen) Modifier
+                    else Modifier.border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
+                )
                 .padding(horizontal = 22.dp.scaled(), vertical = 20.dp.scaled()),
         ) {
             PanelHeader(
                 title = group.chip.label,
-                onNavigation = onDismiss,
-                navigationIcon = Icons.Filled.Close,
-                navigationContentDescription = "Fermer le groupe ${group.chip.label}",
                 titleIcon = launcherIcon(group.chip.icon),
                 accent = launcherChipAccent(group.chip),
+                onClose = onDismiss,
+                closeContentDescription = "Fermer le groupe ${group.chip.label}",
             )
             Spacer(Modifier.height(12.dp.scaled()))
             Text(

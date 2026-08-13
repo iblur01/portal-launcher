@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -43,16 +44,11 @@ fun SirenControl(chip: LauncherChip, modifier: Modifier = Modifier) {
     val triggerLabel = stringResource(R.string.siren_action_trigger)
     val stopLabel = stringResource(R.string.siren_action_stop)
 
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            if (active) stringResource(R.string.siren_state_active) else stringResource(R.string.siren_state_inactive),
-            style = AppleTypography.titleMedium, color = if (active) AppleColors.error else AppleColors.primary,
-        )
-        Spacer(Modifier.height(12.dp))
-        BoxWithConstraints(Modifier.fillMaxWidth(0.54f).weight(1f), contentAlignment = Alignment.Center) {
-            val widthToHeightRatio = 96f / 240f
-            val height = minOf(maxHeight, maxWidth / widthToHeightRatio)
-            val width = height * widthToHeightRatio
+    val stateLabel = if (active) stringResource(R.string.siren_state_active) else stringResource(R.string.siren_state_inactive)
+    val switchControl: @Composable (Modifier) -> Unit = { controlModifier ->
+        BoxWithConstraints(controlModifier, contentAlignment = Alignment.Center) {
+            val ratio = 96f / 240f
+            val height = minOf(maxHeight, maxWidth / ratio, 300.dp)
             VerticalSwitch(
                 checked = active,
                 onCheckedChange = { wanted ->
@@ -64,9 +60,32 @@ fun SirenControl(chip: LauncherChip, modifier: Modifier = Modifier) {
                 accent = AppleColors.error,
                 icon = { if (it) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff },
                 label = { if (it) stopLabel else triggerLabel },
-                modifier = Modifier.size(width, height),
+                modifier = Modifier.size(height * ratio, height),
             )
         }
+    }
+    val tonePicker: @Composable (Modifier) -> Unit = { pickerModifier ->
+        Column(pickerModifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
+            Text(stateLabel, style = AppleTypography.headlineLarge, color = if (active) AppleColors.error else AppleColors.primary)
+            if ("tone" in contract.actions && contract.options.isNotEmpty()) {
+                Spacer(Modifier.height(18.dp))
+                WheelPicker(
+                    options = contract.options, selected = tone ?: "", onSelect = { tone = it },
+                    label = { it.replace('_', ' ').replaceFirstChar(Char::uppercase) },
+                    accent = AppleColors.error, modifier = Modifier.fillMaxWidth(0.82f),
+                )
+            }
+        }
+    }
+    if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) {
+        AdaptivePanelSplit(modifier, primary = { switchControl(it) }, secondary = { tonePicker(it) })
+    } else Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            stateLabel,
+            style = AppleTypography.titleMedium, color = if (active) AppleColors.error else AppleColors.primary,
+        )
+        Spacer(Modifier.height(12.dp))
+        switchControl(Modifier.fillMaxWidth(0.54f).weight(1f))
         if ("tone" in contract.actions && contract.options.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
             WheelPicker(

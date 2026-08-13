@@ -59,6 +59,7 @@ private const val GRANT_ACKNOWLEDGE_MILLIS = 1200L
 fun SystemSetupStep(
     state: OnboardingUiState,
     onOpenSetting: (Capability) -> Unit,
+    onProvisionWithRoot: () -> Unit,
     onAcknowledgeGrant: () -> Unit,
     adbCommand: String,
     onBack: () -> Unit,
@@ -79,10 +80,10 @@ fun SystemSetupStep(
     // them reads as a settings page. There, the step becomes one capability per page — which is the
     // "one decision per screen" rule the rest of the flow already follows.
     val paged = layout.size == OnboardingSize.COMPACT || layout.short
-    // Compact flows start with a dedicated introduction. Combining that explanation with the
-    // first permission recreated the tablet layout in miniature and made both hard to scan.
+    // Compact flows start directly with the first permission. A separate introduction page left
+    // most of a 5" display empty without helping the user complete anything.
     var page by remember { mutableIntStateOf(0) }
-    val compactPageCount = Capability.values().size + 1
+    val compactPageCount = Capability.values().size
 
     val advance: () -> Unit = { if (paged && page < compactPageCount - 1) page++ else onContinue() }
     val retreat: () -> Unit = { if (paged && page > 0) page-- else onBack() }
@@ -92,8 +93,8 @@ fun SystemSetupStep(
         flags = state.flags,
         title = stringResource(R.string.onb_setup_title),
         modifier = modifier,
-        description = if (!paged || page == 0) stringResource(R.string.onb_setup_body) else null,
-        showHeader = !paged || page == 0,
+        description = if (!paged) stringResource(R.string.onb_setup_body) else null,
+        showHeader = !paged,
         navigation = {
             OnboardingNavigationBar(
                 onBack = retreat,
@@ -102,16 +103,20 @@ fun SystemSetupStep(
             )
         },
     ) {
+        // A rooted panel never has to walk this list: Portal grants itself everything, including
+        // the notification access, and drops its own permanent notification along the way.
+        if (state.rootAvailable) {
+            RootProvisionCard(busy = state.rootProvisioning, onProvision = onProvisionWithRoot)
+            Spacer(Modifier.height(14.dp))
+        }
         if (paged) {
-            if (page > 0) {
-                CapabilityPage(
-                    capability = Capability.values()[page - 1],
-                    capabilities = capabilities,
-                    adbCommand = adbCommand,
-                    onOpenSetting = onOpenSetting,
-                    onLater = advance,
-                )
-            }
+            CapabilityPage(
+                capability = Capability.values()[page],
+                capabilities = capabilities,
+                adbCommand = adbCommand,
+                onOpenSetting = onOpenSetting,
+                onLater = advance,
+            )
         } else {
             Capability.values().forEach { capability ->
                 CapabilityPage(
@@ -123,6 +128,38 @@ fun SystemSetupStep(
                 )
             }
         }
+    }
+}
+
+/** The one-tap path offered only when a root shell answered. */
+@Composable
+private fun RootProvisionCard(busy: Boolean, onProvision: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AppleShapes.section)
+            .background(AppleColors.frostedFill, AppleShapes.section)
+            .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.section)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            stringResource(R.string.onb_setup_root_title),
+            style = AppleTypography.titleMedium,
+            color = AppleColors.primary,
+        )
+        Text(
+            stringResource(R.string.onb_setup_root_desc),
+            style = AppleTypography.bodySmall,
+            color = AppleColors.secondary,
+        )
+        PillButton(
+            label = stringResource(
+                if (busy) R.string.onb_setup_root_action_busy else R.string.onb_setup_root_action
+            ),
+            onClick = { if (!busy) onProvision() },
+            primary = true,
+        )
     }
 }
 
