@@ -1,47 +1,47 @@
 ---
 name: portal-launcher-release
-description: Automatise le workflow de release complet pour le repo portal-launcher (iblur01/portal-launcher). Utiliser quand l'utilisateur veut "deploy", "release", "publier une version", "préparer une 0.0.X", "merge dans main", ou "faire un build release". La branche cible est main. Ce skill analyse les commits de la branche, détermine la version, met à jour CHANGELOG.md, bump versionCode/versionName dans build.gradle.kts, crée une PR, la merge, build un APK signé, crée une release GitHub et supprime la branche.
+description: Automates the complete release workflow for the portal-launcher repo (iblur01/portal-launcher). Use when the user wants to "deploy", "release", publish a version ("publier une version"), prepare a 0.0.X ("préparer une 0.0.X"), merge into main ("merge dans main"), or make a release build ("faire un build release"). The target branch is main. This skill analyzes the branch commits, determines the version, updates CHANGELOG.md, bumps versionCode/versionName in build.gradle.kts, creates a PR, merges it, builds a signed APK, creates a GitHub release and deletes the branch.
 user-invocable: true
 argument-hint: "[version] [branch]"
 ---
 
 # Portal Launcher — Release Workflow
 
-Ce skill automatise entièrement le processus de release pour le repo `iblur01/portal-launcher`.
+This skill fully automates the release process for the `iblur01/portal-launcher` repo.
 
-## Prérequis
+## Prerequisites
 
-Le repo doit être à `/home/tdelannoy-fdi/dev/perso/portal-launcher`. Le keystore de signature est dans `~/.portal-launcher-signing/portal-launcher-release.jks` et les credentials sont dans `app/local.properties` (gitignoré).
+The repo must be at `/home/tdelannoy-fdi/dev/perso/portal-launcher`. The signing keystore is in `~/.portal-launcher-signing/portal-launcher-release.jks` and the credentials are in `app/local.properties` (gitignored).
 
 ## Workflow
 
-L'utilisateur peut fournir :
-- `$ARGUMENTS` : peut contenir un numéro de version (ex: `0.0.5-beta`) ou être vide (version auto-détectée par incrément du versionCode actuel sur main).
+The user may provide:
+- `$ARGUMENTS`: may contain a version number (e.g. `0.0.5-beta`) or be empty (version auto-detected by incrementing the current versionCode on main).
 
-### Étape 1 — Déterminer la branche source
+### Step 1 — Determine the source branch
 
-Si l'utilisateur mentionne un nom de branche, l'utiliser. Sinon, utiliser la branche courante (`git branch --show-current`). **Ne jamais créer de release depuis main directement** — la branche source doit être une branche de feature.
+If the user mentions a branch name, use it. Otherwise, use the current branch (`git branch --show-current`). **Never create a release from main directly** — the source branch must be a feature branch.
 
-### Étape 2 — Déterminer la version
+### Step 2 — Determine the version
 
-Si l'utilisateur a fourni une version explicite, l'utiliser.
-Sinon, lire le `versionCode` actuel dans `main:app/build.gradle.kts`, l'incrémenter, et en déduire le `versionName` correspondant (ex: versionCode 4 → version 0.0.4-beta).
+If the user provided an explicit version, use it.
+Otherwise, read the current `versionCode` in `main:app/build.gradle.kts`, increment it, and derive the corresponding `versionName` (e.g. versionCode 4 → version 0.0.4-beta).
 
-### Étape 3 — Analyser les modifications
+### Step 3 — Analyze the changes
 
-Faire `git diff main...HEAD --stat` et `git log main...HEAD --oneline` pour avoir la liste des fichiers modifiés et les commits.
+Run `git diff main...HEAD --stat` and `git log main...HEAD --oneline` to get the list of modified files and the commits.
 
-Utiliser l'agent `explore` avec `thoroughness: "very thorough"` pour analyser en profondeur TOUS les fichiers modifiés. L'agent doit retourner un résumé structuré en français listant :
-- **Added** : nouvelles features, fichiers, composants, APIs
-- **Changed** : modifications de comportement, refactors UI
-- **Removed** : code/fonctionnalités supprimées
-- **Performance** : optimisations notables
-- **i18n** : nouvelles strings ajoutées
-- **Tests** : nouveaux tests
+Use the `explore` agent with `thoroughness: "very thorough"` to analyze ALL modified files in depth. The agent must return a structured summary in English listing:
+- **Added**: new features, files, components, APIs
+- **Changed**: behavior changes, UI refactors
+- **Removed**: removed code/functionality
+- **Performance**: notable optimizations
+- **i18n**: new strings added
+- **Tests**: new tests
 
-### Étape 4 — Mettre à jour CHANGELOG.md
+### Step 4 — Update CHANGELOG.md
 
-Ajouter une entrée en tête du fichier avec le format :
+Add an entry at the top of the file with the format:
 
 ```markdown
 ## X.Y.Z-beta
@@ -59,11 +59,11 @@ Ajouter une entrée en tête du fichier avec le format :
 - ...
 ```
 
-### Étape 5 — Bump version
+### Step 5 — Bump version
 
-Dans `app/build.gradle.kts`, mettre à jour `versionCode` et `versionName`.
+In `app/build.gradle.kts`, update `versionCode` and `versionName`.
 
-### Étape 6 — Commit, push, PR, merge
+### Step 6 — Commit, push, PR, merge
 
 ```bash
 git add CHANGELOG.md app/build.gradle.kts
@@ -71,48 +71,48 @@ git commit -m "chore: bump version to X.Y.Z-beta and update changelog"
 git push
 ```
 
-Créer la PR avec `gh pr create --base main --head {branche} --title "..." --body "..."`.
-Merger avec `gh pr merge {numero} --merge --delete-branch --subject "..."`.
+Create the PR with `gh pr create --base main --head {branch} --title "..." --body "..."`.
+Merge with `gh pr merge {number} --merge --delete-branch --subject "..."`.
 
-### Étape 7 — Tag et release
+### Step 7 — Tag and release
 
 ```bash
 git checkout main && git pull
-git tag -a "vX.Y.Z-beta" -m "release: vX.Y.Z-beta — {résumé}"
+git tag -a "vX.Y.Z-beta" -m "release: vX.Y.Z-beta — {summary}"
 git push origin "vX.Y.Z-beta"
 ```
 
-### Étape 8 — Build APK signé
+### Step 8 — Build signed APK
 
 ```bash
 ANDROID_HOME=/home/tdelannoy-fdi/android-sdk JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean assembleRelease
 ```
 
-Vérifier la signature avec `apksigner` :
+Verify the signature with `apksigner`:
 ```bash
 /home/tdelannoy-fdi/Android/Sdk/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
 ```
 
-### Étape 9 — Créer la release GitHub avec APK
+### Step 9 — Create the GitHub release with the APK
 
 ```bash
 cp app/build/outputs/apk/release/app-release.apk /tmp/portal-launcher-vX.Y.Z-beta.apk
 gh release create "vX.Y.Z-beta" \
-  --title "vX.Y.Z-beta — {résumé court}" \
-  --notes "{CHANGELOG réduit en markdown}" \
+  --title "vX.Y.Z-beta — {short summary}" \
+  --notes "{CHANGELOG condensed into markdown}" \
   /tmp/portal-launcher-vX.Y.Z-beta.apk
 ```
 
-### Étape 10 — Nettoyage
+### Step 10 — Cleanup
 
 ```bash
-git branch -d {branche}  # locale déjà supprimée par gh merge --delete-branch
+git branch -d {branch}  # local branch already deleted by gh merge --delete-branch
 git remote prune origin
 ```
 
 ## Notes
 
-- Le keystore est identique à toutes les releases (pas de rotation).
-- L'APK utilise la signature v2 seulement (pas de v1 JAR signing). C'est suffisant pour minSdk 28.
-- La branche locale est supprimée par `gh pr merge --delete-branch`, il suffit de pruner le remote tracking.
-- Si `gh` n'est pas authentifié, demander à l'utilisateur de faire `gh auth login` d'abord.
+- The keystore is the same for all releases (no rotation).
+- The APK uses the v2 signature only (no v1 JAR signing). This is sufficient for minSdk 28.
+- The local branch is deleted by `gh pr merge --delete-branch`; you only need to prune the remote tracking ref.
+- If `gh` is not authenticated, ask the user to run `gh auth login` first.

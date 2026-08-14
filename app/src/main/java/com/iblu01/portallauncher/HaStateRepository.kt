@@ -58,9 +58,12 @@ class HaStateRepository(appContext: Context, private val url: String, private va
      * tolerated an arbitrary get_states order).
      */
     @Volatile private var states: PersistentMap<String, HaEntity> = persistentMapOf()
-    private var socket: WebSocket? = null
-    private var connected = false
-    private var enabled = false
+    // Written from the main thread (start/forceReconnect) and read/written from the OkHttp socket
+    // thread (onFailure/onClosed). Without volatile a lost `socket = null` pins a dead socket in the
+    // field forever: start() then short-circuits on "already active" and nothing ever reconnects.
+    @Volatile private var socket: WebSocket? = null
+    @Volatile private var connected = false
+    @Volatile private var enabled = false
     private val retryHandler = Handler(Looper.getMainLooper())
     private val watchdogHandler = Handler(Looper.getMainLooper())
 
@@ -162,7 +165,9 @@ class HaStateRepository(appContext: Context, private val url: String, private va
             val current = socket
             if (enabled && current != null) {
                 val silentMs = System.currentTimeMillis() - lastActivityAt
-                if (connected && silentMs > STALE_MS) {
+                // Not gated on `connected`: a socket that opened but never authenticated is just as
+                // dead as one that stopped answering, and it never fires onFailure either.
+                if (silentMs > STALE_MS) {
                     Log.w(TAG, "watchdog: no frame for ${silentMs}ms; forcing reconnect")
                     forceReconnect()
                     return

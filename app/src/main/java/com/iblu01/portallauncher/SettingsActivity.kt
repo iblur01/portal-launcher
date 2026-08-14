@@ -122,6 +122,7 @@ class SettingsActivity : ComponentActivity() {
                     haStates = pills.latestStates,
                     autoReturnState = autoReturnState,
                     onAutoReturnCancel = autoReturnTimer::onInteraction,
+                    initialPage = intent?.getStringExtra(EXTRA_PAGE),
                 )
             }
         }
@@ -416,5 +417,10 @@ class SettingsActivity : ComponentActivity() {
             return
         }
         Toast.makeText(this, getString(R.string.toast_permissions_ok), Toast.LENGTH_SHORT).show()
+    }
+
+    companion object {
+        /** Optional `SettingsPage` name to open directly instead of the settings root. */
+        const val EXTRA_PAGE = "page"
     }
 }

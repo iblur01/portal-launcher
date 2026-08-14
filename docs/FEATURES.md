@@ -41,7 +41,7 @@ Conventions used below:
 - ⚠️ Locale is the device default. The UI strings are hardcoded French but the date will render in whatever locale the device is set to.
 
 ### Clock theming
-Editor: Settings → Application → "Thème de l'horloge" → `ClockThemeActivity` (immersive fullscreen over the *real* wallpaper with frozen mock content, `ClockThemeActivity.kt:20-54`).
+Editor: Settings → Application → "Clock theme" → `ClockThemeActivity` (immersive fullscreen over the *real* wallpaper with frozen mock content, `ClockThemeActivity.kt:20-54`).
 
 | Control | Range | Source |
 |---|---|---|
@@ -75,17 +75,17 @@ Scrim: separate darkening layer, 0–60 %, default 25 %, only when mode ≠ neut
 
 ### Other idle-screen elements
 - **Temperature pill**: `Appartement {min}–{max}` + `Ext. {outdoor}` — `ClockScreen.kt:132-143`.
-- **Offline banner**: shown only when `!connected && lastUpdateAt > 0`, ticking every second, amber pill reading "Hors ligne — infos figées depuis {N}s" — `ClockScreen.kt:144-147,191-210`. ⚠️ Never rolls over to hours: after 100 minutes it reads "142min".
-- **Pill tray**: collapsed renders 3 pills whenever at least 3 enabled compatible devices are available (with one exceptional extra critical slot only when four remain readable); expanded reaches 9 with up to 6 secondary pills. After alerts, pins and relevant activity, calm unpinned devices fill remaining positions. The bottom Maison icon was removed; Maison remains reachable by swipe — `ClockScreen.kt`, `HomePillComposer.kt`, `HomeCriticalCapacityPolicy.kt`.
+- **Offline banner**: shown only when `!connected && lastUpdateAt > 0`, ticking every second, amber pill reading "Offline — info frozen since {N}s" — `ClockScreen.kt:144-147,191-210`. ⚠️ Never rolls over to hours: after 100 minutes it reads "142min".
+- **Pill tray**: collapsed renders 3 pills whenever at least 3 enabled compatible devices are available (with one exceptional extra critical slot only when four remain readable); expanded reaches 9 with up to 6 secondary pills. After alerts, pins and relevant activity, calm unpinned devices fill remaining positions. The bottom House-page icon was removed; the House page remains reachable by swipe — `ClockScreen.kt`, `HomePillComposer.kt`, `HomeCriticalCapacityPolicy.kt`.
 - Expanding still grows the bottom gradient 360→620 dp over 450 ms and arms auto-return — `LauncherActivity.kt:941-945`.
 
 ---
 
-## 2. Pill system, catalog and Maison composition
+## 2. Pill system, catalog and House-page composition
 
-Pipeline: HA snapshot + `Prefs.pillRules` + the versioned Maison preferences → complete
-`PillCatalogSnapshot` → dynamic ranking → `HomePillComposer` (3 primary / 6 secondary / favorite
-overflow) and `HomePageBuilder` (ordered Maison sections) → `LauncherViewModel.uiState` → Compose.
+Pipeline: HA snapshot + `Prefs.pillRules` + the versioned House-page preferences → complete
+`PillCatalogSnapshot` → dynamic ranking → `HomePillComposer` (3 primary / 6 secondary / favourite
+overflow) and `HomePageBuilder` (ordered House-page sections) → `LauncherViewModel.uiState` → Compose.
 The 100 ms sampled transform stays on `Dispatchers.Default`; capacity is applied only by the home
 composer, never while building the catalog — `PillRepository.kt:173-247`,
 `PillPriorityEngine.kt:20-59`.
@@ -123,9 +123,9 @@ automatic groups or panel routing.
 
 **Eligibility gate**: a persistent target must pass `PillSupport.isAllowedAsPersistedChip`; entities
 without a routed panel (notably button/number/select/camera and passive diagnostic sensors) are not
-catalogued. Compatible devices discovered after the saved rules are included in Maison even before
+catalogued. Compatible devices discovered after the saved rules are included in the House page even before
 being enabled for dynamic ranking. An explicitly disabled rule remains discoverable in Settings but
-is hidden from Accueil, Maison and automatic-group members; only enabled rules can be pinned from
+is hidden from the Home screen, the House page and automatic-group members; only enabled rules can be pinned from
 Settings or feed dynamic ranking — `PillRules.kt:179-203`,
 `PillCatalogBuilder.kt:27-63,166-190`.
 
@@ -137,8 +137,8 @@ Settings or feed dynamic ranking — `PillRules.kt:179-203`,
 `area:<area_id>`, `kind:<PillKind>` or `manual:<immutable id>`; no localized display label is used
 as an identity — `HomePillModels.kt:6-47`, `HomePillPreferencesCodec.kt:113-131`.
 
-`HomePillPreferences` schema v1 stores the Maison toggle, unlimited ordered pins, section visibility /
-order / item order, and manual groups. The first read writes defaults (Maison and all automatic
+`HomePillPreferences` schema v1 stores the House-page toggle, unlimited ordered pins, section visibility /
+order / item order, and manual groups. The first read writes defaults (House page and all automatic
 sections enabled, no pins, no manual groups) without touching legacy `pill_rules`. Corrupt or future
 JSON falls back in memory without overwriting its source; unknown stable references survive decode.
 Writes are process-serialized, canonical-JSON deduplicated and emit one
@@ -156,7 +156,7 @@ Writes are process-serialized, canonical-JSON deduplicated and emit one
 - typed representations of historical aggregates for dynamic-ranking compatibility.
 
 The same device can therefore appear individually, in its room, in its kind, in multiple manual
-groups and in Favorites. Group membership is derived locally and never writes HA area/type state —
+groups and in Favourites. Group membership is derived locally and never writes HA area/type state —
 `PillCatalogBuilder.kt:15-115`, `HaStateRepository.kt:72-82,227-252`.
 
 Group summaries report active/available member counts. A collective action exists only for an
@@ -164,7 +164,7 @@ explicit safe intersection: turn off for light/switch/fan/purifier sets, close f
 locks; mixed unsupported groups get none — `PillCatalogBuilder.kt:117-163,263-269`.
 
 The remaining historical dynamic aggregates retain their prior state summaries:
-- **openingGroup** — "Toutes fermées" / "N ouverte(s)", priority rises with how long something has been open (`:229-253`).
+- **openingGroup** — "All closed" / "N open", priority rises with how long something has been open (`:229-253`).
 - **mediaGroup** — playing/buffering counts; a paused player only counts if paused less than 30 s ago (`:109-133`).
 - ⚠️ **purifierGroup** takes only the **first** enabled purifier; additional ones are silently invisible (`:135-156`).
 
@@ -212,9 +212,10 @@ are not selectable at all.
   `toggle`. A single light opens its detail controls immediately without a redundant one-item
   browser; a group opens the group browser — `ChipMapper.kt:39-47`,
   `LauncherActivity.kt:837-863`.
-- Long-press on Accueil or Maison opens the semantic context menu instead of routing immediately.
+- Long-press on the Home screen or the House page opens the semantic context menu instead of routing immediately.
   It offers pin/unpin, add-device-to-manual-group, reorder (drag plus first/before/after/last), and
-  "Ouvrir les commandes". Individual devices also offer "Ne plus afficher cet appareil", which
+  "Ouvrir les commandes" ("Open controls"). Individual devices also offer "Ne plus afficher cet
+  appareil" ("Stop showing this device"), which
   disables their Settings rule while preserving pins/membership for later restoration. Stale targets still allow safe actions such as unpin but block commands —
   `HomePillContextMenu.kt:192-303,329-355`.
 - Drag reorder is armed explicitly from the menu, locks pager/vertical scrolling, stages relative
@@ -232,7 +233,7 @@ are not selectable at all.
 
 Router: `ChipActionsPanel` → exhaustive `when (chip.toPanelKind())`, no catch-all — `SidePanel.kt:174-191`. Shared chrome = frosted card, circular "×" top-left, centred icon+label pill, `chip.value` as title, scrollable body (`SidePanel.kt:118-171`). Live entity access via `rememberEntity()`, which dedups HA pushes by comparing state + attributes so unrelated updates don't recompose an open control (`PanelHelpers.kt:36-48`).
 
-Unavailable handling: single-entity panels render "Appareil indisponible" (`PanelHelpers.kt:54-69`).
+Unavailable handling: single-entity panels render "Device unavailable" (`PanelHelpers.kt:54-69`).
 List-based lights and purifier panels retain their existing per-member degradation.
 
 | Panel | Mode | Controls → HA service |
@@ -254,7 +255,7 @@ Area, kind and manual-group pills open a typed `PanelRequest.Group(destination, 
 than an id-special-cased panel. The root shows the group summary, an optional explicitly safe
 collective action and the currently resolved members. Selecting a member replaces the content with
 its existing control panel; Back pops to the group, while Close dismisses the whole stack. A member
-that vanishes while selected gets a recoverable "Appareil indisponible" state —
+that vanishes while selected gets a recoverable "Device unavailable" state —
 `PanelState.kt:14-37,92-167`, `GroupBrowserPanel.kt:92-188,296-325`.
 
 Collective services are mapped only from `GroupCollectiveAction` plus the member's typed kind/domain;
@@ -266,7 +267,7 @@ commands nor collective commands — `GroupBrowserPanel.kt:51-90,157-184,218-275
 - Room grouping from the HA area registry: a 2-column grid of room cards showing on-count/total, drilling into a per-room light list; flat list if only one area — `:686-751`.
 - Brightness and colour-temperature are **custom vertical fill sliders**, live-throttled at 110 ms while dragging (`LiveThrottle`, `:638-647`), final value on release. Kelvin range read from `min/max_color_temp_kelvin` (default 2000–6500 K).
 - 8 colour presets + 4 white presets; long-press a colour preset opens a drag **colour wheel** that previews locally and commits `hs_color` on release — `:538-624`.
-- "Tout éteindre" row appears only when something is on (`:753-772`). Lights with an integrated white channel and no `color_temp` show a static label instead of controls (`:309-315`).
+- The "Tout éteindre" ("Turn everything off") row appears only when something is on (`:753-772`). Lights with an integrated white channel and no `color_temp` show a static label instead of controls (`:309-315`).
 
 ### Alarm — code entry (`AlarmPanel.kt`)
 - Arm modes are discovered from the `supported_features` bitmask, not hardcoded — `:106-117`, bits in `PanelHelpers.kt:72`.
@@ -304,8 +305,8 @@ commands nor collective commands — `GroupBrowserPanel.kt:51-90,157-184,218-275
 - Secondary play/pause updates local state optimistically before calling the service; primary does not, so primary feels laggier by design — `LauncherActivity.kt:370-379`.
 
 ### Multi-room / grouped music
-- "Diffuser dans" lists every `media_player` in the whole snapshot that exposes a `group_members` attribute at all — i.e. any player whose integration supports grouping, playing or not (`MediaSessionBuilder.kt:70-79`).
-- The current leader is pinned as "Principal", checked and disabled — `MediaPlayerView.kt:580-584`.
+- "Stream to" lists every `media_player` in the whole snapshot that exposes a `group_members` attribute at all — i.e. any player whose integration supports grouping, playing or not (`MediaSessionBuilder.kt:70-79`).
+- The current leader is pinned as "Main", checked and disabled — `MediaPlayerView.kt:580-584`.
 - Unchecking → `media_player.unjoin` on that member. Checking → `media_player.join` on the leader with `group_members: [thatOneMember]` — `LauncherActivity.kt:639-649`.
 - Each tap sends only the toggled member, not the accumulated selection. That looked like a bug but isn't: HA's `join` is additive for the group-capable integrations, and `selectedGroupMembers` is local optimistic state re-synced from `groupMemberIds`. Verified and refuted.
 - ⚠️ The real fragility is *which* entity is the target: the session's representative is `matchingPlayers.first()` (`MediaSessionBuilder.kt:34,43`), i.e. arbitrary map-iteration order among players sharing a title/artist. It is **never** derived from `group_members` or any coordinator concept. If the integration requires the coordinator entity for transport, a tap can land on a follower and silently no-op. This is also what makes the primary-vs-secondary transport asymmetry above risky rather than merely inconsistent.
@@ -431,17 +432,17 @@ The presence proxy depends on Portal dream broadcasts; tap compensation is keyed
 
 ## 7. Settings, preferences
 
-### Pill and Maison editor
+### Pill and House-page editor
 
 The Pills tile is now a small settings hierarchy with three entry points — `PillsSettingsPage.kt:62-142`:
 
-- **Accueil** previews all 3 primary and 6 secondary pin slots, labels unused positions
-  "Automatique", lists overflow and temporarily unavailable pins separately, and provides ordered
+- **Home screen** previews all 3 primary and 6 secondary pin slots, labels unused positions
+  "Automatic", lists overflow and temporarily unavailable pins separately, and provides ordered
   first/previous/next/last controls — `PillsSettingsPage.kt:199-288`.
-- **Page Maison** toggles the page, controls visibility/order and per-section item order, exposes every
+- **House page** toggles the page, controls visibility/order and per-section item order, exposes every
   automatic room/type group as a pin target, and creates/orders manual groups —
   `PillsSettingsPage.kt:290-408`.
-- **Appareils disponibles** preserves the existing per-device activation rule while adding pin/unpin
+- **Available devices** preserves the existing per-device activation rule while adding pin/unpin
   independently of whether the target currently ranks in the home nine. Targets are grouped by the
   existing user-facing `PillFamily` buckets; unavailable/stale targets cannot be newly pinned —
   `PillsSettingsPage.kt:410-445,550-604`, `HomeSettingsReducer.kt:42-61,209-265`.
@@ -461,74 +462,74 @@ settings catalog is complete rather than top-nine-limited and uses stable `area_
 ## 8. Overlays, gestures, navigation
 
 ### Logical pager pages
-One flat `HorizontalPager` holds `[Maison?, Accueil, app page 0, app page 1, …]`
+One flat `HorizontalPager` holds `[House page?, Home screen, app page 0, app page 1, …]`
 (`LauncherPager.kt`). It is not a pager nested inside the apps page, and no launcher page nests a
 second horizontal scroller.
 
 `LauncherPagerLayout` maps the logical identities `House`, `Clock`, `Apps(n)` to physical indices.
-With Maison enabled those are `0`, `1`, `2+n`; without it they are `0`, `1+n`. The initial destination
-is always Accueil, and a hot Maison toggle remaps the settled logical identity so an application page
+With the House page enabled those are `0`, `1`, `2+n`; without it they are `0`, `1+n`. The initial
+destination is always the Home screen, and a hot House-page toggle remaps the settled logical identity so an application page
 never silently shifts to a neighbour — `LauncherPager.kt:60-149,264-281`.
 
-The clock header collapse is relative to the logical Accueil index and uses the absolute page
-distance: Maison and app pages both keep the clock collapsed in the shared launcher top bar. HOME,
-Back and auto-return call the Maison-aware `returnToClockPage(..., layout)` and therefore always
-target the main Accueil, never Maison — `LauncherPager.kt:151-209`,
+The clock header collapse is relative to the logical Home-screen index and uses the absolute page
+distance: the House page and app pages both keep the clock collapsed in the shared launcher top bar.
+HOME, Back and auto-return call the House-page-aware `returnToClockPage(..., layout)` and therefore
+always target the main Home screen, never the House page — `LauncherPager.kt:151-209`,
 `LauncherBack.kt:44-64`, `LauncherActivity.kt:800-831`.
 
-When enabled, Maison is reachable by a left-to-right gesture from Accueil. There is deliberately no
+When enabled, the House page is reachable by a left-to-right gesture from the Home screen. There is deliberately no
 extra bottom home icon. When disabled, the physical page disappears without leaving a placeholder.
 
-### Maison page and grid
+### House page and grid
 
-Maison renders an independently vertical `LazyColumn` of non-empty ordered sections: available pins
-(Favoris), automatic rooms, one section per populated kind (individual devices only; the redundant
+The House page renders an independently vertical `LazyColumn` of non-empty ordered sections:
+available pins (Favourites), automatic rooms, one section per populated kind (individual devices only; the redundant
 aggregate type pill is not repeated at the start of its own line),
 and rendered manual groups. Hidden and empty sections are omitted while their preferences remain
 stored. An empty catalog produces one page-level explanation/action rather than repeated empty
 sections — `HomePageBuilder.kt:6-105`, `HomePage.kt`.
 
 Each section wraps its devices across full-width lines of equal pills — the same `StatusChip`
-Accueil renders, stretched to the line's column width: the page owns a single vertical gesture, so
+the Home screen renders, stretched to the line's column width: the page owns a single vertical gesture, so
 everything a section holds is reachable without a second scroll axis. The column count is a pure
 function of the available width and the font scale (`HomeGridLayoutPolicy`, 220 dp minimum pill,
 4 columns maximum) — large text yields fewer columns, never a narrower pill. Pills keep their 48 dp
 minimum target and keyboard/D-pad activation. Each one sits on an opaque elevated slab drawn under
 the chip's own frosted fill: the tray's fill assumes the darkened bottom of the clock page, while
-Maison covers the full wallpaper, and on API 28 `Modifier.blur` is a no-op — so the frost is a solid
+the House page covers the full wallpaper, and on API 28 `Modifier.blur` is a no-op — so the frost is a solid
 surface, not a translucent scrim that a bright photo reads straight through —
 `HomeGridLayoutPolicy.kt`, `HomePage.kt`.
 
-Maison's shared clock header owns its title and round actions: a future Type/Pièce grouping switch,
-**Modifier/Terminer**, and Settings. The grouping control is intentionally a UI extension point for
+The House page's shared clock header owns its title and round actions: a future By room / By type
+grouping switch, **Edit/Finish**, and Settings. The grouping control is intentionally a UI extension point for
 now and does not alter the saved section model. Edit mode exposes section before/after/hide controls
 plus group-management entry points in the page content, and explains that automatic room/type
-membership is managed in HA. Pill long-press opens the same complete context menu used by Accueil.
+membership is managed in HA. Pill long-press opens the same complete context menu used by the Home screen.
 TalkBack descriptions include name, state, pin/stale/critical status and group membership —
 `LauncherHeaderActions.kt`, `HomePage.kt`.
 
-Maison's vertical list is a smaller viewport anchored to the bottom and clipped to its own bounds,
+The House page's vertical list is a smaller viewport anchored to the bottom and clipped to its own bounds,
 so scrolling cannot carry later lines behind the fixed header. Its top edge is the header height
 *measured by the pager* (`LocalCollapsedHeaderHeight`) plus a 14 dp gap: the clock is user-themed,
 so a hardcoded constant is what pushed the first line of pills under it. The surface also fades in
 with the leftward collapse progress, matching the app grid reveal.
 
-Maison scrolls vertically and the pager scrolls horizontally, so the two gestures never compete and
+The House page scrolls vertically and the pager scrolls horizontally, so the two gestures never compete and
 no page-level gesture arbitration is needed. Vertical scrolling locks during pill reorder —
 `HomePage.kt`, `LauncherActivity.kt`.
 
 ### App pages
-- The clock header is a sibling above the pager, not inside Accueil. From Accueil it shrinks to 34 % toward Maison or the apps grid, driven by the absolute logical-clock-relative offset through a `graphicsLayer` scale — GPU only, no relayout per frame (the Portal is API 28) — and stays collapsed on every non-Accueil launcher page. In that compact state only the time remains: the date and weather details fade out while the time translates upward to reclaim the date's visual slot.
+- The clock header is a sibling above the pager, not inside the Home screen. From the Home screen it shrinks to 34 % toward the House page or the apps grid, driven by the absolute logical-clock-relative offset through a `graphicsLayer` scale — GPU only, no relayout per frame (the Portal is API 28) — and stays collapsed on every launcher page other than the Home screen. In that compact state only the time remains: the date and weather details fade out while the time translates upward to reclaim the date's visual slot.
 - Because the header is drawn *above* the pager it would be a dead zone for the swipe, so it forwards its own horizontal drags to the pager via `dispatchRawDelta` and settles at 25 % of a page width or 600 px/s (`pagerDragForward`). Its reported height follows the visible (scaled) height so the collapsed clock stops eating taps meant for the first row of icons (`collapsingHeight`).
 - Tap/long-press on the clock keep their meaning (HA / quick actions) but only while it is expanded (`collapse < 0.5`).
-- Application pages show **Masquées** and **Réglages** in the top bar. Maison replaces **Masquées** with its Type/Pièce and edit actions while retaining Settings. The two direction-specific action groups fade independently, so app controls never leak into Maison during a swipe (`LauncherHeaderActions.kt`).
+- Application pages show **Hidden apps** and **Settings** in the top bar. The House page replaces **Hidden apps** with its By room / By type and edit actions while retaining Settings. The two direction-specific action groups fade independently, so app controls never leak into the House page during a swipe (`LauncherHeaderActions.kt`).
 - Pill/app drag locks parent pager scrolling. An open panel reserves
-  33 % of the relevant axis and remeasures Clock, Maison and application pages into the remaining
-  area; only the full-screen wallpaper/scrims continue underneath. Sitting on Maison or any app page
+  33 % of the relevant axis and remeasures the Clock, House and application pages into the remaining
+  area; only the full-screen wallpaper/scrims continue underneath. Sitting on the House page or any app page
   arms auto-return like the expanded tray does.
 - **A pause keeps the page when the launcher itself opened something** (an app, a shortcut, Settings, app info, uninstall — `openingFromLauncher`); any other pause, screen-off included, resets to the clock so the panel never wakes up on the grid. Without that split the page snapped home before the launched app even appeared, and coming back landed on the clock instead of where the icon was.
 - Auto-return is frozen while the launcher is not resumed: it exists for an idle *visible* panel, and letting the countdown run behind another app dragged the page home behind the user's back. Coming back re-arms it from zero.
-- Every return to Accueil goes through the logical-layout-aware `returnToClockPage`, which launches the scroll in a scope that outlives the caller's effect. Awaiting it inside a `LaunchedEffect` keyed on the trigger stranded the pager mid-scroll — crossing the page midpoint cleared the trigger, the key changed, the effect was cancelled, and a few icons stayed faintly visible over the clock.
+- Every return to the Home screen goes through the logical-layout-aware `returnToClockPage`, which launches the scroll in a scope that outlives the caller's effect. Awaiting it inside a `LaunchedEffect` keyed on the trigger stranded the pager mid-scroll — crossing the page midpoint cleared the trigger, the key changed, the effect was cancelled, and a few icons stayed faintly visible over the clock.
 - Page count is derived: every occupied page, plus a trailing empty one **only while an icon is in hand**. That page is how new pages are created (drag an icon onto it) but dead weight otherwise — an extra dot and a swipe into nothing — so it appears with the drag and goes away with it. Dropping back onto an earlier page removes it from under the current page, so the pager clamps back to the last real one.
 - The wallpaper dims a further 45 % across the swipe, and the tray gradient fades out; both alphas are read in the layer phase, so no recomposition per frame.
 - Apps are enumerated **once** off-main with icons pre-rasterized to `ImageBitmap` (`AppListStore`), refreshed through `LauncherApps.Callback` (registered for the activity's whole life, since an uninstall happens while the launcher is paused). The old drawer called `getApplicationIcon()` inside composition — disk I/O on the main thread, invisible behind a fade but a visible stutter inside a pager.
@@ -542,7 +543,7 @@ Icons sit at the exact cell they were dropped in — an absolutely-positioned gr
 - **Cross-page drags**: hold the icon against a page edge for 450 ms and the pager flips (`EDGE_FLIP_*`), which is also how you reach the drag-only empty page and thus create one. The edges are the **pager's viewport**, not a page's rectangle: pages slide, so a scrolled-away page's edges are meaningless — reading one made every position look like "against the right edge" and none like the left, so only forward flips worked. The drag state lives *above* the pager (`GridDragState`) because a page-local one could not survive the flip; the icon is drawn by an overlay in root coordinates, and the page under the icon's centre decides the target cell.
 - The gesture belongs to the page it started on, so it must survive that page moving and being scrolled off: its `pointerInput` is keyed on `page` + `spec` only (keying it on the page's rect rebuilt the node on every flip, ending the drag exactly when it had to continue), the on-page items are read through `rememberUpdatedState`, and while an icon is in hand **every** page stays composed (`beyondViewportPageCount`). A cancel is still treated as a drop, as a last-resort safety net.
 - The hovered cell is outlined from the draw phase, so following the finger costs no recomposition.
-- **Item menu** (`AppContextMenu.kt`): the app's own shortcuts (manifest + dynamic + pinned, max 4), then Renommer / Masquer / Infos de l'application / Désinstaller. A pinned shortcut gets Retirer instead. Uninstall is hidden for system apps and for Portal itself (`ApplicationInfo.FLAG_SYSTEM`).
+- **Item menu** (`AppContextMenu.kt`): the app's own shortcuts (manifest + dynamic + pinned, max 4), then Rename / Hide / App info / Uninstall. A pinned shortcut gets Remove shortcut instead. Uninstall is hidden for system apps and for Portal itself (`ApplicationInfo.FLAG_SYSTEM`).
 - Shortcuts come from `LauncherApps.getShortcuts()`, which **throws unless Portal is the selected home app**. Every call is gated on `hasShortcutHostPermission()`, and when it is false the menu says so rather than looking like an app with no shortcuts.
 - The menu is positioned from its *measured* height (flip above the tile, clamp into the screen, scroll if still too tall). Its panel swallows taps with a raw pointer handler, **not** `clickable`, which would merge the whole panel into one semantics node and hide the rows from TalkBack.
 - Placement lives in `Prefs.appPlacements` (key → page/col/row), renames in `Prefs.appLabels`, hidden items in `Prefs.hiddenApps`, folders in `Prefs.appFolders`. A pre-pages arrangement (`appOrder`) is converted to cells once, so upgrading does not scatter it.
@@ -586,7 +587,7 @@ Export and restore of the arrangement (`LayoutBackup.kt`), through the storage p
 - Shortcut icons stay out (they live in `ShortcutIconStore`): a shortcut restored onto a device that never pinned it shows the placeholder tile but still launches.
 
 ### Widgets
-Bound through our own `AppWidgetHost` (`WidgetHostController.kt`), added from the surface menu → **Ajouter un widget**.
+Bound through our own `AppWidgetHost` (`WidgetHostController.kt`), added from the surface menu → **Add a widget**.
 
 - The picker is ours, not `ACTION_APPWIDGET_PICK`: the system one is platform-styled and says nothing about size, and size is what decides whether a widget fits a page at all. Each entry shows its app and its cell footprint.
 - Adding is allocate → bind → configure. `bindAppWidgetIdIfAllowed` first; binding widgets is **not a permission an app can hold**, so when it fails the user is asked through `ACTION_APPWIDGET_BIND`. If the provider declares a `configure` activity it runs before the widget is kept. Every failure path releases the id — a leaked id keeps the provider updating a widget nobody can see.
@@ -598,26 +599,26 @@ Bound through our own `AppWidgetHost` (`WidgetHostController.kt`), added from th
 - Resizing is `−`/`+` per axis in the item menu, in whole cells, bounded by the page. A deliberate simplification over a drag-handle frame: the capability is there, the gesture surface is not.
 
 ### Being the tablet's launcher
-`CATEGORY_HOME` + `singleTask`, plus `stateNotNeeded` / `clearTaskOnLaunch` / `taskAffinity=""` as AOSP Launcher3 declares them. HOME pressed while already home routes through `onNewIntent` and returns to logical Accueil, closing menus, collapsing the tray, leaving Maison edit/reorder mode and dismissing a USER panel. `PinShortcutActivity` accepts `ACTION_CONFIRM_PIN_SHORTCUT` headlessly (a wall panel has nobody to confirm a dialog) and rasterizes the icon on the spot, because a `ShortcutInfo`'s icon cannot be resolved again after the request is consumed.
+`CATEGORY_HOME` + `singleTask`, plus `stateNotNeeded` / `clearTaskOnLaunch` / `taskAffinity=""` as AOSP Launcher3 declares them. HOME pressed while already home routes through `onNewIntent` and returns to the logical Home screen, closing menus, collapsing the tray, leaving House-page edit/reorder mode and dismissing a USER panel. `PinShortcutActivity` accepts `ACTION_CONFIRM_PIN_SHORTCUT` headlessly (a wall panel has nobody to confirm a dialog) and rasterizes the icon on the spot, because a `ShortcutInfo`'s icon cannot be resolved again after the request is consumed.
 
 ### Back
-Back is always consumed — finishing a home activity gives a black flash while the system restarts it. Innermost surface first: item menu → hidden list → widget picker → surface menu → USER panel (including one-level group pop) → logical Accueil from Maison/apps → nothing (`ui/LauncherBack.kt`, `ui/panel/PanelState.kt`, pure and unit-tested). An AUTO (media) panel is deliberately spared, as everywhere else.
+Back is always consumed — finishing a home activity gives a black flash while the system restarts it. Innermost surface first: item menu → hidden list → widget picker → surface menu → USER panel (including one-level group pop) → logical Home screen from the House page/apps → nothing (`ui/LauncherBack.kt`, `ui/panel/PanelState.kt`, pure and unit-tested). An AUTO (media) panel is deliberately spared, as everywhere else.
 
 ### Overlays
-- **Surface menu** — long-press the clock **or an empty cell of the app grid**: fond d'écran (`ACTION_SET_WALLPAPER` chooser), Réglages, Composants, plus **Définir comme launcher par défaut** (`ACTION_HOME_SETTINGS`) when the home role is missing — offered first, since without it app shortcuts and pin requests cannot work at all. The item menu offers the same fix where the user actually notices the problem.
+- **Surface menu** — long-press the clock **or an empty cell of the app grid**: Wallpaper (`ACTION_SET_WALLPAPER` chooser), Settings, Components, plus **Set as default launcher** (`ACTION_HOME_SETTINGS`) when the home role is missing — offered first, since without it app shortcuts and pin requests cannot work at all. The item menu offers the same fix where the user actually notices the problem.
 - Its backdrop decides whether a tap was outside the panel (both rectangles in root coordinates) instead of relying on the panel to swallow it: overlapping siblings both receive a gesture, consuming it from the panel is dispatch-order dependent, and the `clickable` that used to do it merged the whole panel into one semantics node — hiding every row from TalkBack.
-- **Quick actions** — long-press the clock. Blurred backdrop + 40 % scrim, two entries (Réglages / Composants). Dismiss by scrim tap or a >120 px downward swipe. The app drawer that used to live here is now page 1. Launching an app notifies the presence proxy.
+- **Quick actions** — long-press the clock. Blurred backdrop + 40 % scrim, two entries (Settings / Components). Dismiss by scrim tap or a >120 px downward swipe. The app drawer that used to live here is now page 1. Launching an app notifies the presence proxy.
 - **Alert overlay** — raised from MQTT (`sound/play` or `notification`), auto-dismisses after 5 s, restartable; scrim tap dismisses, taps inside are swallowed. Also blurs the whole scene to 16 dp while visible.
 
 
 ### Gestures
-A left-to-right gesture from Accueil reaches Maison and a right-to-left gesture reaches apps (when Maison is enabled; otherwise the former has no page); Back/HOME/auto-return restore Accueil. Long-press an app icon → its menu; long-press then drag → move it to any free cell, swap with an occupied one, or hold at a page edge to carry it to another app page. Tap the clock → open HA (1 s debounce). Long-press the clock → quick actions. Tap a pill → its existing direct command/panel or a group browser; long-press → the complete pill context menu. An explicitly armed horizontal pill drag reorders pins on drop. Tap the weather pill → weather panel. Swipe down on the quick-actions panel → dismiss. Swipe horizontally on the artwork → change session. Vertical drag on the custom sliders → brightness / Kelvin / cover position. Drag the thermostat ring → setpoint, committed on release. Every touch also feeds the sleep scheduler and the auto-return reset via `dispatchTouchEvent`. No pinch or rotate anywhere.
+A left-to-right gesture from the Home screen reaches the House page and a right-to-left gesture reaches apps (when the House page is enabled; otherwise the former has no page); Back/HOME/auto-return restore the Home screen. Long-press an app icon → its menu; long-press then drag → move it to any free cell, swap with an occupied one, or hold at a page edge to carry it to another app page. Tap the clock → open HA (1 s debounce). Long-press the clock → quick actions. Tap a pill → its existing direct command/panel or a group browser; long-press → the complete pill context menu. An explicitly armed horizontal pill drag reorders pins on drop. Tap the weather pill → weather panel. Swipe down on the quick-actions panel → dismiss. Swipe horizontally on the artwork → change session. Vertical drag on the custom sliders → brightness / Kelvin / cover position. Drag the thermostat ring → setpoint, committed on release. Every touch also feeds the sleep scheduler and the auto-return reset via `dispatchTouchEvent`. No pinch or rotate anywhere.
 
 `Modifier.appleClickable` is the single tap primitive: rippleless, with a GPU-only press-scale (no recomposition), and long-press consumes the gesture so parents don't also fire — `Interactions.kt:37-64`.
 
 ### Panel-reserved layout
 Panels slide into a reserved 33 % zone: right side in landscape, bottom in portrait. The wallpaper
-remains continuous, while Clock, Maison and application pages are animated and remeasured into the
+remains continuous, while the Clock, House and application pages are animated and remeasured into the
 unobstructed 67 %, so no interactive element is hidden below the panel. The last payload remains
 mounted briefly for a complete exit transition — `LauncherPanelLayout.kt`.
 
@@ -666,7 +667,7 @@ HaStateRepository.states() + area/device registries    ← WebSocket, Dispatcher
   → ClockTray / HomePage / GroupBrowserPanel           ← render + typed intents only
 ```
 The raw→UI projection is atomic and runs in exactly one place, off both the socket thread and the
-main thread — `PillRepository.kt:199-247`. Settings/launcher/Maison mutations all go through the
+main thread — `PillRepository.kt:199-247`. Settings/launcher/House-page mutations all go through the
 same versioned preference store, whose change event is combined into `snapshotFlow` for immediate
 recomposition — `PillRepository.kt:137-141,173-188`, `Prefs.kt:300-355`.
 
@@ -682,7 +683,7 @@ panel does not snap shut when its pill temporarily leaves the composition —
 `ui/panel/PanelState.kt` is a pure reducer, including the typed group/device stack.
 `ui/mapper/ChipMapper.kt` is the single place where legacy chip ids and kinds are branched on,
 keeping call sites free of display-label matching. `domain/home` contains the Compose/Android-free
-catalog, alert, composition, layout and Maison reducers; `LauncherChip` is kept on the live rendering
+catalog, alert, composition, layout and House-page reducers; `LauncherChip` is kept on the live rendering
 side of that boundary.
 
 Three known leaks:
@@ -700,17 +701,17 @@ A typed `ChipVisual` enum to replace the stringly-typed `LauncherChip.state` was
 semantics/layout tests run under Robolectric on the JVM (`@Config(sdk = [28])`), not on a physical
 device.
 
-The Maison work adds direct coverage for:
+The House-page work adds direct coverage for:
 
 - `HomePillPreferencesCodec` round-trip/defaults/unknown ids/corruption and the non-destructive
   `Prefs` migration;
 - complete catalog eligibility, area/type/manual groups, partial availability and global stale state;
 - pure dynamic alert policy and the 3/6/overflow composer, including restoration/promotion and stable
   tie-breaks;
-- Maison section/order and responsive column policies;
+- House-page section/order and responsive column policies;
 - logical pager remapping, HOME/Back/auto-return targeting and the typed group panel reducer;
 - Settings reducers for every pin/section/manual-group mutation and accessible reorder alternative;
-- Robolectric semantics for the collapsed/expanded tray, Maison icon, context menu, section grids,
+- Robolectric semantics for the collapsed/expanded tray, House-page icon, context menu, section grids,
   empty/stale states and group browser;
 - explicit non-regression contracts for SWITCH/FAN, Presence/Energy, media `PanelSource`, panels and
   application-page mapping.
@@ -761,9 +762,9 @@ Home Assistant entity labels and locally supplied names remain data rather than 
 
 ### Behavioural rough edges
 - A fresh install auto-enables three pill kinds: lights, media and purifier.
-- The historical dynamic purifier aggregate still summarizes only the first purifier; all compatible purifiers are nevertheless present individually in Maison and automatic groups.
+- The historical dynamic purifier aggregate still summarizes only the first purifier; all compatible purifiers are nevertheless present individually in the House page and automatic groups.
 - Settings' entity refresh overwrites `label` / `kind` / `relatedEntityIds` from the live HA scan, so those fields can't hold a manual edit.
-- Pill reordering is a relative horizontal drag after an explicit menu action, not a free-position drag overlay. Accueil exposes only the visible nine; overflow order is reachable through the Favoris section or Settings.
+- Pill reordering is a relative horizontal drag after an explicit menu action, not a free-position drag overlay. The Home screen exposes only the visible nine; overflow order is reachable through the Favourites section or Settings.
 - The new accessibility and responsive contracts have Robolectric/logic coverage, but no device-level TalkBack, D-pad or large-font screenshot suite; real Android 9 wall-panel validation is still manual.
 - Media: mute not actionable, no seek, primary transport hits the leader only, `join` sends one member at a time.
 - Thermostat has no dual setpoint.

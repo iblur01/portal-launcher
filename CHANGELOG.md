@@ -2,91 +2,91 @@
 
 ## 1.0
 
-Première version stable. Sortie de beta après `0.0.7-beta`.
+First stable release. Leaving beta after `0.0.7-beta`.
 
 ### Added
 
-- **Configuration à distance depuis un téléphone** : un serveur HTTP local embarqué sert une page de réglages sur le réseau Wi-Fi ; le panneau affiche un QR code et un code d'accès à usage unique. L'adresse Home Assistant, le jeton, le MQTT et la sélection des pills se saisissent depuis le clavier du téléphone. La page se ferme dès qu'on quitte l'écran.
-- **Onboarding « avec un téléphone »** : l'étape Home Assistant propose deux voies explicites — configuration par téléphone (QR code) ou saisie directe sur le panneau — avec un avertissement dédié sur écran compact.
-- **Dossiers dans la grille d'applications** : un dossier se crée en déposant une icône sur une autre, s'ouvre en popup centré, se renomme d'un tap sur son titre et se dissout automatiquement sous deux membres ou quand une app est désinstallée. La tuile affiche les quatre premiers membres en 2×2.
-- **Packs d'icônes tiers** : détection des packs installés (ADW / GO / Nova), lecture d'`appfilter.xml` et application aux icônes de la grille ; les apps non thémées gardent leur icône d'origine.
-- **Pastilles de notification** : un service d'écoute allume une pastille sur les applications qui ont quelque chose en attente (aucun contenu n'est lu ni conservé), y compris sur les dossiers. Les notifications permanentes n'allument rien.
-- **Sauvegarde et restauration de la disposition** : export/import d'un fichier JSON versionné et lisible contenant placements, dossiers, renommages, apps masquées, raccourcis épinglés, échelle de grille et pack d'icônes — sans aucun identifiant ni mot de passe.
-- **Provisionnement root automatique** : sur un panneau rooté, Portal s'accorde lui-même toutes les autorisations système (rôle launcher, accessibilité, accès notifications, réglages sécurisés, exclusion doze) en un bouton, dans l'onboarding comme dans les réglages.
-- **Panneaux Porte et Mouvement** : nouveaux panneaux dédiés aux ouvrants et aux détecteurs de présence, avec état et horodatage « depuis ».
-- **Nouvelle catégorie de pill Mouvement** : les détecteurs de mouvement/présence rejoignent « Sécurité & accès ».
-- **Logos de source sur les pochettes média** : 40 logos de fournisseurs (Spotify, Netflix, Plex, Sonos, YouTube, Tidal…) intégrés en vectoriel et résolus depuis `app_name`, `source` ou le domaine du lecteur.
-- **Page Maison groupée par pièce ou par type** : un sélecteur dans l'en-tête bascule entre les deux organisations, la préférence est mémorisée.
-- **Prévisions météo à onglets** : le panneau météo distingue « Heures » et « Jours », avec la plage min/max du jour.
-- **Fond d'écran personnalisé dans l'onboarding** : choix d'une photo locale pendant la configuration initiale, en plus des modes système, calme et Immich.
-- **Récapitulatif de fin d'onboarding** : l'écran final résume les choix effectués.
+- **Remote configuration from a phone**: an embedded local HTTP server serves a settings page over the Wi-Fi network; the panel displays a QR code and a single-use access code. The Home Assistant address, the token, MQTT and the pill selection are entered from the phone's keyboard. The page closes as soon as the screen is left.
+- **"With a phone" onboarding**: the Home Assistant step offers two explicit paths — configuration by phone (QR code) or direct entry on the panel — with a dedicated warning on compact screens.
+- **Folders in the app grid**: a folder is created by dropping an icon onto another one, opens as a centered popup, is renamed with a tap on its title, and dissolves automatically below two members or when an app is uninstalled. The tile shows the first four members in a 2×2 layout.
+- **Third-party icon packs**: detection of installed packs (ADW / GO / Nova), reading of `appfilter.xml` and application to the grid icons; unthemed apps keep their original icon.
+- **Notification dots**: a listener service lights up a dot on applications that have something pending (no content is read or retained), including on folders. Ongoing notifications light up nothing.
+- **Layout backup and restore**: export/import of a versioned, human-readable JSON file containing placements, folders, renames, hidden apps, pinned shortcuts, grid scale and icon pack — without any credential or password.
+- **Automatic root provisioning**: on a rooted panel, Portal grants itself all system permissions (launcher role, accessibility, notification access, secure settings, doze exclusion) with a single button, both in onboarding and in settings.
+- **Door and Motion panels**: new panels dedicated to openings and presence detectors, with state and a "since" timestamp.
+- **New Motion pill category**: motion/presence detectors join "Security & access".
+- **Source logos on media artwork**: 40 provider logos (Spotify, Netflix, Plex, Sonos, YouTube, Tidal…) bundled as vectors and resolved from `app_name`, `source` or the player's domain.
+- **Home page grouped by room or by type**: a selector in the header switches between the two organizations, and the preference is remembered.
+- **Tabbed weather forecast**: the weather panel distinguishes "Hours" and "Days", with the day's min/max range.
+- **Custom wallpaper in onboarding**: choice of a local photo during initial configuration, in addition to the system, calm and Immich modes.
+- **Onboarding completion summary**: the final screen summarizes the choices that were made.
 
 ### Changed
 
-- **Panneaux adaptatifs** : la composition d'un panneau est décidée par ses propres dimensions, pas par l'orientation de l'appareil ; les panneaux passent en pleine page sur écran compact au lieu de rester dockés au tiers de l'écran.
-- **Divulgation progressive du média** : les contrôles de lecture principaux sont conservés en priorité et le détail secondaire disparaît à mesure que la hauteur utile diminue.
-- **Horloge et bandeau compacts** : hiérarchie, marges et espacement repensés pour les petits écrans, températures intérieure/extérieure condensées dans l'en-tête et masquées quand elles sont indisponibles, séparation nette entre les pills et les points du pager.
-- **Icônes météo** : le glyphe dessiné au Canvas est remplacé par les icônes Meteocons statiques embarquées dans l'APK, disponibles hors ligne.
-- **Dépôt sur une case occupée** : le geste crée un dossier au lieu d'échanger les deux icônes ; l'échange ne subsiste que quand le regroupement est impossible (widget, tailles différentes).
-- **Textes français au vouvoiement** : l'ensemble des écrans de configuration passe du tutoiement au vouvoiement, avec des formulations plus claires.
-- **Chargement d'images unifié** : un seul `ImageLoader` Coil pour tout le processus, avec décodeur SVG, budgets mémoire/disque explicites (12 % du heap, 32 Mo), RGB565 et contournement du proxy HTTP pour le trafic local.
-- **Documentation** : README réécrit, nouveaux guides `docs/GETTING-STARTED.md`, `docs/ARCHITECTURE.md`, `docs/CONFIGURATION.md`, `docs/DEVELOPMENT.md`, `docs/TESTING.md`, et `docs/FEATURES.md` remis à jour.
+- **Adaptive panels**: a panel's composition is decided by its own dimensions, not by the device orientation; panels go full-page on compact screens instead of staying docked to a third of the screen.
+- **Progressive disclosure for media**: the main playback controls are kept in priority and secondary detail disappears as the usable height decreases.
+- **Compact clock and header**: hierarchy, margins and spacing reworked for small screens, indoor/outdoor temperatures condensed into the header and hidden when unavailable, clear separation between the pills and the pager dots.
+- **Weather icons**: the Canvas-drawn glyph is replaced by the static Meteocons icons bundled in the APK, available offline.
+- **Drop on an occupied cell**: the gesture creates a folder instead of swapping the two icons; the swap only remains when grouping is impossible (widget, different sizes).
+- **French text switched to formal address**: all configuration screens move from the informal *tutoiement* to the formal *vouvoiement* (French second-person forms), with clearer wording.
+- **Unified image loading**: a single Coil `ImageLoader` for the whole process, with an SVG decoder, explicit memory/disk budgets (12% of the heap, 32 MB), RGB565 and HTTP proxy bypass for local traffic.
+- **Documentation**: README rewritten, new guides `docs/GETTING-STARTED.md`, `docs/ARCHITECTURE.md`, `docs/CONFIGURATION.md`, `docs/DEVELOPMENT.md`, `docs/TESTING.md`, and `docs/FEATURES.md` brought up to date.
 
 ### Removed
 
-- Les taps ne traversent plus les panneaux : un panneau opaque absorbe tous les événements pointeur, y compris pendant son animation de fermeture.
-- Le jeu complet d'icônes météo `meteocons/fill` (plus de 120 SVG) est remplacé par un jeu réduit aux conditions réellement utilisées.
-- Suppression de `latestStates` de l'état d'interface : les états bruts Home Assistant ne transitent plus par l'état global du launcher.
-- Retrait de la mention « bientôt disponible » sur le groupement de la page Maison, désormais fonctionnel.
+- Taps no longer pass through panels: an opaque panel absorbs all pointer events, including during its closing animation.
+- The complete `meteocons/fill` weather icon set (over 120 SVGs) is replaced by a set reduced to the conditions actually used.
+- Removal of `latestStates` from the UI state: raw Home Assistant states no longer travel through the launcher's global state.
+- Removal of the "coming soon" mention on Home page grouping, which is now functional.
 
 ### Performance
 
-- **Store observable par entité** : les états Home Assistant ne sont plus diffusés dans un état global recomposé en bloc. Chaque entité possède son propre slot observable ; un `state_changed` sur `light.salon` n'invalide que les composables qui lisent `light.salon`. Mesuré : de 122-145 ms par push sur petit appareil à une seule frame.
-- **Interface optimiste** : une action écrit immédiatement l'état prédit (`turn_on`, `toggle`, `lock`/`unlock`, `open_cover`/`close_cover`, `media_play_pause`…) ; le vrai état reprend la main dès qu'il apporte du nouveau, avec retour arrière automatique après 4 s sans confirmation. Les entités en `assumed_state` conservent la prédiction.
-- **Snapshot immuable côté socket** : la carte d'états devient une `PersistentMap` à écrivain unique — plus de copie défensive de 765 entrées à chaque événement, plus de verrou.
-- **Latence action → confirmation divisée par six** : la fenêtre d'échantillonnage des snapshots passe de 100 ms à 16 ms, et un flux brut non échantillonné alimente le store par entité.
-- **Découverte des pills mémoïsée** : la découverte ne dépend que de l'ensemble des identifiants et des registres, jamais des valeurs d'état ; elle n'est recalculée que quand un appareil apparaît ou disparaît.
-- **Indexation des entités en une passe** : les balayages imbriqués (765 entités × ~60 candidats à chaque push) sont remplacés par un index par appareil partagé, avec mémoïsation des slugs et des clés logiques.
-- **Identités préservées dans l'état d'interface** : une projection reconstruite mais identique conserve son instance précédente, pour que le « strong skipping » de Compose ne recompose pas les sous-arbres de la barre et de la page Maison.
-- **Profil baseline** : ajout de `baseline-prof.txt` et de `profileinstaller`, pour un démarrage à froid compilé AOT plutôt qu'interprété + JIT.
-- **Pont MQTT silencieux** : sur appareil provisionné en root, le pont tourne en service simple, sans notification permanente, avec repli automatique sur le service de premier plan ailleurs.
-- **Sonde de présence conditionnée** : le proxy d'occupation n'est exposé que sur le matériel disposant réellement d'un composant écran de veille.
+- **Per-entity observable store**: Home Assistant states are no longer broadcast in a global state recomposed as a whole. Each entity has its own observable slot; a `state_changed` on `light.salon` only invalidates the composables that read `light.salon`. Measured: from 122-145 ms per push on a small device down to a single frame.
+- **Optimistic UI**: an action immediately writes the predicted state (`turn_on`, `toggle`, `lock`/`unlock`, `open_cover`/`close_cover`, `media_play_pause`…); the real state takes over as soon as it brings something new, with automatic rollback after 4 s without confirmation. Entities in `assumed_state` keep the prediction.
+- **Immutable snapshot on the socket side**: the state map becomes a single-writer `PersistentMap` — no more defensive copy of 765 entries on every event, no more lock.
+- **Action → confirmation latency divided by six**: the snapshot sampling window goes from 100 ms to 16 ms, and an unsampled raw flow feeds the per-entity store.
+- **Memoized pill discovery**: discovery only depends on the set of identifiers and the registries, never on state values; it is only recomputed when a device appears or disappears.
+- **Single-pass entity indexing**: the nested scans (765 entities × ~60 candidates on every push) are replaced by a shared per-device index, with memoization of slugs and logical keys.
+- **Identities preserved in the UI state**: a projection that is rebuilt but identical keeps its previous instance, so that Compose's "strong skipping" does not recompose the subtrees of the bar and of the Home page.
+- **Baseline profile**: addition of `baseline-prof.txt` and of `profileinstaller`, for an AOT-compiled cold start rather than interpreted + JIT.
+- **Silent MQTT bridge**: on a root-provisioned device, the bridge runs as a plain service, without an ongoing notification, with automatic fallback to the foreground service elsewhere.
+- **Conditional presence probe**: the occupancy proxy is only exposed on hardware that actually has a screensaver component.
 
 ## 0.0.7-beta
 
 ### Added
 
-- **Maison Home Assistant** : nouvelle page optionnelle avec sections configurables, favoris, pièces, groupes, entités individuelles, menus contextuels et réorganisation des raccourcis.
-- **Panneaux Home Assistant étendus** : prise en charge des humidificateurs, chauffe-eau, vannes, sirènes, tondeuses, lave-linge, groupes et entités génériques, avec navigation et contrôles adaptés à leurs capacités.
-- **Icônes Home Assistant et MDI** : police et index embarqués, résolution des icônes natives et personnalisées, cache local et rafraîchissement ciblé.
-- **Provisionnement ADB protégé** : activité cachée permettant de préconfigurer les identifiants Home Assistant sur les appareils administrés.
-- **Compatibilité TV et D-pad** : bannière Android TV, navigation clavier/télécommande et alias de débogage dédiés.
+- **Home Assistant Home page**: new optional page with configurable sections, favorites, rooms, groups, individual entities, context menus and shortcut reordering.
+- **Extended Home Assistant panels**: support for humidifiers, water heaters, valves, sirens, lawn mowers, washing machines, groups and generic entities, with navigation and controls adapted to their capabilities.
+- **Home Assistant and MDI icons**: bundled font and index, resolution of native and custom icons, local cache and targeted refresh.
+- **Protected ADB provisioning**: hidden activity allowing Home Assistant credentials to be preconfigured on managed devices.
+- **TV and D-pad compatibility**: Android TV banner, keyboard/remote navigation and dedicated debug aliases.
 
 ### Changed
 
-- **Accueil responsive** : la page Maison utilise désormais une grille verticale adaptative de une à quatre colonnes et un en-tête partagé plus compact.
-- **Navigation du launcher** : ordre stable entre Maison, Accueil et applications, retour vers Accueil et transitions de pager optimisées.
-- **Pills Home Assistant** : catalogue complet, priorités contextuelles, alertes et capacités critiques, tout en réduisant le bruit des entités auxiliaires.
-- **Panneaux et réglages** : alarmes, médias, thermostats, purificateurs, accessoires, fonds et configuration des pills ont été enrichis et adaptés aux différentes tailles d'écran.
+- **Responsive home**: the Home page now uses an adaptive vertical grid of one to four columns and a more compact shared header.
+- **Launcher navigation**: stable order between the House page, Home screen and applications, back navigation to the Home screen, and optimized pager transitions.
+- **Home Assistant pills**: complete catalog, contextual priorities, alerts and critical capabilities, while reducing the noise from auxiliary entities.
+- **Panels and settings**: alarms, media, thermostats, purifiers, accessories, backgrounds and pill configuration have been enriched and adapted to the different screen sizes.
 
 ### Removed
 
-- Les anciens panneaux dédiés Air Quality, Energy, Presence et Scenes ont été remplacés par les contrats génériques et les groupes Home Assistant.
-- Les rails horizontaux imbriqués de la page Maison et leur arbitrage gestuel ont été remplacés par une grille à défilement vertical unique.
+- The former dedicated Air Quality, Energy, Presence and Scenes panels have been replaced by the generic contracts and the Home Assistant groups.
+- The nested horizontal rails of the Home page and their gesture arbitration have been replaced by a single vertically scrolling grid.
 
 ### Performance
 
-- Les transformations de snapshots Home Assistant sont échantillonnées et exécutées hors du thread principal.
-- Les transitions du pager et de l'horloge privilégient les transformations graphiques afin de limiter les recompositions.
-- L'index MDI est lu directement depuis l'APK sans chargement complet en mémoire.
+- Home Assistant snapshot transformations are sampled and executed off the main thread.
+- Pager and clock transitions favor graphic transformations in order to limit recompositions.
+- The MDI index is read directly from the APK without loading it fully into memory.
 
 ### i18n
 
-- Ajout des traductions anglaises et françaises pour la page Maison, les réglages, les appareils, les alarmes et le Playground.
+- Added English and French translations for the Home page, the settings, the devices, the alarms and the Playground.
 
 ### Tests
 
-- Couverture étendue des préférences Maison, du catalogue et des priorités, de la navigation, des panneaux Home Assistant, des icônes, de l'accessibilité et des reducers de réglages.
+- Extended coverage of the Home preferences, of the catalog and priorities, of the navigation, of the Home Assistant panels, of the icons, of accessibility and of the settings reducers.
 
 ## 0.0.5-beta
 

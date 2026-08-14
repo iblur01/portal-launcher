@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome while Portal Launcher remains in beta.
+Contributions are welcome. Portal Launcher is stable as of 1.0.
 
 ## Before starting
 

@@ -200,10 +200,15 @@ fun SettingsScreen(
     haStates: Map<String, HaEntity> = emptyMap(),
     autoReturnState: AutoReturnUiState = AutoReturnUiState(),
     onAutoReturnCancel: (() -> Unit)? = null,
+    initialPage: String? = null,
 ) {
     // First-run configuration is its own flow now (ui.onboarding), not a page of the settings, so
-    // the settings always open on their own root — even when no home has been connected.
-    var currentPage by remember { mutableStateOf(SettingsPage.MAIN) }
+    // the settings always open on their own root — even when no home has been connected. Callers
+    // may deep-link to one page by name (see SettingsActivity.EXTRA_PAGE); an unknown name falls
+    // back to the root rather than failing.
+    var currentPage by remember {
+        mutableStateOf(SettingsPage.values().firstOrNull { it.name == initialPage } ?: SettingsPage.MAIN)
+    }
 
     var haPackage by remember { mutableStateOf(prefs.homeAssistantPackage) }
     var host by remember { mutableStateOf(prefs.brokerHost) }
