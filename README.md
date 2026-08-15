@@ -78,6 +78,7 @@ For detailed setup, permissions, ADB provisioning and local web configuration, r
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Testing](docs/TESTING.md)
+- [Next release: scenes and camera center](docs/NEXT_RELEASE_SCENES_CAMERAS_SPEC.md)
 - [Immich and photo sources](docs/photo-sources.md)
 - [Home pills technical specification](docs/PILLS_HOME_TECHNICAL_SPEC.md)
 - [MQTT session protocol](docs/session-protocol.md)
