@@ -444,4 +444,5 @@ internal fun PillRef.groupDescription(context: android.content.Context): String 
     is PillRef.AreaGroup -> context.getString(R.string.pill_ref_area_group)
     is PillRef.KindGroup -> context.getString(R.string.pill_ref_kind_group)
     is PillRef.ManualGroup -> context.getString(R.string.pill_ref_manual_group)
+    is PillRef.Special -> context.getString(R.string.pill_ref_special)
 }

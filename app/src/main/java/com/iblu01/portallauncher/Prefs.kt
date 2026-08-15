@@ -7,6 +7,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.iblu01.portallauncher.domain.home.CameraPreferences
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
 import com.iblu01.portallauncher.session.SessionAllowlist
 import com.iblu01.portallauncher.session.SessionAllowlistCodec
@@ -410,6 +411,51 @@ class Prefs(private val context: Context) {
         return true
     }
 
+    /**
+     * Camera center configuration. Stored under its own key, so a launcher that never opened the
+     * camera center keeps a preference file byte-for-byte identical to the previous release.
+     *
+     * Absent or invalid JSON falls back to defaults **in memory** and the raw value is left
+     * untouched, exactly like [homePillPreferences].
+     */
+    var cameraPreferences: CameraPreferences
+        get() = synchronized(cameraPreferencesLock) { readCameraPreferencesLocked() }
+        set(value) {
+            synchronized(cameraPreferencesLock) { writeCameraPreferencesLocked(value) }
+        }
+
+    /** Serializes read-modify-write calls and publishes at most one change event. */
+    fun updateCameraPreferences(
+        transform: (CameraPreferences) -> CameraPreferences,
+    ): CameraPreferences = synchronized(cameraPreferencesLock) {
+        val updated = transform(readCameraPreferencesLocked()).copy(
+            schemaVersion = CameraPreferencesCodec.CURRENT_SCHEMA_VERSION,
+        )
+        writeCameraPreferencesLocked(updated)
+        updated
+    }
+
+    private fun readCameraPreferencesLocked(): CameraPreferences {
+        val raw = runCatching { sp.getString(CAMERA_PREFERENCES_KEY, null) }.getOrElse {
+            Log.e("Prefs", "camera preferences are not stored as JSON", it)
+            return CameraPreferencesCodec.defaults()
+        } ?: return CameraPreferencesCodec.defaults()
+        return CameraPreferencesCodec.decode(raw) ?: run {
+            Log.e("Prefs", "invalid camera preferences; using defaults without overwriting source")
+            CameraPreferencesCodec.defaults()
+        }
+    }
+
+    private fun writeCameraPreferencesLocked(value: CameraPreferences): Boolean {
+        val encoded = CameraPreferencesCodec.encode(
+            value.copy(schemaVersion = CameraPreferencesCodec.CURRENT_SCHEMA_VERSION),
+        )
+        if (runCatching { sp.getString(CAMERA_PREFERENCES_KEY, null) }.getOrNull() == encoded) return false
+        sp.edit().putString(CAMERA_PREFERENCES_KEY, encoded).apply()
+        SettingsChangeBus.get().emit(CAMERA_PREFERENCES_CHANGE_KEY)
+        return true
+    }
+
     var pillAutoGroupsInitialized: Boolean
         get() = sp.getBoolean("pill_auto_groups_initialized", false)
         set(value) = sp.edit().putBoolean("pill_auto_groups_initialized", value).apply()
@@ -606,6 +652,9 @@ class Prefs(private val context: Context) {
         const val HOME_PILL_PREFERENCES_CHANGE_KEY = "homePillPreferences"
         private const val HOME_PILL_PREFERENCES_KEY = "home_pill_preferences"
         private val homePillPreferencesLock = Any()
+        const val CAMERA_PREFERENCES_CHANGE_KEY = "cameraPreferences"
+        private const val CAMERA_PREFERENCES_KEY = "camera_preferences"
+        private val cameraPreferencesLock = Any()
 
         // Building EncryptedSharedPreferences spins up a Keystore MasterKey + Tink (heavy crypto,
         // reflection via sun.misc.Unsafe) — ~hundreds of ms. Prefs() is constructed all over,

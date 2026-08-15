@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.SensorDoor
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -54,6 +55,7 @@ fun launcherIcon(key: String): ImageVector = when (key.lowercase()) {
     "energy", "power", "consumption" -> Icons.Outlined.Bolt
     "media", "tv", "speaker" -> Icons.Outlined.Tv
     "scene", "scenes", "script", "shortcut" -> Icons.Outlined.AutoAwesome
+    "camera", "cameras", "camera_center" -> Icons.Outlined.Videocam
     "presence", "person", "people" -> Icons.Outlined.Group
     "security" -> Icons.Outlined.Security
     "shield" -> Icons.Outlined.Shield

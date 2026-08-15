@@ -41,6 +41,7 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
         areaIdByEntity: Map<String, String> = emptyMap(),
         areaNameById: Map<String, String> = emptyMap(),
         manualGroups: List<ManualPillGroup> = emptyList(),
+        cameraPreferences: CameraPreferences = CameraPreferences(),
         connected: Boolean = true,
         nowMs: Long = System.currentTimeMillis(),
     ): PillCatalogSnapshot {
@@ -130,6 +131,8 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
         }
 
         groups.forEach { (ref, group) -> availability[ref] = group.availability }
+        val specials = buildSpecials(states, cameraPreferences, connected)
+        specials.forEach { (ref, pill) -> availability[ref] = pill.availability }
         val devices = resolvedDevices.mapValues { it.value.chip }
         val provisional = PillCatalogSnapshot(
             devices = devices,
@@ -138,6 +141,7 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
             dynamicCandidates = emptyList(),
             resolvedDevices = resolvedDevices,
             disabledDeviceRefs = allDisabledDeviceRefs,
+            specials = specials,
         )
         val dynamic = dynamicCandidates(enabledRules, states, provisional, nowMs)
         return provisional.copy(dynamicCandidates = dynamic)
@@ -183,6 +187,57 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
         discovery = Discovery(states.keys.toSet(), deviceIdByEntity, entityCategoryByEntity, rules)
         discoveryPasses++
         return rules
+    }
+
+    /**
+     * The launcher-provided entries. Today: the general "Cameras" pill, which exists as soon as
+     * Home Assistant exposes at least one camera the user has not hidden. It is never
+     * auto-promoted onto the home — only pinning puts it there — so it costs nothing when unused.
+     */
+    private fun buildSpecials(
+        states: Map<String, HaEntity>,
+        cameraPreferences: CameraPreferences,
+        connected: Boolean,
+    ): Map<PillRef.Special, ResolvedPill> {
+        val cameras = states.values
+            .filter { it.domain == "camera" }
+            .sortedBy { it.entityId }
+        if (cameras.isEmpty()) return emptyMap()
+        val visibleIds = cameraPreferences.visibleCameras(cameras.map { it.entityId })
+        if (visibleIds.isEmpty()) return emptyMap()
+        val visible = visibleIds.mapNotNull(states::get)
+        val reachable = visible.filter {
+            it.state.trim().lowercase(Locale.ROOT) != "unavailable"
+        }
+        val ref = PillSpecials.cameras
+        val context = priorityEngine.context
+        val chip = LauncherChip(
+            id = ref.stableKey,
+            icon = "camera",
+            label = context.getString(com.iblu01.portallauncher.R.string.pill_cameras_label),
+            value = context.resources.getQuantityString(
+                com.iblu01.portallauncher.R.plurals.pill_group_available_count,
+                reachable.size,
+                reachable.size,
+            ),
+            state = if (reachable.isEmpty()) "ok" else "active",
+            // Deliberately blank: this pill targets no single entity, and a fake entity id here
+            // would make the panel router try to resolve one.
+            entityId = "",
+            priority = PillKind.CAMERA.basePriority,
+            details = visible.map {
+                PillDetail(it.name, friendlyEntityState(context, it), it.entityId)
+            },
+            kind = PillKind.CAMERA,
+        )
+        val availability = when {
+            reachable.isEmpty() -> Availability.UNAVAILABLE
+            !connected -> Availability.STALE
+            else -> Availability.AVAILABLE
+        }
+        return mapOf(
+            ref to ResolvedPill(ref, chip, availability, visible.mapTo(linkedSetOf()) { it.entityId }),
+        )
     }
 
     private fun buildGroup(
@@ -298,6 +353,12 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
     }
 
     private fun availabilityOf(entity: HaEntity, connected: Boolean): Availability = when {
+        // A scene that has never run reports `unknown`, and a camera reports `idle`/`unknown` until
+        // it streams. Neither is unavailable: only HA's explicit `unavailable` is.
+        entity.domain in setOf("scene", "camera") ->
+            if (entity.state.trim().lowercase(Locale.ROOT) == "unavailable") Availability.UNAVAILABLE
+            else if (!connected) Availability.STALE
+            else Availability.AVAILABLE
         entity.state.trim().lowercase(Locale.ROOT) in setOf("unavailable", "unknown", "none", "") -> Availability.UNAVAILABLE
         !connected -> Availability.STALE
         else -> Availability.AVAILABLE
@@ -326,7 +387,8 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
             PillKind.LAWN_MOWER -> state in setOf("mowing", "returning", "error")
             PillKind.GENERIC -> state == "on"
             PillKind.AIR, PillKind.CLIMATE, PillKind.BATTERY, PillKind.ENERGY,
-            PillKind.SCENE, PillKind.PRESENCE -> false
+            // Stateless actions: never promoted by the dynamic ranking, only pinned or calm-filled.
+            PillKind.SCENE, PillKind.CAMERA, PillKind.PRESENCE -> false
         }
     }
 

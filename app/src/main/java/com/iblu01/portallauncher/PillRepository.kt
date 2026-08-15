@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.iblu01.portallauncher.domain.MediaSessionBuilder
+import com.iblu01.portallauncher.domain.home.CameraPreferences
 import com.iblu01.portallauncher.domain.home.HomePageBuilder
 import com.iblu01.portallauncher.domain.home.HomePillComposer
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
@@ -249,7 +250,11 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
                 else combine(
                     repo.states(),
                     SettingsChangeBus.get().changes
-                        .filter { it == Prefs.HOME_PILL_PREFERENCES_CHANGE_KEY || it == PILL_RULES_CHANGE_KEY }
+                        .filter {
+                            it == Prefs.HOME_PILL_PREFERENCES_CHANGE_KEY ||
+                                it == Prefs.CAMERA_PREFERENCES_CHANGE_KEY ||
+                                it == PILL_RULES_CHANGE_KEY
+                        }
                         .map { Unit }
                         .onStart { emit(Unit) },
                 ) { snapshot, _ -> snapshot }
@@ -257,6 +262,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
             rulesProvider = { prefs.pillRules },
             haUrl = prefs.haUrl,
             homePreferencesProvider = { prefs.homePillPreferences },
+            cameraPreferencesProvider = { prefs.cameraPreferences },
         ).onEach { latestCatalog = it.catalog }
 
     /**
@@ -274,6 +280,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         rulesProvider: () -> List<PillRule>,
         haUrl: String,
         homePreferencesProvider: () -> HomePillPreferences = { HomePillPreferencesCodec.defaults() },
+        cameraPreferencesProvider: () -> CameraPreferences = { CameraPreferences() },
         dispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.Default,
         sampleMs: Long = SNAPSHOT_SAMPLE_MS,
     ): Flow<PillSnapshot> =
@@ -282,6 +289,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
             .scan(emptySet<String>() to (null as PillSnapshot?)) { (prevPrimaryIds, _), s ->
                 val rules = rulesProvider()   // read once per emission
                 val homePreferences = homePreferencesProvider()
+                val cameraPreferences = cameraPreferencesProvider()
                 val media = MediaSessionBuilder.build(s.states, haUrl, prevPrimaryIds)
                 val catalog = catalogBuilder.build(
                     rules = rules,
@@ -291,6 +299,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
                     areaIdByEntity = s.areaIdByEntity,
                     areaNameById = s.areaNameById,
                     manualGroups = homePreferences.manualGroups,
+                    cameraPreferences = cameraPreferences,
                     connected = s.connected,
                 )
                 val homeComposition = HomePillComposer.compose(catalog, homePreferences)

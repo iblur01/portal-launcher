@@ -31,6 +31,7 @@ enum class PillKind(@StringRes val labelRes: Int, val icon: String, val basePrio
     VALVE(R.string.pill_kind_valve, "valve", 30),
     SIREN(R.string.pill_kind_siren, "shield", 45),
     LAWN_MOWER(R.string.pill_kind_lawn_mower, "mower", 28),
+    CAMERA(R.string.pill_kind_camera, "camera", 14),
     GENERIC(R.string.pill_kind_generic, "sensor", 15),
 }
 
@@ -92,6 +93,8 @@ enum class PillFamily(@StringRes val labelRes: Int, val kinds: Set<PillKind>) {
     APPLIANCES(R.string.pill_family_appliances, setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.VALVE, PillKind.LAWN_MOWER)),
     LIGHTS(R.string.pill_family_lights, setOf(PillKind.LIGHTS)),
     MEDIA(R.string.pill_family_media, setOf(PillKind.MEDIA)),
+    SCENES(R.string.pill_family_scenes, setOf(PillKind.SCENE)),
+    CAMERAS(R.string.pill_family_cameras, setOf(PillKind.CAMERA)),
     HOME(R.string.pill_family_home, setOf(PillKind.TIMER, PillKind.GENERIC));
 
     companion object {
@@ -112,7 +115,15 @@ fun friendlyEntityState(context: Context, e: HaEntity): String {
     }
     return when {
         s == "unavailable" -> context.getString(R.string.entity_state_unavailable)
-        s in setOf("unknown", "none", "") -> "—"
+        s in setOf("unknown", "none", "") && e.domain != "scene" -> "—"
+        // A scene's state is the ISO timestamp of its last activation (or `unknown` when it has
+        // never run): neither is a state the user acts on, so the pill advertises the action.
+        e.domain == "scene" -> context.getString(R.string.pill_scene_ready)
+        e.domain == "camera" -> when (s) {
+            "streaming" -> context.getString(R.string.camera_state_streaming)
+            "recording" -> context.getString(R.string.camera_state_recording)
+            else -> context.getString(R.string.camera_state_idle)
+        }
         e.domain in setOf("person", "device_tracker") -> when (s) { "home" -> context.getString(R.string.entity_state_home); "not_home" -> context.getString(R.string.entity_state_away); else -> raw.replaceFirstChar { it.uppercase() } }
         e.domain == "lock" -> when (s) { "locked" -> context.getString(R.string.pill_lock_locked); "unlocked" -> context.getString(R.string.pill_lock_unlocked); "locking" -> context.getString(R.string.pill_lock_locking); "unlocking" -> context.getString(R.string.pill_lock_unlocking); else -> raw.replaceFirstChar { it.uppercase() } }
         s == "on" -> when (e.deviceClass) {
@@ -202,7 +213,7 @@ object PillSupport {
     )
     fun isSupported(e: HaEntity) = isPrimary(e)
     fun isAllowedAsPersistedChip(rule: PillRule, e: HaEntity): Boolean {
-        if (e.domain in setOf("button", "input_button", "number", "input_number", "select", "input_select", "camera")) return false
+        if (e.domain in setOf("button", "input_button", "number", "input_number", "select", "input_select")) return false
         if (e.domain == "sensor" && e.deviceClass in setOf(
                 "illuminance", "atmospheric_pressure", "pressure", "absolute_humidity", "moisture",
                 "signal_strength", "water", "volume", "volume_flow_rate", "volume_storage",
@@ -217,6 +228,9 @@ object PillSupport {
         e.domain in setOf("light", "media_player", "fan", "switch", "cover") -> true
         e.domain in setOf("lock", "vacuum", "timer", "climate", "alarm_control_panel") -> true
         e.domain in setOf("humidifier", "water_heater", "valve", "siren", "lawn_mower", "input_boolean") -> true
+        // Scenes are stateless one-shot actions and cameras open the camera center; both are
+        // discoverable pills, both stay opt-in (see [isAutomaticallyEnabled]).
+        e.domain in setOf("scene", "camera") -> true
         e.domain == "binary_sensor" && e.deviceClass in (openingClasses + motionClasses) -> true
         // Only the appliance's MAIN state sensor is a primary pill; sub-sensors like
         // "_etat_du_cycle" get absorbed as related (see candidates()), not shown separately.
@@ -225,6 +239,8 @@ object PillSupport {
         else -> false
     }
     fun kind(e: HaEntity): PillKind = when {
+        e.domain == "scene" -> PillKind.SCENE
+        e.domain == "camera" -> PillKind.CAMERA
         e.domain == "light" -> PillKind.LIGHTS
         e.domain == "media_player" -> PillKind.MEDIA
         e.domain == "fan" && (e.entityId.contains("purif") || e.name.contains("purif", ignoreCase = true)) -> PillKind.PURIFIER
@@ -361,6 +377,9 @@ object PillSupport {
     ): Boolean {
         val primary = candidate.primary
         if (entityCategoryByEntity[primary.entityId] in setOf("config", "diagnostic")) return false
+        // A home has far more scenes and cameras than tray slots, and neither reports a state worth
+        // watching. They stay discoverable in Settings and are added to the home on demand.
+        if (primary.domain in setOf("scene", "camera")) return false
         if (primary.domain !in setOf("switch", "input_boolean")) return true
 
         val slug = primary.entityId.substringAfter('.').lowercase()

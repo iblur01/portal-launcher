@@ -347,6 +347,7 @@
     <string name="pill_ref_area_group">Groupe de pièce</string>
     <string name="pill_ref_kind_group">Groupe de type</string>
     <string name="pill_ref_manual_group">Groupe manuel</string>
+    <string name="pill_ref_special">Launcher</string>
     <string name="auto_return_pill_label">Fermeture auto</string>
     <string name="auto_return_cancel_desc">Annuler</string>
     <string name="bg_mode_system">Fond d’écran Android</string>
@@ -787,12 +788,68 @@
     <string name="pill_kind_siren">Sirène</string>
     <string name="pill_kind_lawn_mower">Robot tondeuse</string>
     <string name="pill_kind_generic">Information</string>
+    <string name="pill_kind_camera">Caméras</string>
     <string name="pill_family_security">Sécurité et accès</string>
     <string name="pill_family_comfort">Confort</string>
     <string name="pill_family_appliances">Appareils</string>
     <string name="pill_family_lights">Lumières</string>
     <string name="pill_family_media">Médias</string>
     <string name="pill_family_home">Maison</string>
+    <string name="pill_family_scenes">Scènes</string>
+    <string name="pill_family_cameras">Caméras</string>
+
+    <!-- Scènes : activation immédiate et retour visuel temporaire -->
+    <string name="pill_scene_ready">Activer</string>
+    <string name="pill_scene_activating">Activation…</string>
+    <string name="pill_scene_activated">Activée</string>
+    <string name="pill_scene_failed">Échec</string>
+    <string name="pill_scene_activate_desc">Activer la scène %1$s</string>
+
+    <!-- Centre caméra -->
+    <string name="pill_cameras_label">Caméras</string>
+    <string name="camera_state_streaming">En diffusion</string>
+    <string name="camera_state_recording">Enregistrement</string>
+    <string name="camera_state_idle">En veille</string>
+    <string name="camera_center_open_desc">Ouvrir le centre caméra</string>
+    <string name="camera_center_open_camera_desc">Ouvrir la caméra %1$s</string>
+    <string name="camera_center_title">Caméras</string>
+    <string name="camera_center_close">Fermer</string>
+    <string name="camera_center_close_desc">Fermer le centre caméra</string>
+    <string name="camera_center_mode_main">Caméra principale</string>
+    <string name="camera_center_mode_grid">Grille</string>
+    <string name="camera_center_mode_main_desc">Afficher la caméra principale en grand</string>
+    <string name="camera_center_mode_grid_desc">Afficher toutes les caméras en grille</string>
+    <string name="camera_center_select_desc">Afficher la caméra %1$s</string>
+    <string name="camera_center_empty">Aucune caméra à afficher</string>
+    <string name="camera_center_empty_hint">Choisissez les caméras à afficher dans les réglages.</string>
+    <string name="camera_stream_loading">Connexion…</string>
+    <string name="camera_stream_error">Flux indisponible</string>
+    <string name="camera_stream_unavailable">Caméra indisponible</string>
+    <string name="camera_stream_retry">Réessayer</string>
+    <string name="camera_stream_retry_desc">Réessayer le chargement de la caméra %1$s</string>
+    <string name="camera_audio_mute_desc">Couper le son</string>
+    <string name="camera_audio_unmute_desc">Activer le son</string>
+    <string name="camera_audio_none">Aucune piste audio</string>
+    <string name="camera_ptz_up_desc">Incliner vers le haut</string>
+    <string name="camera_ptz_down_desc">Incliner vers le bas</string>
+    <string name="camera_ptz_left_desc">Pivoter vers la gauche</string>
+    <string name="camera_ptz_right_desc">Pivoter vers la droite</string>
+    <string name="camera_ptz_zoom_in_desc">Zoom avant</string>
+    <string name="camera_ptz_zoom_out_desc">Zoom arrière</string>
+
+    <!-- Réglages caméra -->
+    <string name="settings_cameras_title">Caméras</string>
+    <string name="settings_cameras_subtitle">Centre caméra, caméra principale et mode d\'affichage</string>
+    <string name="settings_cameras_visible">Caméras affichées dans le centre</string>
+    <string name="settings_cameras_main">Caméra principale</string>
+    <string name="settings_cameras_default_mode">Mode d\'affichage par défaut</string>
+    <string name="settings_cameras_pin_general">Épingler la pill Caméras</string>
+    <string name="settings_cameras_empty">Aucune caméra trouvée dans Home Assistant</string>
+    <string name="settings_cameras_order_hint">Déplacez une caméra pour changer son ordre dans le centre.</string>
+    <string name="settings_camera_move_up_desc">Déplacer %1$s vers le haut</string>
+    <string name="settings_camera_move_down_desc">Déplacer %1$s vers le bas</string>
+    <string name="settings_camera_toggle_desc">Afficher %1$s dans le centre caméra</string>
+    <string name="settings_camera_main_desc">Utiliser %1$s comme caméra principale</string>
     <string name="entity_state_unavailable">Indisponible</string>
     <string name="entity_state_home">À la maison</string>
     <string name="entity_state_away">Absent</string>
