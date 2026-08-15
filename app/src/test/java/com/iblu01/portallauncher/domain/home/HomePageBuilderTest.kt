@@ -1,13 +1,20 @@
 package com.iblu01.portallauncher.domain.home
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.PillKind
+import com.iblu01.portallauncher.localizedLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class HomePageBuilderTest {
+    private val context: Context = ApplicationProvider.getApplicationContext()
     private fun device(id: String, kind: PillKind): ResolvedPill {
         val ref = PillRef.Device(id)
         return ResolvedPill(ref, LauncherChip(id, kind.icon, id.substringAfter('.'), "ok", entityId = id, kind = kind), sourceEntityIds = setOf(id))
@@ -23,7 +30,7 @@ class HomePageBuilderTest {
         val byRef = devices.associateBy { it.ref as PillRef.Device }
         val kindGroups: Map<PillRef, PillGroupSnapshot> = devices.groupBy { it.chip.kind }.map { (kind, members) ->
             val ref = PillRef.KindGroup(kind)
-            ref to PillGroupSnapshot(ref, LauncherChip(ref.stableKey, kind.icon, kind.label, "${members.size}", kind = kind), members.map { it.ref as PillRef.Device }, members)
+            ref to PillGroupSnapshot(ref, LauncherChip(ref.stableKey, kind.icon, kind.localizedLabel(context), "${members.size}", kind = kind), members.map { it.ref as PillRef.Device }, members)
         }.toMap()
         return PillCatalogSnapshot(byRef.mapValues { it.value.chip }, kindGroups, byRef.mapValues { Availability.AVAILABLE } + kindGroups.mapValues { Availability.AVAILABLE }, emptyList(), byRef)
     }
@@ -53,7 +60,7 @@ class HomePageBuilderTest {
                 HomeSectionPreference(HomeSectionIds.FAVORITES, true, 10, emptyList()),
             ),
         )
-        val page = HomePageBuilder.build(catalog(lightA, lightB), prefs)
+        val page = HomePageBuilder.build(context, catalog(lightA, lightB), prefs)
         assertEquals(HomeSectionIds.kind(PillKind.LIGHTS), page.sections.first().sectionId)
         assertEquals(listOf(lightB.ref, lightA.ref), page.sections.first().items.map { it.ref })
         assertTrue(page.sections.first().items.none { it.ref is PillRef.KindGroup })
@@ -63,13 +70,13 @@ class HomePageBuilderTest {
     @Test fun `hidden and empty sections are omitted without losing compatible state`() {
         val light = device("light.a", PillKind.LIGHTS)
         val prefs = preferences(sections = listOf(HomeSectionPreference(HomeSectionIds.kind(PillKind.LIGHTS), false, 0, emptyList())))
-        val page = HomePageBuilder.build(catalog(light), prefs)
+        val page = HomePageBuilder.build(context, catalog(light), prefs)
         assertTrue(page.sections.isEmpty())
         assertTrue(page.hasCompatibleDevices)
     }
 
     @Test fun `empty catalog exposes one page level empty state rather than empty rails`() {
-        val page = HomePageBuilder.build(catalog(), preferences())
+        val page = HomePageBuilder.build(context, catalog(), preferences())
         assertFalse(page.hasCompatibleDevices)
         assertTrue(page.sections.isEmpty())
     }
@@ -80,6 +87,7 @@ class HomePageBuilderTest {
         val cuisineLight = device("light.cuisine", PillKind.LIGHTS)
         val prefs = preferences().copy(groupingMode = HomeGroupingMode.BY_ROOM)
         val page = HomePageBuilder.build(
+            context,
             catalogByRoom(
                 salonLight to "salon",
                 salonSwitch to "salon",
@@ -96,7 +104,7 @@ class HomePageBuilderTest {
 
     @Test fun `by type shows only per-kind rails`() {
         val light = device("light.salon", PillKind.LIGHTS)
-        val page = HomePageBuilder.build(catalogByRoom(light to "salon"), preferences())
+        val page = HomePageBuilder.build(context, catalogByRoom(light to "salon"), preferences())
         assertTrue(page.sections.none { it.type == HomeSectionType.AREAS })
         assertTrue(page.sections.any { it.type == HomeSectionType.KIND })
         assertTrue(page.sections.none { it.type == HomeSectionType.AREA })

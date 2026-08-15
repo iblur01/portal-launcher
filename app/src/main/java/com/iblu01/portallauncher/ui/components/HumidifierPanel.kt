@@ -30,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
@@ -49,8 +51,9 @@ internal fun HumidifierControl(entity: HaEntity, modifier: Modifier = Modifier) 
     var value by remember(entity.entityId, contract.value) { mutableFloatStateOf(contract.value ?: contract.min) }
     val advertisedModes = remember(contract.options) { contract.options.filterNot { it.equals("off", true) } }
     val hasModes = "set_mode" in contract.actions && advertisedModes.isNotEmpty()
-    val choices = remember(advertisedModes) {
-        listOf(HumidifierMode(null, "Éteindre")) + advertisedModes.map { option ->
+    val offLabel = stringResource(R.string.action_turn_off)
+    val choices = remember(advertisedModes, offLabel) {
+        listOf(HumidifierMode(null, offLabel)) + advertisedModes.map { option ->
             HumidifierMode(option, option.replace('_', ' ').replaceFirstChar(Char::uppercase))
         }
     }
@@ -143,7 +146,7 @@ internal fun HumidifierControl(entity: HaEntity, modifier: Modifier = Modifier) 
                                 modifier = Modifier.size(compactIconSize),
                             )
                             Text(
-                                if (entity.state.equals("off", true)) "Allumer" else "Éteindre",
+                                if (entity.state.equals("off", true)) stringResource(R.string.action_turn_on) else stringResource(R.string.action_turn_off),
                                 style = AppleTypography.bodySmall,
                                 color = AppleColors.primary,
                             )

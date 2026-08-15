@@ -34,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.ui.LocalHaStates
@@ -106,9 +108,9 @@ private fun WasherProgress(state: WasherUiState, progress: Float?, accent: Color
 @Composable
 private fun WasherFacts(state: WasherUiState) {
         val facts = listOfNotNull(
-            state.program?.let { "Programme" to it },
-            state.temperature?.let { "Température" to it },
-            state.spinSpeed?.let { "Essorage" to it },
+            state.program?.let { stringResource(R.string.washer_fact_program) to it },
+            state.temperature?.let { stringResource(R.string.washer_fact_temperature) to it },
+            state.spinSpeed?.let { stringResource(R.string.washer_fact_spin) to it },
         )
         if (facts.isNotEmpty()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -152,13 +154,14 @@ private fun phaseIcon(phase: WasherPhase): ImageVector = when (phase) {
     WasherPhase.FINISHED -> Icons.Outlined.CheckCircle
 }
 
+@Composable
 private fun phaseLabel(phase: WasherPhase, paused: Boolean): String = when {
-    paused -> "En pause"
-    phase == WasherPhase.PREPARING -> "Préparation"
-    phase == WasherPhase.WASH -> "Lavage"
-    phase == WasherPhase.RINSE -> "Rinçage"
-    phase == WasherPhase.SPIN -> "Essorage"
-    else -> "Terminé"
+    paused -> stringResource(R.string.entity_state_paused)
+    phase == WasherPhase.PREPARING -> stringResource(R.string.washer_phase_preparing)
+    phase == WasherPhase.WASH -> stringResource(R.string.washer_phase_wash)
+    phase == WasherPhase.RINSE -> stringResource(R.string.washer_phase_rinse)
+    phase == WasherPhase.SPIN -> stringResource(R.string.washer_phase_spin)
+    else -> stringResource(R.string.washer_phase_finished)
 }
 
 /** Home Assistant adapter; naming heuristics mirror PillPriorityEngine's related sensors. */

@@ -50,7 +50,7 @@ object MediaSessionBuilder {
                 }
                 PlayingMedia(
                     entityId = entity.entityId,
-                    title = entity.attributes.optString("media_title").ifBlank { "Média" },
+                    title = entity.attributes.optString("media_title").ifBlank { "Media" },
                     artist = entity.attributes.optString("media_artist").ifBlank { entity.name },
                     album = entity.attributes.optString("media_album_name").takeIf { it.isNotBlank() },
                     state = entity.state,

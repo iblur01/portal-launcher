@@ -196,6 +196,7 @@ internal fun WallpaperPage(
             title = stringResource(R.string.settings_wallpaper_page_title),
             onBack = onBack,
             showBack = showBack,
+            breadcrumb = "${stringResource(R.string.settings_main_title)}  ›  ${stringResource(R.string.settings_tile_wallpaper_title)}",
         )
 
         Text(

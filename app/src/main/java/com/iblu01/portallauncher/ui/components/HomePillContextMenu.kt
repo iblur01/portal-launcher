@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.disabled
@@ -56,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.iblu01.portallauncher.domain.home.Availability
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.home.PillRef
 import com.iblu01.portallauncher.domain.home.ResolvedPill
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -224,7 +227,7 @@ fun HomePillContextMenu(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.52f))
-                .clickable(onClickLabel = "Fermer le menu") { onDismiss() },
+                .clickable(onClickLabel = stringResource(R.string.menu_close)) { onDismiss() },
             contentAlignment = Alignment.Center,
         ) {
             Column(
@@ -247,7 +250,7 @@ fun HomePillContextMenu(
 
                 HomeMenuRow(
                     icon = Icons.Outlined.PushPin,
-                    label = if (isPinned) "Désépingler" else "Épingler",
+                    label = if (isPinned) stringResource(R.string.menu_unpin) else stringResource(R.string.menu_pin),
                     enabled = canPin,
                 ) {
                     actions.onSetPinned(target, !isPinned)
@@ -255,18 +258,18 @@ fun HomePillContextMenu(
                 }
                 HomeMenuRow(
                     icon = Icons.Outlined.PlaylistAdd,
-                    label = "Ajouter à un groupe manuel",
+                    label = stringResource(R.string.menu_add_manual_group),
                     enabled = target.ref is PillRef.Device && manualGroups.any { !it.containsTarget() },
                 ) { showGroups = !showGroups }
                 if (showGroups) {
                     if (manualGroups.isEmpty()) {
-                        MenuHint("Aucun groupe manuel. Créez-en un depuis Modifier.")
+                        MenuHint(stringResource(R.string.menu_no_manual_group))
                     } else {
                         manualGroups.forEach { group ->
                             val containsTarget = group.containsTarget()
                             HomeMenuRow(
                                 icon = Icons.Outlined.PlaylistAdd,
-                                label = if (containsTarget) "${group.name} · déjà ajouté" else group.name,
+                                label = if (containsTarget) stringResource(R.string.menu_already_added, group.name) else group.name,
                                 enabled = !containsTarget,
                                 nested = true,
                             ) {
@@ -279,7 +282,7 @@ fun HomePillContextMenu(
 
                 HomeMenuRow(
                     icon = Icons.Outlined.DragIndicator,
-                    label = "Réorganiser",
+                    label = stringResource(R.string.menu_reorder),
                     enabled = canReorder,
                 ) {
                     showMoveActions = !showMoveActions
@@ -291,25 +294,25 @@ fun HomePillContextMenu(
                 MenuDivider()
                 HomeMenuRow(
                     icon = Icons.Outlined.Tune,
-                    label = "Ouvrir les commandes",
+                    label = stringResource(R.string.menu_open_controls),
                     enabled = canOpenCommands,
                 ) {
                     actions.onOpenCommands(target)
                     onDismiss()
                 }
                 if (!canOpenCommands) {
-                    MenuHint("Données figées : les commandes sont temporairement indisponibles.")
+                    MenuHint(stringResource(R.string.menu_controls_stale))
                 }
                 if (target.ref is PillRef.Device) {
                     HomeMenuRow(
                         icon = Icons.Outlined.VisibilityOff,
-                        label = "Ne plus afficher cet appareil",
+                        label = stringResource(R.string.menu_hide_device),
                         enabled = true,
                     ) {
                         actions.onHideDevice(target)
                         onDismiss()
                     }
-                    MenuHint("L’appareil pourra être réactivé depuis les réglages des pills.")
+                    MenuHint(stringResource(R.string.menu_restore_device_hint))
                 }
             }
         }
@@ -318,6 +321,7 @@ fun HomePillContextMenu(
 
 @Composable
 private fun MenuHeader(target: ResolvedPill, isPinned: Boolean) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -329,9 +333,9 @@ private fun MenuHeader(target: ResolvedPill, isPinned: Boolean) {
             buildString {
                 append(target.chip.value)
                 append(" · ")
-                append(target.ref.groupDescription())
-                if (isPinned) append(" · Épinglé")
-                if (target.availability == Availability.STALE) append(" · Données figées")
+                append(target.ref.groupDescription(context))
+                if (isPinned) append(" · ${context.getString(R.string.home_pinned)}")
+                if (target.availability == Availability.STALE) append(" · ${context.getString(R.string.group_stale_state)}")
             },
             style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
             color = AppleColors.secondary,
@@ -348,7 +352,7 @@ private fun MoveRows(
 ) {
     HomeMenuRow(
         icon = Icons.Outlined.DragIndicator,
-        label = "Déplacer par glisser-déposer",
+        label = stringResource(R.string.menu_move_drag),
         enabled = true,
         nested = true,
     ) {
@@ -356,10 +360,10 @@ private fun MoveRows(
         onDismiss()
     }
     listOf(
-        Triple(Icons.Outlined.FirstPage, "Placer en premier", HomePillMove.FIRST),
-        Triple(Icons.Outlined.ArrowBack, "Déplacer avant", HomePillMove.BEFORE),
-        Triple(Icons.Outlined.ArrowForward, "Déplacer après", HomePillMove.AFTER),
-        Triple(Icons.Outlined.LastPage, "Placer en dernier", HomePillMove.LAST),
+        Triple(Icons.Outlined.FirstPage, stringResource(R.string.menu_move_first), HomePillMove.FIRST),
+        Triple(Icons.Outlined.ArrowBack, stringResource(R.string.menu_move_before), HomePillMove.BEFORE),
+        Triple(Icons.Outlined.ArrowForward, stringResource(R.string.menu_move_after), HomePillMove.AFTER),
+        Triple(Icons.Outlined.LastPage, stringResource(R.string.menu_move_last), HomePillMove.LAST),
     ).forEach { (icon, label, move) ->
         HomeMenuRow(icon, label, availability.allows(move), nested = true) {
             actions.onMove(target, move)
@@ -435,9 +439,9 @@ private fun MenuDivider() {
     )
 }
 
-internal fun PillRef.groupDescription(): String = when (this) {
-    is PillRef.Device -> "Appareil"
-    is PillRef.AreaGroup -> "Groupe de pièce"
-    is PillRef.KindGroup -> "Groupe de type"
-    is PillRef.ManualGroup -> "Groupe manuel"
+internal fun PillRef.groupDescription(context: android.content.Context): String = when (this) {
+    is PillRef.Device -> context.getString(R.string.pill_ref_device)
+    is PillRef.AreaGroup -> context.getString(R.string.pill_ref_area_group)
+    is PillRef.KindGroup -> context.getString(R.string.pill_ref_kind_group)
+    is PillRef.ManualGroup -> context.getString(R.string.pill_ref_manual_group)
 }

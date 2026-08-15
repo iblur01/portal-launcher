@@ -14,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.components.controls.PortalThreeWayControl
@@ -29,18 +31,18 @@ internal fun LawnMowerControl(entity: HaEntity, modifier: Modifier = Modifier) {
     val control: @Composable (Modifier) -> Unit = { area -> Box(area, contentAlignment = Alignment.Center) {
         PortalThreeWayControl(
             leadingIcon = Icons.Outlined.PlayArrow,
-            leadingContentDescription = "Démarrer",
+            leadingContentDescription = stringResource(R.string.action_start),
             onLeadingClick = { callService("lawn_mower", "start_mowing", entity.entityId) },
-            leadingLabel = "Démarrer",
+            leadingLabel = stringResource(R.string.action_start),
             leadingEnabled = "start_mowing" in contract.actions,
             centerIcon = Icons.Outlined.Pause,
-            centerContentDescription = "Pause",
+            centerContentDescription = stringResource(R.string.action_pause),
             onCenterClick = { callService("lawn_mower", "pause", entity.entityId) },
             centerEnabled = "pause" in contract.actions,
             trailingIcon = Icons.Outlined.Home,
-            trailingContentDescription = "Retour base",
+            trailingContentDescription = stringResource(R.string.action_return_to_base),
             onTrailingClick = { callService("lawn_mower", "dock", entity.entityId) },
-            trailingLabel = "Base",
+            trailingLabel = stringResource(R.string.action_base),
             trailingEnabled = "dock" in contract.actions,
             size = if (LocalPanelLayoutMode.current == PanelLayoutMode.HORIZONTAL) ThreeWayControlSize.Large else ThreeWayControlSize.Regular,
         )

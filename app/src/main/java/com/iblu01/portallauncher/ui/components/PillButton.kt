@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -29,11 +30,13 @@ fun PillButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     primary: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val fill = if (primary) AppleColors.accent else AppleColors.frostedFill
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.55f)
             .defaultMinSize(minHeight = 50.dp.scaled())
             .clip(AppleShapes.pill)
             .background(fill, AppleShapes.pill)
@@ -41,7 +44,7 @@ fun PillButton(
                 if (primary) Modifier
                 else Modifier.border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
             )
-            .appleClickable(onClick)
+            .then(if (enabled) Modifier.appleClickable(onClick) else Modifier)
             .padding(horizontal = 28.dp.scaled(), vertical = 14.dp.scaled()),
         contentAlignment = Alignment.Center
     ) {

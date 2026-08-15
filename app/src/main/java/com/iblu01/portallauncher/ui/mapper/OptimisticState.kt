@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher.ui.mapper
 
+import android.content.Context
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.friendlyEntityState
@@ -43,7 +44,7 @@ private val ACTIVE_DEVICE_STATES = setOf(
  * window (an optimistic write, or a push already applied to `HaStates`) the live entity is the
  * fresher truth. Alert states computed by the pipeline ("critical"/"warning") are preserved.
  */
-internal fun LauncherChip.withLiveState(live: HaEntity?): LauncherChip {
+internal fun LauncherChip.withLiveState(context: Context, live: HaEntity?): LauncherChip {
     val device = deviceState ?: return this
     if (live == null) return this
     val liveState = live.state.lowercase(Locale.ROOT)
@@ -55,6 +56,6 @@ internal fun LauncherChip.withLiveState(live: HaEntity?): LauncherChip {
             liveState in ACTIVE_DEVICE_STATES -> "active"
             else -> "ok"
         },
-        value = friendlyEntityState(live),
+        value = friendlyEntityState(context, live),
     )
 }

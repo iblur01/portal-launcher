@@ -19,7 +19,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], qualifiers = "w640dp-h600dp")
+@Config(sdk = [28], qualifiers = "fr-w640dp-h600dp")
 class HomePillContextMenuTest {
     @get:Rule val rule = createComposeRule()
 

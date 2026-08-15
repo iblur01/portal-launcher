@@ -47,6 +47,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -59,6 +60,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.domain.home.Availability
+import com.iblu01.portallauncher.R
+import androidx.compose.ui.res.stringResource
 import com.iblu01.portallauncher.domain.home.HomeGridLayoutPolicy
 import com.iblu01.portallauncher.domain.home.HomePageModel
 import com.iblu01.portallauncher.domain.home.HomeSectionModel
@@ -221,7 +224,7 @@ private fun HomePageHeader(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (isStale) {
             Text(
-                "Hors ligne · données figées, commandes suspendues",
+                stringResource(R.string.home_stale_state),
                 style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
                 color = AppleColors.warning,
                 modifier = Modifier.testTag("homeStaleState"),
@@ -229,11 +232,11 @@ private fun HomePageHeader(
         }
         if (editing) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HomeCompactButton(Icons.Outlined.Add, "Créer un groupe", onCreateManualGroup)
-                HomeCompactButton(Icons.Outlined.HomeWork, "Gérer mes groupes", onEditManualGroups)
+                HomeCompactButton(Icons.Outlined.Add, stringResource(R.string.home_create_group), onCreateManualGroup)
+                HomeCompactButton(Icons.Outlined.HomeWork, stringResource(R.string.home_manage_groups), onEditManualGroups)
             }
             Text(
-                "L’appartenance aux pièces et aux types se gère dans Home Assistant.",
+                stringResource(R.string.home_ha_membership_hint),
                 style = AppleTypography.bodySmall.copy(fontSize = 12.sp),
                 color = AppleColors.tertiary,
             )
@@ -268,20 +271,20 @@ private fun HomeSection(
                 )
                 if (editing) {
                     Text(
-                        "${section.items.size} élément${if (section.items.size > 1) "s" else ""}",
+                        androidx.compose.ui.res.pluralStringResource(R.plurals.home_section_item_count, section.items.size, section.items.size),
                         style = AppleTypography.bodySmall.copy(fontSize = 12.sp),
                         color = AppleColors.tertiary,
                     )
                 }
             }
             if (editing) {
-                HomeIconButton(Icons.Outlined.ArrowUpward, "Déplacer ${section.title} avant") {
+                HomeIconButton(Icons.Outlined.ArrowUpward, stringResource(R.string.home_move_section_before, section.title)) {
                     editActions.onMoveSection(section.sectionId, HomePillMove.BEFORE)
                 }
-                HomeIconButton(Icons.Outlined.ArrowDownward, "Déplacer ${section.title} après") {
+                HomeIconButton(Icons.Outlined.ArrowDownward, stringResource(R.string.home_move_section_after, section.title)) {
                     editActions.onMoveSection(section.sectionId, HomePillMove.AFTER)
                 }
-                HomeIconButton(Icons.Outlined.VisibilityOff, "Masquer ${section.title}") {
+                HomeIconButton(Icons.Outlined.VisibilityOff, stringResource(R.string.home_hide_section, section.title)) {
                     editActions.onHideSection(section.sectionId)
                 }
             }
@@ -339,7 +342,10 @@ private fun HomePill(
     modifier: Modifier = Modifier,
 ) {
     val available = pill.availability == Availability.AVAILABLE
-    val description = homePillAccessibilityLabel(pill, pinned, sectionTitle)
+    val context = LocalContext.current
+    val description = homePillAccessibilityLabel(context, pill, pinned, sectionTitle)
+    val openLabel = stringResource(R.string.home_open_item, pill.chip.label)
+    val actionsLabel = stringResource(R.string.home_item_actions, pill.chip.label)
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -361,12 +367,12 @@ private fun HomePill(
                     contentDescription = description
                     role = Role.Button
                     if (available) {
-                        onClick(label = "Ouvrir ${pill.chip.label}") {
+                        onClick(label = openLabel) {
                             actions.onOpen(pill)
                             true
                         }
                     }
-                    onLongClick(label = "Actions pour ${pill.chip.label}") {
+                    onLongClick(label = actionsLabel) {
                         onLongPress()
                         true
                     }
@@ -383,7 +389,7 @@ private fun HomePill(
         )
         if (editing && pinned) {
             Text(
-                "Épinglé",
+                stringResource(R.string.home_pinned),
                 style = AppleTypography.labelSmall.copy(fontSize = 11.sp),
                 color = AppleColors.secondary,
                 modifier = Modifier.padding(start = 14.dp),
@@ -413,21 +419,21 @@ private fun HomeEmptyState(
             modifier = Modifier.size(42.dp),
         )
         Text(
-            if (hasCompatibleDevices) "Aucune section visible" else "Aucun appareil compatible",
+            if (hasCompatibleDevices) stringResource(R.string.home_empty_sections) else stringResource(R.string.home_empty_devices),
             style = AppleTypography.titleLarge,
             color = AppleColors.primary,
         )
         Text(
             if (hasCompatibleDevices) {
-                "Affichez une section pour retrouver vos appareils et groupes."
+                stringResource(R.string.home_empty_sections_hint)
             } else {
-                "Ajoutez ou activez un appareil pilotable dans Home Assistant."
+                stringResource(R.string.home_empty_devices_hint)
             },
             style = AppleTypography.bodyMedium,
             color = AppleColors.secondary,
         )
         HomeTextButton(
-            label = if (hasCompatibleDevices) "Modifier les sections" else "Ouvrir les réglages Home Assistant",
+            label = if (hasCompatibleDevices) stringResource(R.string.home_edit_sections) else stringResource(R.string.home_open_ha_settings),
             onClick = if (hasCompatibleDevices) onEdit else onOpenHomeAssistantSettings,
         )
     }
@@ -478,17 +484,18 @@ private fun HomeIconButton(icon: androidx.compose.ui.graphics.vector.ImageVector
 }
 
 internal fun homePillAccessibilityLabel(
+    context: android.content.Context,
     pill: ResolvedPill,
     pinned: Boolean,
     sectionTitle: String,
 ): String = buildString {
     append(pill.chip.label)
     if (pill.chip.value.isNotBlank()) append(", ${pill.chip.value}")
-    append(", ${pill.ref.groupDescription()}")
-    append(", section $sectionTitle")
-    if (pinned) append(", épinglé")
+    append(", ${pill.ref.groupDescription(context)}")
+    append(", ${context.getString(R.string.home_accessibility_section, sectionTitle)}")
+    if (pinned) append(", ${context.getString(R.string.home_pinned).lowercase()}")
     if (pill.alert != null || pill.chip.state.equals("critical", ignoreCase = true)) {
-        append(", alerte critique")
+        append(", ${context.getString(R.string.home_accessibility_critical)}")
     }
-    if (pill.availability == Availability.STALE) append(", données figées, commandes indisponibles")
+    if (pill.availability == Availability.STALE) append(", ${context.getString(R.string.home_accessibility_stale)}")
 }

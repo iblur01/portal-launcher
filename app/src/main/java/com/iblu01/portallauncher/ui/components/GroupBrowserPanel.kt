@@ -37,6 +37,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.domain.home.Availability
@@ -111,7 +113,7 @@ fun GroupBrowserPanel(
                 chip = selectedDevice,
                 onDismiss = onBack,
                 navigationIcon = Icons.Filled.ArrowBack,
-                navigationContentDescription = "Retour au groupe ${group.chip.label}",
+                navigationContentDescription = stringResource(R.string.group_back, group.chip.label),
                 onClose = onDismiss,
                 modifier = modifier.testTag("groupDevicePanel"),
                 fullScreen = fullScreen,
@@ -152,7 +154,7 @@ fun GroupBrowserPanel(
                 titleIcon = launcherIcon(group.chip.icon),
                 accent = launcherChipAccent(group.chip),
                 onClose = onDismiss,
-                closeContentDescription = "Fermer le groupe ${group.chip.label}",
+                closeContentDescription = stringResource(R.string.group_close, group.chip.label),
             )
             Spacer(Modifier.height(12.dp.scaled()))
             Text(
@@ -164,7 +166,7 @@ fun GroupBrowserPanel(
             if (group.availability == Availability.STALE) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Données figées · commandes suspendues",
+                    stringResource(R.string.group_stale_state),
                     style = AppleTypography.bodySmall,
                     color = AppleColors.warning,
                     modifier = Modifier.testTag("groupStaleState"),
@@ -201,9 +203,9 @@ private fun CollectiveActionButton(
     onClick: () -> Unit,
 ) {
     val label = when (action) {
-        GroupCollectiveAction.TURN_OFF -> "Tout éteindre"
-        GroupCollectiveAction.CLOSE -> "Tout fermer"
-        GroupCollectiveAction.LOCK -> "Tout verrouiller"
+        GroupCollectiveAction.TURN_OFF -> stringResource(R.string.group_action_turn_off)
+        GroupCollectiveAction.CLOSE -> stringResource(R.string.group_action_close)
+        GroupCollectiveAction.LOCK -> stringResource(R.string.group_action_lock)
     }
     Row(
         modifier = Modifier
@@ -228,6 +230,9 @@ private fun GroupMemberRow(
     onSelectMember: (ResolvedPill) -> Unit,
 ) {
     val available = member.availability == Availability.AVAILABLE
+    val openLabel = stringResource(R.string.home_open_item, member.chip.label)
+    val staleLabel = stringResource(R.string.group_stale_state)
+    val unavailableLabel = stringResource(R.string.group_device_unavailable)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -237,7 +242,7 @@ private fun GroupMemberRow(
             .then(
                 if (available) Modifier.clickable(
                     role = Role.Button,
-                    onClickLabel = "Ouvrir ${member.chip.label}",
+                    onClickLabel = openLabel,
                 ) { onSelectMember(member) } else Modifier,
             )
             .semantics(mergeDescendants = true) {
@@ -247,8 +252,8 @@ private fun GroupMemberRow(
                     if (member.chip.value.isNotBlank()) append(", ${member.chip.value}")
                     when (member.availability) {
                         Availability.AVAILABLE -> Unit
-                        Availability.STALE -> append(", données figées, commandes indisponibles")
-                        Availability.UNAVAILABLE -> append(", appareil indisponible")
+                        Availability.STALE -> append(", $staleLabel")
+                        Availability.UNAVAILABLE -> append(", $unavailableLabel")
                     }
                 }
                 if (!available) disabled()
@@ -270,8 +275,8 @@ private fun GroupMemberRow(
             Text(
                 when (member.availability) {
                     Availability.AVAILABLE -> member.chip.value
-                    Availability.STALE -> "Données figées · commandes suspendues"
-                    Availability.UNAVAILABLE -> "Appareil indisponible"
+                    Availability.STALE -> staleLabel
+                    Availability.UNAVAILABLE -> unavailableLabel
                 },
                 style = AppleTypography.bodySmall.copy(fontSize = 12.sp),
                 color = AppleColors.secondary,
@@ -289,10 +294,10 @@ private fun GroupEmptyState(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Appareils indisponibles", style = AppleTypography.titleLarge, color = AppleColors.primary)
+            Text(stringResource(R.string.group_devices_unavailable), style = AppleTypography.titleLarge, color = AppleColors.primary)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Revenez au groupe lorsque Home Assistant aura retrouvé ses appareils.",
+                stringResource(R.string.group_devices_unavailable_hint),
                 style = AppleTypography.bodySmall,
                 color = AppleColors.secondary,
             )
@@ -316,15 +321,15 @@ private fun UnavailableGroupDevice(
             .testTag("groupUnavailableDevice"),
     ) {
         PanelHeader(
-            title = "Appareil indisponible",
+            title = stringResource(R.string.panel_device_unavailable),
             onNavigation = onBack,
             navigationIcon = Icons.Filled.ArrowBack,
-            navigationContentDescription = "Retour au groupe $groupName",
+            navigationContentDescription = stringResource(R.string.group_back, groupName),
             onClose = onDismiss,
         )
         Spacer(Modifier.height(18.dp))
         Text(
-            "Cet appareil n’est plus disponible. Les autres membres du groupe restent accessibles.",
+            stringResource(R.string.group_unavailable_detail),
             style = AppleTypography.bodyMedium,
             color = AppleColors.secondary,
         )

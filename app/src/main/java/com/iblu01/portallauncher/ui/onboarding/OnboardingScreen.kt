@@ -24,6 +24,7 @@ import com.iblu01.portallauncher.ui.onboarding.screens.MqttTestStep
 import com.iblu01.portallauncher.ui.onboarding.screens.PillsIntroStep
 import com.iblu01.portallauncher.ui.onboarding.screens.RemoteControlStep
 import com.iblu01.portallauncher.ui.onboarding.screens.SystemSetupStep
+import com.iblu01.portallauncher.ui.onboarding.screens.TapAppStep
 import com.iblu01.portallauncher.ui.onboarding.screens.WelcomeStep
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 
@@ -171,6 +172,13 @@ fun OnboardingScreen(
                 onLoadApps = viewModel::loadApps,
                 onApply = viewModel::applyHiddenApps,
                 onHideNothing = viewModel::skipHiddenApps,
+                onBack = viewModel::goBack,
+            )
+
+            OnboardingStep.TAP_APP -> TapAppStep(
+                state = state,
+                onLoadApps = viewModel::loadApps,
+                onConfirm = viewModel::setTapApp,
                 onBack = viewModel::goBack,
             )
 

@@ -1,10 +1,12 @@
 package com.iblu01.portallauncher.ui.settings
 
+import android.content.Context
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.HomePillPreferencesCodec
 import com.iblu01.portallauncher.PillCandidate
 import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.PillRule
+import com.iblu01.portallauncher.localizedLabel
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
 import com.iblu01.portallauncher.domain.home.HomeSectionIds
 import com.iblu01.portallauncher.domain.home.ManualPillGroup
@@ -218,6 +220,7 @@ object HomeSettingsReducer {
 
 object HomeSettingsCatalogBuilder {
     fun build(
+        context: Context,
         candidates: List<PillCandidate>,
         rules: List<PillRule>,
         areaIdByEntity: Map<String, String> = emptyMap(),
@@ -229,7 +232,7 @@ object HomeSettingsCatalogBuilder {
             SettingsPillTarget(
                 ref = PillRef.Device(candidate.primary.entityId),
                 label = candidate.label,
-                stateLabel = com.iblu01.portallauncher.friendlyEntityState(candidate.primary),
+                stateLabel = com.iblu01.portallauncher.friendlyEntityState(context, candidate.primary),
                 enabled = candidate.primary.entityId in enabledIds,
                 available = candidate.primary.isIndividuallyAvailable(),
                 kind = candidate.kind,
@@ -245,7 +248,7 @@ object HomeSettingsCatalogBuilder {
         val kindGroups = compatibleAvailable.groupBy(PillCandidate::kind).map { (kind, members) ->
             SettingsPillTarget(
                 ref = PillRef.KindGroup(kind),
-                label = kind.label,
+                label = kind.localizedLabel(context),
                 stateLabel = "${members.size}",
                 enabled = true,
                 available = members.isNotEmpty(),
@@ -344,13 +347,14 @@ private fun isSettingsRenderable(
 }
 
 fun labelForSettingsRef(
+    context: Context,
     ref: PillRef,
     catalog: SettingsPillCatalog,
     preferences: HomePillPreferences,
 ): String = catalog.byRef[ref]?.label ?: when (ref) {
     is PillRef.Device -> ref.entityId
     is PillRef.AreaGroup -> ref.areaId
-    is PillRef.KindGroup -> ref.kind.label
+    is PillRef.KindGroup -> ref.kind.localizedLabel(context)
     is PillRef.ManualGroup -> preferences.manualGroups.firstOrNull { it.id == ref.groupId }?.name ?: ref.groupId
 }
 

@@ -1,11 +1,14 @@
 package com.iblu01.portallauncher.domain.home
 
+import android.content.Context
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.PillKind
+import com.iblu01.portallauncher.localizedLabel
 import java.util.Locale
 
 /** Pure projection of preferences + catalog into ordered, non-empty Maison rails. */
 object HomePageBuilder {
-    fun build(catalog: PillCatalogSnapshot, preferences: HomePillPreferences): HomePageModel {
+    fun build(context: Context, catalog: PillCatalogSnapshot, preferences: HomePillPreferences): HomePageModel {
         val preferenceById = preferences.homeSections.associateBy { it.sectionId }
         val candidates = mutableListOf<OrderedSection>()
 
@@ -17,7 +20,7 @@ object HomePageBuilder {
             defaultOrder = 0,
             sectionId = HomeSectionIds.FAVORITES,
             type = HomeSectionType.FAVORITES,
-            title = "Favoris",
+            title = context.getString(R.string.home_section_favorites),
             items = favoriteItems,
         )
 
@@ -39,7 +42,7 @@ object HomePageBuilder {
                         defaultOrder = 100 + index,
                         sectionId = sectionId,
                         type = HomeSectionType.KIND,
-                        title = kind.label,
+                        title = kind.localizedLabel(context),
                         // The rail title already expresses the type. Repeating an aggregate "all" pill
                         // before the individual devices adds no information and opens the wrong level.
                         items = devices,
@@ -57,7 +60,7 @@ object HomePageBuilder {
             defaultOrder = 1_000,
             sectionId = HomeSectionIds.MANUAL_GROUPS,
             type = HomeSectionType.MANUAL_GROUPS,
-            title = "Mes groupes",
+            title = context.getString(R.string.home_section_manual_groups),
             items = manualItems,
         )
 

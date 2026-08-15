@@ -25,7 +25,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], qualifiers = "w900dp-h600dp")
+@Config(sdk = [28], qualifiers = "fr-w900dp-h600dp")
 class GroupBrowserPanelTest {
     @get:Rule val rule = createComposeRule()
 

@@ -1,12 +1,18 @@
 package com.iblu01.portallauncher
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class PillRulesTest {
+    private val context: Context = ApplicationProvider.getApplicationContext()
 
     private fun entity(id: String, state: String, deviceClass: String = "", unit: String = "") =
         HaEntity(
@@ -44,34 +50,34 @@ class PillRulesTest {
     // --- friendlyEntityState ---
 
     @Test fun `binary sensors use plain words`() {
-        assertEquals("Ouverte", friendlyEntityState(entity("binary_sensor.front_door", "on", "door")))
-        assertEquals("Fermée", friendlyEntityState(entity("binary_sensor.front_door", "off", "door")))
-        assertEquals("Mouvement", friendlyEntityState(entity("binary_sensor.hall", "on", "motion")))
-        assertEquals("Alerte", friendlyEntityState(entity("binary_sensor.smoke", "on", "smoke")))
+        assertEquals("Open", friendlyEntityState(context, entity("binary_sensor.front_door", "on", "door")))
+        assertEquals("Closed", friendlyEntityState(context, entity("binary_sensor.front_door", "off", "door")))
+        assertEquals("Motion detected", friendlyEntityState(context, entity("binary_sensor.hall", "on", "motion")))
+        assertEquals("Alert", friendlyEntityState(context, entity("binary_sensor.smoke", "on", "smoke")))
     }
 
     @Test fun `sensors show their value and unit`() {
-        assertEquals("21 °C", friendlyEntityState(entity("sensor.living_temp", "21.0", "temperature", "°C")))
-        assertEquals("45 %", friendlyEntityState(entity("sensor.living_hum", "45", "humidity", "%")))
+        assertEquals("21 °C", friendlyEntityState(context, entity("sensor.living_temp", "21.0", "temperature", "°C")))
+        assertEquals("45 %", friendlyEntityState(context, entity("sensor.living_hum", "45", "humidity", "%")))
     }
 
     @Test fun `people and locks use everyday words`() {
-        assertEquals("À la maison", friendlyEntityState(entity("person.marie", "home")))
-        assertEquals("Absente", friendlyEntityState(entity("person.marie", "not_home")))
-        assertEquals("Verrouillée", friendlyEntityState(entity("lock.door", "locked")))
-        assertEquals("Déverrouillée", friendlyEntityState(entity("lock.door", "unlocked")))
+        assertEquals("At home", friendlyEntityState(context, entity("person.marie", "home")))
+        assertEquals("Away", friendlyEntityState(context, entity("person.marie", "not_home")))
+        assertEquals("Locked", friendlyEntityState(context, entity("lock.door", "locked")))
+        assertEquals("Unlocked", friendlyEntityState(context, entity("lock.door", "unlocked")))
     }
 
     @Test fun `common on off and media states`() {
-        assertEquals("Allumé", friendlyEntityState(entity("light.salon", "on")))
-        assertEquals("Éteint", friendlyEntityState(entity("light.salon", "off")))
-        assertEquals("En lecture", friendlyEntityState(entity("media_player.tv", "playing")))
-        assertEquals("En pause", friendlyEntityState(entity("media_player.tv", "paused")))
+        assertEquals("On", friendlyEntityState(context, entity("light.salon", "on")))
+        assertEquals("Off", friendlyEntityState(context, entity("light.salon", "off")))
+        assertEquals("Playing", friendlyEntityState(context, entity("media_player.tv", "playing")))
+        assertEquals("Paused", friendlyEntityState(context, entity("media_player.tv", "paused")))
     }
 
     @Test fun `degraded states are readable`() {
-        assertEquals("Indisponible", friendlyEntityState(entity("sensor.x", "unavailable")))
-        assertEquals("—", friendlyEntityState(entity("sensor.x", "unknown")))
+        assertEquals("Unavailable", friendlyEntityState(context, entity("sensor.x", "unavailable")))
+        assertEquals("—", friendlyEntityState(context, entity("sensor.x", "unknown")))
     }
 
     // --- deriveHaUrl (mDNS discovery) ---

@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher.ui.home
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -36,6 +38,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "w800dp-h600dp")
 class HomePageTest {
+    private val context: Context = ApplicationProvider.getApplicationContext()
     @get:Rule val rule = createComposeRule()
 
     private fun pill(
@@ -87,7 +90,7 @@ class HomePageTest {
         rule.onNodeWithTag("homeGrid:favorites").assertExists()
         rule.onNodeWithTag("homeGrid:lights").assertExists()
         rule.onNodeWithContentDescription(
-            "Salon, Allumée, Appareil, section Favoris, épinglé",
+            "Salon, Allumée, Device, section Favoris, pinned",
         ).assertExists()
         assertTrue(
             "the complete Maison scroll surface must start below the fixed header",
@@ -109,8 +112,8 @@ class HomePageTest {
 
         rule.onNodeWithTag("homeStaleState").assertIsDisplayed()
         rule.onNodeWithTag("homeEmptyState").assertIsDisplayed()
-        rule.onNodeWithText("Aucun appareil compatible").assertIsDisplayed()
-        rule.onNodeWithText("Ouvrir les réglages Home Assistant").assertIsDisplayed()
+        rule.onNodeWithText("No compatible devices").assertIsDisplayed()
+        rule.onNodeWithText("Open Home Assistant settings").assertIsDisplayed()
     }
 
     @Test
@@ -132,10 +135,10 @@ class HomePageTest {
             .performSemanticsAction(SemanticsActions.OnLongClick)
         rule.waitForIdle()
 
-        rule.onNodeWithText("Épingler").assertIsDisplayed()
-        rule.onNodeWithText("Ajouter à un groupe manuel").assertIsDisplayed()
-        rule.onNodeWithText("Réorganiser").assertIsDisplayed()
-        rule.onNodeWithText("Ouvrir les commandes").assertIsDisplayed()
+        rule.onNodeWithText("Pin").assertIsDisplayed()
+        rule.onNodeWithText("Add to a manual group").assertIsDisplayed()
+        rule.onNodeWithText("Reorder").assertIsDisplayed()
+        rule.onNodeWithText("Open controls").assertIsDisplayed()
         assertEquals(0, opened)
     }
 
@@ -146,12 +149,12 @@ class HomePageTest {
             availability = Availability.STALE,
             alert = PillAlert(AlertSeverity.CRITICAL, incidentEntityIds = setOf("light.alarme")),
         )
-        val label = homePillAccessibilityLabel(target, pinned = true, sectionTitle = "Favoris")
+        val label = homePillAccessibilityLabel(context, target, pinned = true, sectionTitle = "Favorites")
 
-        assertTrue(label.contains("alerte critique"))
-        assertTrue(label.contains("épinglé"))
-        assertTrue(label.contains("données figées"))
-        assertTrue(label.contains("section Favoris"))
+        assertTrue(label.contains("critical alert"))
+        assertTrue(label.contains("pinned"))
+        assertTrue(label.contains("cached data"))
+        assertTrue(label.contains("section Favorites"))
     }
 
     @Test

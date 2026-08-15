@@ -33,7 +33,7 @@
     <string name="setup_access_key_help_step_5">5. Copy and paste it here</string>
 
     <!-- ===== HOME CONNECTION PAGE ===== -->
-    <string name="home_connection_title">My Home</string>
+    <string name="home_connection_title">Connections</string>
     <string name="home_connection_subtitle">Portal connects to your Home Assistant server to display the state of your home.</string>
     <string name="home_connection_section_address">ADDRESS</string>
     <string name="home_connection_ha_detected">Home Assistant detected</string>
@@ -81,17 +81,31 @@
     <string name="settings_home_subtitle_connected">Connected</string>
     <string name="settings_home_subtitle_error">Check connection</string>
     <string name="settings_home_subtitle_default">Address, access key</string>
-    <string name="settings_tile_home_title">My Home</string>
-    <string name="settings_tile_pills_title">Displayed info</string>
-    <string name="settings_tile_pills_subtitle">What Portal shows at the top of the screen</string>
-    <string name="settings_tile_app_title">Application</string>
-    <string name="settings_tile_app_subtitle">Language, clock, grid, sleep</string>
+    <string name="settings_tile_home_title">Connected home</string>
+    <string name="settings_tile_pills_title">Home screen</string>
+    <string name="settings_tile_pills_subtitle">Content, groups and pinned information</string>
+    <string name="settings_tile_app_title">Device</string>
+    <string name="settings_tile_app_subtitle">Display, navigation, language and apps</string>
     <string name="settings_tile_dev_title">Developer</string>
     <string name="settings_tile_dev_subtitle">Advanced options</string>
-    <string name="settings_tile_info_title">Information</string>
-    <string name="settings_tile_info_subtitle">Version &amp; updates</string>
+    <string name="settings_tile_info_title">About</string>
+    <string name="settings_tile_info_subtitle">Version, updates and advanced options</string>
     <string name="settings_main_title">Portal Launcher</string>
-    <string name="settings_app_page_title">Application</string>
+    <string name="settings_category_section">CHOOSE A SECTION</string>
+    <string name="settings_home_content_title">Displayed content</string>
+    <string name="settings_home_content_subtitle">Pinned information, sections and groups</string>
+    <string name="settings_home_apps_title">Apps and interaction</string>
+    <string name="settings_home_apps_subtitle">Grid, icons, badges and tap action</string>
+    <string name="settings_appearance_wallpaper_title">Wallpaper</string>
+    <string name="settings_appearance_wallpaper_subtitle">Source, Immich photos and readability</string>
+    <string name="settings_appearance_clock_title">Clock</string>
+    <string name="settings_appearance_clock_subtitle">Home screen clock style</string>
+    <string name="settings_connected_connection_title">Home Assistant and MQTT</string>
+    <string name="settings_connected_sessions_title">App sessions</string>
+    <string name="settings_connected_sessions_subtitle">Allowed external applications</string>
+    <string name="settings_device_general_title">Display, navigation and language</string>
+    <string name="settings_device_general_subtitle">Sleep, auto-return, language and setup assistant</string>
+    <string name="settings_app_page_title">Device</string>
     <string name="settings_app_section_language">LANGUAGE</string>
     <string name="settings_app_label_language">Language</string>
     <string name="language_page_title">Language</string>
@@ -100,6 +114,7 @@
     <string name="language_french">Français</string>
     <string name="settings_app_section_tap_home">HOME SCREEN TAP</string>
     <string name="settings_app_label_app_to_open">App to open</string>
+    <string name="settings_app_tap_home_none">No app</string>
     <string name="settings_app_section_wallpaper">WALLPAPER</string>
     <string name="settings_app_label_overlay_opacity">Overlay opacity</string>
     <string name="settings_immich_section">IMMICH PHOTO SOURCE</string>
@@ -147,7 +162,7 @@
     <string name="settings_dev_reboot">Reboot</string>
 
     <!-- ===== INFORMATION PAGE ===== -->
-    <string name="settings_info_page_title">Information</string>
+    <string name="settings_info_page_title">About</string>
     <string name="settings_info_section_app">APP</string>
     <string name="settings_info_label_version">Version</string>
     <string name="settings_info_section_updates">UPDATES</string>
@@ -158,9 +173,14 @@
     <string name="settings_info_downloading">Downloading…</string>
     <string name="settings_info_install">Download &amp; install</string>
     <string name="settings_info_check_error">Check failed</string>
+    <string name="update_popup_title">A new Portal update is available</string>
+    <string name="update_popup_version">Version %1$s</string>
+    <string name="update_popup_install">Update now</string>
+    <string name="update_popup_later">Remind me later</string>
+    <string name="update_popup_ignore">Skip this version</string>
 
     <!-- ===== PILL SETTINGS PAGE ===== -->
-    <string name="pills_page_title">Displayed info</string>
+    <string name="pills_page_title">Displayed content</string>
     <string name="pills_page_description">Choose what Portal can display at the top of the screen. Disabled items are never shown even if detected.</string>
     <string name="pills_loading">Loading from your home…</string>
     <string name="pills_section_connection">CONNECTION</string>
@@ -252,6 +272,63 @@
     <string name="home_grouping_by_type_short">Type</string>
     <string name="home_header_edit_content_desc">Edit Home</string>
     <string name="home_header_finish_content_desc">Finish editing Home</string>
+    <string name="home_section_favorites">Favourites</string>
+    <string name="home_section_manual_groups">My groups</string>
+    <string name="home_stale_state">Offline · cached data, controls suspended</string>
+    <string name="home_create_group">Create a group</string>
+    <string name="home_manage_groups">Manage my groups</string>
+    <string name="home_ha_membership_hint">Room and type membership is managed in Home Assistant.</string>
+    <plurals name="home_section_item_count"><item quantity="one">%1$d item</item><item quantity="other">%1$d items</item></plurals>
+    <string name="home_move_section_before">Move %1$s before</string>
+    <string name="home_move_section_after">Move %1$s after</string>
+    <string name="home_hide_section">Hide %1$s</string>
+    <string name="home_open_item">Open %1$s</string>
+    <string name="home_item_actions">Actions for %1$s</string>
+    <string name="home_pinned">Pinned</string>
+    <string name="home_empty_sections">No visible sections</string>
+    <string name="home_empty_devices">No compatible devices</string>
+    <string name="home_empty_sections_hint">Show a section to find your devices and groups.</string>
+    <string name="home_empty_devices_hint">Add or enable a controllable device in Home Assistant.</string>
+    <string name="home_edit_sections">Edit sections</string>
+    <string name="home_open_ha_settings">Open Home Assistant settings</string>
+    <string name="home_accessibility_section">section %1$s</string>
+    <string name="home_accessibility_critical">critical alert</string>
+    <string name="home_accessibility_stale">cached data, controls unavailable</string>
+    <string name="group_back">Back to group %1$s</string>
+    <string name="group_close">Close group %1$s</string>
+    <string name="group_stale_state">Cached data · controls suspended</string>
+    <string name="group_action_turn_off">Turn all off</string>
+    <string name="group_action_close">Close all</string>
+    <string name="group_action_lock">Lock all</string>
+    <string name="group_device_unavailable">device unavailable</string>
+    <string name="group_devices_unavailable">Devices unavailable</string>
+    <string name="group_devices_unavailable_hint">Return to the group when Home Assistant has found its devices again.</string>
+    <string name="group_unavailable_detail">This device is no longer available. The other group members remain accessible.</string>
+    <string name="media_players_title">Media players</string><string name="media_choose_player">Choose a player</string><string name="media_no_player">No player available</string>
+    <string name="media_state_stopped">Stopped</string>
+    <string name="washer_fact_program">Program</string><string name="washer_fact_temperature">Temperature</string><string name="washer_fact_spin">Spin</string>
+    <string name="washer_phase_preparing">Preparing</string><string name="washer_phase_wash">Wash</string><string name="washer_phase_rinse">Rinse</string><string name="washer_phase_spin">Spin</string><string name="washer_phase_finished">Finished</string>
+    <string name="action_turn_on">Turn on</string><string name="action_turn_off">Turn off</string><string name="action_start">Start</string><string name="action_pause">Pause</string><string name="action_return_to_base">Return to base</string><string name="action_base">Base</string>
+    <string name="menu_close">Close menu</string>
+    <string name="menu_pin">Pin</string>
+    <string name="menu_unpin">Unpin</string>
+    <string name="menu_add_manual_group">Add to a manual group</string>
+    <string name="menu_no_manual_group">No manual groups. Create one from Edit.</string>
+    <string name="menu_already_added">%1$s · already added</string>
+    <string name="menu_reorder">Reorder</string>
+    <string name="menu_open_controls">Open controls</string>
+    <string name="menu_controls_stale">Cached data: controls are temporarily unavailable.</string>
+    <string name="menu_hide_device">Stop showing this device</string>
+    <string name="menu_restore_device_hint">The device can be enabled again from the pill settings.</string>
+    <string name="menu_move_drag">Move by dragging</string>
+    <string name="menu_move_first">Place first</string>
+    <string name="menu_move_before">Move before</string>
+    <string name="menu_move_after">Move after</string>
+    <string name="menu_move_last">Place last</string>
+    <string name="pill_ref_device">Device</string>
+    <string name="pill_ref_area_group">Room group</string>
+    <string name="pill_ref_kind_group">Type group</string>
+    <string name="pill_ref_manual_group">Manual group</string>
     <string name="auto_return_pill_label">Auto close</string>
     <string name="auto_return_cancel_desc">Cancel</string>
     <string name="bg_mode_system">Android wallpaper</string>
@@ -296,6 +373,13 @@
     <string name="connection_status_testing">Testing…</string>
     <string name="connection_status_ok">Connected</string>
     <string name="connection_status_error">Failed</string>
+    <string name="connection_error_failed">Connection failed</string>
+    <string name="connection_error_token_required">Paste your access key first</string>
+    <string name="connection_error_token_invalid">Invalid access key</string>
+    <string name="connection_error_address_invalid">Incorrect address</string>
+    <string name="connection_error_server_not_found">Server not found</string>
+    <string name="connection_error_code">Error %1$d</string>
+    <string name="media_none">No media</string>
     <string name="search_placeholder">Search…</string>
     <string name="dialog_button_ok">OK</string>
     <string name="subpage_back_desc">Back</string>
@@ -314,6 +398,13 @@
     <string name="weather_tab_hourly">Hours</string>
     <string name="weather_tab_daily">Days</string>
     <string name="weather_today_range_format">Min %1$d° · Max %2$d°</string>
+    <string name="weather_condition_sunny">Sunny</string><string name="weather_condition_clear_night">Clear sky</string>
+    <string name="weather_condition_partly_cloudy">Partly cloudy</string><string name="weather_condition_cloudy">Cloudy</string>
+    <string name="weather_condition_fog">Fog</string><string name="weather_condition_rainy">Rain</string>
+    <string name="weather_condition_pouring">Heavy rain</string><string name="weather_condition_lightning">Thunderstorm</string>
+    <string name="weather_condition_lightning_rainy">Thunderstorms and rain</string><string name="weather_condition_snowy">Snow</string>
+    <string name="weather_condition_snowy_rainy">Sleet</string><string name="weather_condition_hail">Hail</string>
+    <string name="weather_condition_windy">Windy</string><string name="weather_condition_exceptional">Exceptional</string>
 
     <!-- ===== AIR QUALITY PANEL ===== -->
     <string name="air_quality_back_desc">Back</string>
@@ -481,6 +572,12 @@
 
     <!-- ===== PANEL HELPERS / SHARED ===== -->
     <string name="panel_device_unavailable">Device unavailable</string>
+    <string name="panel_state">State</string>
+    <string name="lights_back">Back to lights</string><string name="lights_no_room">No room</string>
+    <string name="lights_all_off">Turn all off</string><string name="lights_room_off">Turn room off</string>
+    <plurals name="lights_room_on_count"><item quantity="one">%1$d / %2$d on</item><item quantity="other">%1$d / %2$d on</item></plurals>
+    <plurals name="lights_room_count"><item quantity="one">%1$d light</item><item quantity="other">%1$d lights</item></plurals>
+    <string name="lights_color_wheel_desc">Color wheel, hue %1$d degrees</string>
     <string name="side_panel_close_desc">Close panel</string>
     <string name="side_panel_battery_desc">Battery at %1$d percent</string>
     <string name="side_panel_battery_value">%1$d%%</string>
@@ -644,6 +741,52 @@
     <string name="settings_app_sessions_cancel">Cancel</string>
 
     <!-- ===== PILL PRIORITY ENGINE (Dynamic Labels) ===== -->
+    <string name="pill_kind_safety">Security</string>
+    <string name="pill_kind_lock">Lock</string>
+    <string name="pill_kind_opening">Doors &amp; windows</string>
+    <string name="pill_kind_motion">Motion</string>
+    <string name="pill_kind_appliance">Appliance</string>
+    <string name="pill_kind_vacuum">Vacuum</string>
+    <string name="pill_kind_battery">Battery</string>
+    <string name="pill_kind_air">Air quality</string>
+    <string name="pill_kind_climate">Comfort</string>
+    <string name="pill_kind_thermostat">Thermostat</string>
+    <string name="pill_kind_cover">Cover</string>
+    <string name="pill_kind_switch">Switch</string>
+    <string name="pill_kind_fan">Fan</string>
+    <string name="pill_kind_scene">Scenes</string>
+    <string name="pill_kind_presence">Presence</string>
+    <string name="pill_kind_energy">Energy</string>
+    <string name="pill_kind_lights">Lights</string>
+    <string name="pill_kind_media">Media</string>
+    <string name="pill_kind_purifier">Purifier</string>
+    <string name="pill_kind_timer">Timer</string>
+    <string name="pill_kind_humidifier">Humidifier</string>
+    <string name="pill_kind_water_heater">Water heater</string>
+    <string name="pill_kind_valve">Valve</string>
+    <string name="pill_kind_siren">Siren</string>
+    <string name="pill_kind_lawn_mower">Lawn mower</string>
+    <string name="pill_kind_generic">Information</string>
+    <string name="pill_family_security">Security &amp; access</string>
+    <string name="pill_family_comfort">Comfort</string>
+    <string name="pill_family_appliances">Appliances</string>
+    <string name="pill_family_lights">Lights</string>
+    <string name="pill_family_media">Media</string>
+    <string name="pill_family_home">Home</string>
+    <string name="entity_state_unavailable">Unavailable</string>
+    <string name="entity_state_home">At home</string>
+    <string name="entity_state_away">Away</string>
+    <string name="entity_state_connected">Connected</string>
+    <string name="entity_state_disconnected">Disconnected</string>
+    <string name="entity_state_charging">Charging</string>
+    <string name="entity_state_not_charging">Not charging</string>
+    <string name="entity_state_plugged">Plugged in</string>
+    <string name="entity_state_unplugged">Unplugged</string>
+    <string name="entity_state_active">Active</string>
+    <string name="entity_state_inactive">Inactive</string>
+    <string name="entity_state_clear">Clear</string>
+    <string name="entity_state_playing">Playing</string>
+    <string name="entity_state_paused">Paused</string>
     <string name="presence_home">At home</string>
     <string name="presence_away">Away</string>
     <string name="pill_group_presence">Presence</string>
@@ -671,6 +814,14 @@
     <string name="motion_detected_since">Motion detected since %1$s</string>
     <string name="motion_clear_since">No motion since %1$s</string>
     <string name="pill_safety_alert">Alert</string>
+    <string name="alarm_state_disarmed">Disarmed</string>
+    <string name="alarm_state_armed_away">Armed · away</string>
+    <string name="alarm_state_armed_home">Armed · home</string>
+    <string name="alarm_state_armed_night">Armed · night</string>
+    <string name="alarm_state_triggered">Alarm triggered</string>
+    <string name="alarm_state_pending">Trigger pending</string>
+    <string name="alarm_state_arming">Arming…</string>
+    <string name="pill_completion_at">Ends at %1$s</string>
     <string name="phase_none">None</string>
     <string name="phase_air_wash">Air wash</string>
     <string name="phase_ai_rinse">AI rinse</string>
@@ -692,6 +843,14 @@
     <plurals name="pill_scenes_count">
         <item quantity="one">%1$d shortcut</item>
         <item quantity="other">%1$d shortcuts</item>
+    </plurals>
+    <plurals name="pill_group_active_count">
+        <item quantity="one">%1$d active out of %2$d</item>
+        <item quantity="other">%1$d active out of %2$d</item>
+    </plurals>
+    <plurals name="pill_group_available_count">
+        <item quantity="one">%1$d available</item>
+        <item quantity="other">%1$d available</item>
     </plurals>
 
     <!-- ===== PILL LIGHTS STATE (plurals) ===== -->
@@ -1018,6 +1177,13 @@
     <string name="onb_hidden_action_hide_none">Hide nothing</string>
     <string name="onb_hidden_hint_settings">You can change this list from the settings.</string>
 
+    <!-- ===== ONBOARDING — TAP APP ===== -->
+    <string name="onb_tap_app_title">A tap in the void</string>
+    <string name="onb_tap_app_body">Choose the app opened by a tap on the empty part of the home screen. Leave it off if you would rather nothing happens.</string>
+    <string name="onb_tap_app_summary_none">No app</string>
+    <string name="onb_tap_app_action_none">No app</string>
+    <string name="onb_tap_app_hint_settings">You can change this later from the settings.</string>
+
     <!-- ===== ONBOARDING — GESTURES ===== -->
     <string name="onb_gestures_title">Everything is within a gesture\'s reach</string>
     <string name="onb_gestures_hint_apps">Swipe left to see your apps.</string>
@@ -1051,8 +1217,8 @@
     <string name="onb_pills_demo_pill_temperature">Temperature</string>
     <string name="onb_pills_demo_pill_door">Front door open</string>
     <string name="onb_pills_demo_pill_alarm">Alarm triggered</string>
-    <string name="settings_tile_wallpaper_title">Wallpaper</string>
-    <string name="settings_tile_wallpaper_subtitle">Background, photos, Immich</string>
+    <string name="settings_tile_wallpaper_title">Appearance</string>
+    <string name="settings_tile_wallpaper_subtitle">Wallpaper, readability and photos</string>
     <string name="settings_wallpaper_page_title">Wallpaper</string>
     <string name="settings_wallpaper_section_readability">READABILITY</string>
     <string name="settings_wallpaper_choose_photo">Choose a photo</string>
