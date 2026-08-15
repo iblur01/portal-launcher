@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.res.stringResource
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.HaInstance
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -221,8 +223,8 @@ fun SettingsStatusRow(
         Text(label, style = AppleTypography.titleMedium, color = AppleColors.primary)
         Box(Modifier.weight(1f))
         when (status) {
-            ConnStatus.IDLE -> Text("Vérifier", style = AppleTypography.titleMedium, color = AppleColors.accent)
-            ConnStatus.TESTING -> Text("Vérification…", style = AppleTypography.titleMedium, color = AppleColors.secondary)
+            ConnStatus.IDLE -> Text(stringResource(R.string.connection_status_idle), style = AppleTypography.titleMedium, color = AppleColors.accent)
+            ConnStatus.TESTING -> Text(stringResource(R.string.connection_status_testing), style = AppleTypography.titleMedium, color = AppleColors.secondary)
             ConnStatus.OK -> {
                 Icon(
                     Icons.Outlined.CheckCircle,
@@ -231,11 +233,11 @@ fun SettingsStatusRow(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(6.dp))
-                Text("Connecté", style = AppleTypography.titleMedium, color = AppleColors.active)
+                Text(stringResource(R.string.connection_status_ok), style = AppleTypography.titleMedium, color = AppleColors.active)
             }
             ConnStatus.ERROR -> {
                 Text(
-                    detail ?: "Échec",
+                    detail ?: stringResource(R.string.connection_status_error),
                     style = AppleTypography.titleMedium,
                     color = AppleColors.error,
                     maxLines = 1,
@@ -505,6 +507,7 @@ fun SettingsSubPageHeader(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     showBack: Boolean = true,
+    breadcrumb: String? = null,
 ) {
     Row(
         modifier = modifier
@@ -524,18 +527,28 @@ fun SettingsSubPageHeader(
             ) {
                 Icon(
                     Icons.Outlined.ChevronLeft,
-                    contentDescription = "Retour",
+                    contentDescription = stringResource(R.string.subpage_back_desc),
                     tint = AppleColors.accent,
                     modifier = Modifier.size(22.dp)
                 )
             }
             Spacer(Modifier.width(16.dp))
         }
-        Text(
-            title,
-            style = AppleTypography.headlineLarge,
-            color = AppleColors.primary
-        )
+        Column {
+            if (!breadcrumb.isNullOrBlank()) {
+                Text(
+                    breadcrumb,
+                    style = AppleTypography.bodySmall,
+                    color = AppleColors.accent,
+                    modifier = Modifier.appleClickable(onBack),
+                )
+            }
+            Text(
+                title,
+                style = AppleTypography.headlineLarge,
+                color = AppleColors.primary,
+            )
+        }
     }
 }
 
@@ -599,6 +612,9 @@ fun AppPickerDialog(
     selectedPackage: String,
     onDismiss: () -> Unit,
     onAppSelected: (AppEntry) -> Unit,
+    /** When set, an extra row above the list clears the choice (used by the opt-in home tap). */
+    noneLabel: String? = null,
+    onNoneSelected: () -> Unit = {},
 ) {
     var filter by remember { mutableStateOf("") }
     val filtered = remember(apps, filter) {
@@ -633,9 +649,36 @@ fun AppPickerDialog(
                     container = AppleColors.background.copy(alpha = 0.5f)
                 )
                 Spacer(Modifier.height(12.dp))
+                if (noneLabel != null) {
+                    val noneSelected = selectedPackage.isBlank()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(AppleShapes.section)
+                            .appleClickable(onNoneSelected)
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            noneLabel,
+                            style = AppleTypography.titleMedium,
+                            color = if (noneSelected) AppleColors.accent else AppleColors.primary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (noneSelected) {
+                            Icon(
+                                Icons.Outlined.Check,
+                                null,
+                                tint = AppleColors.accent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    SettingsDivider()
+                }
                 if (filtered.isEmpty()) {
                     Text(
-                        "Aucune application trouvée",
+                        stringResource(R.string.app_picker_empty),
                         style = AppleTypography.bodySmall,
                         color = AppleColors.secondary,
                         modifier = Modifier.padding(vertical = 16.dp)
@@ -685,7 +728,7 @@ fun AppPickerDialog(
                 }
                 Spacer(Modifier.height(8.dp))
                 PillButton(
-                    label = "Annuler",
+                    label = stringResource(R.string.dialog_button_cancel),
                     onClick = onDismiss
                 )
             }
@@ -715,14 +758,14 @@ fun HaDiscoveryDialog(
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    "Home Assistant sur le réseau",
+                    stringResource(R.string.ha_discovery_title),
                     style = AppleTypography.titleLarge,
                     color = AppleColors.primary,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 if (instances.isEmpty()) {
                     Text(
-                        "Recherche en cours…",
+                        stringResource(R.string.ha_discovery_scanning),
                         style = AppleTypography.bodySmall,
                         color = AppleColors.secondary,
                         modifier = Modifier.padding(vertical = 16.dp)
@@ -759,7 +802,7 @@ fun HaDiscoveryDialog(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                PillButton(label = "Annuler", onClick = onDismiss)
+                PillButton(label = stringResource(R.string.ha_discovery_cancel), onClick = onDismiss)
             }
         }
     }

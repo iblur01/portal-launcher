@@ -36,15 +36,6 @@ import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 
-/** Step-by-step help shown next to the access-key field. */
-internal val accessKeyHelpLines = listOf(
-    "1. Ouvre Home Assistant dans un navigateur (même adresse qu'ici).",
-    "2. Clique sur ton nom d'utilisateur en bas à gauche.",
-    "3. Va dans l'onglet « Sécurité ».",
-    "4. Tout en bas : « Jetons d'accès de longue durée » → « Créer un jeton ».",
-    "5. Donne-lui un nom (ex. Portal), copie le jeton et colle-le ici.",
-)
-
 /**
  * « Ma maison » — single friendly page for everything connection-related:
  * HA address + access key with a live status row, network auto-discovery,
@@ -104,7 +95,13 @@ fun HomeConnectionPage(
     if (showKeyHelp) {
         SettingsInfoDialog(
             title = stringResource(R.string.home_connection_label_key_help),
-            lines = accessKeyHelpLines,
+            lines = listOf(
+                stringResource(R.string.setup_access_key_help_step_1),
+                stringResource(R.string.setup_access_key_help_step_2),
+                stringResource(R.string.setup_access_key_help_step_3),
+                stringResource(R.string.setup_access_key_help_step_4),
+                stringResource(R.string.setup_access_key_help_step_5),
+            ),
             onDismiss = { showKeyHelp = false },
         )
     }
@@ -113,7 +110,12 @@ fun HomeConnectionPage(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        SettingsSubPageHeader(title = stringResource(R.string.home_connection_title), onBack = onBack, showBack = showBack)
+        SettingsSubPageHeader(
+            title = stringResource(R.string.home_connection_title),
+            onBack = onBack,
+            showBack = showBack,
+            breadcrumb = "${stringResource(R.string.settings_main_title)}  ›  ${stringResource(R.string.settings_tile_home_title)}",
+        )
         Text(
             stringResource(R.string.home_connection_subtitle),
             style = AppleTypography.bodyLarge,

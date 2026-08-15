@@ -8,6 +8,8 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -257,22 +259,28 @@ fun VerticalFillSlider(
                         val t = (y / size.height).coerceIn(0f, 1f)
                         return if (origin == FillOrigin.BOTTOM) 1f - t else t
                     }
-                    detectTapGestures { commit(fracAt(it.y), finished = true) }
-                },
-            )
-            .then(
-                if (!enabled) Modifier else Modifier.pointerInput(origin, valueRange) {
-                    fun fracAt(y: Float): Float {
-                        val t = (y / size.height).coerceIn(0f, 1f)
-                        return if (origin == FillOrigin.BOTTOM) 1f - t else t
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var current = fracAt(down.position.y)
+                        dragging = true
+                        commit(current, finished = false)
+                        down.consume()
+
+                        var pressed = true
+                        while (pressed) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                            if (change == null || !change.pressed) {
+                                pressed = false
+                            } else {
+                                current = fracAt(change.position.y)
+                                commit(current, finished = false)
+                                change.consume()
+                            }
+                        }
+                        dragging = false
+                        commit(current, finished = true)
                     }
-                    var current = fraction
-                    detectVerticalDragGestures(
-                        onDragStart = { dragging = true; current = fracAt(it.y); commit(current, finished = false) },
-                        onVerticalDrag = { change, _ -> current = fracAt(change.position.y); commit(current, finished = false) },
-                        onDragEnd = { dragging = false; commit(current, finished = true) },
-                        onDragCancel = { dragging = false },
-                    )
                 },
             ),
     ) {
@@ -460,19 +468,29 @@ fun VerticalGradientSlider(
             .semantics { contentDescription = "Curseur ${(fraction * 100).roundToInt()} pour cent" }
             .then(
                 if (!enabled) Modifier else Modifier.pointerInput(valueRange) {
-                    detectTapGestures { commit(1f - (it.y / size.height).coerceIn(0f, 1f), finished = true) }
-                },
-            )
-            .then(
-                if (!enabled) Modifier else Modifier.pointerInput(valueRange) {
                     fun fracAt(y: Float): Float = 1f - (y / size.height).coerceIn(0f, 1f)
-                    var current = fraction
-                    detectVerticalDragGestures(
-                        onDragStart = { dragging = true; current = fracAt(it.y); commit(current, finished = false) },
-                        onVerticalDrag = { change, _ -> current = fracAt(change.position.y); commit(current, finished = false) },
-                        onDragEnd = { dragging = false; commit(current, finished = true) },
-                        onDragCancel = { dragging = false },
-                    )
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var current = fracAt(down.position.y)
+                        dragging = true
+                        commit(current, finished = false)
+                        down.consume()
+
+                        var pressed = true
+                        while (pressed) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                            if (change == null || !change.pressed) {
+                                pressed = false
+                            } else {
+                                current = fracAt(change.position.y)
+                                commit(current, finished = false)
+                                change.consume()
+                            }
+                        }
+                        dragging = false
+                        commit(current, finished = true)
+                    }
                 },
             ),
     ) {

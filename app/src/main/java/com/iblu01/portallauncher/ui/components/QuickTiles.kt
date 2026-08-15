@@ -60,8 +60,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.PillKind
+import com.iblu01.portallauncher.ui.components.controls.contentColorOn
+import com.iblu01.portallauncher.ui.components.controls.kelvinToColor
 import com.iblu01.portallauncher.ui.icons.HaIcon
 import com.iblu01.portallauncher.ui.mapper.withLiveState
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -99,6 +102,22 @@ fun launcherChipAccent(chip: LauncherChip): Color = when {
     }
 }
 
+/**
+ * The colour a light is currently showing — `rgb_color` for colour bulbs, `color_temp_kelvin` for
+ * tunable-white — or null when it is off or reports no colour. Paints the pill's icon circle so the
+ * pill "is" the light; the caller picks the icon tint via [contentColorOn] for contrast.
+ */
+internal fun lightColorOf(entity: HaEntity): Color? {
+    if (!entity.state.equals("on", true)) return null
+    val rgb = entity.attributes.optJSONArray("rgb_color")
+    if (rgb != null && rgb.length() >= 3) {
+        return Color(rgb.optInt(0), rgb.optInt(1), rgb.optInt(2))
+    }
+    val kelvin = entity.attributes.optInt("color_temp_kelvin", 0)
+    if (kelvin > 0) return kelvinToColor(kelvin)
+    return null
+}
+
 @Composable
 fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Boolean = false, onClick: (() -> Unit)? = null, onLongPress: (() -> Unit)? = null) {
     // Live per-entity overlay (P3): an optimistic write or a push already applied to the store
@@ -107,10 +126,25 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
     val live = if (chip.deviceState != null && chip.entityId.isNotBlank() && ',' !in chip.entityId) {
         rememberEntity(chip.entityId)
     } else null
-    @Suppress("NAME_SHADOWING") val chip = chip.withLiveState(live)
+    @Suppress("NAME_SHADOWING") val chip = chip.withLiveState(androidx.compose.ui.platform.LocalContext.current, live)
     val target = selectedChipAccent(launcherChipAccent(chip), selected)
     val accent by animateColorAsState(target, AppleMotion.spring(), label = "chipAccent")
     val animatedProgress by animateFloatAsState(chip.progress, AppleMotion.spring(), label = "chipProgress")
+    // Light pills wear their light's real colour: the icon circle fills with the bulb's current
+    // colour and the glyph flips to whatever stays legible on top of it.
+    val lightColor = if (chip.kind == PillKind.LIGHTS && chip.entityId.startsWith("light.") && ',' !in chip.entityId) {
+        live?.let(::lightColorOf)
+    } else null
+    val circleFill by animateColorAsState(
+        lightColor ?: accent.copy(alpha = 0.22f),
+        AppleMotion.spring(),
+        label = "chipCircle",
+    )
+    val glyphTint by animateColorAsState(
+        lightColor?.let(::contentColorOn) ?: accent,
+        AppleMotion.spring(),
+        label = "chipGlyph",
+    )
     // Selected chip: iOS-style — white fill, dark text, matching border.
     val selectedSubtitle = Color(0xFF3C3C43).copy(alpha = 0.6f)
     val borderColor by animateColorAsState(if (selected) Color.White else AppleColors.frostedBorder, AppleMotion.spring(), label = "chipBorder")
@@ -153,10 +187,10 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(accent.copy(alpha = 0.22f), CircleShape)
+                        .background(circleFill, CircleShape)
                 )
             }
-            ChipGlyph(chip, accent)
+            ChipGlyph(chip, glyphTint)
         }
         Spacer(Modifier.width(14.dp.scaled()))
         Column {
@@ -214,7 +248,7 @@ private fun ChipGlyph(chip: LauncherChip, accent: Color, iconSize: Dp = 26.dp.sc
 @Composable
 private fun WasherGlyph(phase: String, accent: Color, modifier: Modifier = Modifier) {
     when (phase) {
-        "Essorage" -> {
+        "Essorage", "Spin" -> {
             val spin by rememberInfiniteTransition(label = "spin").animateFloat(
                 0f, 360f,
                 infiniteRepeatable(tween(1200, easing = LinearEasing)),
@@ -222,7 +256,7 @@ private fun WasherGlyph(phase: String, accent: Color, modifier: Modifier = Modif
             )
             Icon(Icons.Outlined.Autorenew, null, tint = accent, modifier = modifier.rotate(spin))
         }
-        "Terminé" -> Icon(Icons.Outlined.CheckCircle, null, tint = accent, modifier = modifier)
+        "Terminé", "Finished" -> Icon(Icons.Outlined.CheckCircle, null, tint = accent, modifier = modifier)
         else -> Icon(Icons.Outlined.WaterDrop, null, tint = accent, modifier = modifier)
     }
 }

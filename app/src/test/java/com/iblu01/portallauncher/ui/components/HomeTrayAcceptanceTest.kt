@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher.ui.components
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -27,6 +29,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [28], qualifiers = "w800dp-h600dp")
 class HomeTrayAcceptanceTest {
     @get:Rule val rule = createComposeRule()
+    private val context: Context = ApplicationProvider.getApplicationContext()
 
     private fun pill(index: Int): ResolvedPill {
         val ref = PillRef.Device("switch.device_$index")
@@ -95,7 +98,7 @@ class HomeTrayAcceptanceTest {
     fun `tray long press exposes the complete semantic menu without routing the simple tap`() {
         val target = pill(1)
         var opened = 0
-        val label = trayPillAccessibilityLabel(target, pinned = false)
+        val label = trayPillAccessibilityLabel(context, target, pinned = false)
         rule.setContent {
             ClockTray(
                 composition = HomeComposition(listOf(target), emptyList(), emptyList()),
@@ -112,11 +115,11 @@ class HomeTrayAcceptanceTest {
         rule.waitForIdle()
 
         listOf(
-            "Épingler",
-            "Ajouter à un groupe manuel",
-            "Réorganiser",
-            "Ouvrir les commandes",
-            "Ne plus afficher cet appareil",
+            "Pin",
+            "Add to a manual group",
+            "Reorder",
+            "Open controls",
+            "Stop showing this device",
         ).forEach { action ->
             rule.onNodeWithText(action).assertIsDisplayed().assertHasClickAction()
         }

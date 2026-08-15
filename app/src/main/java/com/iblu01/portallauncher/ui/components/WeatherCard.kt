@@ -24,7 +24,7 @@ data class WeatherUi(
  * Derives [WeatherUi] from the HA `weather.*` entity and its subscribed forecasts,
  * observed through [PillRepository]'s lightweight change notifier.
  */
-class WeatherController(context: Context, private val pills: PillRepository) {
+class WeatherController(private val context: Context, private val pills: PillRepository) {
     var state by mutableStateOf(WeatherUi())
         private set
 
@@ -40,7 +40,7 @@ class WeatherController(context: Context, private val pills: PillRepository) {
         val temp = entity.attributes.optDouble("temperature").let { if (it.isNaN()) null else it }
         state = WeatherUi(
             temp = temp?.let { "${it.roundToInt()}°" } ?: "--°",
-            condition = weatherLabel(condition),
+            condition = weatherLabel(context, condition),
             glyph = weatherGlyph(condition, isNight()),
             hourly = pills.hourlyForecast,
             daily = pills.dailyForecast,
@@ -70,21 +70,21 @@ fun weatherGlyph(condition: String, night: Boolean): WeatherGlyph = when (condit
     else -> WeatherGlyph("not-available")
 }
 
-/** HA condition string → French label. */
-fun weatherLabel(condition: String): String = when (condition.lowercase()) {
-    "sunny", "clear" -> "Ensoleillé"
-    "clear-night" -> "Ciel dégagé"
-    "partlycloudy" -> "Partiellement nuageux"
-    "cloudy" -> "Couvert"
-    "fog" -> "Brouillard"
-    "rainy" -> "Pluie"
-    "pouring" -> "Fortes pluies"
-    "lightning" -> "Orage"
-    "lightning-rainy" -> "Orage pluvieux"
-    "snowy" -> "Neige"
-    "snowy-rainy" -> "Neige et pluie"
-    "hail" -> "Grêle"
-    "windy", "windy-variant" -> "Venteux"
-    "exceptional" -> "Exceptionnel"
+/** HA condition string → localized label. */
+fun weatherLabel(context: Context, condition: String): String = when (condition.lowercase()) {
+    "sunny", "clear" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_sunny)
+    "clear-night" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_clear_night)
+    "partlycloudy" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_partly_cloudy)
+    "cloudy" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_cloudy)
+    "fog" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_fog)
+    "rainy" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_rainy)
+    "pouring" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_pouring)
+    "lightning" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_lightning)
+    "lightning-rainy" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_lightning_rainy)
+    "snowy" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_snowy)
+    "snowy-rainy" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_snowy_rainy)
+    "hail" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_hail)
+    "windy", "windy-variant" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_windy)
+    "exceptional" -> context.getString(com.iblu01.portallauncher.R.string.weather_condition_exceptional)
     else -> condition.replaceFirstChar { it.uppercase() }
 }

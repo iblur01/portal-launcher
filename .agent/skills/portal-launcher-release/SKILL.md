@@ -72,7 +72,7 @@ git push
 ```
 
 Create the PR with `gh pr create --base main --head {branch} --title "..." --body "..."`.
-Merge with `gh pr merge {number} --merge --delete-branch --subject "..."`.
+Merge with **squash**: `gh pr merge {number} --squash --delete-branch --subject "..."`. All commits between the last commit of `main` and the branch HEAD must be squashed into a single commit on `main`.
 
 ### Step 7 — Tag and release
 
@@ -112,6 +112,7 @@ git remote prune origin
 
 ## Notes
 
+- **Release notes are always in English** — CHANGELOG entries, PR title/body, tag messages, and GitHub release notes/summaries must be written in English, without exception.
 - The keystore is the same for all releases (no rotation).
 - The APK uses the v2 signature only (no v1 JAR signing). This is sufficient for minSdk 28.
 - The local branch is deleted by `gh pr merge --delete-branch`; you only need to prune the remote tracking ref.

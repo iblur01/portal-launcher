@@ -103,7 +103,6 @@ class SettingsActivity : ComponentActivity() {
         savedMqttSignature = mqttSignature(prefs.brokerHost, prefs.brokerPort, prefs.username, prefs.password, prefs.deviceName)
 
         val apps = resolveInstalledApps()
-        val appLabel = apps.find { it.packageName == prefs.homeAssistantPackage }?.label ?: prefs.homeAssistantPackage
 
         // Check the saved connection right away so the « Ma maison » tile shows a live status.
         if (prefs.haToken.isNotBlank()) {
@@ -118,7 +117,6 @@ class SettingsActivity : ComponentActivity() {
                     uiState = uiState,
                     callbacks = callbacks,
                     installedApps = apps,
-                    currentAppLabel = appLabel,
                     haStates = pills.latestStates,
                     autoReturnState = autoReturnState,
                     onAutoReturnCancel = autoReturnTimer::onInteraction,
@@ -294,6 +292,7 @@ class SettingsActivity : ComponentActivity() {
 
     private fun refreshPillSettingsCatalog() {
         uiState.settingsPillCatalog = HomeSettingsCatalogBuilder.build(
+            context = this,
             candidates = uiState.pillCandidates,
             rules = uiState.pillRules,
             areaIdByEntity = pills.latestAreaIdByEntity,
@@ -369,7 +368,7 @@ class SettingsActivity : ComponentActivity() {
                     uiState.mqttTestMessage = null
                 } else {
                     uiState.mqttTest = ConnStatus.ERROR
-                    uiState.mqttTestMessage = "Échec de connexion"
+                    uiState.mqttTestMessage = getString(R.string.connection_error_failed)
                 }
             }
         }.also { it.isDaemon = true }.start()
@@ -380,7 +379,7 @@ class SettingsActivity : ComponentActivity() {
         val cleanToken = token.trim()
         if (cleanToken.isEmpty()) {
             uiState.haTest = ConnStatus.ERROR
-            uiState.haTestMessage = "Colle d'abord ta clé"
+            uiState.haTestMessage = getString(R.string.connection_error_token_required)
             return
         }
         uiState.haTest = ConnStatus.TESTING
@@ -395,10 +394,10 @@ class SettingsActivity : ComponentActivity() {
                 } else {
                     uiState.haTest = ConnStatus.ERROR
                     uiState.haTestMessage = when (result.statusCode) {
-                        401 -> "Clé invalide"
-                        404 -> "Adresse incorrecte"
-                        -1 -> "Serveur introuvable"
-                        else -> "Erreur ${result.statusCode}"
+                        401 -> getString(R.string.connection_error_token_invalid)
+                        404 -> getString(R.string.connection_error_address_invalid)
+                        -1 -> getString(R.string.connection_error_server_not_found)
+                        else -> getString(R.string.connection_error_code, result.statusCode)
                     }
                 }
             }
@@ -422,5 +421,10 @@ class SettingsActivity : ComponentActivity() {
     companion object {
         /** Optional `SettingsPage` name to open directly instead of the settings root. */
         const val EXTRA_PAGE = "page"
+        const val PAGE_HOME = "HOME_SCREEN"
+        const val PAGE_APPEARANCE = "APPEARANCE"
+        const val PAGE_CONNECTED_HOME = "CONNECTED_HOME"
+        const val PAGE_DEVICE = "DEVICE"
+        const val PAGE_ABOUT = "ABOUT"
     }
 }

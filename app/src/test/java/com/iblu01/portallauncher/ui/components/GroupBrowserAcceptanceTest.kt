@@ -35,7 +35,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], qualifiers = "w800dp-h600dp")
+@Config(sdk = [28], qualifiers = "fr-w800dp-h600dp")
 class GroupBrowserAcceptanceTest {
     @get:Rule val rule = createComposeRule()
 
@@ -137,7 +137,7 @@ class GroupBrowserAcceptanceTest {
         }
 
         rule.onNodeWithTag("groupStaleState").assertIsDisplayed()
-        rule.onNodeWithContentDescription("Cached, Prêt, données figées, commandes indisponibles")
+        rule.onNodeWithContentDescription("Cached, Prêt, Données figées · commandes suspendues")
             .assertIsDisplayed()
             .assertIsNotEnabled()
         rule.onNodeWithTag("groupCollectiveAction").assertDoesNotExist()
@@ -173,7 +173,7 @@ class GroupBrowserAcceptanceTest {
         rule.waitForIdle()
         assertEquals(1, back)
 
-        rule.onNodeWithContentDescription("Close panel").performClick()
+        rule.onNodeWithContentDescription("Fermer le panneau").performClick()
         rule.waitForIdle()
         assertEquals(1, close)
     }

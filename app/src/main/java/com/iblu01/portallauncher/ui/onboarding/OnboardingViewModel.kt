@@ -78,6 +78,7 @@ class OnboardingViewModel @Inject constructor(
             mqttPassword = prefs.password,
             mqttDeviceName = prefs.deviceName,
             hiddenPackages = prefs.hiddenApps,
+            tapAppPackage = prefs.homeAssistantPackage,
         )
     }
 
@@ -528,7 +529,17 @@ class OnboardingViewModel @Inject constructor(
     fun skipHiddenApps() {
         prefs.appCleanupOnboardingSkipped = true
         _state.update { it.copy(flags = it.flags.copy(appCleanupSkipped = true)) }
-        goTo(OnboardingStep.GESTURES)
+        goTo(OnboardingStep.TAP_APP)
+    }
+
+    /**
+     * Arms (or disarms, with a blank package) the tap-on-empty-space gesture. Off is a real answer,
+     * not a postponed one: nothing happens on tap until an app is picked here or in the settings.
+     */
+    fun setTapApp(packageName: String) {
+        prefs.homeAssistantPackage = packageName
+        _state.update { it.copy(tapAppPackage = packageName) }
+        goNext()
     }
 
     fun acknowledgeGestures() {

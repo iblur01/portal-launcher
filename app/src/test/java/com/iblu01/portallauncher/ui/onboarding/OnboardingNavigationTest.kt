@@ -89,7 +89,8 @@ class OnboardingNavigationTest {
     @Test
     fun `skipping app cleanup still reaches the gestures and the summary`() {
         val flags = OnboardingFlags(appCleanupSkipped = true)
-        assertEquals(OnboardingStep.GESTURES, nextStep(OnboardingStep.MQTT_TEST, flags))
+        assertEquals(OnboardingStep.TAP_APP, nextStep(OnboardingStep.MQTT_TEST, flags))
+        assertEquals(OnboardingStep.GESTURES, nextStep(OnboardingStep.TAP_APP, flags))
         assertEquals(OnboardingStep.COMPLETE, nextStep(OnboardingStep.GESTURES, flags))
     }
 

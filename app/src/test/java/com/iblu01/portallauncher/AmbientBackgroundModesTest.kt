@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AmbientBackgroundModesTest {
-    @Test fun only_android_neutral_and_immich_are_offered() {
-        assertEquals(listOf("system", "neutral", "immich"), backgroundModes.map { it.first })
+    @Test fun all_supported_wallpaper_sources_are_offered() {
+        assertEquals(listOf("system", "neutral", "custom", "immich"), backgroundModes.map { it.first })
     }
 }

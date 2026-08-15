@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher.ui.settings
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import com.iblu01.portallauncher.HomePillPreferencesCodec
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.PillCandidate
@@ -12,8 +14,12 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.json.JSONObject
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class HomeSettingsReducerTest {
+    private val context: Context = ApplicationProvider.getApplicationContext()
     private val deviceA = PillRef.Device("light.a")
     private val deviceB = PillRef.Device("light.b")
 
@@ -164,6 +170,7 @@ class HomeSettingsReducerTest {
         }
         val rules = candidates.map { PillRule(it.primary.entityId, it.kind, it.label) }
         val catalog = HomeSettingsCatalogBuilder.build(
+            context = context,
             candidates = candidates,
             rules = rules,
             areaIdByEntity = candidates.associate { it.primary.entityId to "area-stable-42" },
@@ -183,6 +190,7 @@ class HomeSettingsReducerTest {
             PillCandidate(disabled, PillKind.LIGHTS, "Disabled", emptyList()),
         )
         val catalog = HomeSettingsCatalogBuilder.build(
+            context,
             candidates,
             rules = listOf(PillRule(unavailable.entityId, PillKind.LIGHTS, "Offline")),
         )
@@ -196,6 +204,7 @@ class HomeSettingsReducerTest {
         val candidate = PillCandidate(entity, PillKind.LIGHTS, "Cached", emptyList())
         val ref = PillRef.Device(entity.entityId)
         val catalog = HomeSettingsCatalogBuilder.build(
+            context = context,
             candidates = listOf(candidate),
             rules = listOf(PillRule(entity.entityId, PillKind.LIGHTS, "Cached")),
             connected = false,

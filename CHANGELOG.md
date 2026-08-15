@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.0.1
+
+### Added
+
+- **In-app updates**: Portal checks GitHub for a newer release and installs it without leaving the launcher. A full-screen card shows the version number and the release notes, with three choices — *Update now*, *Remind me later* (24 h snooze) or *Skip this version*. The APK is downloaded to the app cache and handed to the system installer through a `FileProvider`.
+- **Panel-friendly update polling**: the check runs at most once a day, only while Portal is in the foreground, and the prompt is held back whenever a panel, a menu, a folder, an overlay or the widget picker is open — so it never interrupts what you are doing.
+- **Markdown rendering for release notes**: headings, bullet and numbered lists, bold, italic, inline code and clickable links.
+- **New onboarding step "A tap in the void"**: a searchable app list picks what a tap on the empty home screen opens, with an explicit "No app" choice. The same "No app" option is available later from the settings app picker.
+- **Light pills show the bulb's real colour**: single-entity `light.*` pills read `rgb_color`, falling back to `color_temp_kelvin`, and tint their icon circle with the light's live colour. The glyph flips between dark and light for contrast; lights that are off keep the neutral accent.
+- **Breadcrumbs in settings sub-pages**, tappable to walk back up the tree.
+
+### Changed
+
+- **Settings reorganised into five categories with sub-pages**: *Home screen* (Displayed content, Apps & interaction), *Appearance* (Wallpaper, Clock), *Connected home* (Home Assistant & MQTT, App sessions), *Device* (Display, navigation & language) and *About*. Deep links emitted by older builds still resolve to the right page.
+- **The whole runtime UI is localized**: around 170 hard-coded French strings moved to resources — pill kinds and families, entity and alarm states, weather conditions, washer phases, group actions, context menus, connection errors and accessibility labels. An English build no longer falls back to French. Counts such as "2 active out of 5" now use real plurals per locale.
+- **Tap on empty home space is opt-in**: a fresh install no longer assumes the Home Assistant app is present. Until an app is picked, the tap does nothing.
+- **Wide media player reworked**: the floating corner close button is replaced by a real panel header matching the vertical layout, the artwork takes the remaining height, and the source name reads top-left instead of stacked above the track title.
+- **Vertical sliders feel immediate**: brightness and colour-temperature sliders handle tap and drag in a single gesture loop, so a tap commits at once and a tap-then-drag stays one continuous move.
+- **Apple TV icon fixed**: the bundled vector is used instead of the icon-pack glyph, and its viewport was corrected to a 2:1 ratio so the logo is no longer squashed.
+- Developer options (keep screen on, permissions, reboot) moved into the *About* page.
+- The washer glyph now recognises the English phase names as well as the French ones.
+
+### Removed
+
+- The standalone *Developer* settings tile, folded into *About*.
+- The implicit Home Assistant fallback for the empty-space tap gesture.
+
+### Performance
+
+- Update checks are rate-limited to one network call per 24 h and suspended while the launcher is not in the foreground, so a panel left running for weeks does not poll GitHub continuously.
+- Pill colours animate through a shared spring instead of allocating new colour objects on every state push.
+- Sliders consume pointer events in one gesture loop, removing the duplicated pointer-input handlers that both ran on every touch.
+
 ## 1.0
 
 First stable release. Leaving beta after `0.0.7-beta`.

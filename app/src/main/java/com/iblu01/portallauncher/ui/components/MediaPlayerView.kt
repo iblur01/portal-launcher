@@ -84,6 +84,9 @@ import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import kotlinx.coroutines.launch
 
+/** Height the wide layout keeps for [PanelHeader] (52.dp row + its vertical padding). */
+private val HeaderReservedHeight = 64.dp
+
 internal data class MediaDisclosure(
     val showAlbum: Boolean,
     val secondaryPlayerCount: Int,
@@ -305,85 +308,81 @@ fun MediaPlayerView(
         )
 
         if (wide) {
-            Box(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize()) {
                 val shortEdge = minOf(availableWidth, availableHeight)
                 val outerInset = (shortEdge * 0.035f).coerceIn(10.dp, 24.dp)
-                val contentGap = if (mediaDisclosure.emphasizePrimary) 26.dp else (shortEdge * 0.045f).coerceIn(14.dp, 30.dp)
+                // The header now sits above the content, so the artwork gets the height it leaves.
                 val artworkSize = minOf(
-                    availableHeight - if (mediaDisclosure.emphasizePrimary) 38.dp else outerInset * 2,
+                    availableHeight - HeaderReservedHeight -
+                        if (mediaDisclosure.emphasizePrimary) 38.dp else outerInset * 2,
                     availableWidth * if (mediaDisclosure.emphasizePrimary) 0.37f else 0.36f,
                 )
                 val artworkCorner = (artworkSize * 0.085f).coerceIn(14.dp, 28.dp)
                 val sectionGap = (shortEdge * 0.025f).coerceIn(8.dp, 16.dp)
-                val sourceFontSize = if (mediaDisclosure.emphasizePrimary) 21.sp else (shortEdge.value * 0.042f).coerceIn(17f, 23f).sp
                 val titleFontSize = if (mediaDisclosure.emphasizePrimary) 28.sp else (shortEdge.value * 0.052f).coerceIn(20f, 29f).sp
                 val artistFontSize = if (mediaDisclosure.emphasizePrimary) 18.sp else (shortEdge.value * 0.036f).coerceIn(14f, 19f).sp
+
+                // Same header as the vertical layout: the source name reads top-left, not stacked
+                // above the track title.
+                PanelHeader(
+                    title = sourceName,
+                    titleIcon = Icons.Outlined.MusicNote,
+                    titleEntityId = media.entityId,
+                    accent = if (isPlaying) AppleColors.active else AppleColors.warning,
+                    onTitleClick = if (media.groupablePlayers.size > 1) ({ groupDialogVisible = true }) else null,
+                    onClose = onDismiss,
+                    modifier = Modifier.padding(horizontal = outerInset, vertical = 6.dp),
+                )
+
                 Row(
-                    modifier = Modifier.fillMaxSize().then(
+                    modifier = Modifier.fillMaxWidth().weight(1f).then(
                         if (mediaDisclosure.emphasizePrimary) {
                             Modifier.padding(start = 24.dp, top = 14.dp, end = 14.dp, bottom = 14.dp)
                         } else Modifier.padding(outerInset)
                     ),
-                    horizontalArrangement = Arrangement.spacedBy(contentGap),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(artworkSize)
-                            .clip(RoundedCornerShape(artworkCorner))
-                            .background(Color.White.copy(alpha = 0.07f))
-                            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(artworkCorner)),
+                            .weight(1f)
+                            .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (imageRequest != null) {
-                            AsyncImage(
-                                model = imageRequest,
-            contentDescription = stringResource(R.string.media_cover_desc_format, media.title),
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                        } else if (!media.hasMedia) {
-                                            HaEntityIcon(
-                                                entityId = media.entityId,
-                                                contentDescription = stringResource(R.string.media_player_icon_desc_format, sourceName),
-                                                tint = AppleColors.secondary,
-                                                size = 64.dp,
-                                                fallback = Icons.Outlined.MusicNote,
-                                            )
-                                        } else {
-                                            Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(64.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(artworkSize)
+                                .clip(RoundedCornerShape(artworkCorner))
+                                .background(Color.White.copy(alpha = 0.07f))
+                                .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(artworkCorner)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (imageRequest != null) {
+                                AsyncImage(
+                                    model = imageRequest,
+                                    contentDescription = stringResource(R.string.media_cover_desc_format, media.title),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else if (!media.hasMedia) {
+                                HaEntityIcon(
+                                    entityId = media.entityId,
+                                    contentDescription = stringResource(R.string.media_player_icon_desc_format, sourceName),
+                                    tint = AppleColors.secondary,
+                                    size = 64.dp,
+                                    fallback = Icons.Outlined.MusicNote,
+                                )
+                            } else {
+                                Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(64.dp))
+                            }
+                            CoverSourceBadge(media.source, media.entityId, artworkCorner)
                         }
-                        CoverSourceBadge(media.source, media.entityId, artworkCorner)
                     }
 
                     Column(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(sectionGap),
+                        verticalArrangement = Arrangement.spacedBy(sectionGap, Alignment.CenterVertically),
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .then(if (media.groupablePlayers.size > 1) Modifier.clickable { groupDialogVisible = true } else Modifier)
-                                .padding(horizontal = 8.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        ) {
-                            Box(Modifier.size(7.dp).background(if (isPlaying) AppleColors.active else AppleColors.warning, CircleShape))
-                            if (!mediaDisclosure.emphasizePrimary) {
-                                HaEntityIcon(
-                                    entityId = media.entityId,
-                                    contentDescription = null,
-                                    tint = if (isPlaying) AppleColors.active else AppleColors.warning,
-                                    size = 23.dp,
-                                    fallback = Icons.Outlined.MusicNote,
-                                )
-                            }
-                            Text(
-                                sourceName,
-                                style = AppleTypography.titleLarge.copy(fontSize = sourceFontSize, fontWeight = FontWeight.SemiBold),
-                                color = AppleColors.primary,
-                            )
-                        }
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -425,21 +424,6 @@ fun MediaPlayerView(
                             Icon(if (media.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp, stringResource(R.string.media_volume_desc), tint = AppleColors.secondary, modifier = Modifier.size(if (mediaDisclosure.emphasizePrimary) 22.dp else 18.dp))
                             Text(if (media.players.size > 1) stringResource(R.string.media_volume_multi_format, media.players.size) else stringResource(R.string.media_volume_single_format, media.volumePercent), style = AppleTypography.bodySmall.copy(fontSize = if (mediaDisclosure.emphasizePrimary) 15.sp else 12.sp), color = AppleColors.primary)
                         }
-                    }
-                }
-                if (onDismiss != null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(10.dp)
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(AppleColors.frostedFill)
-                            .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
-                            .clickable { onDismiss() },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.media_close_player_desc), tint = AppleColors.primary, modifier = Modifier.size(24.dp))
                     }
                 }
             }

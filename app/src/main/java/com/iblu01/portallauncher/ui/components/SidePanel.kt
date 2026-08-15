@@ -256,7 +256,7 @@ private fun ChipActionsContent(
                 // from a group can still reach this nested renderer, so retain a meaningful status
                 // row instead of presenting a completely empty panel.
                 PanelKind.MEDIA -> chip.details
-                    .ifEmpty { listOf(PillDetail("État", chip.value, chip.entityId)) }
+                    .ifEmpty { listOf(PillDetail(stringResource(R.string.panel_state), chip.value, chip.entityId)) }
                     .forEach { PanelDetailRow(it) }
                 PanelKind.WEATHER, PanelKind.GENERIC_DETAILS ->
                     PanelDetails(chip.details)

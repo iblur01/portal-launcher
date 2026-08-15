@@ -8,6 +8,7 @@ import com.iblu01.portallauncher.PillRule
 import com.iblu01.portallauncher.PillSupport
 import com.iblu01.portallauncher.domain.model.PillDetail
 import com.iblu01.portallauncher.friendlyEntityState
+import com.iblu01.portallauncher.localizedLabel
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.Locale
@@ -105,7 +106,7 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
             val ref = PillRef.KindGroup(kind)
             groups[ref] = buildGroup(
                 ref = ref,
-                label = kind.label,
+                label = kind.localizedLabel(priorityEngine.context),
                 icon = kind.icon,
                 members = members,
                 resolvedDevices = resolvedDevices,
@@ -206,9 +207,9 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
                 .thenBy { it.chip.priority },
         )
         val value = when {
-            resolved.isEmpty() -> "Indisponible"
-            active > 0 -> "$active actif${if (active > 1) "s" else ""} sur ${resolved.size}"
-            else -> "${resolved.size} disponible${if (resolved.size > 1) "s" else ""}"
+            resolved.isEmpty() -> priorityEngine.context.getString(com.iblu01.portallauncher.R.string.entity_state_unavailable)
+            active > 0 -> priorityEngine.context.resources.getQuantityString(com.iblu01.portallauncher.R.plurals.pill_group_active_count, active, active, resolved.size)
+            else -> priorityEngine.context.resources.getQuantityString(com.iblu01.portallauncher.R.plurals.pill_group_available_count, resolved.size, resolved.size)
         }
         val chip = LauncherChip(
             id = ref.stableKey,
@@ -286,11 +287,11 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
             id = entity.entityId,
             icon = rule.kind.icon,
             label = rule.label,
-            value = friendlyEntityState(entity),
+            value = friendlyEntityState(priorityEngine.context, entity),
             state = if (active) "active" else "ok",
             entityId = entity.entityId,
             priority = rule.kind.basePriority + rule.priorityBoost,
-            details = related.map { PillDetail(it.name, friendlyEntityState(it), it.entityId) },
+            details = related.map { PillDetail(it.name, friendlyEntityState(priorityEngine.context, it), it.entityId) },
             kind = rule.kind,
             deviceState = state,
         )

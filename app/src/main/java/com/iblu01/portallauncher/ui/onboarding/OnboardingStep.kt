@@ -20,6 +20,7 @@ enum class OnboardingStep {
     MQTT_CONFIGURATION,
     MQTT_TEST,
     HIDDEN_APPS,
+    TAP_APP,
     GESTURES,
     COMPLETE;
 
@@ -28,7 +29,7 @@ enum class OnboardingStep {
             WELCOME, SYSTEM_SETUP, GRID, BACKGROUND -> OnboardingChapter.LAUNCHER
             HOME_ASSISTANT_INTRO, HOME_ASSISTANT_CREDENTIALS, HOME_ASSISTANT_TEST,
             PILLS_INTRO, REMOTE_CONTROL, MQTT_CONFIGURATION, MQTT_TEST -> OnboardingChapter.HOME
-            HIDDEN_APPS, GESTURES, COMPLETE -> OnboardingChapter.FINISH
+            HIDDEN_APPS, TAP_APP, GESTURES, COMPLETE -> OnboardingChapter.FINISH
         }
 
     companion object {

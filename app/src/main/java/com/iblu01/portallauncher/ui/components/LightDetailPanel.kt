@@ -241,7 +241,7 @@ private fun DetailHeader(label: String, onBack: () -> Unit, closePanel: Boolean 
         title = label,
         onNavigation = if (closePanel) null else onBack,
         navigationIcon = if (closePanel) null else Icons.AutoMirrored.Filled.ArrowBack,
-        navigationContentDescription = if (closePanel) null else "Retour aux lumières",
+        navigationContentDescription = if (closePanel) null else stringResource(R.string.lights_back),
         onClose = if (closePanel) onBack else null,
     )
 }
@@ -670,8 +670,9 @@ private fun ColorWheel(
     onTouchState: (Boolean) -> Unit, onChange: (Float, Float) -> Unit, onCommit: () -> Unit,
 ) {
     val hueStops = remember { (0..12).map { hsvToColor(it * 30f, 1f) } }
+    val wheelDescription = stringResource(R.string.lights_color_wheel_desc, hue.roundToInt())
     Canvas(
-        modifier.size(diameter).semantics { contentDescription = "Roue chromatique, teinte ${hue.roundToInt()} degrés" }
+        modifier.size(diameter).semantics { contentDescription = wheelDescription }
             .pointerInput(Unit) {
                 fun update(point: Offset) {
                     val center = Offset(size.width / 2f, size.height / 2f)
@@ -759,13 +760,11 @@ private fun colorToHsv(color: Color): Triple<Float, Float, Float> {
     return Triple((hue + 360f) % 360f, if (maxValue == 0f) 0f else delta / maxValue, maxValue)
 }
 
-private const val NO_ROOM = "Sans pièce"
-
-/** Group the chip's lights by HA area, ordered by name with "Sans pièce" last. */
-private fun lightRooms(chip: LauncherChip, areaOf: (String) -> String?): List<Pair<String, List<PillDetail>>> =
-    chip.details.groupBy { areaOf(it.entityId) ?: NO_ROOM }
+/** Group the chip's lights by HA area, ordered by name with the unassigned room last. */
+private fun lightRooms(chip: LauncherChip, noRoom: String, areaOf: (String) -> String?): List<Pair<String, List<PillDetail>>> =
+    chip.details.groupBy { areaOf(it.entityId) ?: noRoom }
         .toList()
-        .sortedWith(compareBy({ it.first == NO_ROOM }, { it.first }))
+        .sortedWith(compareBy({ it.first == noRoom }, { it.first }))
 
 /** Existing light list API consumed by SidePanel. */
 @Composable
@@ -775,11 +774,11 @@ fun LightsActions(chip: LauncherChip, onOpenLight: (PillDetail) -> Unit) {
     // not duplicate themselves in `details`, so materialise their own actionable row here.
     val lights = chip.details.ifEmpty { listOfNotNull(chip.individualLightDetailOrNull()) }
     val actionableChip = chip.copy(details = lights)
-    val rooms = lightRooms(actionableChip) { areas[it] }
+    val rooms = lightRooms(actionableChip, stringResource(R.string.lights_no_room)) { areas[it] }
     // Fewer than two rooms (or registries not loaded yet): keep the plain flat list.
     if (rooms.size <= 1) {
         LightRows(lights, onOpenLight)
-        AllOffRow(lights, "Tout éteindre")
+        AllOffRow(lights, stringResource(R.string.lights_all_off))
         return
     }
 
@@ -787,12 +786,12 @@ fun LightsActions(chip: LauncherChip, onOpenLight: (PillDetail) -> Unit) {
     val current = selectedRoom?.let { name -> rooms.firstOrNull { it.first == name } }
     if (current == null) {
         RoomGrid(rooms, onSelect = { selectedRoom = it })
-        AllOffRow(lights, "Tout éteindre")
+        AllOffRow(lights, stringResource(R.string.lights_all_off))
     } else {
         DetailHeader(current.first, onBack = { selectedRoom = null })
         Spacer(Modifier.height(12.dp))
         LightRows(current.second, onOpenLight)
-        AllOffRow(current.second, "Éteindre la pièce")
+        AllOffRow(current.second, stringResource(R.string.lights_room_off))
     }
 }
 
@@ -845,7 +844,8 @@ private fun RoomCard(name: String, details: List<PillDetail>, modifier: Modifier
             Text(name, style = AppleTypography.bodyLarge, color = AppleColors.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text(
-            if (onCount > 0) "$onCount / ${details.size} allumée${if (onCount > 1) "s" else ""}" else "${details.size} lumière${if (details.size > 1) "s" else ""}",
+            if (onCount > 0) androidx.compose.ui.res.pluralStringResource(R.plurals.lights_room_on_count, onCount, onCount, details.size)
+            else androidx.compose.ui.res.pluralStringResource(R.plurals.lights_room_count, details.size, details.size),
             style = AppleTypography.bodySmall, color = AppleColors.secondary,
         )
     }
@@ -886,7 +886,7 @@ private fun LightRow(detail: PillDetail, onOpen: () -> Unit) {
     ) {
         Column(Modifier.weight(1f)) {
             Text(detail.label, style = AppleTypography.bodyLarge, color = AppleColors.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (checked) "Allumée" else "Éteinte", style = AppleTypography.bodySmall, color = AppleColors.secondary)
+            Text(if (checked) stringResource(R.string.light_state_on) else stringResource(R.string.light_state_off), style = AppleTypography.bodySmall, color = AppleColors.secondary)
         }
         if (detail.entityId.isNotBlank()) {
             IosSwitch(

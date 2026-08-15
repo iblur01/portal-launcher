@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
@@ -95,6 +94,7 @@ import com.iblu01.portallauncher.ui.components.PillButton
 import com.iblu01.portallauncher.ui.components.SettingsDivider
 import com.iblu01.portallauncher.NotificationDots
 import com.iblu01.portallauncher.SettingsChangeBus
+import com.iblu01.portallauncher.SettingsActivity
 import com.iblu01.portallauncher.ui.apps.IconPackInfo
 import com.iblu01.portallauncher.ui.apps.installedIconPacks
 import com.iblu01.portallauncher.ui.components.SettingsRow
@@ -175,7 +175,15 @@ interface SettingsCallbacks {
     fun onImportLayout()
 }
 
-private enum class SettingsPage { MAIN, HOME, PILLS, WALLPAPER, APPLICATION, DEVELOPER, INFORMATION }
+private enum class SettingsPage {
+    MAIN,
+    HOME, HOME_CONTENT, HOME_APPS,
+    APPEARANCE, APPEARANCE_WALLPAPER, APPEARANCE_CLOCK,
+    CONNECTED_HOME, CONNECTED_HOME_CONNECTION, CONNECTED_HOME_SESSIONS,
+    DEVICE, DEVICE_GENERAL,
+    ABOUT,
+}
+private enum class AppPageMode { HOME, APPEARANCE, CONNECTED_HOME, DEVICE }
 private enum class UpdateState { IDLE, CHECKING, UP_TO_DATE, DOWNLOADING, ERROR }
 
 /** Best-effort host extraction used to pre-fill the MQTT broker from the HA address. */
@@ -190,13 +198,23 @@ private data class TileDef(
     val subtitle: String,
 )
 
+/** Keeps links emitted by older launcher versions working after the settings reorganisation. */
+private fun settingsPageFromRoute(route: String?): SettingsPage = when (route) {
+    "HOME", SettingsActivity.PAGE_CONNECTED_HOME -> SettingsPage.CONNECTED_HOME
+    SettingsActivity.PAGE_HOME -> SettingsPage.HOME
+    "PILLS" -> SettingsPage.HOME
+    "WALLPAPER", SettingsActivity.PAGE_APPEARANCE -> SettingsPage.APPEARANCE
+    "APPLICATION", SettingsActivity.PAGE_DEVICE -> SettingsPage.DEVICE
+    "DEVELOPER", "INFORMATION", SettingsActivity.PAGE_ABOUT -> SettingsPage.ABOUT
+    else -> SettingsPage.MAIN
+}
+
 @Composable
 fun SettingsScreen(
     prefs: Prefs,
     uiState: SettingsUiState,
     callbacks: SettingsCallbacks,
     installedApps: List<AppEntry> = emptyList(),
-    currentAppLabel: String = "",
     haStates: Map<String, HaEntity> = emptyMap(),
     autoReturnState: AutoReturnUiState = AutoReturnUiState(),
     onAutoReturnCancel: (() -> Unit)? = null,
@@ -207,7 +225,7 @@ fun SettingsScreen(
     // may deep-link to one page by name (see SettingsActivity.EXTRA_PAGE); an unknown name falls
     // back to the root rather than failing.
     var currentPage by remember {
-        mutableStateOf(SettingsPage.values().firstOrNull { it.name == initialPage } ?: SettingsPage.MAIN)
+        mutableStateOf(settingsPageFromRoute(initialPage))
     }
 
     var haPackage by remember { mutableStateOf(prefs.homeAssistantPackage) }
@@ -293,7 +311,9 @@ fun SettingsScreen(
             apps = installedApps,
             selectedPackage = haPackage,
             onDismiss = { showAppPicker = false },
-            onAppSelected = { app -> haPackage = app.packageName; showAppPicker = false }
+            onAppSelected = { app -> haPackage = app.packageName; showAppPicker = false },
+            noneLabel = stringResource(R.string.settings_app_tap_home_none),
+            onNoneSelected = { haPackage = ""; showAppPicker = false },
         )
     }
     if (showSessionAppPicker) {
@@ -325,37 +345,13 @@ fun SettingsScreen(
         )
     }
 
-    // Shared between the narrow (single sub-page, back button) and expanded (sidebar +
-    // detail pane, no back button) layouts below.
-    val detailContent: @Composable (SettingsPage, Boolean) -> Unit = { page, showBack ->
-        when (page) {
-            SettingsPage.MAIN -> MainPage(
-                homeSubtitle = homeSubtitle,
-                onNavigate = { currentPage = it },
-            )
-            SettingsPage.HOME -> HomeConnectionPage(
-                uiState = uiState,
-                haUrl = haUrl, haToken = haToken,
-                mqttHost = host, mqttPort = port,
-                mqttUsername = username, mqttPassword = password,
-                deviceName = deviceName,
-                onUrlChange = onUrlChange,
-                onTokenChange = onTokenChange,
-                onSelectInstance = onSelectInstance,
-                onMqttHostChange = { host = it; brokerAuto = false },
-                onMqttPortChange = { port = it },
-                onMqttUsernameChange = { username = it },
-                onMqttPasswordChange = { password = it },
-                onDeviceNameChange = { deviceName = it },
-                onTestHa = { callbacks.onTestHaApi(haUrl, haToken) },
-                onTestMqtt = { callbacks.onTestMqtt(host, port.toIntOrNull() ?: 1883, username, password) },
-                onBack = { save(); currentPage = SettingsPage.MAIN },
-                showBack = showBack,
-            )
-            SettingsPage.APPLICATION -> AppPage(
+    val appPageContent: @Composable (AppPageMode, Int, () -> Unit, Boolean) -> Unit =
+        { mode, titleRes, onBack, showBack ->
+            AppPage(
+                mode = mode,
+                titleRes = titleRes,
                 prefs = prefs,
                 haPackage = haPackage,
-                currentAppLabel = currentAppLabel,
                 onShowAppPicker = { showAppPicker = true },
                 bgMode = bgMode,
                 onBgModeChange = { bgMode = it; callbacks.onSetBackgroundMode(it) },
@@ -392,38 +388,88 @@ fun SettingsScreen(
                 onGridScaleChange = { gridScale = it; prefs.gridScale = it },
                 onExportLayout = callbacks::onExportLayout,
                 onImportLayout = callbacks::onImportLayout,
-                onBack = { currentPage = SettingsPage.MAIN },
+                onBack = onBack,
                 showBack = showBack,
             )
-            SettingsPage.WALLPAPER -> WallpaperPage(
-                prefs = prefs,
-                bgMode = bgMode,
+        }
+
+    // Shared between the narrow (single sub-page, back button) and expanded (sidebar +
+    // detail pane, no back button) layouts below.
+    val detailContent: @Composable (SettingsPage, Boolean) -> Unit = { page, showBack ->
+        when (page) {
+            SettingsPage.MAIN -> MainPage(
+                homeSubtitle = homeSubtitle,
+                onNavigate = { currentPage = it },
+            )
+            SettingsPage.HOME -> CategoryPage(
+                title = stringResource(R.string.settings_tile_pills_title),
+                entries = listOf(
+                    CategoryEntry(stringResource(R.string.settings_home_content_title), stringResource(R.string.settings_home_content_subtitle), Icons.Outlined.Dashboard, SettingsPage.HOME_CONTENT),
+                    CategoryEntry(stringResource(R.string.settings_home_apps_title), stringResource(R.string.settings_home_apps_subtitle), Icons.Outlined.Settings, SettingsPage.HOME_APPS),
+                ),
+                onNavigate = { currentPage = it }, onBack = { currentPage = SettingsPage.MAIN }, showBack = showBack,
+            )
+            SettingsPage.HOME_CONTENT -> PillsSettingsPage(
+                uiState = uiState, homePreferences = uiState.homePillPreferences,
+                settingsCatalog = uiState.settingsPillCatalog, onRefresh = callbacks::onLoadPillEntities,
+                onSetEnabled = callbacks::onSetPillEnabled, onHomeAction = callbacks::onHomeSettingsAction,
+                onBack = { currentPage = SettingsPage.HOME }, showBack = showBack,
+            )
+            SettingsPage.HOME_APPS -> appPageContent(AppPageMode.HOME, R.string.settings_home_apps_title, { currentPage = SettingsPage.HOME }, showBack)
+            SettingsPage.APPEARANCE -> CategoryPage(
+                title = stringResource(R.string.settings_tile_wallpaper_title),
+                entries = listOf(
+                    CategoryEntry(stringResource(R.string.settings_appearance_wallpaper_title), stringResource(R.string.settings_appearance_wallpaper_subtitle), Icons.Outlined.Wallpaper, SettingsPage.APPEARANCE_WALLPAPER),
+                    CategoryEntry(stringResource(R.string.settings_appearance_clock_title), stringResource(R.string.settings_appearance_clock_subtitle), Icons.Outlined.Settings, SettingsPage.APPEARANCE_CLOCK),
+                ),
+                onNavigate = { currentPage = it }, onBack = { currentPage = SettingsPage.MAIN }, showBack = showBack,
+            )
+            SettingsPage.APPEARANCE_WALLPAPER -> WallpaperPage(
+                prefs = prefs, bgMode = bgMode,
                 onBgModeChange = { bgMode = it; callbacks.onSetBackgroundMode(it) },
-                bgOverlayOpacity = bgOverlayOpacity,
-                onOpenOpacityPreview = callbacks::onOpenOpacityPreview,
+                bgOverlayOpacity = bgOverlayOpacity, onOpenOpacityPreview = callbacks::onOpenOpacityPreview,
                 onOpenSystemWallpaperPicker = callbacks::onOpenSystemWallpaperPicker,
-                onBack = { currentPage = SettingsPage.MAIN },
-                showBack = showBack,
+                onBack = { currentPage = SettingsPage.APPEARANCE }, showBack = showBack,
             )
-            SettingsPage.PILLS -> PillsSettingsPage(
+            SettingsPage.APPEARANCE_CLOCK -> appPageContent(AppPageMode.APPEARANCE, R.string.settings_appearance_clock_title, { currentPage = SettingsPage.APPEARANCE }, showBack)
+            SettingsPage.CONNECTED_HOME -> CategoryPage(
+                title = stringResource(R.string.settings_tile_home_title),
+                entries = listOf(
+                    CategoryEntry(stringResource(R.string.settings_connected_connection_title), homeSubtitle, Icons.Outlined.Home, SettingsPage.CONNECTED_HOME_CONNECTION),
+                    CategoryEntry(stringResource(R.string.settings_connected_sessions_title), stringResource(R.string.settings_connected_sessions_subtitle), Icons.Outlined.Settings, SettingsPage.CONNECTED_HOME_SESSIONS),
+                ),
+                onNavigate = { currentPage = it }, onBack = { currentPage = SettingsPage.MAIN }, showBack = showBack,
+            )
+            SettingsPage.CONNECTED_HOME_CONNECTION -> HomeConnectionPage(
                 uiState = uiState,
-                homePreferences = uiState.homePillPreferences,
-                settingsCatalog = uiState.settingsPillCatalog,
-                onRefresh = callbacks::onLoadPillEntities,
-                onSetEnabled = callbacks::onSetPillEnabled,
-                onHomeAction = callbacks::onHomeSettingsAction,
-                onBack = { currentPage = SettingsPage.MAIN },
+                haUrl = haUrl, haToken = haToken,
+                mqttHost = host, mqttPort = port,
+                mqttUsername = username, mqttPassword = password,
+                deviceName = deviceName,
+                onUrlChange = onUrlChange,
+                onTokenChange = onTokenChange,
+                onSelectInstance = onSelectInstance,
+                onMqttHostChange = { host = it; brokerAuto = false },
+                onMqttPortChange = { port = it },
+                onMqttUsernameChange = { username = it },
+                onMqttPasswordChange = { password = it },
+                onDeviceNameChange = { deviceName = it },
+                onTestHa = { callbacks.onTestHaApi(haUrl, haToken) },
+                onTestMqtt = { callbacks.onTestMqtt(host, port.toIntOrNull() ?: 1883, username, password) },
+                onBack = { save(); currentPage = SettingsPage.CONNECTED_HOME },
                 showBack = showBack,
             )
-            SettingsPage.DEVELOPER -> DeveloperPage(
-                prefs = prefs,
+            SettingsPage.CONNECTED_HOME_SESSIONS -> appPageContent(AppPageMode.CONNECTED_HOME, R.string.settings_connected_sessions_title, { currentPage = SettingsPage.CONNECTED_HOME }, showBack)
+            SettingsPage.DEVICE -> CategoryPage(
+                title = stringResource(R.string.settings_tile_app_title),
+                entries = listOf(CategoryEntry(stringResource(R.string.settings_device_general_title), stringResource(R.string.settings_device_general_subtitle), Icons.Outlined.Settings, SettingsPage.DEVICE_GENERAL)),
+                onNavigate = { currentPage = it }, onBack = { currentPage = SettingsPage.MAIN }, showBack = showBack,
+            )
+            SettingsPage.DEVICE_GENERAL -> appPageContent(AppPageMode.DEVICE, R.string.settings_device_general_title, { currentPage = SettingsPage.DEVICE }, showBack)
+            SettingsPage.ABOUT -> InformationPage(
                 devKeep = devKeep,
                 onDevKeepChange = { devKeep = it; callbacks.onToggleDevKeepScreenOn(it) },
                 onGrantPermissions = { callbacks.onGrantPermissions() },
-                onBack = { currentPage = SettingsPage.MAIN },
-                showBack = showBack,
-            )
-            SettingsPage.INFORMATION -> InformationPage(
                 onBack = { currentPage = SettingsPage.MAIN },
                 showBack = showBack,
             )
@@ -442,12 +488,11 @@ fun SettingsScreen(
 
                 if (isExpanded) {
                     val sidebarItems = listOf(
-                        Triple(SettingsPage.HOME, Icons.Outlined.Home, stringResource(R.string.settings_tile_home_title)),
-                        Triple(SettingsPage.PILLS, Icons.Outlined.Dashboard, stringResource(R.string.settings_tile_pills_title)),
-                        Triple(SettingsPage.WALLPAPER, Icons.Outlined.Wallpaper, stringResource(R.string.settings_tile_wallpaper_title)),
-                        Triple(SettingsPage.APPLICATION, Icons.Outlined.Settings, stringResource(R.string.settings_tile_app_title)),
-                        Triple(SettingsPage.DEVELOPER, Icons.Outlined.Build, stringResource(R.string.settings_tile_dev_title)),
-                        Triple(SettingsPage.INFORMATION, Icons.Outlined.Info, stringResource(R.string.settings_tile_info_title)),
+                        Triple(SettingsPage.HOME, Icons.Outlined.Dashboard, stringResource(R.string.settings_tile_pills_title)),
+                        Triple(SettingsPage.APPEARANCE, Icons.Outlined.Wallpaper, stringResource(R.string.settings_tile_wallpaper_title)),
+                        Triple(SettingsPage.CONNECTED_HOME, Icons.Outlined.Home, stringResource(R.string.settings_tile_home_title)),
+                        Triple(SettingsPage.DEVICE, Icons.Outlined.Settings, stringResource(R.string.settings_tile_app_title)),
+                        Triple(SettingsPage.ABOUT, Icons.Outlined.Info, stringResource(R.string.settings_tile_info_title)),
                     )
                     // The MAIN tile grid only exists for the narrow layout; land on "Ma maison" instead.
                     val selectedPage = if (currentPage == SettingsPage.MAIN) SettingsPage.HOME else currentPage
@@ -496,12 +541,11 @@ fun SettingsScreen(
 @Composable
 private fun MainPage(homeSubtitle: String, onNavigate: (SettingsPage) -> Unit) {
     val tiles = listOf(
-        TileDef(SettingsPage.HOME, Icons.Outlined.Home, stringResource(R.string.settings_tile_home_title), homeSubtitle),
-        TileDef(SettingsPage.PILLS, Icons.Outlined.Dashboard, stringResource(R.string.settings_tile_pills_title), stringResource(R.string.settings_tile_pills_subtitle)),
-        TileDef(SettingsPage.WALLPAPER, Icons.Outlined.Wallpaper, stringResource(R.string.settings_tile_wallpaper_title), stringResource(R.string.settings_tile_wallpaper_subtitle)),
-        TileDef(SettingsPage.APPLICATION, Icons.Outlined.Settings, stringResource(R.string.settings_tile_app_title), stringResource(R.string.settings_tile_app_subtitle)),
-        TileDef(SettingsPage.DEVELOPER, Icons.Outlined.Build, stringResource(R.string.settings_tile_dev_title), stringResource(R.string.settings_tile_dev_subtitle)),
-        TileDef(SettingsPage.INFORMATION, Icons.Outlined.Info, stringResource(R.string.settings_tile_info_title), stringResource(R.string.settings_tile_info_subtitle)),
+        TileDef(SettingsPage.CONNECTED_HOME, Icons.Outlined.Home, stringResource(R.string.settings_tile_home_title), homeSubtitle),
+        TileDef(SettingsPage.HOME, Icons.Outlined.Dashboard, stringResource(R.string.settings_tile_pills_title), stringResource(R.string.settings_tile_pills_subtitle)),
+        TileDef(SettingsPage.APPEARANCE, Icons.Outlined.Wallpaper, stringResource(R.string.settings_tile_wallpaper_title), stringResource(R.string.settings_tile_wallpaper_subtitle)),
+        TileDef(SettingsPage.DEVICE, Icons.Outlined.Settings, stringResource(R.string.settings_tile_app_title), stringResource(R.string.settings_tile_app_subtitle)),
+        TileDef(SettingsPage.ABOUT, Icons.Outlined.Info, stringResource(R.string.settings_tile_info_title), stringResource(R.string.settings_tile_info_subtitle)),
     )
 
     Column(
@@ -523,10 +567,46 @@ private fun MainPage(homeSubtitle: String, onNavigate: (SettingsPage) -> Unit) {
 }
 }
 
+private data class CategoryEntry(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val page: SettingsPage,
+)
+
+@Composable
+private fun CategoryPage(
+    title: String,
+    entries: List<CategoryEntry>,
+    onNavigate: (SettingsPage) -> Unit,
+    onBack: () -> Unit,
+    showBack: Boolean,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        SettingsSubPageHeader(
+            title = title,
+            onBack = onBack,
+            showBack = showBack,
+            breadcrumb = stringResource(R.string.settings_main_title),
+        )
+        SettingsSection(title = stringResource(R.string.settings_category_section)) {
+            entries.forEachIndexed { index, entry ->
+                SettingsRow(label = entry.title, value = entry.subtitle, onClick = { onNavigate(entry.page) })
+                if (index != entries.lastIndex) SettingsDivider()
+            }
+        }
+    }
+}
+
 @Composable
 private fun AppPage(
+    mode: AppPageMode,
+    titleRes: Int,
     prefs: Prefs,
-    haPackage: String, currentAppLabel: String, onShowAppPicker: () -> Unit,
+    haPackage: String, onShowAppPicker: () -> Unit,
     bgMode: String, onBgModeChange: (String) -> Unit,
     bgOverlayOpacity: Float = 0.25f, onOpenOpacityPreview: () -> Unit = {},
     onOpenClockTheme: () -> Unit = {},
@@ -674,9 +754,20 @@ private fun AppPage(
     }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        SettingsSubPageHeader(title = stringResource(R.string.settings_app_page_title), onBack = onBack, showBack = showBack)
+        val parentTitle = when (mode) {
+            AppPageMode.HOME -> stringResource(R.string.settings_tile_pills_title)
+            AppPageMode.APPEARANCE -> stringResource(R.string.settings_tile_wallpaper_title)
+            AppPageMode.CONNECTED_HOME -> stringResource(R.string.settings_tile_home_title)
+            AppPageMode.DEVICE -> stringResource(R.string.settings_tile_app_title)
+        }
+        SettingsSubPageHeader(
+            title = stringResource(titleRes),
+            onBack = onBack,
+            showBack = showBack,
+            breadcrumb = "${stringResource(R.string.settings_main_title)}  ›  $parentTitle",
+        )
 
-        SettingsSection(title = stringResource(R.string.settings_app_section_language)) {
+        if (mode == AppPageMode.DEVICE) SettingsSection(title = stringResource(R.string.settings_app_section_language)) {
             val currentLanguage = AppLanguage.from(prefs.appLanguage)
             SettingsRow(
                 label = stringResource(R.string.settings_app_label_language),
@@ -704,15 +795,16 @@ private fun AppPage(
 
         // Any app, not just Home Assistant: this is the launcher's headline gesture, and HA is
         // only the default choice.
-        SettingsSection(title = stringResource(R.string.settings_app_section_tap_home)) {
+        if (mode == AppPageMode.HOME) SettingsSection(title = stringResource(R.string.settings_app_section_tap_home)) {
             SettingsRow(
                 label = stringResource(R.string.settings_app_label_app_to_open),
-                value = currentAppLabel.ifBlank { haPackage },
+                value = if (haPackage.isBlank()) stringResource(R.string.settings_app_tap_home_none)
+                else installedApps.firstOrNull { it.packageName == haPackage }?.label ?: haPackage,
                 onClick = onShowAppPicker,
             )
         }
 
-        if (mqttConfigured) SettingsSection(title = stringResource(R.string.settings_app_section_sessions)) {
+        if (mode == AppPageMode.CONNECTED_HOME && mqttConfigured) SettingsSection(title = stringResource(R.string.settings_app_section_sessions)) {
             SettingsToggle(
                 label = stringResource(R.string.settings_app_sessions_enabled),
                 checked = appSessionsEnabled,
@@ -885,11 +977,11 @@ private fun AppPage(
             }
         }
 
-        SettingsSection(title = stringResource(R.string.settings_app_section_clock)) {
+        if (mode == AppPageMode.APPEARANCE) SettingsSection(title = stringResource(R.string.settings_app_section_clock)) {
             SettingsRow(label = stringResource(R.string.settings_app_label_clock_theme), value = "", onClick = onOpenClockTheme)
         }
 
-        SettingsSection(title = stringResource(R.string.settings_app_section_app_grid)) {
+        if (mode == AppPageMode.HOME) SettingsSection(title = stringResource(R.string.settings_app_section_app_grid)) {
             val configuration = LocalConfiguration.current
             val spec = remember(gridScale, configuration.screenWidthDp, configuration.screenHeightDp) {
                 gridSpecFor(
@@ -978,7 +1070,7 @@ private fun AppPage(
             }
         }
 
-        SettingsSection(title = stringResource(R.string.settings_app_section_layout_backup)) {
+        if (mode == AppPageMode.HOME) SettingsSection(title = stringResource(R.string.settings_app_section_layout_backup)) {
             SettingsRow(
                 label = stringResource(R.string.settings_app_label_export_layout),
                 value = "",
@@ -992,7 +1084,7 @@ private fun AppPage(
             )
         }
 
-        SettingsSection(title = stringResource(R.string.settings_app_section_screen_sleep)) {
+        if (mode == AppPageMode.DEVICE) SettingsSection(title = stringResource(R.string.settings_app_section_screen_sleep)) {
             SettingsToggle(label = stringResource(R.string.settings_app_toggle_always_on), checked = powerAlwaysOn, onCheckedChange = onPowerAlwaysOnChange)
             SettingsDivider()
             SettingsToggle(label = stringResource(R.string.settings_app_toggle_auto_timeout), checked = timeoutEnabled, onCheckedChange = onTimeoutEnabledChange)
@@ -1002,7 +1094,7 @@ private fun AppPage(
             }
         }
 
-        SettingsSection(title = stringResource(R.string.settings_app_section_auto_return)) {
+        if (mode == AppPageMode.DEVICE) SettingsSection(title = stringResource(R.string.settings_app_section_auto_return)) {
             SettingsToggle(label = stringResource(R.string.settings_app_toggle_auto_return), checked = autoReturnEnabled, onCheckedChange = onAutoReturnEnabledChange)
             if (autoReturnEnabled) {
                 SettingsDivider()
@@ -1207,50 +1299,10 @@ internal fun IntPresetDialog(
 }
 
 @Composable
-private fun DeveloperPage(
-    prefs: Prefs,
+private fun InformationPage(
     devKeep: Boolean,
     onDevKeepChange: (Boolean) -> Unit,
     onGrantPermissions: () -> Unit,
-    onBack: () -> Unit,
-    showBack: Boolean = true,
-) {
-    var rebootLoading by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        SettingsSubPageHeader(title = stringResource(R.string.settings_dev_page_title), onBack = onBack, showBack = showBack)
-
-        SettingsSection(title = stringResource(R.string.settings_dev_section_debug)) {
-            SettingsToggle(label = stringResource(R.string.settings_dev_toggle_keep_screen_on), checked = devKeep, onCheckedChange = onDevKeepChange)
-        }
-
-        SettingsSection(title = stringResource(R.string.settings_dev_section_system)) {
-            SettingsRow(label = stringResource(R.string.settings_dev_label_permissions), onClick = onGrantPermissions)
-            SettingsDivider()
-            SettingsRow(
-                label = if (rebootLoading) stringResource(R.string.settings_dev_rebooting) else stringResource(R.string.settings_dev_reboot),
-                value = null,
-                onClick = {
-                    if (!rebootLoading) {
-                        rebootLoading = true
-                        Thread {
-                            runCatching {
-                                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "reboot"))
-                                process.waitFor()
-                            }
-                        }.also { it.isDaemon = true }.start()
-                    }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun InformationPage(
     onBack: () -> Unit,
     showBack: Boolean = true,
 ) {
@@ -1263,6 +1315,7 @@ private fun InformationPage(
     var updateState by remember { mutableStateOf(UpdateState.IDLE) }
     var latestVersion by remember { mutableStateOf<String?>(null) }
     var downloadUrl by remember { mutableStateOf<String?>(null) }
+    var rebootLoading by remember { mutableStateOf(false) }
 
     fun checkForUpdates() {
         if (updateState == UpdateState.CHECKING) return
@@ -1384,6 +1437,35 @@ private fun InformationPage(
                         downloadAndInstall(downloadUrl!!)
                     } else if (!isBusy) {
                         checkForUpdates()
+                    }
+                },
+            )
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_dev_page_title)) {
+            SettingsToggle(
+                label = stringResource(R.string.settings_dev_toggle_keep_screen_on),
+                checked = devKeep,
+                onCheckedChange = onDevKeepChange,
+            )
+            SettingsDivider()
+            SettingsRow(
+                label = stringResource(R.string.settings_dev_label_permissions),
+                onClick = onGrantPermissions,
+            )
+            SettingsDivider()
+            SettingsRow(
+                label = if (rebootLoading) stringResource(R.string.settings_dev_rebooting)
+                else stringResource(R.string.settings_dev_reboot),
+                onClick = {
+                    if (!rebootLoading) {
+                        rebootLoading = true
+                        Thread {
+                            runCatching {
+                                val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "reboot"))
+                                process.waitFor()
+                            }
+                        }.also { it.isDaemon = true }.start()
                     }
                 },
             )

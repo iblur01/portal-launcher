@@ -1,36 +1,40 @@
 package com.iblu01.portallauncher
 
+import android.content.Context
+import androidx.annotation.StringRes
 import org.json.JSONArray
 import org.json.JSONObject
 
-enum class PillKind(val label: String, val icon: String, val basePriority: Int) {
-    SAFETY("Sécurité", "shield", 90),
-    LOCK("Serrure", "lock", 35),
-    OPENING("Porte / fenêtre", "door", 25),
-    MOTION("Mouvement", "motion", 30),
-    APPLIANCE("Appareil", "washer", 58),
-    VACUUM("Aspirateur", "vacuum", 58),
-    BATTERY("Batterie", "battery", 20),
-    AIR("Qualité de l'air", "air", 35),
-    CLIMATE("Confort", "temperature", 22),
-    THERMOSTAT("Thermostat", "temperature", 24),
-    COVER("Volet", "cover", 26),
-    SWITCH("Prise", "switch", 17),
-    FAN("Ventilateur", "fan", 15),
-    SCENE("Scènes", "scene", 12),
-    PRESENCE("Présence", "presence", 20),
-    ENERGY("Énergie", "energy", 18),
-    LIGHTS("Lumières", "light", 16),
-    MEDIA("Médias", "media", 13),
-    PURIFIER("Purificateur", "air", 15),
-    TIMER("Minuteur", "timer", 50),
-    HUMIDIFIER("Humidificateur", "humidity", 20),
-    WATER_HEATER("Chauffe-eau", "temperature", 24),
-    VALVE("Vanne", "valve", 30),
-    SIREN("Sirène", "shield", 45),
-    LAWN_MOWER("Robot tondeuse", "mower", 28),
-    GENERIC("Information", "sensor", 15),
+enum class PillKind(@StringRes val labelRes: Int, val icon: String, val basePriority: Int) {
+    SAFETY(R.string.pill_kind_safety, "shield", 90),
+    LOCK(R.string.pill_kind_lock, "lock", 35),
+    OPENING(R.string.pill_kind_opening, "door", 25),
+    MOTION(R.string.pill_kind_motion, "motion", 30),
+    APPLIANCE(R.string.pill_kind_appliance, "washer", 58),
+    VACUUM(R.string.pill_kind_vacuum, "vacuum", 58),
+    BATTERY(R.string.pill_kind_battery, "battery", 20),
+    AIR(R.string.pill_kind_air, "air", 35),
+    CLIMATE(R.string.pill_kind_climate, "temperature", 22),
+    THERMOSTAT(R.string.pill_kind_thermostat, "temperature", 24),
+    COVER(R.string.pill_kind_cover, "cover", 26),
+    SWITCH(R.string.pill_kind_switch, "switch", 17),
+    FAN(R.string.pill_kind_fan, "fan", 15),
+    SCENE(R.string.pill_kind_scene, "scene", 12),
+    PRESENCE(R.string.pill_kind_presence, "presence", 20),
+    ENERGY(R.string.pill_kind_energy, "energy", 18),
+    LIGHTS(R.string.pill_kind_lights, "light", 16),
+    MEDIA(R.string.pill_kind_media, "media", 13),
+    PURIFIER(R.string.pill_kind_purifier, "air", 15),
+    TIMER(R.string.pill_kind_timer, "timer", 50),
+    HUMIDIFIER(R.string.pill_kind_humidifier, "humidity", 20),
+    WATER_HEATER(R.string.pill_kind_water_heater, "temperature", 24),
+    VALVE(R.string.pill_kind_valve, "valve", 30),
+    SIREN(R.string.pill_kind_siren, "shield", 45),
+    LAWN_MOWER(R.string.pill_kind_lawn_mower, "mower", 28),
+    GENERIC(R.string.pill_kind_generic, "sensor", 15),
 }
+
+fun PillKind.localizedLabel(context: Context): String = context.getString(labelRes)
 
 /**
  * A Home Assistant entity snapshot. [attributes] is a `JSONObject` (no structural `equals`), so
@@ -82,13 +86,13 @@ data class PillRule(
  * Plain-language buckets grouping the ~20 technical [PillKind]s into a handful of
  * families, so the settings page doesn't expose HA jargon to the user.
  */
-enum class PillFamily(val label: String, val kinds: Set<PillKind>) {
-    SECURITY("Sécurité & accès", setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING, PillKind.MOTION, PillKind.SIREN)),
-    COMFORT("Confort", setOf(PillKind.THERMOSTAT, PillKind.PURIFIER, PillKind.FAN, PillKind.COVER, PillKind.HUMIDIFIER, PillKind.WATER_HEATER)),
-    APPLIANCES("Appareils", setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.VALVE, PillKind.LAWN_MOWER)),
-    LIGHTS("Lumières", setOf(PillKind.LIGHTS)),
-    MEDIA("Médias", setOf(PillKind.MEDIA)),
-    HOME("Maison", setOf(PillKind.TIMER, PillKind.GENERIC));
+enum class PillFamily(@StringRes val labelRes: Int, val kinds: Set<PillKind>) {
+    SECURITY(R.string.pill_family_security, setOf(PillKind.SAFETY, PillKind.LOCK, PillKind.OPENING, PillKind.MOTION, PillKind.SIREN)),
+    COMFORT(R.string.pill_family_comfort, setOf(PillKind.THERMOSTAT, PillKind.PURIFIER, PillKind.FAN, PillKind.COVER, PillKind.HUMIDIFIER, PillKind.WATER_HEATER)),
+    APPLIANCES(R.string.pill_family_appliances, setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.VALVE, PillKind.LAWN_MOWER)),
+    LIGHTS(R.string.pill_family_lights, setOf(PillKind.LIGHTS)),
+    MEDIA(R.string.pill_family_media, setOf(PillKind.MEDIA)),
+    HOME(R.string.pill_family_home, setOf(PillKind.TIMER, PillKind.GENERIC));
 
     companion object {
         /** Legacy codec kinds intentionally have no Settings family once their support is removed. */
@@ -96,8 +100,10 @@ enum class PillFamily(val label: String, val kinds: Set<PillKind>) {
     }
 }
 
+fun PillFamily.localizedLabel(context: Context): String = context.getString(labelRes)
+
 /** Plain-language rendering of an entity's current state, e.g. "Ouverte", "21°", "Allumé". */
-fun friendlyEntityState(e: HaEntity): String {
+fun friendlyEntityState(context: Context, e: HaEntity): String {
     val raw = e.state.trim()
     val s = raw.lowercase()
     val unit = e.attributes.optString("unit_of_measurement").trim()
@@ -105,39 +111,37 @@ fun friendlyEntityState(e: HaEntity): String {
         if (v == v.toInt().toFloat()) v.toInt().toString() else raw
     }
     return when {
-        s == "unavailable" -> "Indisponible"
+        s == "unavailable" -> context.getString(R.string.entity_state_unavailable)
         s in setOf("unknown", "none", "") -> "—"
-        e.domain in setOf("person", "device_tracker") -> when (s) { "home" -> "À la maison"; "not_home" -> "Absente"; else -> raw.replaceFirstChar { it.uppercase() } }
-        e.domain == "lock" -> when (s) { "locked" -> "Verrouillée"; "unlocked" -> "Déverrouillée"; "locking" -> "Verrouillage…"; "unlocking" -> "Déverrouillage…"; else -> raw.replaceFirstChar { it.uppercase() } }
+        e.domain in setOf("person", "device_tracker") -> when (s) { "home" -> context.getString(R.string.entity_state_home); "not_home" -> context.getString(R.string.entity_state_away); else -> raw.replaceFirstChar { it.uppercase() } }
+        e.domain == "lock" -> when (s) { "locked" -> context.getString(R.string.pill_lock_locked); "unlocked" -> context.getString(R.string.pill_lock_unlocked); "locking" -> context.getString(R.string.pill_lock_locking); "unlocking" -> context.getString(R.string.pill_lock_unlocking); else -> raw.replaceFirstChar { it.uppercase() } }
         s == "on" -> when (e.deviceClass) {
-            "door", "window", "opening", "garage_door" -> "Ouverte"
-            "motion", "occupancy", "presence" -> "Mouvement"
-            "smoke", "carbon_monoxide", "gas", "moisture" -> "Alerte"
-            "problem", "battery" -> "Alerte"
-            "connectivity" -> "Connecté"
-            "battery_charging" -> "En charge"
-            "plug" -> "Branché"
-            "power", "running", "moving", "vibration", "sound", "heat", "cold", "light" -> "Actif"
-            else -> "Allumé"
+            "door", "window", "opening", "garage_door" -> context.getString(R.string.opening_state_open)
+            "motion", "occupancy", "presence" -> context.getString(R.string.motion_state_detected)
+            "smoke", "carbon_monoxide", "gas", "moisture", "problem", "battery" -> context.getString(R.string.pill_safety_alert)
+            "connectivity" -> context.getString(R.string.entity_state_connected)
+            "battery_charging" -> context.getString(R.string.entity_state_charging)
+            "plug" -> context.getString(R.string.entity_state_plugged)
+            "power", "running", "moving", "vibration", "sound", "heat", "cold", "light" -> context.getString(R.string.entity_state_active)
+            else -> context.getString(R.string.light_state_on)
         }
         s == "off" -> when (e.deviceClass) {
-            "door", "window", "opening", "garage_door" -> "Fermée"
-            "motion", "occupancy", "presence" -> "Aucun mouvement"
-            "smoke", "carbon_monoxide", "gas", "moisture" -> "Rien à signaler"
-            "problem", "battery" -> "Rien à signaler"
-            "connectivity" -> "Déconnecté"
-            "battery_charging" -> "Pas en charge"
-            "plug" -> "Débranché"
-            "power", "running", "moving", "vibration", "sound", "heat", "cold", "light" -> "Inactif"
-            else -> "Éteint"
+            "door", "window", "opening", "garage_door" -> context.getString(R.string.opening_state_closed)
+            "motion", "occupancy", "presence" -> context.getString(R.string.motion_state_clear)
+            "smoke", "carbon_monoxide", "gas", "moisture", "problem", "battery" -> context.getString(R.string.entity_state_clear)
+            "connectivity" -> context.getString(R.string.entity_state_disconnected)
+            "battery_charging" -> context.getString(R.string.entity_state_not_charging)
+            "plug" -> context.getString(R.string.entity_state_unplugged)
+            "power", "running", "moving", "vibration", "sound", "heat", "cold", "light" -> context.getString(R.string.entity_state_inactive)
+            else -> context.getString(R.string.light_state_off)
         }
-        s == "open" || s == "opening" -> "Ouverte"
-        s == "closed" -> "Fermée"
-        s == "playing" -> "En lecture"
-        s == "paused" -> "En pause"
-        s == "idle" || s == "standby" -> "Inactif"
-        s == "locked" -> "Verrouillée"
-        s == "unlocked" -> "Déverrouillée"
+        s == "open" || s == "opening" -> context.getString(R.string.opening_state_open)
+        s == "closed" -> context.getString(R.string.opening_state_closed)
+        s == "playing" -> context.getString(R.string.entity_state_playing)
+        s == "paused" -> context.getString(R.string.entity_state_paused)
+        s == "idle" || s == "standby" -> context.getString(R.string.entity_state_inactive)
+        s == "locked" -> context.getString(R.string.pill_lock_locked)
+        s == "unlocked" -> context.getString(R.string.pill_lock_unlocked)
         number() != null -> if (unit.isNotEmpty()) "${number()} $unit" else raw
         else -> raw.replaceFirstChar { it.uppercase() }
     }

@@ -187,7 +187,7 @@ class OnboardingViewModelTest {
 
         assertTrue(prefs.appCleanupOnboardingSkipped)
         assertTrue(prefs.hiddenApps.isEmpty())
-        assertEquals(OnboardingStep.GESTURES, model.state.value.step)
+        assertEquals(OnboardingStep.TAP_APP, model.state.value.step)
     }
 
     @Test

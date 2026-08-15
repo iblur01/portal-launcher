@@ -486,6 +486,9 @@ private fun TrayPill(
     onOpenMenu: (String) -> Unit,
 ) {
     val available = pill.availability == Availability.AVAILABLE
+    val context = LocalContext.current
+    val openLabel = stringResource(R.string.home_open_item, pill.chip.label)
+    val actionsLabel = stringResource(R.string.home_item_actions, pill.chip.label)
     StatusChip(
         chip = pill.chip,
         selected = selected,
@@ -498,15 +501,15 @@ private fun TrayPill(
             .heightIn(min = 48.dp)
             .homePillReorderDrag(pill, actions)
             .semantics(mergeDescendants = true) {
-                contentDescription = trayPillAccessibilityLabel(pill, pinned)
+                contentDescription = trayPillAccessibilityLabel(context, pill, pinned)
                 role = Role.Button
                 if (available) {
-                    onClick(label = "Ouvrir ${pill.chip.label}") {
+                    onClick(label = openLabel) {
                         actions.onOpen(pill)
                         true
                     }
                 }
-                onLongClick(label = "Actions pour ${pill.chip.label}") {
+                onLongClick(label = actionsLabel) {
                     onOpenMenu(pill.ref.stableKey)
                     true
                 }
@@ -542,7 +545,7 @@ private fun ClockTrayControls(
                     .clip(AppleShapes.pill)
                     .clickable(
                         role = Role.Button,
-                        onClickLabel = if (pillsExpanded) "Réduire les pills" else "Développer les pills",
+                        onClickLabel = if (pillsExpanded) stringResource(R.string.clock_collapse_content_desc) else stringResource(R.string.clock_expand_content_desc),
                     ) { onPillsExpandedChange(!pillsExpanded) }
                     .padding(horizontal = 12.dp.scaled()),
                 verticalAlignment = Alignment.CenterVertically,
@@ -562,15 +565,15 @@ private fun ClockTrayControls(
     }
 }
 
-internal fun trayPillAccessibilityLabel(pill: ResolvedPill, pinned: Boolean): String = buildString {
+internal fun trayPillAccessibilityLabel(context: android.content.Context, pill: ResolvedPill, pinned: Boolean): String = buildString {
     append(pill.chip.label)
     if (pill.chip.value.isNotBlank()) append(", ${pill.chip.value}")
-    append(", ${pill.ref.groupDescription()}")
-    if (pinned) append(", épinglé")
+    append(", ${pill.ref.groupDescription(context)}")
+    if (pinned) append(", ${context.getString(R.string.home_pinned).lowercase()}")
     if (pill.alert != null || pill.chip.state.equals("critical", ignoreCase = true)) {
-        append(", alerte critique")
+        append(", ${context.getString(R.string.home_accessibility_critical)}")
     }
-    if (pill.availability == Availability.STALE) append(", données figées, commandes indisponibles")
+    if (pill.availability == Availability.STALE) append(", ${context.getString(R.string.home_accessibility_stale)}")
 }
 
 @Composable

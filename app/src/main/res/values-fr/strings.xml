@@ -31,7 +31,7 @@
     <string name="setup_access_key_help_step_5">5. Copiez-la et collez-la ici</string>
 
     <!-- ===== HOME CONNECTION PAGE ===== -->
-    <string name="home_connection_title">Ma maison</string>
+    <string name="home_connection_title">Connexions</string>
     <string name="home_connection_subtitle">Portal se connecte à votre serveur Home Assistant pour afficher l\'état de votre maison.</string>
     <string name="home_connection_section_address">ADRESSE</string>
     <string name="home_connection_ha_detected">Home Assistant détecté</string>
@@ -79,17 +79,31 @@
     <string name="settings_home_subtitle_connected">Connectée</string>
     <string name="settings_home_subtitle_error">Vérifier la connexion</string>
     <string name="settings_home_subtitle_default">Adresse, clé d\'accès</string>
-    <string name="settings_tile_home_title">Ma maison</string>
-    <string name="settings_tile_pills_title">Informations affichées</string>
-    <string name="settings_tile_pills_subtitle">Ce que Portal montre en haut de l\'écran</string>
-    <string name="settings_tile_app_title">Application</string>
-    <string name="settings_tile_app_subtitle">Langue, horloge, grille, veille</string>
+    <string name="settings_tile_home_title">Maison connectée</string>
+    <string name="settings_tile_pills_title">Accueil</string>
+    <string name="settings_tile_pills_subtitle">Contenu, groupes et informations épinglées</string>
+    <string name="settings_tile_app_title">Appareil</string>
+    <string name="settings_tile_app_subtitle">Écran, navigation, langue et applications</string>
     <string name="settings_tile_dev_title">Développeur</string>
     <string name="settings_tile_dev_subtitle">Options avancées</string>
-    <string name="settings_tile_info_title">Informations</string>
-    <string name="settings_tile_info_subtitle">Version &amp; mises à jour</string>
+    <string name="settings_tile_info_title">À propos</string>
+    <string name="settings_tile_info_subtitle">Version, mises à jour et options avancées</string>
     <string name="settings_main_title">Portal Launcher</string>
-    <string name="settings_app_page_title">Application</string>
+    <string name="settings_category_section">CHOISIR UNE RUBRIQUE</string>
+    <string name="settings_home_content_title">Contenu affiché</string>
+    <string name="settings_home_content_subtitle">Informations épinglées, sections et groupes</string>
+    <string name="settings_home_apps_title">Applications et interaction</string>
+    <string name="settings_home_apps_subtitle">Grille, icônes, pastilles et action au toucher</string>
+    <string name="settings_appearance_wallpaper_title">Fond d’écran</string>
+    <string name="settings_appearance_wallpaper_subtitle">Source, photos Immich et lisibilité</string>
+    <string name="settings_appearance_clock_title">Horloge</string>
+    <string name="settings_appearance_clock_subtitle">Style de l’horloge d’accueil</string>
+    <string name="settings_connected_connection_title">Home Assistant et MQTT</string>
+    <string name="settings_connected_sessions_title">Sessions d’applications</string>
+    <string name="settings_connected_sessions_subtitle">Applications externes autorisées</string>
+    <string name="settings_device_general_title">Écran, navigation et langue</string>
+    <string name="settings_device_general_subtitle">Veille, retour automatique, langue et assistant</string>
+    <string name="settings_app_page_title">Appareil</string>
     <string name="settings_app_section_language">LANGUE</string>
     <string name="settings_app_label_language">Langue</string>
     <string name="language_page_title">Langue</string>
@@ -98,6 +112,7 @@
     <string name="language_french">Français</string>
     <string name="settings_app_section_tap_home">TAP SUR L\'ÉCRAN D\'ACCUEIL</string>
     <string name="settings_app_label_app_to_open">Application à ouvrir</string>
+    <string name="settings_app_tap_home_none">Aucune application</string>
     <string name="settings_app_section_wallpaper">FOND D\'ÉCRAN</string>
     <string name="settings_app_label_overlay_opacity">Opacité du voile</string>
     <string name="settings_immich_section">SOURCE PHOTO IMMICH</string>
@@ -145,7 +160,7 @@
     <string name="settings_dev_reboot">Redémarrer</string>
 
     <!-- ===== INFORMATION PAGE ===== -->
-    <string name="settings_info_page_title">Informations</string>
+    <string name="settings_info_page_title">À propos</string>
     <string name="settings_info_section_app">APPLICATION</string>
     <string name="settings_info_label_version">Version</string>
     <string name="settings_info_section_updates">MISES À JOUR</string>
@@ -156,9 +171,14 @@
     <string name="settings_info_downloading">Téléchargement…</string>
     <string name="settings_info_install">Télécharger &amp; installer</string>
     <string name="settings_info_check_error">Échec de la vérification</string>
+    <string name="update_popup_title">Une nouvelle version de Portal est disponible</string>
+    <string name="update_popup_version">Version %1$s</string>
+    <string name="update_popup_install">Mettre à jour maintenant</string>
+    <string name="update_popup_later">Me le rappeler plus tard</string>
+    <string name="update_popup_ignore">Ignorer cette version</string>
 
     <!-- ===== PILL SETTINGS PAGE ===== -->
-    <string name="pills_page_title">Informations affichées</string>
+    <string name="pills_page_title">Contenu affiché</string>
     <string name="pills_page_description">Active ce que Portal peut afficher en haut de l\'écran. Les éléments désactivés ne sont jamais montrés même s\'ils sont détectés.</string>
     <string name="pills_loading">Chargement depuis votre maison…</string>
     <string name="pills_section_connection">CONNEXION</string>
@@ -250,6 +270,63 @@
     <string name="home_grouping_by_type_short">Type</string>
     <string name="home_header_edit_content_desc">Modifier Maison</string>
     <string name="home_header_finish_content_desc">Terminer la modification de Maison</string>
+    <string name="home_section_favorites">Favoris</string>
+    <string name="home_section_manual_groups">Mes groupes</string>
+    <string name="home_stale_state">Hors ligne · données figées, commandes suspendues</string>
+    <string name="home_create_group">Créer un groupe</string>
+    <string name="home_manage_groups">Gérer mes groupes</string>
+    <string name="home_ha_membership_hint">L’appartenance aux pièces et aux types se gère dans Home Assistant.</string>
+    <plurals name="home_section_item_count"><item quantity="one">%1$d élément</item><item quantity="other">%1$d éléments</item></plurals>
+    <string name="home_move_section_before">Déplacer %1$s avant</string>
+    <string name="home_move_section_after">Déplacer %1$s après</string>
+    <string name="home_hide_section">Masquer %1$s</string>
+    <string name="home_open_item">Ouvrir %1$s</string>
+    <string name="home_item_actions">Actions pour %1$s</string>
+    <string name="home_pinned">Épinglé</string>
+    <string name="home_empty_sections">Aucune section visible</string>
+    <string name="home_empty_devices">Aucun appareil compatible</string>
+    <string name="home_empty_sections_hint">Affichez une section pour retrouver vos appareils et groupes.</string>
+    <string name="home_empty_devices_hint">Ajoutez ou activez un appareil pilotable dans Home Assistant.</string>
+    <string name="home_edit_sections">Modifier les sections</string>
+    <string name="home_open_ha_settings">Ouvrir les réglages Home Assistant</string>
+    <string name="home_accessibility_section">section %1$s</string>
+    <string name="home_accessibility_critical">alerte critique</string>
+    <string name="home_accessibility_stale">données figées, commandes indisponibles</string>
+    <string name="group_back">Retour au groupe %1$s</string>
+    <string name="group_close">Fermer le groupe %1$s</string>
+    <string name="group_stale_state">Données figées · commandes suspendues</string>
+    <string name="group_action_turn_off">Tout éteindre</string>
+    <string name="group_action_close">Tout fermer</string>
+    <string name="group_action_lock">Tout verrouiller</string>
+    <string name="group_device_unavailable">appareil indisponible</string>
+    <string name="group_devices_unavailable">Appareils indisponibles</string>
+    <string name="group_devices_unavailable_hint">Revenez au groupe lorsque Home Assistant aura retrouvé ses appareils.</string>
+    <string name="group_unavailable_detail">Cet appareil n’est plus disponible. Les autres membres du groupe restent accessibles.</string>
+    <string name="media_players_title">Lecteurs média</string><string name="media_choose_player">Choisissez un lecteur</string><string name="media_no_player">Aucun lecteur disponible</string>
+    <string name="media_state_stopped">À l’arrêt</string>
+    <string name="washer_fact_program">Programme</string><string name="washer_fact_temperature">Température</string><string name="washer_fact_spin">Essorage</string>
+    <string name="washer_phase_preparing">Préparation</string><string name="washer_phase_wash">Lavage</string><string name="washer_phase_rinse">Rinçage</string><string name="washer_phase_spin">Essorage</string><string name="washer_phase_finished">Terminé</string>
+    <string name="action_turn_on">Allumer</string><string name="action_turn_off">Éteindre</string><string name="action_start">Démarrer</string><string name="action_pause">Pause</string><string name="action_return_to_base">Retour à la base</string><string name="action_base">Base</string>
+    <string name="menu_close">Fermer le menu</string>
+    <string name="menu_pin">Épingler</string>
+    <string name="menu_unpin">Désépingler</string>
+    <string name="menu_add_manual_group">Ajouter à un groupe manuel</string>
+    <string name="menu_no_manual_group">Aucun groupe manuel. Créez-en un depuis Modifier.</string>
+    <string name="menu_already_added">%1$s · déjà ajouté</string>
+    <string name="menu_reorder">Réorganiser</string>
+    <string name="menu_open_controls">Ouvrir les commandes</string>
+    <string name="menu_controls_stale">Données figées : les commandes sont temporairement indisponibles.</string>
+    <string name="menu_hide_device">Ne plus afficher cet appareil</string>
+    <string name="menu_restore_device_hint">L’appareil pourra être réactivé depuis les réglages des pills.</string>
+    <string name="menu_move_drag">Déplacer par glisser-déposer</string>
+    <string name="menu_move_first">Placer en premier</string>
+    <string name="menu_move_before">Déplacer avant</string>
+    <string name="menu_move_after">Déplacer après</string>
+    <string name="menu_move_last">Placer en dernier</string>
+    <string name="pill_ref_device">Appareil</string>
+    <string name="pill_ref_area_group">Groupe de pièce</string>
+    <string name="pill_ref_kind_group">Groupe de type</string>
+    <string name="pill_ref_manual_group">Groupe manuel</string>
     <string name="auto_return_pill_label">Fermeture auto</string>
     <string name="auto_return_cancel_desc">Annuler</string>
     <string name="bg_mode_system">Fond d’écran Android</string>
@@ -294,6 +371,13 @@
     <string name="connection_status_testing">Vérification…</string>
     <string name="connection_status_ok">Connecté</string>
     <string name="connection_status_error">Échec</string>
+    <string name="connection_error_failed">Échec de connexion</string>
+    <string name="connection_error_token_required">Collez d’abord votre clé d’accès</string>
+    <string name="connection_error_token_invalid">Clé d’accès invalide</string>
+    <string name="connection_error_address_invalid">Adresse incorrecte</string>
+    <string name="connection_error_server_not_found">Serveur introuvable</string>
+    <string name="connection_error_code">Erreur %1$d</string>
+    <string name="media_none">Aucun média</string>
     <string name="search_placeholder">Rechercher…</string>
     <string name="dialog_button_ok">OK</string>
     <string name="subpage_back_desc">Retour</string>
@@ -312,6 +396,13 @@
     <string name="weather_tab_hourly">Heures</string>
     <string name="weather_tab_daily">Jours</string>
     <string name="weather_today_range_format">Min %1$d° · Max %2$d°</string>
+    <string name="weather_condition_sunny">Ensoleillé</string><string name="weather_condition_clear_night">Ciel dégagé</string>
+    <string name="weather_condition_partly_cloudy">Partiellement nuageux</string><string name="weather_condition_cloudy">Couvert</string>
+    <string name="weather_condition_fog">Brouillard</string><string name="weather_condition_rainy">Pluie</string>
+    <string name="weather_condition_pouring">Fortes pluies</string><string name="weather_condition_lightning">Orage</string>
+    <string name="weather_condition_lightning_rainy">Orage pluvieux</string><string name="weather_condition_snowy">Neige</string>
+    <string name="weather_condition_snowy_rainy">Neige et pluie</string><string name="weather_condition_hail">Grêle</string>
+    <string name="weather_condition_windy">Venteux</string><string name="weather_condition_exceptional">Exceptionnel</string>
 
     <!-- ===== AIR QUALITY PANEL ===== -->
     <string name="air_quality_back_desc">Retour</string>
@@ -479,6 +570,12 @@
 
     <!-- ===== PANEL HELPERS / SHARED ===== -->
     <string name="panel_device_unavailable">Appareil indisponible</string>
+    <string name="panel_state">État</string>
+    <string name="lights_back">Retour aux lumières</string><string name="lights_no_room">Sans pièce</string>
+    <string name="lights_all_off">Tout éteindre</string><string name="lights_room_off">Éteindre la pièce</string>
+    <plurals name="lights_room_on_count"><item quantity="one">%1$d / %2$d allumée</item><item quantity="other">%1$d / %2$d allumées</item></plurals>
+    <plurals name="lights_room_count"><item quantity="one">%1$d lumière</item><item quantity="other">%1$d lumières</item></plurals>
+    <string name="lights_color_wheel_desc">Roue chromatique, teinte %1$d degrés</string>
     <string name="side_panel_close_desc">Fermer le panneau</string>
     <string name="side_panel_battery_desc">Batterie à %1$d pour cent</string>
     <string name="side_panel_battery_value">%1$d%%</string>
@@ -642,6 +739,52 @@
     <string name="settings_app_sessions_cancel">Annuler</string>
 
     <!-- ===== PILL PRIORITY ENGINE (Dynamic Labels) ===== -->
+    <string name="pill_kind_safety">Sécurité</string>
+    <string name="pill_kind_lock">Serrure</string>
+    <string name="pill_kind_opening">Portes et fenêtres</string>
+    <string name="pill_kind_motion">Mouvement</string>
+    <string name="pill_kind_appliance">Appareil</string>
+    <string name="pill_kind_vacuum">Aspirateur</string>
+    <string name="pill_kind_battery">Batterie</string>
+    <string name="pill_kind_air">Qualité de l’air</string>
+    <string name="pill_kind_climate">Confort</string>
+    <string name="pill_kind_thermostat">Thermostat</string>
+    <string name="pill_kind_cover">Volet</string>
+    <string name="pill_kind_switch">Prise</string>
+    <string name="pill_kind_fan">Ventilateur</string>
+    <string name="pill_kind_scene">Scènes</string>
+    <string name="pill_kind_presence">Présence</string>
+    <string name="pill_kind_energy">Énergie</string>
+    <string name="pill_kind_lights">Lumières</string>
+    <string name="pill_kind_media">Médias</string>
+    <string name="pill_kind_purifier">Purificateur</string>
+    <string name="pill_kind_timer">Minuteur</string>
+    <string name="pill_kind_humidifier">Humidificateur</string>
+    <string name="pill_kind_water_heater">Chauffe-eau</string>
+    <string name="pill_kind_valve">Vanne</string>
+    <string name="pill_kind_siren">Sirène</string>
+    <string name="pill_kind_lawn_mower">Robot tondeuse</string>
+    <string name="pill_kind_generic">Information</string>
+    <string name="pill_family_security">Sécurité et accès</string>
+    <string name="pill_family_comfort">Confort</string>
+    <string name="pill_family_appliances">Appareils</string>
+    <string name="pill_family_lights">Lumières</string>
+    <string name="pill_family_media">Médias</string>
+    <string name="pill_family_home">Maison</string>
+    <string name="entity_state_unavailable">Indisponible</string>
+    <string name="entity_state_home">À la maison</string>
+    <string name="entity_state_away">Absent</string>
+    <string name="entity_state_connected">Connecté</string>
+    <string name="entity_state_disconnected">Déconnecté</string>
+    <string name="entity_state_charging">En charge</string>
+    <string name="entity_state_not_charging">Pas en charge</string>
+    <string name="entity_state_plugged">Branché</string>
+    <string name="entity_state_unplugged">Débranché</string>
+    <string name="entity_state_active">Actif</string>
+    <string name="entity_state_inactive">Inactif</string>
+    <string name="entity_state_clear">Rien à signaler</string>
+    <string name="entity_state_playing">En lecture</string>
+    <string name="entity_state_paused">En pause</string>
     <string name="presence_home">À la maison</string>
     <string name="presence_away">Absent</string>
     <string name="pill_group_presence">Présence</string>
@@ -669,6 +812,14 @@
     <string name="motion_detected_since">Mouvement détecté depuis le %1$s</string>
     <string name="motion_clear_since">Aucun mouvement depuis le %1$s</string>
     <string name="pill_safety_alert">Alerte</string>
+    <string name="alarm_state_disarmed">Désarmée</string>
+    <string name="alarm_state_armed_away">Armée · absence</string>
+    <string name="alarm_state_armed_home">Armée · présence</string>
+    <string name="alarm_state_armed_night">Armée · nuit</string>
+    <string name="alarm_state_triggered">Alarme déclenchée</string>
+    <string name="alarm_state_pending">Déclenchement imminent</string>
+    <string name="alarm_state_arming">Armement…</string>
+    <string name="pill_completion_at">Fin à %1$s</string>
     <string name="phase_none">Aucun</string>
     <string name="phase_air_wash">Air wash</string>
     <string name="phase_ai_rinse">AI rinse</string>
@@ -690,6 +841,14 @@
     <plurals name="pill_scenes_count">
         <item quantity="one">%1$d raccourci</item>
         <item quantity="other">%1$d raccourcis</item>
+    </plurals>
+    <plurals name="pill_group_active_count">
+        <item quantity="one">%1$d actif sur %2$d</item>
+        <item quantity="other">%1$d actifs sur %2$d</item>
+    </plurals>
+    <plurals name="pill_group_available_count">
+        <item quantity="one">%1$d disponible</item>
+        <item quantity="other">%1$d disponibles</item>
     </plurals>
 
     <!-- ===== PILL LIGHTS STATE (plurals) ===== -->
@@ -1016,6 +1175,13 @@
     <string name="onb_hidden_action_hide_none">Ne rien masquer</string>
     <string name="onb_hidden_hint_settings">Vous pourrez modifier cette liste depuis les réglages.</string>
 
+    <!-- ===== ONBOARDING — TAP APP ===== -->
+    <string name="onb_tap_app_title">Un tap dans le vide</string>
+    <string name="onb_tap_app_body">Choisissez l\'application ouverte par un tap sur une zone vide de l\'écran d\'accueil. Laissez désactivé si vous préférez qu\'il ne se passe rien.</string>
+    <string name="onb_tap_app_summary_none">Aucune application</string>
+    <string name="onb_tap_app_action_none">Aucune application</string>
+    <string name="onb_tap_app_hint_settings">Modifiable plus tard depuis les paramètres.</string>
+
     <!-- ===== ONBOARDING — GESTURES ===== -->
     <string name="onb_gestures_title">Tout est à portée d\'un geste</string>
     <string name="onb_gestures_hint_apps">Glissez vers la gauche pour voir vos applications.</string>
@@ -1049,9 +1215,9 @@
     <string name="onb_pills_demo_pill_temperature">Température</string>
     <string name="onb_pills_demo_pill_door">Porte d\'entrée ouverte</string>
     <string name="onb_pills_demo_pill_alarm">Alarme déclenchée</string>
-    <string name="settings_tile_wallpaper_title">Fond d\'écran</string>
-    <string name="settings_tile_wallpaper_subtitle">Arrière-plan, photos, Immich</string>
-    <string name="settings_wallpaper_page_title">Fond d\'écran</string>
+    <string name="settings_tile_wallpaper_title">Apparence</string>
+    <string name="settings_tile_wallpaper_subtitle">Fond d’écran, lisibilité et photos</string>
+    <string name="settings_wallpaper_page_title">Fond d’écran</string>
     <string name="settings_wallpaper_section_readability">LISIBILITÉ</string>
     <string name="settings_wallpaper_choose_photo">Choisir une photo</string>
     <string name="settings_wallpaper_replace_photo">Remplacer la photo</string>

@@ -1,5 +1,7 @@
 package com.iblu01.portallauncher.ui.home
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
@@ -37,6 +39,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "w480dp-h600dp")
 class HomeAccessibilityAcceptanceTest {
+    private val context: Context = ApplicationProvider.getApplicationContext()
     @get:Rule val rule = createComposeRule()
 
     private fun pill(
@@ -70,17 +73,17 @@ class HomeAccessibilityAcceptanceTest {
             alert = PillAlert(AlertSeverity.CRITICAL, incidentEntityIds = setOf("lock.front")),
         )
 
-        val tray = trayPillAccessibilityLabel(target, pinned = true)
-        val house = homePillAccessibilityLabel(target, pinned = true, sectionTitle = "Favoris")
+        val tray = trayPillAccessibilityLabel(context, target, pinned = true)
+        val house = homePillAccessibilityLabel(context, target, pinned = true, sectionTitle = "Favorites")
         listOf(tray, house).forEach { label ->
             assertTrue(label.contains("Porte d’entrée"))
             assertTrue(label.contains("Déverrouillée"))
-            assertTrue(label.contains("Appareil"))
-            assertTrue(label.contains("épinglé"))
-            assertTrue(label.contains("alerte critique"))
-            assertTrue(label.contains("données figées"))
+            assertTrue(label.contains("Device"))
+            assertTrue(label.contains("pinned"))
+            assertTrue(label.contains("critical alert"))
+            assertTrue(label.contains("cached data"))
         }
-        assertTrue(house.contains("section Favoris"))
+        assertTrue(house.contains("section Favorites"))
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -88,7 +91,7 @@ class HomeAccessibilityAcceptanceTest {
     fun `large font preserves a focusable pill and a minimum 48dp touch target`() {
         val target = pill()
         var opened = 0
-        val label = homePillAccessibilityLabel(target, pinned = true, sectionTitle = "Favoris")
+        val label = homePillAccessibilityLabel(context, target, pinned = true, sectionTitle = "Favoris")
         rule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 1.8f)) {
                 HomePage(

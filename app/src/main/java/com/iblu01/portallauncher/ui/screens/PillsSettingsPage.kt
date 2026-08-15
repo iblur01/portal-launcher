@@ -211,6 +211,7 @@ private fun PillsSettingsRoot(
             title = stringResource(R.string.pills_page_title),
             onBack = onBack,
             showBack = showBack,
+            breadcrumb = "${stringResource(R.string.settings_main_title)}  ›  ${stringResource(R.string.settings_tile_pills_title)}",
         )
         Text(
             stringResource(R.string.pills_page_description),
@@ -425,7 +426,7 @@ private fun OrderedReferenceRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (prefix != null) Text(prefix, style = AppleTypography.bodySmall, color = AppleColors.tertiary, modifier = Modifier.padding(end = 12.dp))
-            Text(labelForSettingsRef(ref, catalog, preferences), style = AppleTypography.titleMedium, color = AppleColors.primary, modifier = Modifier.weight(1f))
+            Text(labelForSettingsRef(androidx.compose.ui.platform.LocalContext.current, ref, catalog, preferences), style = AppleTypography.titleMedium, color = AppleColors.primary, modifier = Modifier.weight(1f))
             SettingsPinDragHandle(
                 ref = ref,
                 onStart = onStartDrag,
@@ -589,7 +590,7 @@ private fun SectionItemOrderRow(
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(start = 28.dp, top = 4.dp)) {
         Text(
-            text = labelForSettingsRef(ref, catalog, preferences),
+            text = labelForSettingsRef(androidx.compose.ui.platform.LocalContext.current, ref, catalog, preferences),
             style = AppleTypography.bodySmall,
             color = AppleColors.secondary,
         )
@@ -615,7 +616,7 @@ private fun AvailableDevicesSettings(
             PillFamily.entries.forEach { family ->
                 val candidates = uiState.pillCandidates.filter { PillFamily.of(it.kind) == family }
                 if (candidates.isNotEmpty()) {
-                    SettingsSection(title = family.label) {
+                    SettingsSection(title = stringResource(family.labelRes)) {
                         candidates.forEachIndexed { index, candidate ->
                             val ref = PillRef.Device(candidate.primary.entityId)
                             val target = catalog.byRef[ref] ?: return@forEachIndexed
@@ -839,7 +840,7 @@ private fun sectionLabel(sectionId: String): String = when {
     sectionId == HomeSectionIds.AREAS -> stringResource(R.string.pills_section_areas)
     sectionId == HomeSectionIds.MANUAL_GROUPS -> stringResource(R.string.pills_manual_groups)
     sectionId.startsWith("kind:") -> runCatching {
-        com.iblu01.portallauncher.PillKind.valueOf(sectionId.substringAfter(':')).label
+        stringResource(com.iblu01.portallauncher.PillKind.valueOf(sectionId.substringAfter(':')).labelRes)
     }.getOrDefault(sectionId)
     else -> sectionId
 }

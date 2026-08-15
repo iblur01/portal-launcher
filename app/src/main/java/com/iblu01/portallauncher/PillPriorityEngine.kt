@@ -7,7 +7,7 @@ import java.time.OffsetDateTime
 import java.util.Locale
 import kotlin.math.roundToInt
 
-class PillPriorityEngine(private val context: Context) {
+class PillPriorityEngine(internal val context: Context) {
     private val inactive = setOf("off", "closed", "locked", "idle", "docked", "standby", "stop", "stopped", "unavailable", "unknown", "clear", "disarmed")
     private val activeAppliance = setOf("on", "run", "running", "cleaning", "washing", "drying", "printing", "active", "returning", "paused", "prepare", "slicing", "init")
     private val done = setOf("done", "finished", "complete", "completed", "finish")
@@ -319,7 +319,7 @@ class PillPriorityEngine(private val context: Context) {
                 } else {
                     val zdt = instant.atZone(java.time.ZoneId.systemDefault())
                     val formatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-                    "Fin à " + zdt.format(formatter)
+                    context.getString(R.string.pill_completion_at, zdt.format(formatter))
                 }
             } else null
         }.onFailure { err -> android.util.Log.e("PillPriorityEngine", "Failed to parse completion time", err) }.getOrNull()
@@ -362,16 +362,16 @@ class PillPriorityEngine(private val context: Context) {
             
         val display = when (rule.kind) {
             PillKind.OPENING -> when (s) { "on", "open", "opening" -> context.getString(R.string.pill_opening_open); else -> rawDisplay }
-            PillKind.MOTION -> friendlyEntityState(e)
+            PillKind.MOTION -> friendlyEntityState(context, e)
             PillKind.LOCK -> when (s) { "locked" -> context.getString(R.string.pill_lock_locked); "unlocked" -> context.getString(R.string.pill_lock_unlocked); "jammed" -> context.getString(R.string.pill_lock_jammed); "locking" -> context.getString(R.string.pill_lock_locking); "unlocking" -> context.getString(R.string.pill_lock_unlocking); else -> rawDisplay }
             PillKind.SAFETY -> if (e.domain == "alarm_control_panel") when (s) {
-                "disarmed" -> "Désarmée"
-                "armed_away" -> "Armée · absence"
-                "armed_home" -> "Armée · présence"
-                "armed_night" -> "Armée · nuit"
-                "triggered" -> "Alarme déclenchée"
-                "pending" -> "Déclenchement imminent"
-                "arming" -> "Armement…"
+                "disarmed" -> context.getString(R.string.alarm_state_disarmed)
+                "armed_away" -> context.getString(R.string.alarm_state_armed_away)
+                "armed_home" -> context.getString(R.string.alarm_state_armed_home)
+                "armed_night" -> context.getString(R.string.alarm_state_armed_night)
+                "triggered" -> context.getString(R.string.alarm_state_triggered)
+                "pending" -> context.getString(R.string.alarm_state_pending)
+                "arming" -> context.getString(R.string.alarm_state_arming)
                 else -> rawDisplay
             } else if (s !in inactive) context.getString(R.string.pill_safety_alert) else rawDisplay
             PillKind.THERMOSTAT -> {
@@ -386,7 +386,7 @@ class PillPriorityEngine(private val context: Context) {
                 else -> rawDisplay
             }
             PillKind.SWITCH -> when (s) { "on" -> context.getString(R.string.pill_switch_on); "off" -> context.getString(R.string.pill_switch_off); else -> rawDisplay }
-            PillKind.GENERIC -> if (e.domain == "binary_sensor") friendlyEntityState(e) else rawDisplay
+            PillKind.GENERIC -> if (e.domain == "binary_sensor") friendlyEntityState(context, e) else rawDisplay
             PillKind.FAN -> when (s) {
                 "on" -> e.attributes.optInt("percentage", -1).let { if (it in 0..100) context.getString(R.string.pill_fan_on_format, it.toString()) else context.getString(R.string.pill_fan_on) }
                 "off" -> context.getString(R.string.pill_fan_off)

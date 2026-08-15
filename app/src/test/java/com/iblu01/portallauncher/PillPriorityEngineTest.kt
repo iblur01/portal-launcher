@@ -222,7 +222,7 @@ class PillPriorityEngineTest {
         )
         val chips = engine.select(rules, listOf(alarm, lock).associateBy { it.entityId })
         assertEquals(setOf("Security", "Serrure"), chips.map { it.label }.toSet())
-        assertEquals(setOf("Désarmée", "Locked"), chips.map { it.value }.toSet())
+        assertEquals(setOf("Disarmed", "Locked"), chips.map { it.value }.toSet())
     }
 
     @Test fun `lights are grouped into one pill`() {

@@ -289,7 +289,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
                     connected = s.connected,
                 )
                 val homeComposition = HomePillComposer.compose(catalog, homePreferences)
-                val homePage = HomePageBuilder.build(catalog, homePreferences)
+                val homePage = HomePageBuilder.build(appContext, catalog, homePreferences)
                 val snapshot = PillSnapshot(
                     chips = (homeComposition.primary + homeComposition.secondary).map { it.chip },
                     media = media,

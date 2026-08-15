@@ -93,6 +93,7 @@ import com.iblu01.portallauncher.ui.apps.ShortcutIconStore
 import com.iblu01.portallauncher.ui.apps.WidgetHostController
 import com.iblu01.portallauncher.ui.apps.WidgetOffer
 import com.iblu01.portallauncher.ui.components.AlertOverlay
+import com.iblu01.portallauncher.ui.components.AppUpdateOverlay
 import com.iblu01.portallauncher.ui.components.AmbientBackground
 import androidx.compose.ui.res.stringResource
 import com.iblu01.portallauncher.ui.components.AppContextMenu
@@ -354,7 +355,9 @@ class LauncherActivity : ComponentActivity() {
         if (now - lastLaunchMs < 1_000L) return
         lastLaunchMs = now
 
+        // No app configured: the gesture is opt-in, so a tap in the void is simply a no-op.
         val pkg = prefs.homeAssistantPackage
+        if (pkg.isBlank()) return
         val intent = packageManager.getLaunchIntentForPackage(pkg)
         if (intent == null) {
             Toast.makeText(this, getString(R.string.toast_app_not_found_pkg_format, pkg), Toast.LENGTH_LONG).show()
@@ -396,7 +399,7 @@ class LauncherActivity : ComponentActivity() {
     private fun setWallpaper() {
         openFromLauncher(
             Intent(this, SettingsActivity::class.java)
-                .putExtra(SettingsActivity.EXTRA_PAGE, "WALLPAPER")
+                .putExtra(SettingsActivity.EXTRA_PAGE, SettingsActivity.PAGE_APPEARANCE)
         )
     }
 
@@ -530,6 +533,7 @@ private fun PortalLauncherApp(
     // not idle — letting the countdown run there would drag the page home behind the user's back.
     var resumed by remember { mutableStateOf(true) }
     val context = LocalContext.current
+    val noMediaLabel = stringResource(R.string.media_none)
     val compactScreen = context.resources.displayMetrics.let { metrics ->
         isCompactClockScreen(
             metrics.widthPixels,
@@ -688,7 +692,7 @@ private fun PortalLauncherApp(
         mediaSessions.firstOrNull { session -> session.players.any { it.entityId == entity.entityId } }
             ?: PlayingMedia(
                 entityId = entity.entityId,
-                title = entity.attributes.optString("media_title").ifBlank { "Aucun média" },
+                title = entity.attributes.optString("media_title").ifBlank { noMediaLabel },
                 artist = entity.name,
                 album = entity.attributes.optString("media_album_name").takeIf { it.isNotBlank() },
                 state = entity.state,
@@ -769,6 +773,31 @@ private fun PortalLauncherApp(
     val panel by vm.panel.collectAsStateWithLifecycle()
     val panelChip by vm.panelChip.collectAsStateWithLifecycle()
     val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
+    var availableUpdate by remember { mutableStateOf<AppRelease?>(null) }
+    var updateDownloading by remember { mutableStateOf(false) }
+
+    // A wall launcher may stay alive for weeks, so checking only at Activity creation is not
+    // enough. Wake hourly, but hit GitHub at most once per day and only while Portal is visible.
+    LaunchedEffect(resumed) {
+        if (!resumed) return@LaunchedEffect
+        while (true) {
+            val now = System.currentTimeMillis()
+            val due = now >= prefs.updateRemindAfter &&
+                now - prefs.updateLastCheckAt >= AppUpdateManager.CHECK_INTERVAL_MS
+            if (due) {
+                prefs.updateLastCheckAt = now
+                runCatching { withContext(Dispatchers.IO) { AppUpdateManager.fetchLatest() } }
+                    .onSuccess { release ->
+                        val isEligible = AppUpdateManager.isNewer(
+                            remote = release.version,
+                            current = AppUpdateManager.currentVersion(context),
+                        ) && release.version != prefs.ignoredUpdateVersion && release.apkUrl.isNotBlank()
+                        availableUpdate = release.takeIf { isEligible }
+                    }
+            }
+            delay(60L * 60L * 1_000L)
+        }
+    }
 
     // Alarm entry delay / triggered: the VM forces the keypad panel up (PanelSource.ALERT); the
     // Activity mirrors the flag onto the screen policy so nothing locks it away mid-countdown.
@@ -1413,6 +1442,40 @@ private fun PortalLauncherApp(
         )
 
         AutoReturnOverlay(state = autoReturnState, onCancel = { autoReturnTimer.onInteraction() })
+
+        val updateToShow = availableUpdate.takeIf {
+            resumed && panel.request == null && !overlayVisible && menuTarget == null &&
+                openFolderKey == null && !showHidden && !widgetPickerRequested
+        }
+        AppUpdateOverlay(
+            release = updateToShow,
+            downloading = updateDownloading,
+            onInstall = {
+                val release = availableUpdate ?: return@AppUpdateOverlay
+                if (updateDownloading) return@AppUpdateOverlay
+                updateDownloading = true
+                pagerScope.launch {
+                    runCatching { withContext(Dispatchers.IO) { AppUpdateManager.download(context, release) } }
+                        .onSuccess { apk -> AppUpdateManager.launchInstaller(context, apk) }
+                        .onFailure {
+                            updateDownloading = false
+                            Toast.makeText(context, R.string.settings_info_check_error, Toast.LENGTH_LONG).show()
+                        }
+                }
+            },
+            onLater = {
+                if (!updateDownloading) {
+                    prefs.updateRemindAfter = System.currentTimeMillis() + AppUpdateManager.REMINDER_DELAY_MS
+                    availableUpdate = null
+                }
+            },
+            onIgnore = {
+                if (!updateDownloading) {
+                    availableUpdate?.let { prefs.ignoredUpdateVersion = it.version }
+                    availableUpdate = null
+                }
+            },
+        )
     }
     }
 }

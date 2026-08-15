@@ -151,6 +151,8 @@ data class OnboardingUiState(
 
     val apps: List<OnboardingApp> = emptyList(),
     val hiddenPackages: Set<String> = emptySet(),
+    /** App opened by a tap on the empty home screen; blank means the gesture stays off. */
+    val tapAppPackage: String = "",
 ) {
     val haConnected: Boolean get() = haTest is TestState.Success
     val mqttConnected: Boolean get() = mqttTest is TestState.Success

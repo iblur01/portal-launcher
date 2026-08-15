@@ -44,9 +44,14 @@ class Prefs(private val context: Context) {
         if (sp.contains(key)) sp.edit().remove(key).apply()
     }
 
+    /**
+     * App opened by a tap on the empty part of the home screen. Blank by default and blank is a
+     * valid choice: the gesture is opt-in, so a fresh install does nothing on tap rather than
+     * pointing at an app that may not be installed.
+     */
     var homeAssistantPackage: String
-        get() = sp.getString("ha_package", DEFAULT_HA_PACKAGE) ?: DEFAULT_HA_PACKAGE
-        set(value) = sp.edit().putString("ha_package", value.trim().ifEmpty { DEFAULT_HA_PACKAGE }).apply()
+        get() = sp.getString("ha_package", "") ?: ""
+        set(value) = sp.edit().putString("ha_package", value.trim()).apply()
 
     var brokerHost: String
         get() = sp.getString("broker_host", "homeassistant.local") ?: "homeassistant.local"
@@ -140,6 +145,18 @@ class Prefs(private val context: Context) {
     var onboardingLanguageSelected: Boolean
         get() = sp.getBoolean("onboarding_language_selected", false)
         set(value) { sp.edit().putBoolean("onboarding_language_selected", value).commit() }
+
+    var updateLastCheckAt: Long
+        get() = sp.getLong("update_last_check_at", 0L)
+        set(value) = sp.edit().putLong("update_last_check_at", value).apply()
+
+    var updateRemindAfter: Long
+        get() = sp.getLong("update_remind_after", 0L)
+        set(value) = sp.edit().putLong("update_remind_after", value).apply()
+
+    var ignoredUpdateVersion: String
+        get() = sp.getString("ignored_update_version", "").orEmpty()
+        set(value) = sp.edit().putString("ignored_update_version", value).apply()
 
     var bgOverlayOpacity: Float
         get() = sp.getFloat("bg_overlay_opacity", 0.25f)
