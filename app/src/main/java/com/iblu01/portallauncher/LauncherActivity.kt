@@ -93,7 +93,6 @@ import com.iblu01.portallauncher.ui.apps.LauncherLayoutStore
 import com.iblu01.portallauncher.ui.apps.ShortcutIconStore
 import com.iblu01.portallauncher.ui.apps.WidgetHostController
 import com.iblu01.portallauncher.ui.apps.WidgetOffer
-import com.iblu01.portallauncher.domain.home.PillSpecials
 import com.iblu01.portallauncher.domain.home.CameraSupport
 import com.iblu01.portallauncher.domain.home.PtzAction
 import com.iblu01.portallauncher.ui.camera.CameraCenter
@@ -802,8 +801,14 @@ private fun PortalLauncherApp(
             .filter { it == Prefs.CAMERA_PREFERENCES_CHANGE_KEY }
             .collect { cameraPreferences = prefs.cameraPreferences }
     }
+    // Every camera Home Assistant exposes, *before* the centre's visibility list is applied: an
+    // individual camera pill must open its own camera even when the user hid it from the centre,
+    // and hiding every camera must not make the pills stop working.
     val availableCameraIds = remember(ui.catalog) {
-        ui.catalog.resolve(PillSpecials.cameras)?.sourceEntityIds?.toList().orEmpty()
+        pills.latestStates.values
+            .filter { it.domain == "camera" }
+            .map { it.entityId }
+            .sorted()
     }
     var cameraCenter by remember { mutableStateOf(CameraCenterState()) }
     // Resolved once the centre is opened, never at startup: a launcher whose user never looks at a
