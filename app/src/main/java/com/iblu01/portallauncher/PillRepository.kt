@@ -141,8 +141,19 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
     fun addListener(listener: Listener) { listeners += listener; listener.onData() }
     fun removeListener(listener: Listener) { listeners -= listener }
 
-    fun callService(domain: String, service: String, entityId: String?, data: Map<String, Any>? = null) {
-        activeRepo.value?.callService(domain, service, entityId, data)
+    fun callService(
+        domain: String,
+        service: String,
+        entityId: String?,
+        data: Map<String, Any>? = null,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val repo = activeRepo.value
+        if (repo == null) {
+            onResult?.invoke(false)
+            return
+        }
+        repo.callService(domain, service, entityId, data, onResult)
     }
 
     /** Atomic preference reducer used by launcher, Maison and Settings entry points. */

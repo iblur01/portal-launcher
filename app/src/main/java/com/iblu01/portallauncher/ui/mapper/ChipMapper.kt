@@ -12,6 +12,9 @@ import com.iblu01.portallauncher.ui.model.PanelKind
  */
 fun LauncherChip.toPanelKind(): PanelKind = when {
     id == "media_group" -> PanelKind.MEDIA
+    // Scenes and cameras have no side panel: they act (see [toChipAction]). A long press falls
+    // back to the generic details sheet rather than opening a control surface that does not exist.
+    kind == PillKind.SCENE || kind == PillKind.CAMERA -> PanelKind.GENERIC_DETAILS
     id == "lights_group" -> PanelKind.LIGHTS
     id == "purifier_group" -> PanelKind.PURIFIER
     kind == PillKind.LIGHTS -> PanelKind.LIGHTS
@@ -43,5 +46,8 @@ fun LauncherChip.toPanelKind(): PanelKind = when {
  */
 fun LauncherChip.toChipAction(): ChipAction = when (kind) {
     PillKind.FAN -> ChipAction.ServiceToggle("fan", "toggle")
+    PillKind.SCENE -> ChipAction.ActivateScene(entityId)
+    // The general pill carries no entity id; an individual camera pill carries exactly its own.
+    PillKind.CAMERA -> ChipAction.OpenCameraCenter(entityId.takeIf(String::isNotBlank))
     else -> ChipAction.OpenPanel(toPanelKind())
 }

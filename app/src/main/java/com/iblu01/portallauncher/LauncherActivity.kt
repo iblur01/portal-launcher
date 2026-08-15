@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
+import kotlinx.coroutines.flow.filter
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +93,9 @@ import com.iblu01.portallauncher.ui.apps.LauncherLayoutStore
 import com.iblu01.portallauncher.ui.apps.ShortcutIconStore
 import com.iblu01.portallauncher.ui.apps.WidgetHostController
 import com.iblu01.portallauncher.ui.apps.WidgetOffer
+import com.iblu01.portallauncher.domain.home.PillSpecials
+import com.iblu01.portallauncher.ui.camera.CameraCenterState
+import com.iblu01.portallauncher.ui.scene.rememberSceneActivations
 import com.iblu01.portallauncher.ui.components.AlertOverlay
 import com.iblu01.portallauncher.ui.components.AppUpdateOverlay
 import com.iblu01.portallauncher.ui.components.AmbientBackground
@@ -784,6 +788,25 @@ private fun PortalLauncherApp(
     // panelChip is resolved last-known-good by the VM.
     val panel by vm.panel.collectAsStateWithLifecycle()
     val panelChip by vm.panelChip.collectAsStateWithLifecycle()
+    // Scene taps and the camera center: both are surfaces of their own, neither is a side panel.
+    val sceneActivations = rememberSceneActivations(vm::callService)
+    var cameraPreferences by remember { mutableStateOf(prefs.cameraPreferences) }
+    LaunchedEffect(Unit) {
+        SettingsChangeBus.get().changes
+            .filter { it == Prefs.CAMERA_PREFERENCES_CHANGE_KEY }
+            .collect { cameraPreferences = prefs.cameraPreferences }
+    }
+    val availableCameraIds = remember(ui.catalog) {
+        ui.catalog.resolve(PillSpecials.cameras)?.sourceEntityIds?.toList().orEmpty()
+    }
+    var cameraCenter by remember { mutableStateOf(CameraCenterState()) }
+    // A camera removed from Home Assistant, or hidden from the centre while it is open, must not
+    // strand the surface: it falls back to another camera, and only an empty list closes it.
+    LaunchedEffect(availableCameraIds, cameraPreferences, cameraCenter.isOpen) {
+        if (cameraCenter.isOpen) {
+            cameraCenter = cameraCenter.reconciled(availableCameraIds, cameraPreferences)
+        }
+    }
     val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
     var availableUpdate by remember { mutableStateOf<AppRelease?>(null) }
     var updateDownloading by remember { mutableStateOf(false) }
@@ -957,6 +980,14 @@ private fun PortalLauncherApp(
             // Through the intercepting caller: immediate visual echo, HA takes over on its push.
             is ChipAction.ServiceToggle -> callServiceProvider(action.domain, action.service, chip.entityId)
             is ChipAction.OpenPanel -> vm.onEvent(PanelEvent.OpenChip(PanelRequest.Chip(chip.id, action.panelKind)))
+            // No panel, no confirmation: the scene runs, and the pill carries the outcome. The
+            // guard against a second call while one is in flight lives in the activation state.
+            is ChipAction.ActivateScene -> sceneActivations.activate(action.entityId)
+            is ChipAction.OpenCameraCenter -> cameraCenter = cameraCenter.opened(
+                target = action.entityId,
+                availableIds = availableCameraIds,
+                preferences = cameraPreferences,
+            )
         }
     }
     // Remembered against their (identity-preserved) sources: rebuilding these collections on every
