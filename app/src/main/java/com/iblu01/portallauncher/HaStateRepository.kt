@@ -115,6 +115,9 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         private set
     @Volatile var entityCategoryByEntity: Map<String, String> = emptyMap()
         private set
+    /** entity_id -> integration that created it (`onvif`, `reolink`…). Drives PTZ detection. */
+    @Volatile var entityPlatformByEntity: Map<String, String> = emptyMap()
+        private set
     @Volatile var entityRegistryResolved: Boolean = false
         private set
     private var areaNames: Map<String, String> = emptyMap()        // area_id -> name
@@ -226,9 +229,12 @@ class HaStateRepository(appContext: Context, private val url: String, private va
     private fun parseEntityRegistry(arr: JSONArray) {
         val areaMap = HashMap<String, String?>(); val devMap = HashMap<String, String?>()
         val categoryMap = HashMap<String, String>()
+        val platformMap = HashMap<String, String>()
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
             val eid = o.optString("entity_id"); if (eid.isBlank()) continue
+            o.optString("platform").takeIf { it.isNotBlank() && !o.isNull("platform") }
+                ?.let { platformMap[eid] = it }
             areaMap[eid] = o.optString("area_id").takeIf { it.isNotBlank() && !o.isNull("area_id") }
             devMap[eid] = o.optString("device_id").takeIf { it.isNotBlank() && !o.isNull("device_id") }
             o.optString("entity_category").takeIf { it.isNotBlank() && !o.isNull("entity_category") }
@@ -237,6 +243,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         entityAreaId = areaMap; entityDeviceId = devMap
         deviceIdByEntity = devMap.mapNotNull { (entityId, deviceId) -> deviceId?.let { entityId to it } }.toMap()
         entityCategoryByEntity = categoryMap
+        entityPlatformByEntity = platformMap
     }
 
     /** JS-module resources only; a CSS or HTML resource can never register an icon set. */
@@ -372,6 +379,15 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                         resolveAreas()
                     } else if (id == 6) {
                         if (!msg.optBoolean("success")) Log.e(TAG, "subscribe_events failed: ${msg.optJSONObject("error")}")
+                    } else if (id >= 100 && pendingRequests.containsKey(id)) {
+                        val callback = pendingRequests.remove(id)
+                        val result = if (msg.optBoolean("success")) {
+                            msg.optJSONObject("result") ?: JSONObject()
+                        } else {
+                            Log.w(TAG, "websocket request $id failed: ${msg.optJSONObject("error")}")
+                            null
+                        }
+                        callback?.invoke(result)
                     } else if (id >= 100) {
                         val success = msg.optBoolean("success")
                         if (success) Log.i(TAG, "service call $id succeeded")
@@ -439,10 +455,38 @@ class HaStateRepository(appContext: Context, private val url: String, private va
      */
     private val pendingCalls = java.util.concurrent.ConcurrentHashMap<Int, (Boolean) -> Unit>()
 
+    /**
+     * Arbitrary websocket requests awaiting their `result`, by message id. Used by the camera
+     * center to ask Home Assistant for a stream url and for the service catalogue — both are
+     * request/response, not a subscription, so they share the same one-shot bookkeeping.
+     */
+    private val pendingRequests = java.util.concurrent.ConcurrentHashMap<Int, (JSONObject?) -> Unit>()
+
     private fun failPendingCalls() {
         val pending = pendingCalls.entries.toList()
         pendingCalls.clear()
         pending.forEach { it.value(false) }
+        val requests = pendingRequests.entries.toList()
+        pendingRequests.clear()
+        requests.forEach { it.value(null) }
+    }
+
+    /**
+     * Sends a one-shot websocket request built from [payload] (its `id` is filled in here) and
+     * hands the `result` object to [onResult], or `null` when the request failed, was refused, or
+     * the socket died first. [onResult] runs on the socket thread and must stay lightweight.
+     */
+    fun request(payload: JSONObject, onResult: (JSONObject?) -> Unit) {
+        val socketRef = socket
+        if (socketRef == null) {
+            onResult(null)
+            return
+        }
+        val id = synchronized(this) { msgIdCounter++ }
+        pendingRequests[id] = onResult
+        if (!socketRef.send(payload.put("id", id).toString())) {
+            pendingRequests.remove(id)?.invoke(null)
+        }
     }
 
     /**

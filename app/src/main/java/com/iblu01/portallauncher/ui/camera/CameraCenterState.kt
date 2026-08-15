@@ -14,6 +14,12 @@ data class CameraCenterState(val open: Open? = null) {
         val cameras: List<String>,
         val selected: String,
         val mode: CameraCenterMode,
+        /**
+         * True when an individual pill asked for [selected] by name. Such a camera survives being
+         * hidden from the centre — the user tapped *its* pill — whereas a camera the centre merely
+         * happened to land on follows the visibility list like every other.
+         */
+        val requested: Boolean = false,
     )
 
     val isOpen: Boolean get() = open != null
@@ -39,12 +45,14 @@ data class CameraCenterState(val open: Open? = null) {
             target != null && target in availableIds -> target
             else -> preferences.resolveMainCamera(availableIds)
         } ?: return this
+        val requested = target != null && target == selected
         val mode = if (target != null) CameraCenterMode.MAIN else preferences.defaultMode
         return copy(
             open = Open(
                 cameras = if (selected in cameras) cameras else cameras + selected,
                 selected = selected,
                 mode = mode,
+                requested = requested,
             ),
         )
     }
@@ -55,7 +63,9 @@ data class CameraCenterState(val open: Open? = null) {
     fun selected(entityId: String): CameraCenterState {
         val current = open ?: return this
         if (entityId !in current.cameras) return this
-        return copy(open = current.copy(selected = entityId, mode = CameraCenterMode.MAIN))
+        return copy(
+            open = current.copy(selected = entityId, mode = CameraCenterMode.MAIN, requested = false),
+        )
     }
 
     fun withMode(mode: CameraCenterMode): CameraCenterState {
@@ -71,8 +81,8 @@ data class CameraCenterState(val open: Open? = null) {
     fun reconciled(availableIds: List<String>, preferences: CameraPreferences): CameraCenterState {
         val current = open ?: return this
         val cameras = preferences.visibleCameras(availableIds).let { visible ->
-            // Keep an explicitly opened but hidden camera as long as HA still exposes it.
-            if (current.selected in visible || current.selected !in availableIds) visible
+            // An explicitly requested camera survives being hidden, as long as HA still exposes it.
+            if (!current.requested || current.selected in visible || current.selected !in availableIds) visible
             else visible + current.selected
         }
         if (cameras.isEmpty()) return closed()
