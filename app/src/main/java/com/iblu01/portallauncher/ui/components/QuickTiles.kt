@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,6 +68,9 @@ import com.iblu01.portallauncher.ui.components.controls.contentColorOn
 import com.iblu01.portallauncher.ui.components.controls.kelvinToColor
 import com.iblu01.portallauncher.ui.icons.HaIcon
 import com.iblu01.portallauncher.ui.mapper.withLiveState
+import com.iblu01.portallauncher.ui.scene.LocalSceneActivations
+import com.iblu01.portallauncher.ui.scene.sceneStatusLabel
+import com.iblu01.portallauncher.ui.scene.sceneVisualState
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -126,7 +130,16 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
     val live = if (chip.deviceState != null && chip.entityId.isNotBlank() && ',' !in chip.entityId) {
         rememberEntity(chip.entityId)
     } else null
-    @Suppress("NAME_SHADOWING") val chip = chip.withLiveState(androidx.compose.ui.platform.LocalContext.current, live)
+    @Suppress("NAME_SHADOWING") var chip = chip.withLiveState(androidx.compose.ui.platform.LocalContext.current, live)
+    // A scene has no state to read back, so its pill carries the outcome of the tap itself:
+    // in progress, done, or failed — after which it returns to advertising the action.
+    if (chip.kind == PillKind.SCENE) {
+        val status = LocalSceneActivations.current?.statusOf(chip.entityId)
+        chip = chip.copy(
+            value = stringResource(sceneStatusLabel(status)),
+            state = sceneVisualState(status),
+        )
+    }
     val target = selectedChipAccent(launcherChipAccent(chip), selected)
     val accent by animateColorAsState(target, AppleMotion.spring(), label = "chipAccent")
     val animatedProgress by animateFloatAsState(chip.progress, AppleMotion.spring(), label = "chipProgress")

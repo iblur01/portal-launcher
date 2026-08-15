@@ -100,6 +100,7 @@ import com.iblu01.portallauncher.ui.camera.CameraCenter
 import com.iblu01.portallauncher.ui.camera.CameraCenterEnvironment
 import com.iblu01.portallauncher.ui.camera.CameraCenterState
 import com.iblu01.portallauncher.ui.camera.CameraStreamResolver
+import com.iblu01.portallauncher.ui.scene.LocalSceneActivations
 import com.iblu01.portallauncher.ui.scene.rememberSceneActivations
 import com.iblu01.portallauncher.ui.components.AlertOverlay
 import com.iblu01.portallauncher.ui.components.AppUpdateOverlay
@@ -1216,6 +1217,7 @@ private fun PortalLauncherApp(
     // and the stable per-entity state store to the whole subtree (design §8).
     CompositionLocalProvider(
         LocalCallService provides callServiceProvider,
+        LocalSceneActivations provides sceneActivations,
         LocalHaStates provides haStates,
         LocalAreas provides ui.areaByEntity,
     ) {

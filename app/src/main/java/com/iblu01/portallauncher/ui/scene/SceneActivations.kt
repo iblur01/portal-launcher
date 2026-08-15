@@ -7,6 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.annotation.StringRes
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.scene.SceneActivationState
 import com.iblu01.portallauncher.domain.scene.SceneActivationStatus
 import kotlinx.coroutines.android.awaitFrame
@@ -71,4 +74,29 @@ fun rememberSceneActivations(
         }
     }
     return activations
+}
+
+/**
+ * Read by the pill renderer so a scene shows its own outcome wherever it is drawn — the tray, the
+ * Maison page — without every call site having to be handed the holder.
+ */
+val LocalSceneActivations = staticCompositionLocalOf<SceneActivations?> { null }
+
+/**
+ * The label a scene pill shows. Neutral by default: a scene has no state, so the resting label
+ * advertises what a tap does rather than inventing a status.
+ */
+@StringRes
+fun sceneStatusLabel(status: SceneActivationStatus?): Int = when (status) {
+    SceneActivationStatus.PENDING -> R.string.pill_scene_activating
+    SceneActivationStatus.SUCCEEDED -> R.string.pill_scene_activated
+    SceneActivationStatus.FAILED -> R.string.pill_scene_failed
+    null -> R.string.pill_scene_ready
+}
+
+/** Visual state of a scene pill, in the same vocabulary as every other pill. */
+fun sceneVisualState(status: SceneActivationStatus?): String = when (status) {
+    SceneActivationStatus.SUCCEEDED -> "active"
+    SceneActivationStatus.FAILED -> "warning"
+    else -> "ok"
 }
