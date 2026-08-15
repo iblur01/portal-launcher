@@ -156,6 +156,23 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         repo.callService(domain, service, entityId, data, onResult)
     }
 
+    /** entity_id -> integration that created it. Empty until the entity registry loads. */
+    val entityPlatformByEntity: Map<String, String>
+        get() = activeRepo.value?.entityPlatformByEntity.orEmpty()
+
+    /**
+     * One-shot websocket request on the active connection (see [HaStateRepository.request]).
+     * [onResult] receives null when nothing is connected, so a caller always gets an answer.
+     */
+    fun request(payload: org.json.JSONObject, onResult: (org.json.JSONObject?) -> Unit) {
+        val repo = activeRepo.value
+        if (repo == null) {
+            onResult(null)
+            return
+        }
+        repo.request(payload, onResult)
+    }
+
     /** Atomic preference reducer used by launcher, Maison and Settings entry points. */
     fun updateHomePillPreferences(
         prefs: Prefs,

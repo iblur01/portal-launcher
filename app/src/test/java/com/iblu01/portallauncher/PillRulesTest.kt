@@ -29,13 +29,18 @@ class PillRulesTest {
     @Test fun `every supported kind belongs to exactly one family`() {
         val legacyUnsupported = setOf(
             PillKind.AIR, PillKind.CLIMATE, PillKind.BATTERY,
-            PillKind.SCENE, PillKind.PRESENCE, PillKind.ENERGY,
+            PillKind.PRESENCE, PillKind.ENERGY,
         )
         PillKind.values().filterNot { it in legacyUnsupported }.forEach { kind ->
             val families = PillFamily.values().filter { kind in it.kinds }
             assertEquals("kind $kind should be in exactly one family", 1, families.size)
         }
         legacyUnsupported.forEach { assertEquals(null, PillFamily.of(it)) }
+    }
+
+    @Test fun `scenes and cameras have their own settings families`() {
+        assertEquals(PillFamily.SCENES, PillFamily.of(PillKind.SCENE))
+        assertEquals(PillFamily.CAMERAS, PillFamily.of(PillKind.CAMERA))
     }
 
     @Test fun `family grouping matches plain-language buckets`() {
@@ -170,20 +175,37 @@ class PillRulesTest {
         assertFalse(PillSupport.isSupported(entity("device_tracker.x", "home")))
     }
 
-    @Test fun `passive sensors scenes and location entities are not pill candidates`() {
+    @Test fun `passive sensors and location entities are not pill candidates`() {
         listOf(
             "co", "co2", "pm1", "pm4", "ozone", "radon", "energy", "power", "current",
             "voltage", "temperature", "humidity", "battery", "illuminance", "signal_strength",
         ).forEach {
             assertFalse(it, PillSupport.isSupported(entity("sensor.x", "1", it)))
         }
-        listOf("scene.evening", "script.good_night", "person.alex", "device_tracker.phone").forEach {
+        listOf("script.good_night", "person.alex", "device_tracker.phone").forEach {
             assertFalse(it, PillSupport.isSupported(entity(it, "on")))
         }
     }
 
+    @Test fun `scenes and cameras are discoverable but never enabled on their own`() {
+        val scene = entity("scene.evening", "2024-01-01T00:00:00+00:00")
+        val camera = entity("camera.hall", "idle")
+        listOf(scene, camera).forEach { assertTrue(it.entityId, PillSupport.isSupported(it)) }
+        assertEquals(PillKind.SCENE, PillSupport.kind(scene))
+        assertEquals(PillKind.CAMERA, PillSupport.kind(camera))
+
+        // A home has far more scenes and cameras than tray slots: they are opt-in.
+        val entities = listOf(scene, camera)
+        PillSupport.candidates(entities).forEach { candidate ->
+            assertFalse(
+                candidate.primary.entityId,
+                PillSupport.isAutomaticallyEnabled(candidate, entities),
+            )
+        }
+    }
+
     @Test fun `advanced controls are not permanent chip candidates`() {
-        listOf("button.x", "input_button.x", "number.x", "input_number.x", "select.x", "input_select.x", "camera.x").forEach {
+        listOf("button.x", "input_button.x", "number.x", "input_number.x", "select.x", "input_select.x").forEach {
             assertFalse(it, PillSupport.isSupported(entity(it, "on")))
         }
     }

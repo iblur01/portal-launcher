@@ -94,7 +94,12 @@ import com.iblu01.portallauncher.ui.apps.ShortcutIconStore
 import com.iblu01.portallauncher.ui.apps.WidgetHostController
 import com.iblu01.portallauncher.ui.apps.WidgetOffer
 import com.iblu01.portallauncher.domain.home.PillSpecials
+import com.iblu01.portallauncher.domain.home.CameraSupport
+import com.iblu01.portallauncher.domain.home.PtzAction
+import com.iblu01.portallauncher.ui.camera.CameraCenter
+import com.iblu01.portallauncher.ui.camera.CameraCenterEnvironment
 import com.iblu01.portallauncher.ui.camera.CameraCenterState
+import com.iblu01.portallauncher.ui.camera.CameraStreamResolver
 import com.iblu01.portallauncher.ui.scene.rememberSceneActivations
 import com.iblu01.portallauncher.ui.components.AlertOverlay
 import com.iblu01.portallauncher.ui.components.AppUpdateOverlay
@@ -800,6 +805,41 @@ private fun PortalLauncherApp(
         ui.catalog.resolve(PillSpecials.cameras)?.sourceEntityIds?.toList().orEmpty()
     }
     var cameraCenter by remember { mutableStateOf(CameraCenterState()) }
+    // Resolved once the centre is opened, never at startup: a launcher whose user never looks at a
+    // camera must not spend a websocket round-trip on the service catalogue.
+    var haServices by remember { mutableStateOf<Map<String, Set<String>>>(emptyMap()) }
+    val cameraResolver = remember(pills, prefs.haUrl) {
+        CameraStreamResolver(baseUrl = prefs.haUrl, request = pills::request)
+    }
+    LaunchedEffect(cameraCenter.isOpen) {
+        if (cameraCenter.isOpen && haServices.isEmpty()) haServices = cameraResolver.services()
+    }
+    val cameraEnvironment = remember(cameraResolver, haServices, ui.catalog) {
+        CameraCenterEnvironment(
+            entityOf = { entityId -> pills.latestStates[entityId] },
+            labelOf = { entityId -> pills.latestStates[entityId]?.name ?: entityId.substringAfter('.') },
+            resolver = cameraResolver,
+            token = prefs.haToken,
+            capabilitiesOf = { entity ->
+                CameraSupport.capabilitiesOf(
+                    entity = entity,
+                    states = pills.latestStates,
+                    deviceIdByEntity = pills.latestDeviceIds,
+                    entityPlatformByEntity = pills.entityPlatformByEntity,
+                    services = haServices,
+                )
+            },
+            onPtz = { capabilities, entityId, action ->
+                // Always the active camera, never "the PTZ camera": the id comes from the tile.
+                val companion = capabilities.ptzEntityIds[action]
+                if (companion != null) {
+                    callServiceProvider("button", "press", companion)
+                } else {
+                    callServiceProvider("onvif", "ptz", entityId, ptzArguments(action))
+                }
+            },
+        )
+    }
     // A camera removed from Home Assistant, or hidden from the centre while it is open, must not
     // strand the surface: it falls back to another camera, and only an empty list closes it.
     LaunchedEffect(availableCameraIds, cameraPreferences, cameraCenter.isOpen) {
@@ -845,7 +885,7 @@ private fun PortalLauncherApp(
     // must fall back to the clock on its own.
     val awayFromClock = pagerLayout.identityOf(pagerState.currentPage) != PageIdentity.Clock
     val userState = pillsExpanded || overlayVisible || awayFromClock || menuTarget != null ||
-        showHidden || armedPillReorderKey != null || pillDragActive
+        showHidden || armedPillReorderKey != null || pillDragActive || cameraCenter.isOpen
     // While an alarm is alerting the countdown is suspended outright: returning to the clock would
     // take the disarm keypad off screen exactly when it is needed.
     LaunchedEffect(panel.request, panel.source, userState, resumed, alarmAlerting) {
@@ -861,6 +901,7 @@ private fun PortalLauncherApp(
             if (panel.request != null && panel.source == PanelSource.USER) vm.onEvent(PanelEvent.Dismiss)
             if (pillsExpanded) pillsExpanded = false
             if (overlayVisible) overlayVisible = false
+            if (cameraCenter.isOpen) cameraCenter = cameraCenter.closed()
             if (menuTarget != null) menuTarget = null
             if (showHidden) showHidden = false
             homeEditing = false
@@ -925,6 +966,11 @@ private fun PortalLauncherApp(
     // Back never escapes the launcher: finishing a home activity gives a black flash while the
     // system restarts it. Innermost surface first, then the page, then nothing.
     BackHandler(enabled = true) {
+        // The camera centre covers the whole surface, so it is the innermost thing open.
+        if (cameraCenter.isOpen) {
+            cameraCenter = cameraCenter.closed()
+            return@BackHandler
+        }
         if (armedPillReorderKey != null) {
             armedPillReorderKey = null
             pillDragActive = false
@@ -955,6 +1001,7 @@ private fun PortalLauncherApp(
 
     // HOME pressed while already home: back to the resting screen, like any launcher.
     LaunchedEffect(homePresses) {
+        cameraCenter = cameraCenter.closed()
         menuTarget = null
         showHidden = false
         widgetPickerRequested = false
@@ -1490,6 +1537,18 @@ private fun PortalLauncherApp(
             onDismiss = { showHidden = false },
         )
 
+        // Drawn over every other launcher surface: the camera centre is a page of its own, not a
+        // card inside one. Its whole subtree — and therefore every player it owns — disappears
+        // when it closes.
+        CameraCenter(
+            state = cameraCenter,
+            environment = cameraEnvironment,
+            onClose = { cameraCenter = cameraCenter.closed() },
+            onSelect = { cameraCenter = cameraCenter.selected(it) },
+            onMode = { cameraCenter = cameraCenter.withMode(it) },
+            modifier = Modifier.fillMaxSize(),
+        )
+
         AlertOverlay(
             message = alertMessage,
             onDismiss = { AlertOverlayState.dismiss() }
@@ -1683,4 +1742,17 @@ private fun MediaPlayerPanel(
         onDismiss = onDismiss,
         fullScreen = fullScreen,
     )
+}
+
+/**
+ * The ONVIF `ptz` service vocabulary. Each action moves exactly one axis, so the other fields are
+ * deliberately absent rather than sent as a neutral value.
+ */
+private fun ptzArguments(action: PtzAction): Map<String, Any> = when (action) {
+    PtzAction.PAN_LEFT -> mapOf("pan" to "LEFT")
+    PtzAction.PAN_RIGHT -> mapOf("pan" to "RIGHT")
+    PtzAction.TILT_UP -> mapOf("tilt" to "UP")
+    PtzAction.TILT_DOWN -> mapOf("tilt" to "DOWN")
+    PtzAction.ZOOM_IN -> mapOf("zoom" to "ZOOM_IN")
+    PtzAction.ZOOM_OUT -> mapOf("zoom" to "ZOOM_OUT")
 }
