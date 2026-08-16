@@ -187,17 +187,19 @@ class PillRulesTest {
         }
     }
 
-    @Test fun `scenes and cameras are discoverable but never enabled on their own`() {
+    @Test fun `scenes and cameras are discovered and enabled like any other device`() {
         val scene = entity("scene.evening", "2024-01-01T00:00:00+00:00")
         val camera = entity("camera.hall", "idle")
         listOf(scene, camera).forEach { assertTrue(it.entityId, PillSupport.isSupported(it)) }
         assertEquals(PillKind.SCENE, PillSupport.kind(scene))
         assertEquals(PillKind.CAMERA, PillSupport.kind(camera))
 
-        // A home has far more scenes and cameras than tray slots: they are opt-in.
+        // Enabled by default: a disabled rule is hidden from the Maison page and cannot be
+        // pinned, so opting them out would make requirements 3 and 5 unreachable. What keeps
+        // them out of the way is their low base priority, not a disabled flag.
         val entities = listOf(scene, camera)
         PillSupport.candidates(entities).forEach { candidate ->
-            assertFalse(
+            assertTrue(
                 candidate.primary.entityId,
                 PillSupport.isAutomaticallyEnabled(candidate, entities),
             )

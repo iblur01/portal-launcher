@@ -394,9 +394,6 @@ object PillSupport {
     ): Boolean {
         val primary = candidate.primary
         if (entityCategoryByEntity[primary.entityId] in setOf("config", "diagnostic")) return false
-        // A home has far more scenes and cameras than tray slots, and neither reports a state worth
-        // watching. They stay discoverable in Settings and are added to the home on demand.
-        if (primary.domain in setOf("scene", "camera")) return false
         if (primary.domain !in setOf("switch", "input_boolean")) return true
 
         val slug = primary.entityId.substringAfter('.').lowercase()
