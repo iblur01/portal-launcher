@@ -804,12 +804,20 @@ private fun PortalLauncherApp(
     // Every camera Home Assistant exposes, *before* the centre's visibility list is applied: an
     // individual camera pill must open its own camera even when the user hid it from the centre,
     // and hiding every camera must not make the pills stop working.
-    val availableCameraIds = remember(ui.catalog) {
-        pills.latestStates.values
-            .filter { it.domain == "camera" }
-            .map { it.entityId }
-            .sorted()
+    // Read at invocation, never captured: the tray/home action callbacks are remembered against
+    // their pinned set, so a plain list captured here would freeze at its first value — empty,
+    // before Home Assistant has connected — and every camera tap would silently do nothing.
+    val cameraIdsNow: () -> List<String> = remember(pills) {
+        {
+            pills.latestStates.values
+                .filter { it.domain == "camera" }
+                .map { it.entityId }
+                .sorted()
+        }
     }
+    // Recomposed with the catalog, for the effects below that must react to a camera appearing
+    // or disappearing rather than to a tap.
+    val availableCameraIds = remember(ui.catalog) { cameraIdsNow() }
     var cameraCenter by remember { mutableStateOf(CameraCenterState()) }
     // Resolved once the centre is opened, never at startup: a launcher whose user never looks at a
     // camera must not spend a websocket round-trip on the service catalogue.
@@ -1038,7 +1046,7 @@ private fun PortalLauncherApp(
             is ChipAction.ActivateScene -> sceneActivations.activate(action.entityId)
             is ChipAction.OpenCameraCenter -> cameraCenter = cameraCenter.opened(
                 target = action.entityId,
-                availableIds = availableCameraIds,
+                availableIds = cameraIdsNow(),
                 preferences = cameraPreferences,
             )
         }
@@ -1058,15 +1066,26 @@ private fun PortalLauncherApp(
     val onOpenResolvedPill: (com.iblu01.portallauncher.domain.home.ResolvedPill) -> Unit = { pill ->
         when (pill.ref) {
             is PillRef.Device -> onChipClick(pill.chip)
+            // A launcher-provided entry backs no group: routing it to the group panel would open
+            // an empty one. It carries its own action, exactly like a device pill.
+            is PillRef.Special -> onChipClick(pill.chip)
             else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(pill.ref)))
         }
     }
     val onOpenResolvedCommands: (com.iblu01.portallauncher.domain.home.ResolvedPill) -> Unit = { pill ->
-        when (pill.ref) {
-            is PillRef.Device -> vm.onEvent(
+        val ref = pill.ref
+        when {
+            // Neither a camera nor a scene has commands to show: the details sheet would only
+            // list whatever sensors happen to sit on the same device. They do what a tap does.
+            // (Deliberately keyed on the kind, not on the chip action: a fan is a ServiceToggle
+            // too, and long-pressing it must keep opening its control panel.)
+            pill.chip.kind == PillKind.CAMERA || pill.chip.kind == PillKind.SCENE ->
+                onChipClick(pill.chip)
+            ref is PillRef.Special -> onChipClick(pill.chip)
+            ref is PillRef.Device -> vm.onEvent(
                 PanelEvent.LongPressChip(PanelRequest.Chip(pill.chip.id, pill.chip.toPanelKind())),
             )
-            else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(pill.ref)))
+            else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(ref)))
         }
     }
     // One stable instance per pinned-set: the action callbacks read live values through the `ui`
