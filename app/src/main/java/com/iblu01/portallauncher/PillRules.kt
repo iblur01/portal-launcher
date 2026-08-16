@@ -200,6 +200,23 @@ object PillRuleCodec {
 }
 
 object PillSupport {
+    /**
+     * Whether an entity is usable right now.
+     *
+     * Domain-aware on purpose: a scene's state is the timestamp of its last activation, so one
+     * that has never run reports `unknown`, and a camera reports `idle`/`unknown` until it
+     * streams. Neither is unavailable — only Home Assistant's explicit `unavailable` is. Reading
+     * the generic rule for them would make a brand-new scene impossible to pin.
+     */
+    fun isIndividuallyAvailable(e: HaEntity): Boolean {
+        val state = e.state.trim().lowercase()
+        return if (e.domain in statelessActionDomains) state != "unavailable"
+        else state !in setOf("unavailable", "unknown", "none", "")
+    }
+
+    /** Domains whose entities act instead of holding a state worth reading back. */
+    internal val statelessActionDomains = setOf("scene", "camera")
+
     private val openingClasses = setOf("door", "window", "opening", "garage_door")
     /** Only short-lived movement signals remain eligible; location/presence is intentionally out. */
     private val motionClasses = setOf("motion", "occupancy", "moving")

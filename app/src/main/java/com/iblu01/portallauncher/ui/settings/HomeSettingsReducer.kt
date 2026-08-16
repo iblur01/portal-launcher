@@ -6,6 +6,7 @@ import com.iblu01.portallauncher.HomePillPreferencesCodec
 import com.iblu01.portallauncher.PillCandidate
 import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.PillRule
+import com.iblu01.portallauncher.PillSupport
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.localizedLabel
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
@@ -279,8 +280,9 @@ object HomeSettingsCatalogBuilder {
         )
     }
 
+    /** Shared with the live catalog so a scene or camera is never wrongly greyed out here. */
     private fun HaEntity.isIndividuallyAvailable(): Boolean =
-        state.trim().lowercase() !in setOf("unavailable", "unknown", "none", "")
+        PillSupport.isIndividuallyAvailable(this)
 }
 
 /** Pure projection used by Settings UI and accessible reorder actions. */

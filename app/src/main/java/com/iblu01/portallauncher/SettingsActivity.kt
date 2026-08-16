@@ -337,6 +337,11 @@ class SettingsActivity : ComponentActivity() {
      * a removed one simply stops being listed — without blocking the page or the other cameras.
      */
     private fun refreshCameras() {
+        uiState.cameraPreferences = prefs.cameraPreferences
+        uiState.camerasPillPinned = PillSpecials.cameras in prefs.homePillPreferences.pinnedOrder
+        // An empty state cache means "not connected yet", not "no camera": keep whatever is
+        // already listed instead of blanking the page on a reconnect.
+        if (pills.latestStates.isEmpty()) return
         val cameras = pills.latestStates.values
             .filter { it.domain == "camera" }
             .sortedBy { it.name.lowercase() }
@@ -349,8 +354,6 @@ class SettingsActivity : ComponentActivity() {
             }
         uiState.cameras.clear()
         uiState.cameras.addAll(cameras)
-        uiState.cameraPreferences = prefs.cameraPreferences
-        uiState.camerasPillPinned = PillSpecials.cameras in prefs.homePillPreferences.pinnedOrder
     }
 
     private fun refreshPillSettingsCatalog() {
@@ -377,6 +380,10 @@ class SettingsActivity : ComponentActivity() {
             uiState.pillCandidates.clear()
             uiState.pillCandidates.addAll(candidates)
         }
+        // Cameras are resynchronized here rather than only from the pills page: the camera
+        // settings live under Connected home, and opening them directly must not show an empty
+        // list. This runs on resume and on every Home Assistant push, so the list stays live.
+        refreshCameras()
     }
 
     private fun resolveInstalledApps(): List<AppEntry> {

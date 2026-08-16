@@ -353,13 +353,7 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
     }
 
     private fun availabilityOf(entity: HaEntity, connected: Boolean): Availability = when {
-        // A scene that has never run reports `unknown`, and a camera reports `idle`/`unknown` until
-        // it streams. Neither is unavailable: only HA's explicit `unavailable` is.
-        entity.domain in setOf("scene", "camera") ->
-            if (entity.state.trim().lowercase(Locale.ROOT) == "unavailable") Availability.UNAVAILABLE
-            else if (!connected) Availability.STALE
-            else Availability.AVAILABLE
-        entity.state.trim().lowercase(Locale.ROOT) in setOf("unavailable", "unknown", "none", "") -> Availability.UNAVAILABLE
+        !PillSupport.isIndividuallyAvailable(entity) -> Availability.UNAVAILABLE
         !connected -> Availability.STALE
         else -> Availability.AVAILABLE
     }

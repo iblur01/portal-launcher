@@ -1,6 +1,7 @@
 package com.iblu01.portallauncher.domain.home
 
 import com.iblu01.portallauncher.HaEntity
+import com.iblu01.portallauncher.PillSupport
 
 /**
  * How a camera's live picture can actually be fetched from Home Assistant.
@@ -71,7 +72,7 @@ object CameraSupport {
     private val ptzDomains = setOf("button")
 
     fun isAvailable(entity: HaEntity?): Boolean =
-        entity != null && entity.state.trim().lowercase() != "unavailable"
+        entity != null && PillSupport.isIndividuallyAvailable(entity)
 
     /**
      * Formats to try, best first. HLS is only listed when the camera advertises the STREAM
