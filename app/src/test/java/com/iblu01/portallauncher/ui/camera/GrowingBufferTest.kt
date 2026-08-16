@@ -1,6 +1,8 @@
 package com.iblu01.portallauncher.ui.camera
 
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -59,5 +61,23 @@ class GrowingBufferTest {
         buffer.feed("--frame$payload--frame")
 
         assertArrayEquals(payload.toByteArray(), buffer.takePart(delimiter))
+    }
+
+    @Test fun `a reader cancelled before it starts never opens a connection`() {
+        // A client with no dispatcher work possible: if cancel() were not honoured up front, this
+        // would attempt a real connection instead of returning.
+        val reader = MjpegReader(OkHttpClient(), "http://127.0.0.1:1/stream", "token")
+        reader.cancel()
+
+        var frames = 0
+        reader.read { frames++; true }
+
+        assertEquals(0, frames)
+    }
+
+    @Test fun `cancelling twice is harmless`() {
+        val reader = MjpegReader(OkHttpClient(), "http://127.0.0.1:1/stream", "token")
+        reader.cancel()
+        reader.cancel()
     }
 }

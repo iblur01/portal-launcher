@@ -14,9 +14,11 @@ import java.io.InputStream
  * dedicated reader rather than a media source. It is also the reason MJPEG never carries audio:
  * the format is a sequence of JPEG images and nothing else.
  *
- * The reader is deliberately blocking and single-use: [read] runs on a background thread and
- * returns as soon as the thread is interrupted or the caller's [onFrame] reports it no longer
- * wants frames. Closing the response there and then is what makes stopping deterministic.
+ * The reader is deliberately blocking and single-use: [read] runs on a background thread. Stopping
+ * it is [cancel]'s job, not the coroutine's — cancelling a coroutine does not interrupt a blocking
+ * socket read, so relying on that alone would only close the connection when the *next* frame
+ * happened to arrive, and never at all for a camera that stalls. [cancel] aborts the call itself,
+ * which is what makes the stop deterministic.
  */
 internal class MjpegReader(
     private val client: OkHttpClient,
@@ -28,6 +30,20 @@ internal class MjpegReader(
      * stream ends. Throws [IOException] on a transport or protocol failure so the caller can show
      * its error state; it never throws for an ordinary, requested stop.
      */
+    /** The in-flight call, so [cancel] can abort a blocking read from another thread. */
+    @Volatile private var call: okhttp3.Call? = null
+
+    @Volatile private var cancelled = false
+
+    /**
+     * Aborts the stream now, from any thread. Safe to call before, during or after [read], and
+     * safe to call more than once. A [read] in progress fails fast, closing its response.
+     */
+    fun cancel() {
+        cancelled = true
+        call?.cancel()
+    }
+
     @Throws(IOException::class)
     fun read(onFrame: (Bitmap) -> Boolean) {
         // The credential travels in the header, never in the url: nothing here can end up in a log
@@ -36,7 +52,14 @@ internal class MjpegReader(
             .url(url)
             .header("Authorization", "Bearer $token")
             .build()
-        client.newCall(request).execute().use { response ->
+        val pending = client.newCall(request)
+        call = pending
+        // Lost race: cancel() ran between the field write and the call starting.
+        if (cancelled) {
+            pending.cancel()
+            return
+        }
+        pending.execute().use { response ->
             if (!response.isSuccessful) {
                 // The status alone: an error body from Home Assistant may echo request details.
                 throw IOException("camera stream refused with HTTP ${response.code}")
@@ -53,7 +76,7 @@ internal class MjpegReader(
         val buffer = GrowingBuffer()
         val chunk = ByteArray(READ_CHUNK)
         var wants = true
-        while (wants && !Thread.currentThread().isInterrupted) {
+        while (wants && !cancelled && !Thread.currentThread().isInterrupted) {
             val read = stream.read(chunk)
             if (read < 0) return
             buffer.append(chunk, read)

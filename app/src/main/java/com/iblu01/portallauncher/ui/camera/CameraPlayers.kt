@@ -113,22 +113,27 @@ internal fun MjpegCameraPlayer(
     onPlaying: () -> Unit = {},
 ) {
     var frame by remember(url) { mutableStateOf<Bitmap?>(null) }
+    val reader = remember(url, token) { MjpegReader(mjpegClient(), url, token) }
 
-    LaunchedEffect(url, token) {
+    // Cancelling the coroutine does not interrupt a blocking socket read, so leaving the
+    // composition aborts the HTTP call itself. That is what actually closes the connection the
+    // instant a tile scrolls off screen or the centre is closed.
+    DisposableEffect(reader) {
+        onDispose { reader.cancel() }
+    }
+
+    LaunchedEffect(reader) {
         frame = null
-        val reader = MjpegReader(mjpegClient(), url, token)
         runCatching {
             withContext(Dispatchers.IO) {
                 reader.read { bitmap ->
-                    // Returning false ends the read and closes the response; checking the job here
-                    // is what makes a cancelled composition stop the network immediately.
-                    if (!coroutineContext.isActiveSafe()) return@read false
                     frame = bitmap
                     true
                 }
             }
-        }.onFailure { failure ->
-            coroutineContext.ensureActive()   // a cancellation is a requested stop, not an error
+        }.onFailure {
+            // A cancellation is a requested stop, never an error to show.
+            coroutineContext.ensureActive()
             onError()
             return@LaunchedEffect
         }
@@ -152,9 +157,6 @@ internal fun MjpegCameraPlayer(
         }
     }
 }
-
-private fun kotlin.coroutines.CoroutineContext.isActiveSafe(): Boolean =
-    this[kotlinx.coroutines.Job]?.isActive != false
 
 /**
  * A client of its own: the camera proxy holds each response open for as long as the camera
