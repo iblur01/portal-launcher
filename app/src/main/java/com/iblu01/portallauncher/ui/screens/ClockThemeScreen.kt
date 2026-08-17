@@ -252,7 +252,7 @@ fun ClockThemeScreen(
         // Close button.
         Box(
             modifier = Modifier
-                .align(Alignment.TopStart)
+                .align(Alignment.TopEnd)
                 .padding(24.dp)
                 .size(44.dp)
                 .clip(CircleShape)
