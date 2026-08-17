@@ -2,6 +2,7 @@ package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -45,9 +46,11 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
@@ -246,9 +249,7 @@ fun ClockHeader(
             }
         }
         Spacer(Modifier.height((if (compactScreen) 0.dp else 2.dp) * clockTheme.elementSpacing))
-        Text(
-            text = time,
-            style = AppleTypography.displayLarge.copy(
+        val timeStyle = AppleTypography.displayLarge.copy(
                 fontFamily = clockFontFamily(clockTheme.font, timeWeight),
                 fontSize = clockTheme.size.sp,
                 fontWeight = timeWeight,
@@ -258,16 +259,31 @@ fun ClockHeader(
                     offset = Offset(0f, 2f),
                     blurRadius = 12f
                 )
-            ),
-            color = clockTheme.tint.color,
-            maxLines = 1,
-            softWrap = false,
+            )
+        val timeParts = time.split(':', limit = 2)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             // Reclaim the date's visual slot as it fades, so the minimal time sits at the same top
             // position it would have had if the date were not in the layout at all.
-            modifier = Modifier.graphicsLayer {
-                translationY = -COMPACT_DATE_LIFT.toPx() * collapse().coerceIn(0f, 1f)
-            },
-        )
+            modifier = Modifier
+                .graphicsLayer {
+                    translationY = -COMPACT_DATE_LIFT.toPx() * collapse().coerceIn(0f, 1f)
+                }
+                .clearAndSetSemantics { contentDescription = time },
+        ) {
+            Text(timeParts.first(), style = timeStyle, color = clockTheme.tint.color, maxLines = 1, softWrap = false)
+            if (timeParts.size == 2) {
+                val fontScale = LocalDensity.current.fontScale
+                val colonWidth = (clockTheme.size * fontScale * 0.18f).dp
+                val colonHeight = (clockTheme.size * fontScale * 0.64f).dp
+                Canvas(Modifier.size(colonWidth, colonHeight)) {
+                    val radius = size.width * 0.30f
+                    drawCircle(clockTheme.tint.color, radius, Offset(size.width / 2f, size.height * 0.34f))
+                    drawCircle(clockTheme.tint.color, radius, Offset(size.width / 2f, size.height * 0.66f))
+                }
+                Text(timeParts.last(), style = timeStyle, color = clockTheme.tint.color, maxLines = 1, softWrap = false)
+            }
+        }
         // Keep these nodes composed throughout the gesture. Removing them when alpha reaches zero
         // causes a structural recomposition and a text remeasure exactly halfway through the swipe.
         if (connected && !useCompactTemperatureHeader) {
