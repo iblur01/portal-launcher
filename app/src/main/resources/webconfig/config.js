@@ -13,6 +13,14 @@
   var saving = false;
   var checkingAvailability = false;
 
+  var languageSelect = document.getElementById('language-select');
+  languageSelect.value = document.documentElement.lang;
+  languageSelect.addEventListener('change', function () {
+    var target = new URL(window.location.href);
+    target.searchParams.set('lang', languageSelect.value);
+    window.location.assign(target.toString());
+  });
+
   function el(id) { return document.getElementById(id); }
   function url(path) { return path + '?t=' + encodeURIComponent(token); }
   function say(id, message, kind) { var node = el(id); node.textContent = message; node.className = 'status ' + (kind || ''); }

@@ -11,6 +11,12 @@
   <link rel="stylesheet" href="webconfig.css">
 </head>
 <body class="min-h-full bg-black text-white antialiased">
+  <label class="language-picker access-language-picker" aria-label="Choisir la langue">
+    <select id="language-select">
+      <option value="fr">Français</option>
+      <option value="en">English</option>
+    </select>
+  </label>
   <main class="mx-auto flex min-h-screen w-full max-w-lg items-center px-5 py-10 sm:px-8">
     <section class="w-full" aria-labelledby="page-title">
       <header class="mb-8">
@@ -32,6 +38,6 @@
       </p>
     </section>
   </main>
-  <script src="access.js"></script>
+  <script src="access.js?lang=%LANG%"></script>
 </body>
 </html>

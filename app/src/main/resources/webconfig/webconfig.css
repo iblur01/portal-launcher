@@ -31,6 +31,12 @@ button, input { font: inherit; }
 .wizard-topbar { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 20px; }
 .wizard-brand { margin: 0 0 3px; font-size: .95rem; font-weight: 650; }
 .wizard-progress-label { margin: 0; font-size: .78rem; color: rgb(255 255 255 / 50%); }
+.topbar-actions { display: flex; align-items: center; gap: 16px; }
+.language-picker { position: relative; display: inline-flex; align-items: center; }
+.language-picker::after { content: "⌄"; position: absolute; right: 10px; color: rgb(255 255 255 / 45%); font-size: .75rem; pointer-events: none; }
+.language-picker select { min-height: 34px; appearance: none; border: 1px solid rgb(255 255 255 / 14%); border-radius: 9px; padding: 0 28px 0 11px; background: #1c1c1e; color: rgb(255 255 255 / 75%); font: inherit; font-size: .78rem; cursor: pointer; outline: none; }
+.language-picker select:focus-visible { border-color: rgb(255 255 255 / 65%); outline: 2px solid #0a84ff; outline-offset: 2px; }
+.access-language-picker { position: fixed; z-index: 2; top: max(18px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); }
 .progress-dots { display: flex; align-items: center; gap: 7px; }
 .progress-dot { display: block; width: 7px; height: 7px; border-radius: 50%; background: #3a3a3c; }
 .progress-dot.active { width: 9px; height: 9px; background: #fff; }
@@ -102,6 +108,7 @@ button, input { font: inherit; }
   .wizard-field input { text-align: left; padding-inline: 0; }
   .wizard-field input:focus { padding-inline: 10px; }
   .wizard-progress-label { display: none; }
+  .topbar-actions { gap: 10px; }
   .summary-row { align-items: flex-start; flex-direction: column; gap: 3px; }
   .summary-row strong { max-width: 100%; text-align: left; }
 }

@@ -3,6 +3,13 @@
   var form = document.getElementById('access-form');
   var input = document.getElementById('token');
   var error = document.getElementById('access-error');
+  var languageSelect = document.getElementById('language-select');
+  languageSelect.value = document.documentElement.lang;
+  languageSelect.addEventListener('change', function () {
+    var target = new URL(window.location.href);
+    target.searchParams.set('lang', languageSelect.value);
+    window.location.assign(target.toString());
+  });
   if (document.querySelector('meta[name="portal-invalid-code"]').content === 'true') {
     error.classList.remove('hidden'); input.setAttribute('aria-invalid', 'true'); input.setAttribute('aria-describedby', 'access-error');
   }

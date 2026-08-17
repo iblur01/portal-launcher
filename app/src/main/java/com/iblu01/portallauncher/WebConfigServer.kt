@@ -16,6 +16,14 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 
 enum class WebConfigSection { HOME_ASSISTANT, MQTT, ALL }
 
+internal fun webLanguage(acceptLanguage: String?, appLanguage: String, requestedLanguage: String? = null): String {
+    requestedLanguage?.lowercase()?.takeIf { it == "en" || it == "fr" }?.let { return it }
+    val browserLanguages = acceptLanguage.orEmpty().split(',').map { it.substringBefore(';').trim().substringBefore('-').lowercase() }
+    return browserLanguages.firstOrNull { it == "en" || it == "fr" }
+        ?: appLanguage.substringBefore('-').lowercase().takeIf { it == "en" || it == "fr" }
+        ?: "en"
+}
+
 /**
  * Applies a `{entity_id -> enabled}` selection onto [existing], mirroring what the Settings screen's
  * `onSetPillEnabled` does: a known entity keeps its rule and only flips `enabled`, an unknown one is
@@ -60,22 +68,27 @@ class WebConfigServer private constructor(
 
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri.ifEmpty { "/" }
+        val language = webLanguage(
+            acceptLanguage = session.headers["accept-language"],
+            appLanguage = prefs.appLanguage,
+            requestedLanguage = session.parameters["lang"]?.firstOrNull(),
+        )
         when (uri) {
             "/webconfig.css" -> return css(WebConfigPage.asset("webconfig.css"))
-            "/access.js" -> return javascript(WebConfigPage.asset("access.js"))
-            "/config.js" -> return javascript(WebConfigPage.asset("config.js"))
+            "/access.js" -> return javascript(WebConfigPage.asset("access.js", language))
+            "/config.js" -> return javascript(WebConfigPage.asset("config.js", language))
         }
         val providedToken = session.parameters["t"]?.firstOrNull()
         if (!tokenMatches(providedToken)) {
             return if (uri == "/" && session.method == Method.GET) {
-                html(WebConfigPage.renderAccess(invalidCode = !providedToken.isNullOrBlank()))
+                html(WebConfigPage.renderAccess(invalidCode = !providedToken.isNullOrBlank(), language = language))
             } else {
                 errorJson(Response.Status.FORBIDDEN, "forbidden")
             }
         }
         return runCatching {
             when {
-                uri == "/" -> html(WebConfigPage.render(token))
+                uri == "/" -> html(WebConfigPage.render(token, language))
                 uri == "/api/config" && session.method == Method.GET -> json(configJson())
                 uri == "/api/health" && session.method == Method.GET -> json("""{"ok":true}""")
                 uri == "/api/config" && session.method == Method.POST -> applyConfig(readBody(session))

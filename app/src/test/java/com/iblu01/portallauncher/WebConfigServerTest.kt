@@ -76,6 +76,8 @@ class WebConfigServerTest {
         assertTrue(page.contains("Vous pouvez fermer cet onglet"))
         assertTrue(page.contains("id=\"next\""))
         assertTrue(page.contains("id=\"back\""))
+        assertTrue(page.contains("id=\"language-select\""))
+        assertTrue(page.contains("config.js?lang=fr"))
         assertTrue(page.contains("id=\"ha_mdns_warning\""))
         assertTrue(page.contains("adresse IP locale du serveur"))
         assertTrue(page.contains("id=\"ha_check_host\""))
@@ -136,5 +138,30 @@ class WebConfigServerTest {
         val page = WebConfigPage.renderAccess(invalidCode = true)
 
         assertTrue(page.contains("content=\"true\""))
+    }
+
+    @Test
+    fun `english browser receives fully localized web configuration assets`() {
+        val page = WebConfigPage.render("AB2C-D3EF", "en")
+        val access = WebConfigPage.renderAccess(invalidCode = true, language = "en")
+        val script = WebConfigPage.asset("config.js", "en")
+        val accessScript = WebConfigPage.asset("access.js", "en")
+
+        assertTrue(page.contains("lang=\"en\""))
+        assertTrue(page.contains("Panel configuration"))
+        assertTrue(page.contains("You can close this tab"))
+        assertTrue(script.contains("Checking the panel…"))
+        assertTrue(script.contains("The connection test failed."))
+        assertTrue(access.contains("Remote configuration"))
+        assertTrue(access.contains("access.js?lang=en"))
+        assertTrue(accessScript.contains("The code contains 8 characters."))
+    }
+
+    @Test
+    fun `browser language wins with panel language as fallback`() {
+        assertEquals("en", webLanguage("en-US,en;q=0.9,fr;q=0.8", "fr"))
+        assertEquals("fr", webLanguage("de-DE,de;q=0.9", "fr"))
+        assertEquals("en", webLanguage(null, ""))
+        assertEquals("fr", webLanguage("en-US", "en", "fr"))
     }
 }

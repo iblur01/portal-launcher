@@ -17,7 +17,15 @@
         <p class="wizard-brand">Portal</p>
         <p id="progress-label" class="wizard-progress-label">Maison · étape 1 sur 3</p>
       </div>
-      <div id="progress-dots" class="progress-dots" aria-label="Progression"></div>
+      <div class="topbar-actions">
+        <label class="language-picker" aria-label="Choisir la langue">
+          <select id="language-select">
+            <option value="fr">Français</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <div id="progress-dots" class="progress-dots" aria-label="Progression"></div>
+      </div>
     </header>
 
     <form id="config-form" class="wizard-body" novalidate>
@@ -94,6 +102,6 @@
       </footer>
     </form>
   </main>
-  <script src="config.js"></script>
+  <script src="config.js?lang=%LANG%"></script>
 </body>
 </html>
