@@ -3,6 +3,8 @@ package com.iblu01.portallauncher.ui.components
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -108,6 +110,27 @@ class HomePillContextMenuTest {
         rule.waitForIdle()
 
         assertEquals(listOf(target.ref), hidden)
+    }
+
+    @Test
+    fun `scene menu uses a scene-specific hiding label and exposes no useless controls`() {
+        val scene = target.copy(
+            ref = PillRef.Device("scene.evening"),
+            chip = target.chip.copy(entityId = "scene.evening", kind = PillKind.SCENE),
+        )
+        rule.setContent {
+            HomePillContextMenu(
+                target = scene,
+                isPinned = false,
+                manualGroups = emptyList(),
+                actions = HomePillActions(),
+                onDismiss = {},
+            )
+        }
+
+        rule.onAllNodesWithText("Ouvrir les commandes").assertCountEquals(0)
+        rule.onAllNodesWithText("Ne plus afficher cet appareil").assertCountEquals(0)
+        rule.onNodeWithText("Ne plus afficher cette scène").assertIsDisplayed()
     }
 
     @Test

@@ -54,6 +54,10 @@ class LauncherLocalizationTest {
         assertEquals("Activer", friendlyEntityState(fr, scene()))
         assertEquals("Streaming", friendlyEntityState(en, camera("streaming")))
         assertEquals("En diffusion", friendlyEntityState(fr, camera("streaming")))
+        assertEquals("On", friendlyEntityState(en, camera("idle")))
+        assertEquals("Allumée", friendlyEntityState(fr, camera("idle")))
+        assertEquals("Off", friendlyEntityState(en, camera("off")))
+        assertEquals("Éteinte", friendlyEntityState(fr, camera("off")))
     }
 
     /**
@@ -70,6 +74,8 @@ class LauncherLocalizationTest {
             R.string.camera_center_close_desc, R.string.camera_center_mode_main,
             R.string.camera_center_mode_grid, R.string.camera_center_mode_main_desc,
             R.string.camera_center_mode_grid_desc, R.string.camera_center_empty,
+            R.string.camera_hide_confirm_title, R.string.camera_hide_confirm_message,
+            R.string.camera_hide_confirm_action,
             R.string.camera_stream_loading, R.string.camera_stream_error,
             R.string.camera_stream_unavailable, R.string.camera_stream_retry,
             R.string.camera_audio_mute_desc, R.string.camera_audio_unmute_desc,

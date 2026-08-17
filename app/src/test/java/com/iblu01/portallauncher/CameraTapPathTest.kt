@@ -34,6 +34,7 @@ class CameraTapPathTest {
 
         assertEquals(PillKind.CAMERA, chip.kind)
         assertEquals("camera.hall", chip.entityId)
+        assertEquals("an idle camera is powered and must use the active visual", "active", chip.state)
     }
 
     @Test fun `tapping it opens the camera centre on that camera, not a panel`() {
@@ -58,10 +59,23 @@ class CameraTapPathTest {
         assertEquals(null, (action as ChipAction.OpenCameraCenter).entityId)
     }
 
+    @Test fun `camera grid excludes devices disabled in pill settings`() {
+        val cameras = listOf(
+            entity("camera.hall", "idle"),
+            entity("camera.garden", "idle"),
+            entity("light.hall", "on"),
+        )
+        val rules = listOf(
+            PillRule("camera.hall", PillKind.CAMERA, "Hall", enabled = false),
+            PillRule("camera.garden", PillKind.CAMERA, "Garden", enabled = true),
+        )
+
+        assertEquals(listOf("camera.garden"), enabledCameraIds(cameras, rules))
+    }
+
     /**
-     * The long-press router keys on the pill kind, not on the action type: a fan is a
-     * ServiceToggle too, and long-pressing it must keep opening its control panel rather than
-     * toggling it. This mirrors the branch in LauncherActivity.onOpenResolvedCommands.
+     * The long-press router keys on the pill kind. A fan opens its control panel on a regular tap
+     * as well as a long press. This mirrors LauncherActivity.onOpenResolvedCommands.
      */
     @Test fun `only cameras and scenes have no commands to long-press`() {
         val withoutCommands = setOf(PillKind.CAMERA, PillKind.SCENE)
@@ -74,7 +88,7 @@ class CameraTapPathTest {
             val handledAsTap = chip.kind in withoutCommands
             if (kind == PillKind.FAN) {
                 assertTrue("a fan must keep its long-press panel", !handledAsTap)
-                assertTrue(chip.toChipAction() is ChipAction.ServiceToggle)
+                assertEquals(ChipAction.OpenPanel(com.iblu01.portallauncher.ui.model.PanelKind.FAN), chip.toChipAction())
             }
             if (kind == PillKind.CAMERA) {
                 assertTrue(handledAsTap)

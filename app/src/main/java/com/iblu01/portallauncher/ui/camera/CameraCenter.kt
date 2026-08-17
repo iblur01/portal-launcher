@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
@@ -39,7 +40,10 @@ import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.ZoomIn
 import androidx.compose.material.icons.outlined.ZoomOut
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,14 +52,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlin.math.hypot
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.home.CameraCapabilities
@@ -95,9 +104,11 @@ fun CameraCenter(
     environment: CameraCenterEnvironment,
     onClose: () -> Unit,
     onSelect: (String) -> Unit,
+    onHide: (String) -> Unit,
     onMode: (CameraCenterMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var cameraPendingHide by remember { mutableStateOf<String?>(null) }
     AnimatedVisibility(
         visible = state.isOpen,
         modifier = modifier,
@@ -130,6 +141,7 @@ fun CameraCenter(
                                 environment = environment,
                                 wide = wide,
                                 onSelect = onSelect,
+                                onHide = { cameraPendingHide = it },
                             )
                             CameraCenterMode.GRID -> CameraGrid(
                                 cameras = open.cameras,
@@ -140,6 +152,27 @@ fun CameraCenter(
                         }
                     }
                 }
+            }
+            cameraPendingHide?.let { entityId ->
+                val label = environment.labelOf(entityId)
+                AlertDialog(
+                    onDismissRequest = { cameraPendingHide = null },
+                    title = { Text(stringResource(R.string.camera_hide_confirm_title)) },
+                    text = { Text(stringResource(R.string.camera_hide_confirm_message, label)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            cameraPendingHide = null
+                            onHide(entityId)
+                        }) {
+                            Text(stringResource(R.string.camera_hide_confirm_action))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { cameraPendingHide = null }) {
+                            Text(stringResource(android.R.string.cancel))
+                        }
+                    },
+                )
             }
         }
     }
@@ -191,6 +224,7 @@ private fun MainCameraView(
     environment: CameraCenterEnvironment,
     wide: Boolean,
     onSelect: (String) -> Unit,
+    onHide: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -209,6 +243,7 @@ private fun MainCameraView(
                 selected = open.selected,
                 environment = environment,
                 onSelect = onSelect,
+                onHide = onHide,
                 compact = !wide,
             )
         }
@@ -225,6 +260,7 @@ private fun CameraPicker(
     selected: String,
     environment: CameraCenterEnvironment,
     onSelect: (String) -> Unit,
+    onHide: (String) -> Unit,
     compact: Boolean,
 ) {
     val scroll = rememberScrollState()
@@ -235,6 +271,7 @@ private fun CameraPicker(
         cameras.forEach { entityId ->
             val label = environment.labelOf(entityId)
             val active = entityId == selected
+            val hideDescription = stringResource(R.string.camera_center_hide_desc, label)
             Text(
                 text = label,
                 style = if (compact) AppleTypography.bodySmall else AppleTypography.bodyMedium,
@@ -246,10 +283,17 @@ private fun CameraPicker(
                         AppleShapes.pill,
                     )
                     .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.pill)
-                    .appleClickable { onSelect(entityId) }
+                    .appleClickable(
+                        onClick = { onSelect(entityId) },
+                        onLongPress = { onHide(entityId) },
+                    )
                     .padding(horizontal = 14.dp, vertical = 8.dp)
                     .semantics {
-                        contentDescription = "$label"
+                        contentDescription = label
+                        onLongClick(label = hideDescription) {
+                            onHide(entityId)
+                            true
+                        }
                     },
             )
         }
@@ -329,7 +373,7 @@ private fun CameraTile(
 
     Box(modifier.background(Color.Black), contentAlignment = Alignment.Center) {
         when (val current = state) {
-            CameraStreamState.Loading -> StatusMessage(stringResource(R.string.camera_stream_loading))
+            CameraStreamState.Loading -> LoadingStream()
 
             is CameraStreamState.Failed -> StreamFailure(
                 error = current.error,
@@ -388,6 +432,21 @@ private fun CameraTile(
 }
 
 @Composable
+private fun LoadingStream() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(30.dp),
+            color = AppleColors.primary,
+            strokeWidth = 2.5.dp,
+        )
+        StatusMessage(stringResource(R.string.camera_stream_loading))
+    }
+}
+
+@Composable
 private fun CameraOverlayControls(
     entityId: String,
     entity: HaEntity?,
@@ -441,23 +500,79 @@ private fun PtzPad(
         }
     }
 
+    val directionalActions = capabilities.ptz.intersect(
+        setOf(PtzAction.PAN_LEFT, PtzAction.PAN_RIGHT, PtzAction.TILT_UP, PtzAction.TILT_DOWN),
+    )
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        control(PtzAction.TILT_UP, Icons.Outlined.KeyboardArrowUp, R.string.camera_ptz_up_desc)
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            control(PtzAction.PAN_LEFT, Icons.Outlined.KeyboardArrowLeft, R.string.camera_ptz_left_desc)
-            control(PtzAction.PAN_RIGHT, Icons.Outlined.KeyboardArrowRight, R.string.camera_ptz_right_desc)
+        if (directionalActions.isNotEmpty()) {
+            PtzJoystick(
+                actions = directionalActions,
+                onAction = onAction,
+            )
         }
-        control(PtzAction.TILT_DOWN, Icons.Outlined.KeyboardArrowDown, R.string.camera_ptz_down_desc)
         if (PtzAction.ZOOM_IN in capabilities.ptz || PtzAction.ZOOM_OUT in capabilities.ptz) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 control(PtzAction.ZOOM_OUT, Icons.Outlined.ZoomOut, R.string.camera_ptz_zoom_out_desc)
                 control(PtzAction.ZOOM_IN, Icons.Outlined.ZoomIn, R.string.camera_ptz_zoom_in_desc)
             }
         }
+    }
+}
+
+/** A compact spring-loaded joystick: releasing it sends one movement on the dominant axis. */
+@Composable
+private fun PtzJoystick(
+    actions: Set<PtzAction>,
+    onAction: (PtzAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var knob by remember { mutableStateOf(Offset.Zero) }
+    val description = listOfNotNull(
+        stringResource(R.string.camera_ptz_left_desc).takeIf { PtzAction.PAN_LEFT in actions },
+        stringResource(R.string.camera_ptz_right_desc).takeIf { PtzAction.PAN_RIGHT in actions },
+        stringResource(R.string.camera_ptz_up_desc).takeIf { PtzAction.TILT_UP in actions },
+        stringResource(R.string.camera_ptz_down_desc).takeIf { PtzAction.TILT_DOWN in actions },
+    ).joinToString(" · ")
+
+    Canvas(
+        modifier
+            .size(112.dp)
+            .semantics { contentDescription = description }
+            .pointerInput(actions) {
+                val limit = minOf(size.width, size.height).toFloat() * 0.28f
+                detectDragGestures(
+                    onDragStart = { knob = Offset.Zero },
+                    onDragCancel = { knob = Offset.Zero },
+                    onDragEnd = {
+                        val threshold = limit * 0.35f
+                        val action = if (kotlin.math.abs(knob.x) >= kotlin.math.abs(knob.y)) {
+                            if (knob.x < -threshold) PtzAction.PAN_LEFT
+                            else if (knob.x > threshold) PtzAction.PAN_RIGHT else null
+                        } else {
+                            if (knob.y < -threshold) PtzAction.TILT_UP
+                            else if (knob.y > threshold) PtzAction.TILT_DOWN else null
+                        }
+                        if (action != null && action in actions) onAction(action)
+                        knob = Offset.Zero
+                    },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        val candidate = knob + amount
+                        val distance = hypot(candidate.x, candidate.y)
+                        knob = if (distance <= limit || distance == 0f) candidate
+                        else candidate * (limit / distance)
+                    },
+                )
+            },
+    ) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        drawCircle(AppleColors.elevated.copy(alpha = 0.9f), radius = size.minDimension * 0.48f)
+        drawCircle(AppleColors.frostedBorder, radius = size.minDimension * 0.48f, style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))
+        drawCircle(AppleColors.primary.copy(alpha = 0.88f), radius = size.minDimension * 0.18f, center = center + knob)
     }
 }
 

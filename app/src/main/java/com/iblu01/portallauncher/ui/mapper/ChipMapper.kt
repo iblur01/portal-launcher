@@ -40,12 +40,11 @@ fun LauncherChip.toPanelKind(): PanelKind = when {
 }
 
 /**
- * Tap behaviour: switches open their control panel so an accidental tray tap never changes their
- * state. Fans retain their established direct toggle; everything else opens its typed panel.
+ * Tap behaviour: controllable devices open their panel so an accidental tray tap never changes
+ * their state. Scenes are the sole one-tap action; cameras open their dedicated centre.
  * Long-press always opens commands (handled at the call site via [toPanelKind]).
  */
 fun LauncherChip.toChipAction(): ChipAction = when (kind) {
-    PillKind.FAN -> ChipAction.ServiceToggle("fan", "toggle")
     PillKind.SCENE -> ChipAction.ActivateScene(entityId)
     // The general pill carries no entity id; an individual camera pill carries exactly its own.
     PillKind.CAMERA -> ChipAction.OpenCameraCenter(entityId.takeIf(String::isNotBlank))

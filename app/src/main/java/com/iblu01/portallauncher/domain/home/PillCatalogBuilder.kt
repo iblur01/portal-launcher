@@ -334,7 +334,7 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
     private fun calmDeviceChip(rule: PillRule, entity: HaEntity, states: Map<String, HaEntity>): LauncherChip {
         val related = rule.relatedEntityIds.mapNotNull(states::get)
         val state = entity.state.lowercase(Locale.ROOT)
-        val active = state in setOf(
+        val active = (rule.kind == PillKind.CAMERA && state != "off") || state in setOf(
             "on", "open", "opening", "unlocked", "playing", "buffering", "running", "cleaning",
             "washing", "drying", "mowing", "heat", "cool", "heat_cool", "auto",
         )
@@ -388,7 +388,8 @@ class PillCatalogBuilder(private val priorityEngine: PillPriorityEngine) {
 
     private fun isActive(pill: ResolvedPill): Boolean =
         pill.chip.state in setOf("active", "warning", "critical") &&
-            pill.chip.deviceState?.lowercase(Locale.ROOT) !in setOf("off", "closed", "locked", "idle")
+            (pill.chip.kind == PillKind.CAMERA ||
+                pill.chip.deviceState?.lowercase(Locale.ROOT) !in setOf("off", "closed", "locked", "idle"))
 
     private fun collectiveAction(kinds: Set<PillKind>): GroupCollectiveAction? = when {
         kinds.isEmpty() -> null

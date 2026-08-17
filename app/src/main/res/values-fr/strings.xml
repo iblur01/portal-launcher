@@ -337,6 +337,7 @@
     <string name="menu_open_controls">Ouvrir les commandes</string>
     <string name="menu_controls_stale">Données figées : les commandes sont temporairement indisponibles.</string>
     <string name="menu_hide_device">Ne plus afficher cet appareil</string>
+    <string name="menu_hide_scene">Ne plus afficher cette scène</string>
     <string name="menu_restore_device_hint">L’appareil pourra être réactivé depuis les réglages des pills.</string>
     <string name="menu_move_drag">Déplacer par glisser-déposer</string>
     <string name="menu_move_first">Placer en premier</string>
@@ -820,6 +821,10 @@
     <string name="camera_center_mode_main_desc">Afficher la caméra principale en grand</string>
     <string name="camera_center_mode_grid_desc">Afficher toutes les caméras en grille</string>
     <string name="camera_center_select_desc">Afficher la caméra %1$s</string>
+    <string name="camera_center_hide_desc">Ne plus afficher la caméra %1$s</string>
+    <string name="camera_hide_confirm_title">Masquer cette caméra ?</string>
+    <string name="camera_hide_confirm_message">%1$s ne sera plus affichée dans le centre caméra. Vous pourrez la réactiver depuis les réglages.</string>
+    <string name="camera_hide_confirm_action">Masquer</string>
     <string name="camera_center_empty">Aucune caméra à afficher</string>
     <string name="camera_center_empty_hint">Choisissez les caméras à afficher dans les réglages.</string>
     <string name="camera_stream_loading">Connexion…</string>

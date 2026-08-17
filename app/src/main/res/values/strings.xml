@@ -339,6 +339,7 @@
     <string name="menu_open_controls">Open controls</string>
     <string name="menu_controls_stale">Cached data: controls are temporarily unavailable.</string>
     <string name="menu_hide_device">Stop showing this device</string>
+    <string name="menu_hide_scene">Stop showing this scene</string>
     <string name="menu_restore_device_hint">The device can be enabled again from the pill settings.</string>
     <string name="menu_move_drag">Move by dragging</string>
     <string name="menu_move_first">Place first</string>
@@ -822,6 +823,10 @@
     <string name="camera_center_mode_main_desc">Show the main camera full screen</string>
     <string name="camera_center_mode_grid_desc">Show every camera in a grid</string>
     <string name="camera_center_select_desc">Show camera %1$s</string>
+    <string name="camera_center_hide_desc">Stop showing camera %1$s</string>
+    <string name="camera_hide_confirm_title">Hide this camera?</string>
+    <string name="camera_hide_confirm_message">%1$s will no longer appear in the camera centre. You can restore it from Settings.</string>
+    <string name="camera_hide_confirm_action">Hide</string>
     <string name="camera_center_empty">No camera to display</string>
     <string name="camera_center_empty_hint">Choose the cameras to display in Settings.</string>
     <string name="camera_stream_loading">Connecting…</string>

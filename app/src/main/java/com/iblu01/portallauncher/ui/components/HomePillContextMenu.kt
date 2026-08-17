@@ -59,6 +59,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.iblu01.portallauncher.domain.home.Availability
 import com.iblu01.portallauncher.R
+import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.domain.home.PillRef
 import com.iblu01.portallauncher.domain.home.ResolvedPill
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -206,7 +207,10 @@ fun HomePillContextMenu(
     var showGroups by remember(target.ref.stableKey) { mutableStateOf(false) }
     var showMoveActions by remember(target.ref.stableKey) { mutableStateOf(false) }
     val canPin = target.availability == Availability.AVAILABLE || isPinned
-    val canOpenCommands = target.availability == Availability.AVAILABLE
+    // A scene is an action, not a device: it has neither a command panel nor a device-level hide
+    // action. It can still be pinned, ordered and added to a manual group.
+    val isScene = target.chip.kind == PillKind.SCENE
+    val canOpenCommands = target.availability == Availability.AVAILABLE && !isScene
     val canReorder = actions.canReorder(target)
     val moveAvailability = actions.moveAvailability(target)
     val targetDeviceId = (target.ref as? PillRef.Device)?.entityId
@@ -292,21 +296,25 @@ fun HomePillContextMenu(
                 }
 
                 MenuDivider()
-                HomeMenuRow(
-                    icon = Icons.Outlined.Tune,
-                    label = stringResource(R.string.menu_open_controls),
-                    enabled = canOpenCommands,
-                ) {
-                    actions.onOpenCommands(target)
-                    onDismiss()
-                }
-                if (!canOpenCommands) {
-                    MenuHint(stringResource(R.string.menu_controls_stale))
+                if (!isScene) {
+                    HomeMenuRow(
+                        icon = Icons.Outlined.Tune,
+                        label = stringResource(R.string.menu_open_controls),
+                        enabled = canOpenCommands,
+                    ) {
+                        actions.onOpenCommands(target)
+                        onDismiss()
+                    }
+                    if (!canOpenCommands) {
+                        MenuHint(stringResource(R.string.menu_controls_stale))
+                    }
                 }
                 if (target.ref is PillRef.Device) {
                     HomeMenuRow(
                         icon = Icons.Outlined.VisibilityOff,
-                        label = stringResource(R.string.menu_hide_device),
+                        label = stringResource(
+                            if (isScene) R.string.menu_hide_scene else R.string.menu_hide_device,
+                        ),
                         enabled = true,
                     ) {
                         actions.onHideDevice(target)

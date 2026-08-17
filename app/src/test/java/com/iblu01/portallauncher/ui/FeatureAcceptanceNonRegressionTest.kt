@@ -36,7 +36,7 @@ class FeatureAcceptanceNonRegressionTest {
             chip("boolean", PillKind.SWITCH, "input_boolean.guest").toChipAction(),
         )
         assertEquals(
-            ChipAction.ServiceToggle("fan", "toggle"),
+            ChipAction.OpenPanel(PanelKind.FAN),
             chip("fan", PillKind.FAN, "fan.office").toChipAction(),
         )
 

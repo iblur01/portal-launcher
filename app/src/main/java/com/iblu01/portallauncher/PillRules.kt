@@ -122,7 +122,10 @@ fun friendlyEntityState(context: Context, e: HaEntity): String {
         e.domain == "camera" -> when (s) {
             "streaming" -> context.getString(R.string.camera_state_streaming)
             "recording" -> context.getString(R.string.camera_state_recording)
-            else -> context.getString(R.string.camera_state_idle)
+            "off" -> context.getString(R.string.light_state_off)
+            // Home Assistant reports an available camera as `idle` while nobody is watching its
+            // stream. It is still powered and reachable, so presenting it as asleep is misleading.
+            else -> context.getString(R.string.light_state_on)
         }
         e.domain in setOf("person", "device_tracker") -> when (s) { "home" -> context.getString(R.string.entity_state_home); "not_home" -> context.getString(R.string.entity_state_away); else -> raw.replaceFirstChar { it.uppercase() } }
         e.domain == "lock" -> when (s) { "locked" -> context.getString(R.string.pill_lock_locked); "unlocked" -> context.getString(R.string.pill_lock_unlocked); "locking" -> context.getString(R.string.pill_lock_locking); "unlocking" -> context.getString(R.string.pill_lock_unlocking); else -> raw.replaceFirstChar { it.uppercase() } }

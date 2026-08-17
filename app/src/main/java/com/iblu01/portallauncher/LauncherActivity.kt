@@ -809,10 +809,7 @@ private fun PortalLauncherApp(
     // before Home Assistant has connected — and every camera tap would silently do nothing.
     val cameraIdsNow: () -> List<String> = remember(pills) {
         {
-            pills.latestStates.values
-                .filter { it.domain == "camera" }
-                .map { it.entityId }
-                .sorted()
+            enabledCameraIds(pills.latestStates.values, prefs.pillRules)
         }
     }
     // Recomposed with the catalog, for the effects below that must react to a camera appearing
@@ -1077,8 +1074,7 @@ private fun PortalLauncherApp(
         when {
             // Neither a camera nor a scene has commands to show: the details sheet would only
             // list whatever sensors happen to sit on the same device. They do what a tap does.
-            // (Deliberately keyed on the kind, not on the chip action: a fan is a ServiceToggle
-            // too, and long-pressing it must keep opening its control panel.)
+            // (Deliberately keyed on the kind: fans open their control panel on both gestures.)
             pill.chip.kind == PillKind.CAMERA || pill.chip.kind == PillKind.SCENE ->
                 onChipClick(pill.chip)
             ref is PillRef.Special -> onChipClick(pill.chip)
@@ -1571,6 +1567,16 @@ private fun PortalLauncherApp(
             environment = cameraEnvironment,
             onClose = { cameraCenter = cameraCenter.closed() },
             onSelect = { cameraCenter = cameraCenter.selected(it) },
+            onHide = { entityId ->
+                val updated = prefs.updateCameraPreferences { current ->
+                    current.copy(
+                        hidden = current.hidden + entityId,
+                        mainCameraId = current.mainCameraId.takeUnless { it == entityId },
+                    )
+                }
+                cameraPreferences = updated
+                cameraCenter = cameraCenter.reconciled(cameraIdsNow(), updated)
+            },
             onMode = { cameraCenter = cameraCenter.withMode(it) },
             modifier = Modifier.fillMaxSize(),
         )
@@ -1768,6 +1774,16 @@ private fun MediaPlayerPanel(
         onDismiss = onDismiss,
         fullScreen = fullScreen,
     )
+}
+
+/** Cameras explicitly disabled in the device catalog must not leak into the camera centre. */
+internal fun enabledCameraIds(states: Collection<HaEntity>, rules: List<PillRule>): List<String> {
+    val rulesById = rules.associateBy(PillRule::entityId)
+    return states.asSequence()
+        .filter { it.domain == "camera" && rulesById[it.entityId]?.enabled != false }
+        .map(HaEntity::entityId)
+        .sorted()
+        .toList()
 }
 
 /**
