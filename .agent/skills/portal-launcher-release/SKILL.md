@@ -98,10 +98,15 @@ Verify the signature with `apksigner`:
 ```bash
 cp app/build/outputs/apk/release/app-release.apk /tmp/portal-launcher-vX.Y.Z-beta.apk
 gh release create "vX.Y.Z-beta" \
-  --title "vX.Y.Z-beta — {short summary}" \
+  --title "vX.Y.Z-beta" \
   --notes "{CHANGELOG condensed into markdown}" \
   /tmp/portal-launcher-vX.Y.Z-beta.apk
 ```
+
+The GitHub release title must be **only the version tag** (`vX.Y.Z`, including a prerelease suffix
+only when the tag itself has one). Never add a product name, summary, dash, colon, or any other text.
+Before creating the release, verify that the value passed to `--title` is byte-for-byte identical to
+the tag passed as the first argument to `gh release create`.
 
 ### Step 10 — Cleanup
 
@@ -113,6 +118,7 @@ git remote prune origin
 ## Notes
 
 - **Release notes are always in English** — CHANGELOG entries, PR title/body, tag messages, and GitHub release notes/summaries must be written in English, without exception.
+- **GitHub release titles contain only the tag** — for example `v1.2.3`, never `v1.2.3 — New features`.
 - The keystore is the same for all releases (no rotation).
 - The APK uses the v2 signature only (no v1 JAR signing). This is sufficient for minSdk 28.
 - The local branch is deleted by `gh pr merge --delete-branch`; you only need to prune the remote tracking ref.
