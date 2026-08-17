@@ -9,6 +9,16 @@ Home Assistant controls. It is built for landscape devices from compact 5-inch d
 > **Portal Launcher 1.0 is now available.** Download the APK from
 > [GitHub Releases](https://github.com/iblur01/portal-launcher/releases/latest).
 
+<p align="center">
+  <a href="https://discord.gg/m9CK4SXPJ">
+    <img src="https://img.shields.io/badge/Join_the_Portal_Launcher_community-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Portal Launcher community on Discord">
+  </a>
+</p>
+
+<p align="center">
+  Get help, share your setup and discuss new features with the community.
+</p>
+
 ## Highlights
 
 - Real Android home launcher with multiple pages, free icon placement, widgets, folders, shortcuts,
@@ -78,6 +88,7 @@ For detailed setup, permissions, ADB provisioning and local web configuration, r
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Testing](docs/TESTING.md)
+- [Next release: scenes and camera center](docs/NEXT_RELEASE_SCENES_CAMERAS_SPEC.md)
 - [Immich and photo sources](docs/photo-sources.md)
 - [Home pills technical specification](docs/PILLS_HOME_TECHNICAL_SPEC.md)
 - [MQTT session protocol](docs/session-protocol.md)

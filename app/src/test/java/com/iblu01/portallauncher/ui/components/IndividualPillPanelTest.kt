@@ -4,10 +4,15 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.core.app.ApplicationProvider
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.LauncherChip
@@ -96,7 +101,9 @@ class IndividualPillPanelTest {
             }
         }
 
-        rule.onNodeWithContentDescription("Activé").assertExists()
+        rule.onNode(
+            SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch) and hasClickAction(),
+        ).assertIsOn()
     }
 
     @Test fun `plain fan shows running state once and exposes horizontal oscillation choices`() {

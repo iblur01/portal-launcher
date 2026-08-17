@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -32,6 +33,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.dialog
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,12 +66,17 @@ fun WidgetPickerDialog(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { onDismiss() },
+                onClick = onDismiss,
+            )
+            .semantics { dialog() },
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
-                .width(360.dp)
+                .padding(24.dp)
+                .widthIn(max = 360.dp)
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
                 .clip(AppleShapes.panel)
                 .background(AppleColors.elevated.copy(alpha = 0.97f), AppleShapes.panel)
                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
@@ -87,7 +95,7 @@ fun WidgetPickerDialog(
                 color = AppleColors.tertiary,
                 modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp),
             )
-            LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
                 items(offers, key = { it.key }) { offer ->
                     Row(
                         modifier = Modifier

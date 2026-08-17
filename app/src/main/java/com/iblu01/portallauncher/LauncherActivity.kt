@@ -109,6 +109,7 @@ import com.iblu01.portallauncher.ui.components.returnToClockPage
 import com.iblu01.portallauncher.ui.components.AutoReturnOverlay
 import com.iblu01.portallauncher.ui.components.ChipActionsPanel
 import com.iblu01.portallauncher.ui.components.ClockHeader
+import com.iblu01.portallauncher.ui.components.ConnectionProblemBanner
 import com.iblu01.portallauncher.ui.components.GroupBrowserPanel
 import com.iblu01.portallauncher.ui.components.HomePillActions
 import com.iblu01.portallauncher.ui.components.HomeHeaderActions
@@ -133,6 +134,7 @@ import com.iblu01.portallauncher.ui.components.panelPresentation
 import com.iblu01.portallauncher.ui.components.QuickActionsOverlay
 import com.iblu01.portallauncher.ui.components.WeatherController
 import com.iblu01.portallauncher.ui.components.WeatherPanel
+import com.iblu01.portallauncher.ui.onboarding.OnboardingUrls
 import com.iblu01.portallauncher.ui.onboarding.OnboardingActivity
 import com.iblu01.portallauncher.ui.onboarding.OnboardingStatus
 import com.iblu01.portallauncher.ui.onboarding.shouldRunOnboarding
@@ -227,6 +229,15 @@ class LauncherActivity : ComponentActivity() {
                     onUninstall = ::uninstallApp,
                     onStartShortcut = ::startShortcut,
                     onOpenHomeSettings = ::openHomeSettings,
+                    onOpenConnectionSettings = {
+                        openFromLauncher(
+                            Intent(this, SettingsActivity::class.java)
+                                .putExtra(
+                                    SettingsActivity.EXTRA_PAGE,
+                                    SettingsActivity.PAGE_CONNECTED_HOME_CONNECTION,
+                                )
+                        )
+                    },
                     onSetWallpaper = ::setWallpaper,
                     onAddWidget = ::addWidget,
                     onRemoveWidget = { widgets.release(it) },
@@ -503,6 +514,7 @@ private fun PortalLauncherApp(
     onUninstall: (String) -> Unit,
     onStartShortcut: (packageName: String, shortcutId: String) -> Unit,
     onOpenHomeSettings: () -> Unit,
+    onOpenConnectionSettings: () -> Unit,
     onSetWallpaper: () -> Unit,
     onAddWidget: (WidgetOffer) -> Unit,
     onRemoveWidget: (Int) -> Unit,
@@ -1361,6 +1373,17 @@ private fun PortalLauncherApp(
                     (panelContent ?: retainedPanelContent)?.let { sidePanel(it) }
                 },
             )
+
+            if (!haConnected && prefs.haToken.isNotBlank()) {
+                ConnectionProblemBanner(
+                    lastUpdateAt = haLastUpdateAt,
+                    usesMdnsAddress = OnboardingUrls.usesMdnsHostname(prefs.haUrl),
+                    onClick = onOpenConnectionSettings,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
+                )
+            }
         }
 
         QuickActionsOverlay(

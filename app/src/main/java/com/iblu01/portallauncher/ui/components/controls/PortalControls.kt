@@ -8,6 +8,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.aspectRatio
@@ -53,9 +54,24 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -252,7 +268,15 @@ fun VerticalFillSlider(
             .clip(shape)
             .background(trackColor)
             .border(0.5.dp, AppleColors.frostedBorder, shape)
-            .semantics { contentDescription = "Curseur ${(fraction * 100).roundToInt()} pour cent" }
+            .semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(valueRange), valueRange)
+                if (!enabled) disabled()
+                else setProgress { requested ->
+                    commit(fractionOf(requested.coerceIn(valueRange), valueRange), finished = true)
+                    true
+                }
+            }
+            .focusable(enabled)
             .then(
                 if (!enabled) Modifier else Modifier.pointerInput(origin, valueRange) {
                     fun fracAt(y: Float): Float {
@@ -465,7 +489,15 @@ fun VerticalGradientSlider(
                 alpha = if (enabled) 1f else 0.4f,
             )
             .border(0.5.dp, AppleColors.frostedBorder, shape)
-            .semantics { contentDescription = "Curseur ${(fraction * 100).roundToInt()} pour cent" }
+            .semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(valueRange), valueRange)
+                if (!enabled) disabled()
+                else setProgress { requested ->
+                    commit(fractionOf(requested.coerceIn(valueRange), valueRange), finished = true)
+                    true
+                }
+            }
+            .focusable(enabled)
             .then(
                 if (!enabled) Modifier else Modifier.pointerInput(valueRange) {
                     fun fracAt(y: Float): Float = 1f - (y / size.height).coerceIn(0f, 1f)
@@ -746,7 +778,23 @@ fun <T> VerticalSegmentedSelector(
                     Modifier
                         .fillMaxWidth()
                         .height(segmentHeight)
-                        .padding(vertical = segmentPadding),
+                        .padding(vertical = segmentPadding)
+                        .semantics {
+                            role = Role.RadioButton
+                            this.selected = isSelected
+                            if (!enabled) disabled()
+                            else onClick {
+                                onSelect(option)
+                                true
+                            }
+                        }
+                        .onKeyEvent { event ->
+                            if (enabled && event.isActivationKeyUp()) {
+                                onSelect(option)
+                                true
+                            } else false
+                        }
+                        .focusable(enabled),
                     contentAlignment = Alignment.Center,
                 ) {
                     ControlLabel(
@@ -906,7 +954,23 @@ fun <T> HorizontalSegmentedSelector(
                         Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .semantics { contentDescription = label(option) },
+                            .semantics {
+                                contentDescription = label(option)
+                                role = Role.RadioButton
+                                this.selected = active
+                                if (!enabled) disabled()
+                                else onClick {
+                                    onSelect(option)
+                                    true
+                                }
+                            }
+                            .onKeyEvent { event ->
+                                if (enabled && event.isActivationKeyUp()) {
+                                    onSelect(option)
+                                    true
+                                } else false
+                            }
+                            .focusable(enabled),
                         contentAlignment = Alignment.Center,
                     ) {
                         ControlLabel(
@@ -942,6 +1006,12 @@ fun <T> HorizontalSegmentedSelector(
         }
     }
 }
+
+private fun androidx.compose.ui.input.key.KeyEvent.isActivationKeyUp(): Boolean =
+    type == KeyEventType.KeyUp && (
+        key == Key.Enter || key == Key.NumPadEnter ||
+            key == Key.DirectionCenter || key == Key.Spacebar
+        )
 
 // ---------------------------------------------------------------------------------------------
 // 4 · Vertical switch
@@ -1018,7 +1088,22 @@ fun VerticalSwitch(
                     )
                 },
             )
-            .semantics { contentDescription = if (effectiveChecked) "Activé" else "Désactivé" },
+            .semantics {
+                role = Role.Switch
+                toggleableState = ToggleableState(effectiveChecked)
+                if (!enabled) disabled()
+                else onClick {
+                    onCheckedChange(!checked)
+                    true
+                }
+            }
+            .onKeyEvent { event ->
+                if (enabled && event.isActivationKeyUp()) {
+                    onCheckedChange(!checked)
+                    true
+                } else false
+            }
+            .focusable(enabled),
     ) {
         // Thumb takes half the track's height and rides between the two insets.
         val thumbWidth = maxWidth - inset * 2

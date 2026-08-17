@@ -39,6 +39,7 @@
     <string name="home_connection_ha_detected">Home Assistant detected</string>
     <string name="home_connection_label_address">Address</string>
     <string name="home_connection_placeholder_address">http://homeassistant.local:8123</string>
+    <string name="home_connection_warning_mdns">Addresses ending in .local use local DNS (mDNS), which may not work on some panels. If the connection fails, use your Home Assistant server’s local IP address instead.</string>
     <string name="home_connection_label_scan_network">Search the network</string>
     <string name="home_connection_scanning">Searching…</string>
     <string name="home_connection_scan_found_format">%1$d found</string>
@@ -48,6 +49,7 @@
     <string name="home_connection_label_key_help">Where to find my key?</string>
     <string name="home_connection_section_status">CONNECTION STATUS</string>
     <string name="home_connection_label_web_config">Set up from another device</string>
+    <string name="home_connection_web_config_subtitle">Open a QR code and enter Home Assistant and MQTT settings from a phone or computer.</string>
     <string name="web_config_title">Remote setup</string>
     <string name="web_config_subtitle">Scan this code with your phone to fill in this panel\'s settings from its keyboard.</string>
     <string name="web_config_qr_description">QR code for the setup page</string>
@@ -56,8 +58,12 @@
     <string name="web_config_label_code">Code</string>
     <string name="web_config_same_network_note">Your phone must be on the same Wi-Fi network. The page closes as soon as you leave this screen.</string>
     <string name="web_config_unavailable">Remote setup unavailable: this panel is not on a network.</string>
-    <string name="web_config_saved_title">Configuration saved</string>
-    <string name="web_config_saved_body">This panel has received the new settings.</string>
+    <string name="web_config_progress_title">Setup in progress</string>
+    <string name="web_config_progress_body">Continue on your other device to configure MQTT.</string>
+    <string name="web_config_complete_title">Setup complete</string>
+    <string name="web_config_complete_body">Home Assistant and MQTT are ready.</string>
+    <string name="web_config_status_configured">Configured</string>
+    <string name="web_config_status_pending">Waiting</string>
     <string name="web_config_saved_action">Test and continue</string>
     <string name="onb_common_action_web_config">Set up from my phone</string>
     <string name="home_connection_label_connection">Connection</string>
@@ -253,7 +259,18 @@
     <string name="clock_theme_label_element_spacing">Element spacing</string>
     <string name="clock_theme_label_color">Color</string>
     <string name="clock_theme_label_format_24h">24-hour format</string>
+    <string name="clock_theme_label_date_format">Date format</string>
+    <string name="clock_date_format_long">Long</string>
+    <string name="clock_date_format_day_month_year">DD/MM/YYYY</string>
+    <string name="clock_date_format_month_day_year">MM/DD/YYYY</string>
+    <string name="clock_date_format_iso">YYYY-MM-DD</string>
     <string name="clock_theme_close">Close</string>
+    <string name="clock_tint_white">White</string>
+    <string name="clock_tint_amber">Amber</string>
+    <string name="clock_tint_mint">Green</string>
+    <string name="clock_tint_blue">Blue</string>
+    <string name="clock_tint_pink">Pink</string>
+    <string name="clock_tint_violet">Violet</string>
 
     <!-- ===== LAUNCHER HOME SCREEN ===== -->
     <string name="clock_indoor_temp_format">Indoor %1$s–%2$s</string>
@@ -262,7 +279,10 @@
     <string name="clock_expand_pills">Show more info</string>
     <string name="clock_collapse_content_desc">Collapse</string>
     <string name="clock_expand_content_desc">Expand</string>
-    <string name="clock_stale_banner_format">Offline — info frozen since %1$s</string>
+    <string name="clock_stale_banner_format">Offline: info frozen since %1$s</string>
+    <string name="connection_banner_unreachable">Home Assistant is unreachable</string>
+    <string name="connection_banner_mdns_hint">This .local address may not resolve on this panel. Tap here and try Home Assistant’s local IP address.</string>
+    <string name="connection_banner_generic_hint">Check the address and local network. Tap here to open connection settings.</string>
     <string name="header_hidden_apps_content_desc">Hidden apps (%1$d)</string>
     <string name="header_settings_content_desc">Settings</string>
     <string name="home_header_title">Home</string>
@@ -594,6 +614,8 @@
 
     <!-- ===== OPACITY PREVIEW ===== -->
     <string name="opacity_preview_close_desc">Close</string>
+    <string name="opacity_preview_weather_city">Home</string>
+    <string name="opacity_preview_weather_condition">Clear</string>
 
     <!-- ===== PLAYGROUND / DEV SCREEN ===== -->
     <string name="playground_swatch_blue">Blue</string>
@@ -1048,6 +1070,7 @@
     <string name="onb_ha_creds_help_step4">4. Under “Long-lived access tokens”, create a new token.</string>
     <string name="onb_ha_creds_help_step5">5. Name it “Portal”, then copy it here.</string>
     <string name="onb_ha_creds_error_invalid_address">Invalid address.</string>
+    <string name="onb_ha_creds_warning_mdns">“.local” uses local DNS (mDNS), which may not work on this panel. If the connection fails, enter Home Assistant’s local IP address instead.</string>
     <string name="onb_ha_creds_error_token_required">Token is required.</string>
     <string name="onb_ha_creds_skip_dialog_title">Discard this connection?</string>
     <string name="onb_ha_creds_skip_dialog_body">The information entered won\'t be saved.</string>

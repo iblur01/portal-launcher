@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -39,10 +41,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 import com.iblu01.portallauncher.ui.components.AmbientBackground
@@ -52,18 +57,18 @@ import com.iblu01.portallauncher.ui.components.WeatherUi
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.ui.theme.ClockFont
+import com.iblu01.portallauncher.ui.theme.ClockDateFormat
 import com.iblu01.portallauncher.ui.theme.ClockTheme
 import com.iblu01.portallauncher.ui.theme.ClockTint
 import com.iblu01.portallauncher.ui.theme.clockFontFamily
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.GregorianCalendar
+import java.util.Locale
 import kotlin.math.roundToInt
 
-private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", city = "Appartement", condition = "Dégagé", glyph = WeatherGlyph("clear-day"))
+private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", glyph = WeatherGlyph("clear-day"))
 private val previewTemperatures = TemperatureSummary("22,5°", "24,5°", "19°")
-private val previewChips = listOf(
-    LauncherChip("doors", "door", "Portes & fenêtres", "2 ouvertes", "warning"),
-    LauncherChip("purifier", "air", "Purificateur", "En marche · auto", "active"),
-    LauncherChip("scenes", "scenes", "Scènes", "13 raccourcis", "ok"),
-)
 
 /**
  * Full-screen live editor for the clock theme: the launcher home (frozen mock data) over the real
@@ -107,7 +112,7 @@ fun ClockThemeScreen(
             backgroundMode = backgroundMode,
             weather = previewWeather,
             temperatures = previewTemperatures,
-            chips = previewChips,
+            chips = emptyList(),
             onTap = {},
             onLongPress = {},
             pillsExpanded = false,
@@ -143,7 +148,12 @@ fun ClockThemeScreen(
                             .clip(RoundedCornerShape(14.dp))
                             .background(if (selected) AppleColors.accent else AppleColors.frostedFill)
                             .border(0.5.dp, AppleColors.frostedBorder, RoundedCornerShape(14.dp))
-                            .clickable { update(theme.copy(font = font)) }
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { update(theme.copy(font = font)) },
+                            )
+                            .sizeIn(minHeight = 48.dp)
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                     ) {
                         Text(
@@ -199,9 +209,10 @@ fun ClockThemeScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 ClockTint.entries.forEach { tint ->
                     val selected = tint == theme.tint
+                    val tintName = tint.localizedName()
                     Box(
                         Modifier
-                            .size(38.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(tint.color)
                             .border(
@@ -209,7 +220,12 @@ fun ClockThemeScreen(
                                 color = if (selected) Color.White else AppleColors.frostedBorder,
                                 shape = CircleShape,
                             )
-                            .clickable { update(theme.copy(tint = tint)) },
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { update(theme.copy(tint = tint)) },
+                            )
+                            .semantics { contentDescription = tintName },
                     )
                 }
             }
@@ -227,14 +243,40 @@ fun ClockThemeScreen(
                     colors = SwitchDefaults.colors(checkedTrackColor = AppleColors.accent),
                 )
             }
+
+            ControlLabel(stringResource(R.string.clock_theme_label_date_format))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ClockDateFormat.entries.forEach { format ->
+                    val selected = format == theme.dateFormat
+                    val label = dateFormatExample(format)
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (selected) AppleColors.accent else AppleColors.frostedFill)
+                            .border(0.5.dp, AppleColors.frostedBorder, RoundedCornerShape(14.dp))
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { update(theme.copy(dateFormat = format)) },
+                            )
+                            .sizeIn(minHeight = 48.dp)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        Text(label, style = AppleTypography.bodyLarge, color = if (selected) Color.White else AppleColors.primary)
+                    }
+                }
+            }
         }
 
         // Close button.
         Box(
             modifier = Modifier
-                .align(Alignment.TopStart)
+                .align(Alignment.TopEnd)
                 .padding(24.dp)
-                .size(44.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(AppleColors.frostedFill)
                 .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
@@ -244,6 +286,22 @@ fun ClockThemeScreen(
             Icon(Icons.Filled.Close, stringResource(R.string.clock_theme_close), tint = AppleColors.secondary, modifier = Modifier.size(20.dp))
         }
     }
+}
+
+@Composable
+private fun ClockTint.localizedName(): String = when (this) {
+    ClockTint.WHITE -> stringResource(R.string.clock_tint_white)
+    ClockTint.AMBER -> stringResource(R.string.clock_tint_amber)
+    ClockTint.MINT -> stringResource(R.string.clock_tint_mint)
+    ClockTint.BLUE -> stringResource(R.string.clock_tint_blue)
+    ClockTint.PINK -> stringResource(R.string.clock_tint_pink)
+    ClockTint.VIOLET -> stringResource(R.string.clock_tint_violet)
+}
+
+/** A fixed Tuesday makes every option self-explanatory while still following the app locale. */
+private fun dateFormatExample(format: ClockDateFormat): String {
+    val sample = GregorianCalendar(2026, Calendar.AUGUST, 18).time
+    return SimpleDateFormat(format.fullPattern, Locale.getDefault()).format(sample)
 }
 
 @Composable

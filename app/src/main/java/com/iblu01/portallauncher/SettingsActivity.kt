@@ -49,6 +49,7 @@ class SettingsActivity : ComponentActivity() {
 
     /** Last persisted MQTT-relevant values, to restart the bridge only when they actually change. */
     private var savedMqttSignature = ""
+    private var loadedWebConfigSignature = ""
 
     /**
      * Layout export / restore, through the storage picker rather than a fixed path: the app holds no
@@ -101,6 +102,7 @@ class SettingsActivity : ComponentActivity() {
         syncHomeSettingsFromRepository()
         refreshPillSettingsCatalog()
         savedMqttSignature = mqttSignature(prefs.brokerHost, prefs.brokerPort, prefs.username, prefs.password, prefs.deviceName)
+        loadedWebConfigSignature = webConfigSignature()
 
         val apps = resolveInstalledApps()
 
@@ -128,12 +130,22 @@ class SettingsActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (loadedWebConfigSignature.isNotEmpty() && loadedWebConfigSignature != webConfigSignature()) {
+            recreate()
+            return
+        }
         syncHomeSettingsFromRepository()
         refreshPillSettingsCatalog()
         pills.addListener(pillListener)
         MqttBridgeService.start(this)
         autoReturnTimer.start()
     }
+
+    private fun webConfigSignature(): String = listOf(
+        prefs.haUrl,
+        prefs.haToken.hashCode().toString(),
+        mqttSignature(prefs.brokerHost, prefs.brokerPort, prefs.username, prefs.password, prefs.deviceName),
+    ).joinToString("|")
 
     override fun onPause() {
         pills.removeListener(pillListener)
@@ -150,6 +162,13 @@ class SettingsActivity : ComponentActivity() {
 
     private val callbacks = object : SettingsCallbacks {
         override fun onSave(form: SettingsForm) {
+            // Returning from remote configuration recreates this activity so Compose can rebuild
+            // every field from Prefs. The outgoing composition still runs its onDispose auto-save;
+            // never let that stale form overwrite the values the web server has just persisted.
+            if (
+                loadedWebConfigSignature.isNotEmpty() &&
+                loadedWebConfigSignature != webConfigSignature()
+            ) return
             prefs.homeAssistantPackage = form.haPackage
             prefs.brokerHost = form.host
             prefs.brokerPort = form.port
@@ -424,6 +443,7 @@ class SettingsActivity : ComponentActivity() {
         const val PAGE_HOME = "HOME_SCREEN"
         const val PAGE_APPEARANCE = "APPEARANCE"
         const val PAGE_CONNECTED_HOME = "CONNECTED_HOME"
+        const val PAGE_CONNECTED_HOME_CONNECTION = "CONNECTED_HOME_CONNECTION"
         const val PAGE_DEVICE = "DEVICE"
         const val PAGE_ABOUT = "ABOUT"
     }

@@ -42,6 +42,12 @@ import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.R
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
+import com.iblu01.portallauncher.Prefs
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /** Side panel opened from the clock's temperature pill: current condition + hourly & daily forecast. */
@@ -205,7 +211,14 @@ private fun WeatherSummary(
                         R.string.weather_today_range_format,
                         minimum.roundToInt(),
                         weather.daily.first().temp.roundToInt(),
-                    ),
+                    ).replace("°", weather.temperatureUnit),
+                    style = AppleTypography.bodyLarge.copy(fontSize = 17.sp),
+                    color = AppleColors.secondary,
+                )
+            }
+            if (weather.city.isNotBlank()) {
+                Text(
+                    weather.city,
                     style = AppleTypography.bodyLarge.copy(fontSize = 17.sp),
                     color = AppleColors.secondary,
                 )
@@ -229,6 +242,9 @@ private fun WeatherSummary(
                 )
                 if (showCondition && weather.condition.isNotBlank()) {
                     Text(weather.condition, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+                }
+                if (weather.city.isNotBlank()) {
+                    Text(weather.city, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
                 }
             }
         }
@@ -256,6 +272,7 @@ private fun WeatherForecastSections(
     compactRows: Boolean,
     page: ForecastPage,
 ) {
+    val format24h = Prefs(LocalContext.current).clockTheme.format24h
     if (disclosure.emphasizeSummary && weather.hourly.isNotEmpty() && weather.daily.isNotEmpty()) {
         CompactForecastSwitcher(weather, disclosure, page)
         return
@@ -271,7 +288,9 @@ private fun WeatherForecastSections(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(if (compactRows) 14.dp else 18.dp),
             ) {
-                weather.hourly.take(disclosure.hourlyCount).forEach { HourTile(it, disclosure.emphasizeSummary) }
+                weather.hourly.take(disclosure.hourlyCount).forEach {
+                    HourTile(it, disclosure.emphasizeSummary, format24h, weather.temperatureUnit)
+                }
             }
         }
     }
@@ -282,7 +301,7 @@ private fun WeatherForecastSections(
                 style = AppleTypography.labelSmall.copy(fontSize = if (disclosure.emphasizeSummary) 14.sp else 12.sp),
                 color = AppleColors.tertiary,
             )
-            weather.daily.take(disclosure.dailyCount).forEach { DayRow(it, disclosure.emphasizeSummary) }
+            weather.daily.take(disclosure.dailyCount).forEach { DayRow(it, disclosure.emphasizeSummary, weather.temperatureUnit) }
         }
     }
 }
@@ -291,6 +310,7 @@ private enum class ForecastPage { HOURLY, DAILY }
 
 @Composable
 private fun CompactForecastSwitcher(weather: WeatherUi, disclosure: WeatherDisclosure, page: ForecastPage) {
+    val format24h = Prefs(LocalContext.current).clockTheme.format24h
     BoxWithConstraints(Modifier.fillMaxSize()) {
             val visibleItems = when (page) {
                 ForecastPage.HOURLY -> disclosure.hourlyCount
@@ -305,12 +325,12 @@ private fun CompactForecastSwitcher(weather: WeatherUi, disclosure: WeatherDiscl
                 when (page) {
                     ForecastPage.HOURLY -> weather.hourly.forEach { point ->
                         Box(Modifier.size(width = itemWidth, height = itemHeight), contentAlignment = Alignment.Center) {
-                            HourTile(point, enlarged = true)
+                            HourTile(point, enlarged = true, format24h = format24h, unit = weather.temperatureUnit)
                         }
                     }
                     ForecastPage.DAILY -> weather.daily.forEach { point ->
                         Box(Modifier.size(width = itemWidth, height = itemHeight), contentAlignment = Alignment.Center) {
-                            DayTile(point)
+                            DayTile(point, weather.temperatureUnit)
                         }
                     }
                 }
@@ -359,25 +379,25 @@ private fun ForecastPageButton(label: String, selected: Boolean, onClick: () -> 
 }
 
 @Composable
-private fun HourTile(p: ForecastPoint, enlarged: Boolean) {
+private fun HourTile(p: ForecastPoint, enlarged: Boolean, format24h: Boolean, unit: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (enlarged) 7.dp else 6.dp)) {
-        Text(forecastPointLabel(p.datetime, hourly = true), style = AppleTypography.bodySmall.copy(fontSize = if (enlarged) 14.sp else 12.sp), color = AppleColors.secondary)
+        Text(forecastPointLabel(p.datetime, hourly = true, format24h = format24h), style = AppleTypography.bodySmall.copy(fontSize = if (enlarged) 14.sp else 12.sp), color = AppleColors.secondary)
         WeatherIcon(weatherGlyph(p.condition, night = false), Modifier.size(if (enlarged) 40.dp else 30.dp))
-        Text("${p.temp.roundToInt()}°", style = AppleTypography.bodyLarge.copy(fontSize = if (enlarged) 20.sp else 17.sp), color = AppleColors.primary)
+        Text("${p.temp.roundToInt()}$unit", style = AppleTypography.bodyLarge.copy(fontSize = if (enlarged) 20.sp else 17.sp), color = AppleColors.primary)
     }
 }
 
 @Composable
-private fun DayTile(p: ForecastPoint) {
+private fun DayTile(p: ForecastPoint, unit: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            forecastPointLabel(p.datetime, hourly = false),
+            forecastPointLabel(p.datetime, hourly = false, format24h = true),
             style = AppleTypography.bodyLarge.copy(fontSize = 18.sp),
             color = AppleColors.primary,
         )
         WeatherIcon(weatherGlyph(p.condition, night = false), Modifier.size(54.dp))
         Text(
-            p.tempLow?.let { "${p.temp.roundToInt()}° / ${it.roundToInt()}°" } ?: "${p.temp.roundToInt()}°",
+            p.tempLow?.let { "${p.temp.roundToInt()}$unit / ${it.roundToInt()}$unit" } ?: "${p.temp.roundToInt()}$unit",
             style = AppleTypography.bodyLarge.copy(fontSize = 20.sp),
             color = AppleColors.secondary,
         )
@@ -385,23 +405,28 @@ private fun DayTile(p: ForecastPoint) {
 }
 
 @Composable
-private fun DayRow(p: ForecastPoint, enlarged: Boolean) {
+private fun DayRow(p: ForecastPoint, enlarged: Boolean, unit: String) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(forecastPointLabel(p.datetime, hourly = false), style = AppleTypography.bodyLarge.copy(fontSize = if (enlarged) 19.sp else 17.sp), color = AppleColors.primary, modifier = Modifier.weight(1f))
+        Text(forecastPointLabel(p.datetime, hourly = false, format24h = true), style = AppleTypography.bodyLarge.copy(fontSize = if (enlarged) 19.sp else 17.sp), color = AppleColors.primary, modifier = Modifier.weight(1f))
         WeatherIcon(weatherGlyph(p.condition, night = false), Modifier.size(if (enlarged) 38.dp else 28.dp))
         Spacer(Modifier.size(16.dp))
         Text(
-            p.tempLow?.let { "${p.temp.roundToInt()}° / ${it.roundToInt()}°" } ?: "${p.temp.roundToInt()}°",
+            p.tempLow?.let { "${p.temp.roundToInt()}$unit / ${it.roundToInt()}$unit" } ?: "${p.temp.roundToInt()}$unit",
             style = AppleTypography.bodyLarge.copy(fontSize = if (enlarged) 19.sp else 17.sp), color = AppleColors.secondary,
         )
     }
 }
 
-private fun forecastPointLabel(datetime: String, hourly: Boolean): String = runCatching {
-    val odt = java.time.OffsetDateTime.parse(datetime)
-    if (hourly) "${odt.hour}h"
-    else odt.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).replaceFirstChar { it.uppercase() }
+internal fun forecastPointLabel(
+    datetime: String,
+    hourly: Boolean,
+    format24h: Boolean,
+    locale: Locale = Locale.getDefault(),
+): String = runCatching {
+    val local = java.time.OffsetDateTime.parse(datetime).atZoneSameInstant(ZoneId.systemDefault())
+    if (hourly) DateTimeFormatter.ofPattern(if (format24h) "HH:mm" else "h a", locale).format(local)
+    else local.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).replaceFirstChar { it.titlecase(locale) }
 }.getOrDefault("")

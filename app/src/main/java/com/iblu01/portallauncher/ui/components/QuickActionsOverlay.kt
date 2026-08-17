@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
@@ -45,6 +46,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.dialog
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import com.iblu01.portallauncher.R
@@ -87,7 +90,7 @@ fun QuickActionsOverlay(
         var backdropRect by remember { mutableStateOf(Rect.Zero) }
         var panelRect by remember { mutableStateOf(Rect.Zero) }
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().semantics { dialog() }) {
             // Blurred, dimmed backdrop — a SIBLING of the panel so the blur never
             // bleeds onto the menu. Tapping outside the panel dismisses.
             Box(
@@ -110,7 +113,9 @@ fun QuickActionsOverlay(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(
                 modifier = Modifier
-                    .width(320.dp)
+                    .padding(24.dp)
+                    .widthIn(max = 320.dp)
+                    .fillMaxWidth()
                     .clip(AppleShapes.panel)
                     .background(AppleColors.elevated.copy(alpha = 0.96f), AppleShapes.panel)
                     .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)

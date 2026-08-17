@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.0.2
+
+### Added
+
+- **Connection problem banner**: when Home Assistant is unreachable, a tappable banner on the home and clock screens explains the situation and opens the connection settings directly. A `.local` address gets a dedicated hint recommending the server's local IP.
+- **mDNS warnings**: `.local` hostnames are detected in onboarding, connection settings and the web config page, each warning that local DNS (mDNS) may not resolve on some panels and pointing to the local IP as a fallback.
+- **Staged web-config testing**: remote setup now splits Home Assistant and MQTT into separate steps, each validated live before saving — HA tests address, port and token; MQTT tests host, port and authentication. Per-section cards show "Configured" or "Waiting", and an offline view with retry replaces the silent failure.
+- **Clock date formats**: nine layouts (long, weekday variants, numeric and ISO) selectable from the clock theme, with a live localized preview rendered against a fixed reference date.
+- **Weather corrections**: deterministic weather-entity selection, forecast entries without a temperature are dropped instead of reading `0.0`, the real city is reverse-geocoded from the Home Assistant zone, and temperatures convert to the entity's `°C`/`°F` unit.
+- **Accessibility pass**: buttons, switches, sliders and selectors expose proper roles, hardware-key activation and larger touch targets; dialogs are announced as such.
+- **Discord community banner** in the README.
+
+### Changed
+
+- The clock colon is now drawn (two vertically-centered `Canvas` dots) instead of a text character, with an optional small AM/PM suffix; the date follows the selected format.
+- The single "Configuration saved" web-config screen becomes progress/completion states, and the `HomeConnectionPage` entry is promoted to a prominent tile at the top of the page.
+- Settings dialogs are constrained to a maximum size with scrollable content, and remaining hard-coded French strings moved to resources.
+- The clock-theme close button moved to the top-right corner, and mock pills were removed from the previews.
+- `SettingsActivity` guards against an outgoing composition's stale auto-save overwriting values just persisted by the web server.
+
+### Removed
+
+- `StaleBanner`, replaced by `ConnectionProblemBanner`.
+- Mock pill and weather preview constants in the clock theme and opacity previews.
+- The single `configurationSaved` boolean and the monolithic `onConfigSaved` callback, replaced by section-aware save states.
+- The `web_config_saved_title` / `web_config_saved_body` strings.
+
+### Performance
+
+- The clock colon and its semantics are GPU-drawn with a single content-description node.
+- Weather reverse-geocoding runs on a dedicated single-thread executor with a cache-validity key, off the main thread.
+- Forecast parsing no longer fabricates invalid entries.
+
+### i18n
+
+- New English and French strings for the connection banner, mDNS warnings, clock date-format selection, tint names, web-config progress/completion states and preview labels.
+
+### Tests
+
+- New suites: `ClockDateFormatTest`, `WeatherDataTest`, `WeatherTemperatureSummaryTest`, `ConnectionProblemBannerTest`, `WeatherCityTest` and `WeatherForecastLabelTest`; extended `WebConfigServerTest`, `IndividualPillPanelTest` and `OnboardingUrlsTest`.
+
 ## 1.0.1
 
 ### Added

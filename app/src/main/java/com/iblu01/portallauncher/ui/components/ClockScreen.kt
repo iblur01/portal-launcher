@@ -2,6 +2,7 @@ package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
@@ -45,9 +47,12 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
@@ -138,6 +143,17 @@ fun ClockScreen(
             selectedChipKey = selectedChipKey,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        if (!connected) {
+            ConnectionProblemBanner(
+                lastUpdateAt = lastUpdateAt,
+                usesMdnsAddress = false,
+                onClick = onTap,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+            )
+        }
     }
 }
 
@@ -179,7 +195,7 @@ private fun rememberCompactClockScreen(): Boolean {
 }
 
 /**
- * The clock block (date, time, weather pill, stale banner). Pinned above the pager, it shrinks
+ * The clock block (date, time and weather pill). Pinned above the pager, it shrinks
  * toward the top as [collapse] goes 0→1 so the apps grid gets the room back.
  *
  * The shrink is a pure [graphicsLayer] transform (GPU, no relayout) — the Portal is API 28 with a
@@ -198,8 +214,8 @@ fun ClockHeader(
 ) {
 
     val time by rememberClock(if (clockTheme.format24h) "HH:mm" else "h:mm a")
-    val date by rememberClock("EEEE d MMMM")
-    val compactDate by rememberClock("EEE d MMM")
+    val date by rememberClock(clockTheme.dateFormat.fullPattern)
+    val compactDate by rememberClock(clockTheme.dateFormat.compactPattern)
     val compactScreen = rememberCompactClockScreen()
     val useCompactTemperatureHeader = connected && compactScreen
     val compactTemperaturesAvailable = compactIndoorTemperature(
@@ -246,9 +262,7 @@ fun ClockHeader(
             }
         }
         Spacer(Modifier.height((if (compactScreen) 0.dp else 2.dp) * clockTheme.elementSpacing))
-        Text(
-            text = time,
-            style = AppleTypography.displayLarge.copy(
+        val timeStyle = AppleTypography.displayLarge.copy(
                 fontFamily = clockFontFamily(clockTheme.font, timeWeight),
                 fontSize = clockTheme.size.sp,
                 fontWeight = timeWeight,
@@ -258,16 +272,64 @@ fun ClockHeader(
                     offset = Offset(0f, 2f),
                     blurRadius = 12f
                 )
-            ),
-            color = clockTheme.tint.color,
-            maxLines = 1,
-            softWrap = false,
+            )
+        val timeParts = time.split(':', limit = 2)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             // Reclaim the date's visual slot as it fades, so the minimal time sits at the same top
             // position it would have had if the date were not in the layout at all.
-            modifier = Modifier.graphicsLayer {
-                translationY = -COMPACT_DATE_LIFT.toPx() * collapse().coerceIn(0f, 1f)
-            },
-        )
+            modifier = Modifier
+                .graphicsLayer {
+                    translationY = -COMPACT_DATE_LIFT.toPx() * collapse().coerceIn(0f, 1f)
+                }
+                .clearAndSetSemantics { contentDescription = time },
+        ) {
+            Text(
+                timeParts.first(),
+                style = timeStyle,
+                color = clockTheme.tint.color,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.alignByBaseline(),
+            )
+            if (timeParts.size == 2) {
+                val fontScale = LocalDensity.current.fontScale
+                val colonWidth = (clockTheme.size * fontScale * 0.18f).dp
+                val colonHeight = (clockTheme.size * fontScale * 0.64f).dp
+                Canvas(Modifier.size(colonWidth, colonHeight)) {
+                    val radius = size.width * 0.30f
+                    drawCircle(clockTheme.tint.color, radius, Offset(size.width / 2f, size.height * 0.34f))
+                    drawCircle(clockTheme.tint.color, radius, Offset(size.width / 2f, size.height * 0.66f))
+                }
+                val trailing = timeParts.last()
+                val suffixStart = trailing.lastIndexOf(' ').takeIf { it >= 0 }
+                val minute = suffixStart?.let { trailing.substring(0, it) } ?: trailing
+                val dayPeriod = suffixStart?.let { trailing.substring(it + 1) }
+                Text(
+                    minute,
+                    style = timeStyle,
+                    color = clockTheme.tint.color,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.alignByBaseline(),
+                )
+                if (!dayPeriod.isNullOrBlank()) {
+                    Text(
+                        dayPeriod,
+                        style = timeStyle.copy(
+                            fontSize = (clockTheme.size * 0.28f).sp,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = clockTheme.tint.color.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .alignByBaseline()
+                            .padding(start = 6.dp),
+                    )
+                }
+            }
+        }
         // Keep these nodes composed throughout the gesture. Removing them when alpha reaches zero
         // causes a structural recomposition and a text remeasure exactly halfway through the swipe.
         if (connected && !useCompactTemperatureHeader) {
@@ -285,12 +347,6 @@ fun ClockHeader(
             ) {
                 Text(stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
                 Text(stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
-            }
-        }
-        if (!connected && lastUpdateAt > 0L) {
-            Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
-            Box(Modifier.graphicsLayer { alpha = clockDetailAlpha(collapse()) }) {
-                StaleBanner(lastUpdateAt = lastUpdateAt)
             }
         }
     }
@@ -577,24 +633,46 @@ internal fun trayPillAccessibilityLabel(context: android.content.Context, pill: 
 }
 
 @Composable
-private fun StaleBanner(lastUpdateAt: Long) {
+fun ConnectionProblemBanner(
+    lastUpdateAt: Long,
+    usesMdnsAddress: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val elapsed by produceState(initialValue = 0L, lastUpdateAt) {
         while (true) {
-            value = (System.currentTimeMillis() - lastUpdateAt) / 1000L
+            value = if (lastUpdateAt > 0L) {
+                ((System.currentTimeMillis() - lastUpdateAt) / 1000L).coerceAtLeast(0L)
+            } else 0L
             kotlinx.coroutines.delay(1_000L)
         }
     }
     val ago = if (elapsed < 60) "${elapsed}s" else "${elapsed / 60}min"
-    Row(
-        modifier = Modifier.clip(AppleShapes.pill)
-            .background(Color(0x33FF9F0A), AppleShapes.pill)
-            .border(0.5.dp, Color(0x66FF9F0A), AppleShapes.pill)
-            .padding(horizontal = 14.dp, vertical = 5.dp),
+    Column(
+        modifier = modifier
+            .widthIn(max = 620.dp)
+            .fillMaxWidth()
+            .clip(AppleShapes.panel)
+            .background(Color(0xE6221B12), AppleShapes.panel)
+            .border(0.5.dp, Color(0x99FF9F0A), AppleShapes.panel)
+            .appleClickable(onClick)
+            .testTag("connectionProblemBanner")
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Text(
-            stringResource(R.string.clock_stale_banner_format, ago),
-            style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
+            if (lastUpdateAt > 0L) stringResource(R.string.clock_stale_banner_format, ago)
+            else stringResource(R.string.connection_banner_unreachable),
+            style = AppleTypography.titleMedium,
             color = Color(0xFFFFC062),
+        )
+        Text(
+            stringResource(
+                if (usesMdnsAddress) R.string.connection_banner_mdns_hint
+                else R.string.connection_banner_generic_hint,
+            ),
+            style = AppleTypography.bodySmall,
+            color = AppleColors.secondary,
         )
     }
 }

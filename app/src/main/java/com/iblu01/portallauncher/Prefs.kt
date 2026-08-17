@@ -10,6 +10,7 @@ import androidx.security.crypto.MasterKey
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
 import com.iblu01.portallauncher.session.SessionAllowlist
 import com.iblu01.portallauncher.session.SessionAllowlistCodec
+import com.iblu01.portallauncher.ui.theme.ClockDateFormat
 import com.iblu01.portallauncher.ui.theme.ClockFont
 import com.iblu01.portallauncher.ui.theme.ClockTheme
 import com.iblu01.portallauncher.ui.theme.ClockTint
@@ -187,6 +188,10 @@ class Prefs(private val context: Context) {
         get() = sp.getBoolean("clock_format_24h", true)
         set(value) = sp.edit().putBoolean("clock_format_24h", value).apply()
 
+    var clockDateFormat: String
+        get() = sp.getString("clock_date_format", ClockDateFormat.LONG.key) ?: ClockDateFormat.LONG.key
+        set(value) = sp.edit().putString("clock_date_format", value).apply()
+
     var clockElementSpacing: Float
         get() = sp.getFloat("clock_element_spacing", 1f)
         set(value) = sp.edit().putFloat("clock_element_spacing", value.coerceIn(0.4f, 2f)).apply()
@@ -200,6 +205,7 @@ class Prefs(private val context: Context) {
             letterSpacing = clockLetterSpacing,
             tint = ClockTint.fromKey(clockTint),
             format24h = clockFormat24h,
+            dateFormat = ClockDateFormat.fromKey(clockDateFormat),
             elementSpacing = clockElementSpacing,
         )
         set(value) {
@@ -209,6 +215,7 @@ class Prefs(private val context: Context) {
             clockLetterSpacing = value.letterSpacing
             clockTint = value.tint.key
             clockFormat24h = value.format24h
+            clockDateFormat = value.dateFormat.key
             clockElementSpacing = value.elementSpacing
         }
 

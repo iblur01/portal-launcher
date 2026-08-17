@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -254,9 +255,10 @@ fun SettingsSearchField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Rechercher…",
+    placeholder: String? = null,
     container: Color = AppleColors.elevated,
 ) {
+    val resolvedPlaceholder = placeholder ?: stringResource(R.string.search_placeholder)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -283,7 +285,7 @@ fun SettingsSearchField(
                 modifier = Modifier.weight(1f),
                 decorationBox = { inner ->
                     if (value.isEmpty()) {
-                        Text(placeholder, style = AppleTypography.titleMedium, color = AppleColors.tertiary)
+                        Text(resolvedPlaceholder, style = AppleTypography.titleMedium, color = AppleColors.tertiary)
                     }
                     inner()
                 }
@@ -305,8 +307,10 @@ fun SettingsInfoDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
                 .padding(24.dp)
+                .widthIn(max = 720.dp)
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
                 .clip(AppleShapes.panel)
                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel),
             color = AppleColors.elevated,
@@ -319,16 +323,18 @@ fun SettingsInfoDialog(
                     color = AppleColors.primary,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-                lines.forEach { line ->
-                    Text(
-                        line,
-                        style = AppleTypography.bodyMedium,
-                        color = AppleColors.secondary,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
+                    items(lines) { line ->
+                        Text(
+                            line,
+                            style = AppleTypography.bodyMedium,
+                            color = AppleColors.secondary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
-                PillButton(label = "OK", primary = true, onClick = onDismiss)
+                PillButton(label = stringResource(R.string.dialog_button_ok), primary = true, onClick = onDismiss)
             }
         }
     }
@@ -629,8 +635,10 @@ fun AppPickerDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
                 .padding(24.dp)
+                .widthIn(max = 720.dp)
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
                 .clip(AppleShapes.panel)
                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel),
             color = AppleColors.elevated,
@@ -638,7 +646,7 @@ fun AppPickerDialog(
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    "Choisir une application",
+                    stringResource(R.string.app_picker_title),
                     style = AppleTypography.titleLarge,
                     color = AppleColors.primary,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -685,7 +693,7 @@ fun AppPickerDialog(
                     )
                 } else {
                     LazyColumn(
-                        modifier = Modifier.heightIn(max = 400.dp)
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
                         items(filtered, key = { it.packageName }) { app ->
                             val isSelected = app.packageName == selectedPackage
@@ -749,8 +757,10 @@ fun HaDiscoveryDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
                 .padding(24.dp)
+                .widthIn(max = 720.dp)
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
                 .clip(AppleShapes.panel)
                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel),
             color = AppleColors.elevated,
@@ -771,7 +781,7 @@ fun HaDiscoveryDialog(
                         modifier = Modifier.padding(vertical = 16.dp)
                     )
                 } else {
-                    LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                    LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
                         items(instances, key = { it.url }) { instance ->
                             Row(
                                 modifier = Modifier

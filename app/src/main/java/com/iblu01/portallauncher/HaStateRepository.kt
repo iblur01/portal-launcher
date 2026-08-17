@@ -28,6 +28,26 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.net.Proxy
 
+/** Stable weather selection: conventional HA id first, then lexical order. */
+internal fun selectWeatherEntityId(entityIds: Iterable<String>): String? {
+    val weatherIds = entityIds.filter { it.startsWith("weather.") }
+    return weatherIds.firstOrNull { it == "weather.home" }
+        ?: weatherIds.minOrNull()
+}
+
+/** Drops incomplete forecast entries instead of manufacturing a misleading 0°. */
+internal fun parseForecastPoints(arr: JSONArray): List<ForecastPoint> =
+    (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.mapNotNull { o ->
+        val temperature = o.optDouble("temperature", Double.NaN).takeUnless(Double::isNaN)
+            ?: return@mapNotNull null
+        ForecastPoint(
+            datetime = o.optString("datetime"),
+            temp = temperature,
+            tempLow = o.optDouble("templow", Double.NaN).takeUnless(Double::isNaN),
+            condition = o.optString("condition"),
+        )
+    }
+
 class HaStateRepository(appContext: Context, private val url: String, private val token: String) {
     fun interface Listener { fun onStates(states: Map<String, HaEntity>, connected: Boolean) }
     private val listeners = CopyOnWriteArraySet<Listener>()
@@ -74,7 +94,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
     @Volatile var lastUpdateAt = 0L
         private set
 
-    /** First weather.* entity found, and its subscribed forecasts. */
+    /** Deterministically selected weather entity, and its subscribed forecasts. */
     @Volatile var weatherEntityId: String? = null
         private set
     @Volatile var hourlyForecast: List<ForecastPoint> = emptyList()
@@ -282,15 +302,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         val id = o.optString("entity_id"); if (id.isBlank()) return null
         return HaEntity(id, o.optString("state"), o.optJSONObject("attributes") ?: JSONObject(), o.optString("last_changed"))
     }
-    private fun parseForecast(arr: JSONArray): List<ForecastPoint> =
-        (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map { o ->
-            ForecastPoint(
-                datetime = o.optString("datetime"),
-                temp = o.optDouble("temperature", Double.NaN).let { if (it.isNaN()) 0.0 else it },
-                tempLow = o.optDouble("templow", Double.NaN).let { if (it.isNaN()) null else it },
-                condition = o.optString("condition"),
-            )
-        }
+    private fun parseForecast(arr: JSONArray): List<ForecastPoint> = parseForecastPoints(arr)
     private inner class WsListener : WebSocketListener() {
         override fun onMessage(webSocket: WebSocket, text: String) {
             lastActivityAt = System.currentTimeMillis()
@@ -317,7 +329,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                         Log.i(TAG, "received ${result.length()} states; subscribing to changes")
                         // Id must exceed the registry list ids (3,4,5) — HA requires per-connection ids to strictly increase.
                         notifyListeners(); webSocket.send("{\"id\":6,\"type\":\"subscribe_events\",\"event_type\":\"state_changed\"}")
-                        weatherEntityId = states.keys.firstOrNull { it.startsWith("weather.") }
+                        weatherEntityId = selectWeatherEntityId(states.keys)
                         weatherEntityId?.let { w ->
                             webSocket.send("{\"id\":$FORECAST_HOURLY_ID,\"type\":\"weather/subscribe_forecast\",\"forecast_type\":\"hourly\",\"entity_id\":\"$w\"}")
                             webSocket.send("{\"id\":$FORECAST_DAILY_ID,\"type\":\"weather/subscribe_forecast\",\"forecast_type\":\"daily\",\"entity_id\":\"$w\"}")

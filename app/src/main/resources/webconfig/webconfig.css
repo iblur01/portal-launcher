@@ -50,6 +50,15 @@ button, input { font: inherit; }
 .wizard-field input::placeholder { color: rgb(255 255 255 / 45%); }
 .wizard-field input:focus { background: #2c2c2e; outline: 1px solid rgb(255 255 255 / 55%); }
 .field-error { margin: -1px 0 0; padding: 9px 16px 10px; border-top: 1px solid rgb(255 255 255 / 10%); background: #3a1717; color: #ffb4ae; font-size: .83rem; line-height: 1.4; }
+.field-warning { margin: -1px 0 0; padding: 10px 16px; border-top: 1px solid rgb(255 214 10 / 22%); background: rgb(255 214 10 / 9%); color: #ffd60a; font-size: .83rem; line-height: 1.45; }
+.connection-checks { margin-top: 12px; overflow: hidden; border-radius: 12px; background: #1c1c1e; box-shadow: 0 0 0 1px rgb(255 255 255 / 9%); }
+.connection-check { display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 14px; border-top: 1px solid rgb(255 255 255 / 9%); font-size: .88rem; }
+.connection-check:first-child { border-top: 0; }
+.connection-check strong { color: rgb(255 255 255 / 48%); font-weight: 600; }
+.connection-check.testing strong { color: #ffd60a; }
+.connection-check.ok strong { color: #30d158; }
+.connection-check.err strong { color: #ff6961; }
+.connection-checks .status { padding-inline: 14px; }
 .text-action { min-height: 44px; margin-top: 6px; border: 0; background: transparent; color: #0a84ff; font-size: .9rem; cursor: pointer; }
 .text-action:focus-visible { outline: 2px solid #fff; outline-offset: -4px; border-radius: 8px; }
 .step-note { margin: 0 0 14px; padding: 13px 15px; border-radius: 10px; background: #1c1c1e; color: rgb(255 255 255 / 70%); font-size: .9rem; line-height: 1.5; }
@@ -72,6 +81,7 @@ button, input { font: inherit; }
 .nav-primary:hover { background: #2997ff; }
 .completion-view { grid-column: 1 / -1; align-self: center; justify-self: center; max-width: 520px; padding: 48px 24px; text-align: center; }
 .completion-check { display: grid; width: 64px; height: 64px; margin: 0 auto 22px; place-items: center; border-radius: 50%; background: #30d158; color: #000; font-size: 2rem; font-weight: 750; }
+.offline-symbol { display: grid; width: 64px; height: 64px; margin: 0 auto 22px; place-items: center; border-radius: 50%; background: rgb(255 159 10 / 18%); color: #ff9f0a; box-shadow: 0 0 0 1px rgb(255 159 10 / 45%); font-size: 2rem; font-weight: 750; }
 .completion-view h1 { margin: 0; font-size: clamp(1.8rem, 5vw, 2.5rem); letter-spacing: -.035em; }
 .completion-view p { margin: 14px 0 8px; color: rgb(255 255 255 / 60%); line-height: 1.55; }
 .completion-view strong { display: block; color: #fff; font-size: 1.05rem; }

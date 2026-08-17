@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
@@ -28,6 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.dialog
+import androidx.compose.ui.semantics.semantics
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.apps.GridItem
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -55,12 +58,17 @@ fun HiddenAppsDialog(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { onDismiss() },
+                onClick = onDismiss,
+            )
+            .semantics { dialog() },
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
-                .width(320.dp)
+                .padding(24.dp)
+                .widthIn(max = 320.dp)
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
                 .clip(AppleShapes.panel)
                 .background(AppleColors.elevated.copy(alpha = 0.97f), AppleShapes.panel)
                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
@@ -78,7 +86,7 @@ fun HiddenAppsDialog(
                 color = AppleColors.tertiary,
                 modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp),
             )
-            LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
                 items(items, key = { it.key }) { item ->
                     Row(
                         modifier = Modifier

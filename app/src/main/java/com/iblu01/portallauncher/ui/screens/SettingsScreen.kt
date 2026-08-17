@@ -201,6 +201,7 @@ private data class TileDef(
 /** Keeps links emitted by older launcher versions working after the settings reorganisation. */
 private fun settingsPageFromRoute(route: String?): SettingsPage = when (route) {
     "HOME", SettingsActivity.PAGE_CONNECTED_HOME -> SettingsPage.CONNECTED_HOME
+    SettingsActivity.PAGE_CONNECTED_HOME_CONNECTION -> SettingsPage.CONNECTED_HOME_CONNECTION
     SettingsActivity.PAGE_HOME -> SettingsPage.HOME
     "PILLS" -> SettingsPage.HOME
     "WALLPAPER", SettingsActivity.PAGE_APPEARANCE -> SettingsPage.APPEARANCE
@@ -439,6 +440,7 @@ fun SettingsScreen(
                     CategoryEntry(stringResource(R.string.settings_connected_sessions_title), stringResource(R.string.settings_connected_sessions_subtitle), Icons.Outlined.Settings, SettingsPage.CONNECTED_HOME_SESSIONS),
                 ),
                 onNavigate = { currentPage = it }, onBack = { currentPage = SettingsPage.MAIN }, showBack = showBack,
+                leadingContent = { WebConfigShortcut() },
             )
             SettingsPage.CONNECTED_HOME_CONNECTION -> HomeConnectionPage(
                 uiState = uiState,
@@ -581,6 +583,7 @@ private fun CategoryPage(
     onNavigate: (SettingsPage) -> Unit,
     onBack: () -> Unit,
     showBack: Boolean,
+    leadingContent: (@Composable () -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
@@ -592,6 +595,7 @@ private fun CategoryPage(
             showBack = showBack,
             breadcrumb = stringResource(R.string.settings_main_title),
         )
+        leadingContent?.invoke()
         SettingsSection(title = stringResource(R.string.settings_category_section)) {
             entries.forEachIndexed { index, entry ->
                 SettingsRow(label = entry.title, value = entry.subtitle, onClick = { onNavigate(entry.page) })

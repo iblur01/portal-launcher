@@ -76,6 +76,49 @@ class WebConfigServerTest {
         assertTrue(page.contains("Vous pouvez fermer cet onglet"))
         assertTrue(page.contains("id=\"next\""))
         assertTrue(page.contains("id=\"back\""))
+        assertTrue(page.contains("id=\"ha_mdns_warning\""))
+        assertTrue(page.contains("adresse IP locale du serveur"))
+        assertTrue(page.contains("id=\"ha_check_host\""))
+        assertTrue(page.contains("id=\"ha_check_port\""))
+        assertTrue(page.contains("id=\"ha_check_token\""))
+        assertTrue(page.contains("id=\"mqtt_check_host\""))
+        assertTrue(page.contains("id=\"mqtt_check_port\""))
+        assertTrue(page.contains("id=\"mqtt_check_auth\""))
+        assertTrue(page.contains("id=\"mqtt_mdns_warning\""))
+        assertTrue(page.contains("id=\"server-offline-view\""))
+        assertTrue(page.contains("Le launcher n’est pas en mode configuration"))
+    }
+
+    @Test
+    fun `home step tests host then port then token before continuing`() {
+        val script = WebConfigPage.asset("config.js")
+
+        val host = script.indexOf("runHaCheck('host')")
+        val port = script.indexOf("runHaCheck('port')", host + 1)
+        val token = script.indexOf("runHaCheck('token')", port + 1)
+        val continueToMqtt = script.indexOf("showStep(1)", token + 1)
+
+        assertTrue(script.contains("/api/test-ha"))
+        assertTrue(host >= 0)
+        assertTrue(port > host)
+        assertTrue(token > port)
+        assertTrue(continueToMqtt > token)
+    }
+
+    @Test
+    fun `mqtt step tests host then port then authentication before continuing`() {
+        val script = WebConfigPage.asset("config.js")
+
+        val host = script.indexOf("runMqttCheck('host')")
+        val port = script.indexOf("runMqttCheck('port')", host + 1)
+        val auth = script.indexOf("runMqttCheck('auth')", port + 1)
+        val continueToSummary = script.indexOf("showStep(2)", auth + 1)
+
+        assertTrue(script.contains("/api/test-mqtt"))
+        assertTrue(host >= 0)
+        assertTrue(port > host)
+        assertTrue(auth > port)
+        assertTrue(continueToSummary > auth)
     }
 
     @Test

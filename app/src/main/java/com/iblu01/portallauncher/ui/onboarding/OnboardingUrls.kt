@@ -44,6 +44,9 @@ object OnboardingUrls {
     fun hostOf(raw: String): String =
         runCatching { URI(normalizeHaUrl(raw)).host }.getOrNull().orEmpty()
 
+    /** `.local` relies on mDNS, which is unavailable on some Android-based panels. */
+    fun usesMdnsHostname(raw: String): Boolean = hostOf(raw).lowercase().endsWith(".local")
+
     /**
      * The broker address to pre-fill.
      *

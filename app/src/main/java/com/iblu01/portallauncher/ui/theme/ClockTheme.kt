@@ -34,6 +34,27 @@ enum class ClockTint(val key: String, val label: String, val color: Color) {
     }
 }
 
+/** User-selectable date layouts for the clock header. */
+enum class ClockDateFormat(
+    val key: String,
+    val fullPattern: String,
+    val compactPattern: String = fullPattern,
+) {
+    LONG("long", "EEEE d MMMM", "EEE d MMM"),
+    WEEKDAY_MONTH_DAY("weekday_month_day", "EEEE, MMMM d", "EEE, MMM d"),
+    SHORT_WEEKDAY_DAY_MONTH("short_weekday_day_month", "EEE d MMMM", "EEE d MMM"),
+    SHORT_WEEKDAY_MONTH_DAY("short_weekday_month_day", "EEE, MMM d"),
+    MONTH_DAY_TEXT("month_day_text", "MMMM d", "MMM d"),
+    DAY_MONTH_TEXT("day_month_text", "d MMMM", "d MMM"),
+    DAY_MONTH_YEAR("day_month_year", "dd/MM/yyyy"),
+    MONTH_DAY_YEAR("month_day_year", "MM/dd/yyyy"),
+    ISO("iso", "yyyy-MM-dd");
+
+    companion object {
+        fun fromKey(key: String): ClockDateFormat = entries.firstOrNull { it.key == key } ?: LONG
+    }
+}
+
 /**
  * The full clock styling. Defaults reproduce the launcher's current clock (Space Grotesk Black,
  * 138sp, white, 24h) so a defaulted [ClockTheme] leaves the historical look untouched.
@@ -47,6 +68,7 @@ data class ClockTheme(
     val letterSpacing: Float = 0f,
     val tint: ClockTint = ClockTint.WHITE,
     val format24h: Boolean = true,
+    val dateFormat: ClockDateFormat = ClockDateFormat.LONG,
     /** Multiplier on the vertical gaps between date/time/weather-pill rows (see ClockHeader). */
     val elementSpacing: Float = 1f,
 ) {

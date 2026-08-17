@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +40,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
@@ -71,7 +74,8 @@ class WebConfigActivity : ComponentActivity() {
 
     private var server: WebConfigServer? = null
     private var endpoint by mutableStateOf<Endpoint?>(null)
-    private var configurationSaved by mutableStateOf(false)
+    private var homeAssistantSaved by mutableStateOf(false)
+    private var mqttSaved by mutableStateOf(false)
 
     /** Address and access code of the running server; null while it is not listening. */
     data class Endpoint(val url: String, val code: String)
@@ -89,12 +93,10 @@ class WebConfigActivity : ComponentActivity() {
             PortalTheme {
                 WebConfigScreen(
                     endpoint = endpoint,
-                    configurationSaved = configurationSaved,
+                    homeAssistantSaved = homeAssistantSaved,
+                    mqttSaved = mqttSaved,
                     onBack = ::finish,
-                    onContinue = {
-                        setResult(RESULT_OK)
-                        finish()
-                    },
+                    onContinue = ::finish,
                 )
             }
         }
@@ -125,6 +127,11 @@ class WebConfigActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    override fun finish() {
+        if (homeAssistantSaved || mqttSaved) setResult(RESULT_OK)
+        super.finish()
+    }
+
     private fun startServer() {
         if (server != null) return
         val mainHandler = Handler(Looper.getMainLooper())
@@ -137,7 +144,19 @@ class WebConfigActivity : ComponentActivity() {
                     MqttBridgeService.start(this)
                 }
             },
-            onConfigSaved = { mainHandler.post { configurationSaved = true } },
+            onConfigSaved = { section ->
+                mainHandler.post {
+                    if (section == WebConfigSection.HOME_ASSISTANT || section == WebConfigSection.ALL) {
+                        homeAssistantSaved = true
+                    }
+                    if (section == WebConfigSection.MQTT || section == WebConfigSection.ALL) {
+                        mqttSaved = true
+                    }
+                    SettingsChangeBus.get().emit("haUrl")
+                    SettingsChangeBus.get().emit("haToken")
+                    SettingsChangeBus.get().emit("brokerHost")
+                }
+            },
         )
         val ip = localIpv4()
         if (started == null || ip == null) {
@@ -171,7 +190,8 @@ class WebConfigActivity : ComponentActivity() {
 @Composable
 private fun WebConfigScreen(
     endpoint: WebConfigActivity.Endpoint?,
-    configurationSaved: Boolean,
+    homeAssistantSaved: Boolean,
+    mqttSaved: Boolean,
     onBack: () -> Unit,
     onContinue: () -> Unit,
 ) {
@@ -196,39 +216,69 @@ private fun WebConfigScreen(
                 onBack = onBack,
             )
 
-            if (configurationSaved) {
+            if (homeAssistantSaved || mqttSaved) {
+                val complete = homeAssistantSaved && mqttSaved
                 Column(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = null,
-                        tint = AppleColors.active,
-                        modifier = Modifier.size(if (short) 48.dp else 64.dp),
-                    )
-                    Spacer(Modifier.height(if (short) 10.dp else 18.dp))
                     Text(
-                        stringResource(R.string.web_config_saved_title),
+                        stringResource(
+                            if (complete) R.string.web_config_complete_title
+                            else R.string.web_config_progress_title,
+                        ),
                         style = AppleTypography.headlineLarge,
                         color = AppleColors.primary,
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        stringResource(R.string.web_config_saved_body),
+                        stringResource(
+                            if (complete) R.string.web_config_complete_body
+                            else R.string.web_config_progress_body,
+                        ),
                         style = AppleTypography.bodyLarge,
                         color = AppleColors.secondary,
                     )
-                    Spacer(Modifier.height(if (short) 16.dp else 28.dp))
-                    BoxWithConstraints(
-                        Modifier.fillMaxWidth().widthIn(max = 420.dp),
-                        contentAlignment = Alignment.Center,
+                    Spacer(Modifier.height(if (short) 14.dp else 24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().widthIn(max = 620.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
+                        ConfigStatusCard(
+                            title = "Home Assistant",
+                            configured = homeAssistantSaved,
+                            modifier = Modifier.weight(1f),
+                            icon = {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_provider_homeassistant),
+                                    contentDescription = null,
+                                    tint = if (homeAssistantSaved) AppleColors.active else AppleColors.tertiary,
+                                    modifier = Modifier.size(30.dp),
+                                )
+                            },
+                        )
+                        ConfigStatusCard(
+                            title = "MQTT",
+                            configured = mqttSaved,
+                            modifier = Modifier.weight(1f),
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Wifi,
+                                    contentDescription = null,
+                                    tint = if (mqttSaved) AppleColors.active else AppleColors.tertiary,
+                                    modifier = Modifier.size(30.dp),
+                                )
+                            },
+                        )
+                    }
+                    if (complete) {
+                        Spacer(Modifier.height(if (short) 16.dp else 28.dp))
                         PillButton(
                             label = stringResource(R.string.web_config_saved_action),
                             onClick = onContinue,
                             primary = true,
+                            modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                         )
                     }
                 }
@@ -284,6 +334,42 @@ private fun WebConfigScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ConfigStatusCard(
+    title: String,
+    configured: Boolean,
+    icon: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(AppleShapes.card)
+            .background(
+                if (configured) AppleColors.active.copy(alpha = 0.14f) else AppleColors.elevated,
+                AppleShapes.card,
+            )
+            .border(
+                1.dp,
+                if (configured) AppleColors.active.copy(alpha = 0.65f) else AppleColors.frostedBorder,
+                AppleShapes.card,
+            )
+            .padding(18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        icon()
+        Text(title, style = AppleTypography.titleMedium, color = AppleColors.primary)
+        Text(
+            stringResource(
+                if (configured) R.string.web_config_status_configured
+                else R.string.web_config_status_pending,
+            ),
+            style = AppleTypography.bodySmall,
+            color = if (configured) AppleColors.active else AppleColors.tertiary,
+        )
     }
 }
 
