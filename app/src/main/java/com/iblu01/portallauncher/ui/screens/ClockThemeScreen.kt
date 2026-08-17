@@ -39,11 +39,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 import com.iblu01.portallauncher.ui.components.AmbientBackground
@@ -61,13 +59,6 @@ import kotlin.math.roundToInt
 
 private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", glyph = WeatherGlyph("clear-day"))
 private val previewTemperatures = TemperatureSummary("22,5°", "24,5°", "19°")
-
-@Composable
-private fun previewChips() = listOf(
-    LauncherChip("doors", "door", stringResource(R.string.pill_group_openings), stringResource(R.string.pill_openings_count_format, 2), "warning"),
-    LauncherChip("purifier", "air", stringResource(R.string.pill_group_purifier), pluralStringResource(R.plurals.pill_purifier_state, 1, stringResource(R.string.purifier_mode_auto)), "active"),
-    LauncherChip("scenes", "scenes", stringResource(R.string.pill_group_scenes), pluralStringResource(R.plurals.pill_scenes_count, 13, 13), "ok"),
-)
 
 /**
  * Full-screen live editor for the clock theme: the launcher home (frozen mock data) over the real
@@ -111,7 +102,7 @@ fun ClockThemeScreen(
             backgroundMode = backgroundMode,
             weather = previewWeather,
             temperatures = previewTemperatures,
-            chips = previewChips(),
+            chips = emptyList(),
             onTap = {},
             onLongPress = {},
             pillsExpanded = false,
