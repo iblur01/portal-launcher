@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -39,6 +41,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -142,7 +148,12 @@ fun ClockThemeScreen(
                             .clip(RoundedCornerShape(14.dp))
                             .background(if (selected) AppleColors.accent else AppleColors.frostedFill)
                             .border(0.5.dp, AppleColors.frostedBorder, RoundedCornerShape(14.dp))
-                            .clickable { update(theme.copy(font = font)) }
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { update(theme.copy(font = font)) },
+                            )
+                            .sizeIn(minHeight = 48.dp)
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                     ) {
                         Text(
@@ -198,9 +209,10 @@ fun ClockThemeScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 ClockTint.entries.forEach { tint ->
                     val selected = tint == theme.tint
+                    val tintName = tint.localizedName()
                     Box(
                         Modifier
-                            .size(38.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(tint.color)
                             .border(
@@ -208,7 +220,12 @@ fun ClockThemeScreen(
                                 color = if (selected) Color.White else AppleColors.frostedBorder,
                                 shape = CircleShape,
                             )
-                            .clickable { update(theme.copy(tint = tint)) },
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { update(theme.copy(tint = tint)) },
+                            )
+                            .semantics { contentDescription = tintName },
                     )
                 }
             }
@@ -240,7 +257,12 @@ fun ClockThemeScreen(
                             .clip(RoundedCornerShape(14.dp))
                             .background(if (selected) AppleColors.accent else AppleColors.frostedFill)
                             .border(0.5.dp, AppleColors.frostedBorder, RoundedCornerShape(14.dp))
-                            .clickable { update(theme.copy(dateFormat = format)) }
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { update(theme.copy(dateFormat = format)) },
+                            )
+                            .sizeIn(minHeight = 48.dp)
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                     ) {
                         Text(label, style = AppleTypography.bodyLarge, color = if (selected) Color.White else AppleColors.primary)
@@ -254,7 +276,7 @@ fun ClockThemeScreen(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(24.dp)
-                .size(44.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(AppleColors.frostedFill)
                 .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
@@ -264,6 +286,16 @@ fun ClockThemeScreen(
             Icon(Icons.Filled.Close, stringResource(R.string.clock_theme_close), tint = AppleColors.secondary, modifier = Modifier.size(20.dp))
         }
     }
+}
+
+@Composable
+private fun ClockTint.localizedName(): String = when (this) {
+    ClockTint.WHITE -> stringResource(R.string.clock_tint_white)
+    ClockTint.AMBER -> stringResource(R.string.clock_tint_amber)
+    ClockTint.MINT -> stringResource(R.string.clock_tint_mint)
+    ClockTint.BLUE -> stringResource(R.string.clock_tint_blue)
+    ClockTint.PINK -> stringResource(R.string.clock_tint_pink)
+    ClockTint.VIOLET -> stringResource(R.string.clock_tint_violet)
 }
 
 /** A fixed Tuesday makes every option self-explanatory while still following the app locale. */

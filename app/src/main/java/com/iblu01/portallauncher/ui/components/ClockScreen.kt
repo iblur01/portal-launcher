@@ -271,7 +271,14 @@ fun ClockHeader(
                 }
                 .clearAndSetSemantics { contentDescription = time },
         ) {
-            Text(timeParts.first(), style = timeStyle, color = clockTheme.tint.color, maxLines = 1, softWrap = false)
+            Text(
+                timeParts.first(),
+                style = timeStyle,
+                color = clockTheme.tint.color,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.alignByBaseline(),
+            )
             if (timeParts.size == 2) {
                 val fontScale = LocalDensity.current.fontScale
                 val colonWidth = (clockTheme.size * fontScale * 0.18f).dp
@@ -281,7 +288,33 @@ fun ClockHeader(
                     drawCircle(clockTheme.tint.color, radius, Offset(size.width / 2f, size.height * 0.34f))
                     drawCircle(clockTheme.tint.color, radius, Offset(size.width / 2f, size.height * 0.66f))
                 }
-                Text(timeParts.last(), style = timeStyle, color = clockTheme.tint.color, maxLines = 1, softWrap = false)
+                val trailing = timeParts.last()
+                val suffixStart = trailing.lastIndexOf(' ').takeIf { it >= 0 }
+                val minute = suffixStart?.let { trailing.substring(0, it) } ?: trailing
+                val dayPeriod = suffixStart?.let { trailing.substring(it + 1) }
+                Text(
+                    minute,
+                    style = timeStyle,
+                    color = clockTheme.tint.color,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.alignByBaseline(),
+                )
+                if (!dayPeriod.isNullOrBlank()) {
+                    Text(
+                        dayPeriod,
+                        style = timeStyle.copy(
+                            fontSize = (clockTheme.size * 0.28f).sp,
+                            letterSpacing = 0.sp,
+                        ),
+                        color = clockTheme.tint.color.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier
+                            .alignByBaseline()
+                            .padding(start = 6.dp),
+                    )
+                }
             }
         }
         // Keep these nodes composed throughout the gesture. Removing them when alpha reaches zero

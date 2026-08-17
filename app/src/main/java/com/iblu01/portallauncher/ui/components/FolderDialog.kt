@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -30,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.dialog
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.R
@@ -74,13 +77,18 @@ fun FolderDialog(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { onDismiss() }
+                onClick = onDismiss,
+            )
+            .semantics { dialog() }
             .testTag("folderDialog"),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
-                .width(360.dp)
+                .padding(24.dp)
+                .widthIn(max = 360.dp)
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
                 .clip(AppleShapes.panel)
                 .background(AppleColors.elevated.copy(alpha = 0.97f), AppleShapes.panel)
                 .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)
@@ -140,7 +148,9 @@ fun FolderDialog(
 
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 84.dp),
-                modifier = Modifier.heightIn(max = 320.dp).padding(horizontal = 12.dp),
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .padding(horizontal = 12.dp),
             ) {
                 items(folder.folderMembers, key = { it.key }) { member ->
                     Box(contentAlignment = Alignment.Center) {

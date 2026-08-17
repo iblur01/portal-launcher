@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.scan
 import java.util.concurrent.CopyOnWriteArraySet
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -57,6 +58,9 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
     // fresh instance on reconnect / config change via flatMapLatest (fixes the stale-capture bug).
     private val activeRepo = MutableStateFlow<HaStateRepository?>(null)
     private var repositoryConfig: String? = null
+    /** Changes whenever the backing HA server or credentials change. */
+    @Volatile var connectionGeneration: Long = 0L
+        private set
 
     // Trailing-edge debounce for the pull-consumer notifications: HA streams state_changed in
     // bursts, and each notify writes Compose state (the weather card). Coalesce to one per window
@@ -104,6 +108,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         }
         Log.i("PortalPills", "starting: ${prefs.pillRules.count { it.enabled }} enabled rules")
         activeRepo.value?.stop()
+        connectionGeneration++
         repositoryConfig = requestedConfig
         val repo = HaStateRepository(appContext, prefs.haUrl, prefs.haToken)
         // Lightweight listener: refresh the raw-state cache + one-time auto-init, then notify.
@@ -330,16 +335,41 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         )
     }
 
-    private fun temperatureSummary(rules: List<PillRule>, states: Map<String, HaEntity>): TemperatureSummary {
+    internal fun temperatureSummary(rules: List<PillRule>, states: Map<String, HaEntity>): TemperatureSummary {
+        val targetUnit = selectWeatherEntityId(states.keys)
+            ?.let(states::get)
+            ?.attributes
+            ?.optString("temperature_unit")
+            .toTemperatureUnit()
+            ?: TemperatureUnit.CELSIUS
         val readings = rules.filter { it.enabled && it.kind == PillKind.CLIMATE }.mapNotNull { rule ->
             val entity = states[rule.entityId] ?: return@mapNotNull null
             if (entity.deviceClass != "temperature") return@mapNotNull null
-            entity.state.toDoubleOrNull()?.let { Triple(entity, rule.label, it) }
+            val sourceUnit = entity.attributes.optString("unit_of_measurement").toTemperatureUnit()
+                ?: targetUnit
+            entity.state.toDoubleOrNull()?.let { Triple(entity, rule.label, convertTemperature(it, sourceUnit, targetUnit)) }
         }
         val outdoorTokens = Regex("extérieur|exterieur|outdoor|outside|dehors", RegexOption.IGNORE_CASE)
         val outdoor = readings.firstOrNull { (entity, label) -> outdoorTokens.containsMatchIn(entity.entityId) || outdoorTokens.containsMatchIn(label) }
         val indoor = readings.filterNot { it === outdoor }
-        fun fmt(value: Double?) = value?.let { if (it % 1.0 == 0.0) "${it.toInt()}°" else "%.1f°".format(it) } ?: "—"
+        fun fmt(value: Double?) = value?.let {
+            val number = if (it % 1.0 == 0.0) it.toInt().toString() else "%.1f".format(Locale.getDefault(), it)
+            "$number${targetUnit.symbol}"
+        } ?: "—"
         return TemperatureSummary(fmt(indoor.minOfOrNull { it.third }), fmt(indoor.maxOfOrNull { it.third }), fmt(outdoor?.third))
     }
+}
+
+internal enum class TemperatureUnit(val symbol: String) { CELSIUS("°C"), FAHRENHEIT("°F") }
+
+internal fun String?.toTemperatureUnit(): TemperatureUnit? = when (this?.trim()?.uppercase()) {
+    "°C", "C", "CELSIUS" -> TemperatureUnit.CELSIUS
+    "°F", "F", "FAHRENHEIT" -> TemperatureUnit.FAHRENHEIT
+    else -> null
+}
+
+internal fun convertTemperature(value: Double, from: TemperatureUnit, to: TemperatureUnit): Double = when {
+    from == to -> value
+    from == TemperatureUnit.FAHRENHEIT -> (value - 32.0) * 5.0 / 9.0
+    else -> value * 9.0 / 5.0 + 32.0
 }

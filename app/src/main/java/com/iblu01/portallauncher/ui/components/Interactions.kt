@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -14,7 +15,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 
 /**
@@ -56,6 +67,7 @@ fun Modifier.nonConsumingClickable(onClick: () -> Unit): Modifier {
     val interaction = remember { MutableInteractionSource() }
     return this
         .pressScale(interaction)
+        .accessibleActivation(onClick)
         .pointerInput(onClick) {
             val longPressTimeout = viewConfiguration.longPressTimeoutMillis
             awaitEachGesture {
@@ -83,6 +95,7 @@ fun Modifier.appleClickable(onClick: () -> Unit, onLongPress: (() -> Unit)?): Mo
     val interaction = remember { MutableInteractionSource() }
     return this
         .pressScale(interaction)
+        .accessibleActivation(onClick, onLongPress)
         .pointerInput(onClick, onLongPress) {
             detectTapGestures(
                 onPress = { offset ->
@@ -99,3 +112,35 @@ fun Modifier.appleClickable(onClick: () -> Unit, onLongPress: (() -> Unit)?): Mo
             )
         }
 }
+
+/** Adds accessibility-service and hardware-key activation without changing pointer consumption. */
+private fun Modifier.accessibleActivation(
+    onClickAction: () -> Unit,
+    onLongClickAction: (() -> Unit)? = null,
+): Modifier = this
+    .semantics(mergeDescendants = true) {
+        role = Role.Button
+        onClick {
+            onClickAction()
+            true
+        }
+        onLongClickAction?.let { action ->
+            onLongClick {
+                action()
+                true
+            }
+        }
+    }
+    .onKeyEvent { event ->
+        val activationKey = event.key == Key.Enter ||
+            event.key == Key.NumPadEnter ||
+            event.key == Key.DirectionCenter ||
+            event.key == Key.Spacebar
+        if (activationKey && event.type == KeyEventType.KeyUp) {
+            onClickAction()
+            true
+        } else {
+            false
+        }
+    }
+    .focusable()

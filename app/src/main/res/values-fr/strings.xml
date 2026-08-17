@@ -257,6 +257,12 @@
     <string name="clock_date_format_month_day_year">MM/JJ/AAAA</string>
     <string name="clock_date_format_iso">AAAA-MM-JJ</string>
     <string name="clock_theme_close">Fermer</string>
+    <string name="clock_tint_white">Blanc</string>
+    <string name="clock_tint_amber">Ambre</string>
+    <string name="clock_tint_mint">Vert</string>
+    <string name="clock_tint_blue">Bleu</string>
+    <string name="clock_tint_pink">Rose</string>
+    <string name="clock_tint_violet">Violet</string>
 
     <!-- ===== LAUNCHER HOME SCREEN ===== -->
     <string name="clock_indoor_temp_format">Appartement %1$s–%2$s</string>
@@ -597,6 +603,8 @@
 
     <!-- ===== OPACITY PREVIEW ===== -->
     <string name="opacity_preview_close_desc">Fermer</string>
+    <string name="opacity_preview_weather_city">Maison</string>
+    <string name="opacity_preview_weather_condition">Dégagé</string>
 
     <!-- ===== PLAYGROUND / DEV SCREEN ===== -->
     <string name="playground_swatch_blue">Bleu</string>

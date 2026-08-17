@@ -3,8 +3,8 @@ package com.iblu01.portallauncher.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -17,8 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.minimumInteractiveComponentSize
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.PortalTheme
@@ -51,22 +53,31 @@ fun IosSwitch(
 
     Box(
         modifier = modifier
-            .size(trackWidth, trackHeight)
-            .background(trackColor, CircleShape)
-            .clickable(
+            .minimumInteractiveComponentSize()
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { onCheckedChange(!checked) }
-            .padding(2.dp),
-        contentAlignment = Alignment.CenterStart
+                indication = null,
+                onValueChange = onCheckedChange,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
-                .offset(x = thumbOffset)
-                .size(thumbSize)
-                .shadow(2.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.2f))
-                .background(Color.White, CircleShape)
-        )
+                .size(trackWidth, trackHeight)
+                .background(trackColor, CircleShape)
+                .padding(2.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(
+                modifier = Modifier
+                    .offset(x = thumbOffset)
+                    .size(thumbSize)
+                    .shadow(2.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.2f))
+                    .background(Color.White, CircleShape)
+            )
+        }
     }
 }
 

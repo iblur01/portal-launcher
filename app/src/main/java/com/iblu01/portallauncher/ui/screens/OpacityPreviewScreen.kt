@@ -25,7 +25,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 import com.iblu01.portallauncher.ui.components.AmbientBackground
 import com.iblu01.portallauncher.ui.components.ClockScreen
@@ -37,13 +36,7 @@ import com.iblu01.portallauncher.R
 import androidx.compose.ui.res.stringResource
 
 /** Frozen mock content used to judge the overlay against a real wallpaper — no HA dependency. */
-private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", city = "Appartement", condition = "Dégagé", glyph = WeatherGlyph("clear-day"))
 private val previewTemperatures = TemperatureSummary("22,5°", "24,5°", "19°")
-private val previewChips = listOf(
-    LauncherChip("doors", "door", "Portes & fenêtres", "2 ouvertes", "warning"),
-    LauncherChip("purifier", "air", "Purificateur", "En marche · auto", "active"),
-    LauncherChip("scenes", "scenes", "Scènes", "13 raccourcis", "ok"),
-)
 
 /**
  * Full-screen replica of the launcher home over the user's real wallpaper, with a big vertical
@@ -63,6 +56,13 @@ fun OpacityPreviewScreen(
     modifier: Modifier = Modifier,
 ) {
     var opacity by remember { mutableFloatStateOf(initialOpacity) }
+    val previewWeather = WeatherUi(
+        temp = "19°",
+        indoorTemp = "22°",
+        city = stringResource(R.string.opacity_preview_weather_city),
+        condition = stringResource(R.string.opacity_preview_weather_condition),
+        glyph = WeatherGlyph("clear-day"),
+    )
 
     Box(modifier.fillMaxSize()) {
         // 1 · Real wallpaper.
@@ -95,7 +95,7 @@ fun OpacityPreviewScreen(
             backgroundMode = backgroundMode,
             weather = previewWeather,
             temperatures = previewTemperatures,
-            chips = previewChips,
+            chips = emptyList(),
             onTap = {},
             onLongPress = {},
             pillsExpanded = false,
@@ -118,12 +118,12 @@ fun OpacityPreviewScreen(
                 .width(96.dp),
         )
 
-        // 6 · Close button, top-left (same visual as the side-panel dismiss).
+        // 6 · Close button, aligned with the clock editor.
         Box(
             modifier = Modifier
-                .align(Alignment.TopStart)
+                .align(Alignment.TopEnd)
                 .padding(24.dp)
-                .size(44.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(AppleColors.frostedFill)
                 .border(0.5.dp, AppleColors.frostedBorder, CircleShape)
