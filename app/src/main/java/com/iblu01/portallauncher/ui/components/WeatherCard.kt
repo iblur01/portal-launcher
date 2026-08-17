@@ -1,6 +1,9 @@
 package com.iblu01.portallauncher.ui.components
 
 import android.content.Context
+import android.location.Geocoder
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -8,6 +11,8 @@ import com.iblu01.portallauncher.domain.model.ForecastPoint
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.PillRepository
 import java.util.Calendar
+import java.util.Locale
+import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 /** UI snapshot shown on the clock screen, sourced from the Home Assistant weather entity. */
@@ -30,6 +35,12 @@ class WeatherController(private val context: Context, private val pills: PillRep
         private set
 
     private val listener = PillRepository.Listener { rebuild() }
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val cityExecutor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "weather-city").apply { isDaemon = true }
+    }
+    private var resolvedCity = ""
+    private var attemptedCoordinates: String? = null
 
     fun start() { pills.addListener(listener) }
     fun stop() { pills.removeListener(listener) }
@@ -41,26 +52,59 @@ class WeatherController(private val context: Context, private val pills: PillRep
         val temp = entity.attributes.optDouble("temperature").let { if (it.isNaN()) null else it }
         state = WeatherUi(
             temp = temp?.let { "${it.roundToInt()}°" } ?: "--°",
-            city = weatherCity(entity),
+            city = explicitWeatherCity(entity).ifBlank { resolvedCity },
             condition = weatherLabel(context, condition),
             glyph = weatherGlyph(condition, isNight()),
             hourly = pills.hourlyForecast,
             daily = pills.dailyForecast,
         )
+        if (state.city.isBlank()) resolveHomeCity()
     }
 
     private fun isNight(): Boolean {
         val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         return h < 7 || h >= 21
     }
+
+    private fun resolveHomeCity() {
+        val home = pills.latestStates["zone.home"] ?: return
+        val latitude = home.attributes.optDouble("latitude", Double.NaN)
+        val longitude = home.attributes.optDouble("longitude", Double.NaN)
+        if (latitude.isNaN() || longitude.isNaN()) return
+        val key = "$latitude,$longitude"
+        if (attemptedCoordinates == key) return
+        attemptedCoordinates = key
+        cityExecutor.execute {
+            val city = reverseGeocodeCity(context, latitude, longitude)
+            if (city.isNotBlank()) mainHandler.post {
+                resolvedCity = city
+                if (state.city.isBlank()) state = state.copy(city = city)
+            }
+        }
+    }
 }
 
-/** HA integrations may expose the place explicitly or use the entity's display name for it. */
-internal fun weatherCity(entity: HaEntity): String =
-    sequenceOf("city", "location", "friendly_name")
+/** Only real location attributes qualify; an entity name such as "Forecast Home" does not. */
+internal fun explicitWeatherCity(entity: HaEntity): String =
+    sequenceOf("city", "location")
         .map { entity.attributes.optString(it).trim() }
         .firstOrNull { it.isNotBlank() }
         .orEmpty()
+
+@Suppress("DEPRECATION")
+internal fun reverseGeocodeCity(context: Context, latitude: Double, longitude: Double): String {
+    if (!Geocoder.isPresent()) return ""
+    return runCatching {
+        Geocoder(context, Locale.getDefault())
+            .getFromLocation(latitude, longitude, 1)
+            ?.firstOrNull()
+            ?.let { address ->
+                sequenceOf(address.locality, address.subAdminArea, address.adminArea)
+                    .firstOrNull { !it.isNullOrBlank() }
+                    .orEmpty()
+            }
+    }.getOrNull().orEmpty()
+}
 
 /** Home Assistant condition → bundled Meteocons asset. */
 fun weatherGlyph(condition: String, night: Boolean): WeatherGlyph = when (condition.lowercase()) {

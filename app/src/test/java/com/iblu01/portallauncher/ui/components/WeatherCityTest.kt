@@ -14,13 +14,13 @@ class WeatherCityTest {
                 .put("friendly_name", "Forecast Home"),
         )
 
-        assertEquals("Nantes", weatherCity(entity))
+        assertEquals("Nantes", explicitWeatherCity(entity))
     }
 
-    @Test fun `location then friendly name provide fallbacks`() {
-        assertEquals("Paris", weatherCity(weatherEntity(JSONObject().put("location", "Paris"))))
-        assertEquals("Maison", weatherCity(weatherEntity(JSONObject().put("friendly_name", "Maison"))))
-        assertEquals("", weatherCity(weatherEntity(JSONObject())))
+    @Test fun `location is accepted but friendly name is never presented as a city`() {
+        assertEquals("Paris", explicitWeatherCity(weatherEntity(JSONObject().put("location", "Paris"))))
+        assertEquals("", explicitWeatherCity(weatherEntity(JSONObject().put("friendly_name", "Forecast Maison"))))
+        assertEquals("", explicitWeatherCity(weatherEntity(JSONObject())))
     }
 
     private fun weatherEntity(attributes: JSONObject) =
