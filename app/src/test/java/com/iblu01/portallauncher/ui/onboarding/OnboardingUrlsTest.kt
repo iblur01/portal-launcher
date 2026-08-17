@@ -46,6 +46,14 @@ class OnboardingUrlsTest {
     }
 
     @Test
+    fun `mdns warning is limited to local hostnames`() {
+        assertTrue(OnboardingUrls.usesMdnsHostname("http://homeassistant.local:8123"))
+        assertTrue(OnboardingUrls.usesMdnsHostname("HTTPS://HA.LOCAL"))
+        assertFalse(OnboardingUrls.usesMdnsHostname("http://192.168.1.20:8123"))
+        assertFalse(OnboardingUrls.usesMdnsHostname("https://ha.example.com"))
+    }
+
+    @Test
     fun `an unusable address falls back to the default broker host`() {
         assertEquals("homeassistant.local", OnboardingUrls.suggestedMqttHost(""))
         assertEquals("homeassistant.local", OnboardingUrls.suggestedMqttHost("nonsense://"))

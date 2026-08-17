@@ -108,6 +108,15 @@ fun HomeAssistantCredentialsStep(
             }
         }
 
+        if (OnboardingUrls.usesMdnsHostname(state.haUrl)) {
+            Text(
+                text = stringResource(R.string.onb_ha_creds_warning_mdns),
+                style = AppleTypography.bodySmall,
+                color = AppleColors.warning,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+
         Column {
             SettingsTextField(
                 label = stringResource(R.string.onb_ha_creds_label_token),

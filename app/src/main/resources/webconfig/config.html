@@ -32,8 +32,15 @@
           <div class="settings-group">
             <label class="wizard-field" for="ha_url"><span>Adresse</span><input id="ha_url" type="url" inputmode="url" placeholder="http://homeassistant.local:8123" required></label>
             <p id="ha_url_error" class="field-error hidden">Saisissez une adresse commençant par http:// ou https://.</p>
+            <p id="ha_mdns_warning" class="field-warning hidden">Les adresses en <strong>.local</strong> utilisent le DNS local (mDNS), qui peut ne pas fonctionner sur certains écrans. Si la connexion échoue, utilisez plutôt l’adresse IP locale du serveur.</p>
             <label class="wizard-field" for="ha_token"><span>Jeton longue durée</span><input id="ha_token" type="password" autocomplete="off" placeholder="Jeton Home Assistant" required></label>
             <p id="ha_token_error" class="field-error hidden">Le jeton d’accès est nécessaire.</p>
+          </div>
+          <div id="ha_test_status" class="connection-checks hidden" aria-live="polite">
+            <div class="connection-check" data-check="host"><span>Adresse</span><strong id="ha_check_host">En attente</strong></div>
+            <div class="connection-check" data-check="port"><span>Port</span><strong id="ha_check_port">En attente</strong></div>
+            <div class="connection-check" data-check="token"><span>Jeton</span><strong id="ha_check_token">En attente</strong></div>
+            <p id="ha_test_error" class="status"></p>
           </div>
           <button id="toggle-ha-token" class="text-action" type="button">Afficher le jeton</button>
         </section>
@@ -42,11 +49,18 @@
           <p class="step-note">Les identifiants MQTT sont distincts de ceux de Home Assistant.</p>
           <div class="settings-group">
             <label class="wizard-field" for="broker_host"><span>Serveur</span><input id="broker_host" type="text" autocomplete="off" placeholder="192.168.1.10" required></label>
+            <p id="mqtt_mdns_warning" class="field-warning hidden">Les adresses en <strong>.local</strong> utilisent le DNS local (mDNS), qui peut ne pas fonctionner sur certains écrans. Si la connexion échoue, utilisez plutôt l’adresse IP locale du serveur.</p>
             <label class="wizard-field" for="broker_port"><span>Port</span><input id="broker_port" type="number" min="1" max="65535" inputmode="numeric" required></label>
             <p id="mqtt_error" class="field-error hidden">Renseignez un serveur et un port compris entre 1 et 65535.</p>
             <label class="wizard-field" for="username"><span>Utilisateur</span><input id="username" type="text" autocomplete="off"></label>
             <label class="wizard-field" for="password"><span>Mot de passe</span><input id="password" type="password" autocomplete="off"></label>
             <label class="wizard-field" for="device_name"><span>Nom du panneau</span><input id="device_name" type="text" autocomplete="off" placeholder="Panneau salon"></label>
+          </div>
+          <div id="mqtt_test_status" class="connection-checks hidden" aria-live="polite">
+            <div class="connection-check" data-mqtt-check="host"><span>Serveur</span><strong id="mqtt_check_host">En attente</strong></div>
+            <div class="connection-check" data-mqtt-check="port"><span>Port</span><strong id="mqtt_check_port">En attente</strong></div>
+            <div class="connection-check" data-mqtt-check="auth"><span>Authentification</span><strong id="mqtt_check_auth">En attente</strong></div>
+            <p id="mqtt_test_error" class="status"></p>
           </div>
         </section>
 
@@ -65,6 +79,13 @@
         <h1>Configuration enregistrée</h1>
         <p>Le panneau a bien reçu les nouveaux réglages.</p>
         <strong>Vous pouvez fermer cet onglet.</strong>
+      </section>
+
+      <section id="server-offline-view" class="completion-view hidden" aria-live="assertive">
+        <div class="offline-symbol" aria-hidden="true">!</div>
+        <h1>Le launcher n’est pas en mode configuration</h1>
+        <p>Rouvrez « Configurer depuis un autre appareil » sur le panneau, puis scannez le nouveau QR code.</p>
+        <button id="retry-server" type="button" class="secondary-button">Réessayer</button>
       </section>
 
       <footer class="wizard-navigation">

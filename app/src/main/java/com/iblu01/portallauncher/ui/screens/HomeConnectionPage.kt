@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -33,6 +35,8 @@ import com.iblu01.portallauncher.ui.components.SettingsStatusRow
 import com.iblu01.portallauncher.ui.components.SettingsSubPageHeader
 import com.iblu01.portallauncher.ui.components.SettingsTextField
 import com.iblu01.portallauncher.ui.components.SettingsToggle
+import com.iblu01.portallauncher.ui.components.SettingsTile
+import com.iblu01.portallauncher.ui.onboarding.OnboardingUrls
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 
@@ -116,6 +120,7 @@ fun HomeConnectionPage(
             showBack = showBack,
             breadcrumb = "${stringResource(R.string.settings_main_title)}  ›  ${stringResource(R.string.settings_tile_home_title)}",
         )
+        WebConfigShortcut()
         Text(
             stringResource(R.string.home_connection_subtitle),
             style = AppleTypography.bodyLarge,
@@ -140,6 +145,14 @@ fun HomeConnectionPage(
                 onValueChange = onUrlChange,
                 placeholder = stringResource(R.string.home_connection_placeholder_address)
             )
+            if (OnboardingUrls.usesMdnsHostname(haUrl)) {
+                Text(
+                    text = stringResource(R.string.home_connection_warning_mdns),
+                    style = AppleTypography.bodySmall,
+                    color = AppleColors.warning,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
             SettingsDivider()
             SettingsRow(
                 label = stringResource(R.string.home_connection_label_scan_network),
@@ -159,13 +172,6 @@ fun HomeConnectionPage(
             )
             SettingsDivider()
             SettingsRow(label = stringResource(R.string.home_connection_label_key_help), onClick = { showKeyHelp = true })
-            SettingsDivider()
-            // Typing a long-lived token on a panel's on-screen keyboard is miserable; hand the
-            // whole form to a phone instead (see WebConfigActivity).
-            SettingsRow(
-                label = stringResource(R.string.home_connection_label_web_config),
-                onClick = { context.startActivity(Intent(context, WebConfigActivity::class.java)) },
-            )
         }
 
         SettingsSection(title = stringResource(R.string.home_connection_section_status)) {
@@ -240,4 +246,17 @@ fun HomeConnectionPage(
             )
         }
     }
+}
+
+/** Prominent handoff to the phone-friendly configuration server. */
+@Composable
+fun WebConfigShortcut(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    SettingsTile(
+        icon = Icons.Outlined.PhoneAndroid,
+        title = stringResource(R.string.home_connection_label_web_config),
+        subtitle = stringResource(R.string.home_connection_web_config_subtitle),
+        onClick = { context.startActivity(Intent(context, WebConfigActivity::class.java)) },
+        modifier = modifier,
+    )
 }

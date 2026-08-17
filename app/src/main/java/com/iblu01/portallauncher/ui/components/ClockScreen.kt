@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
@@ -47,6 +48,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -141,6 +143,17 @@ fun ClockScreen(
             selectedChipKey = selectedChipKey,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        if (!connected) {
+            ConnectionProblemBanner(
+                lastUpdateAt = lastUpdateAt,
+                usesMdnsAddress = false,
+                onClick = onTap,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+            )
+        }
     }
 }
 
@@ -182,7 +195,7 @@ private fun rememberCompactClockScreen(): Boolean {
 }
 
 /**
- * The clock block (date, time, weather pill, stale banner). Pinned above the pager, it shrinks
+ * The clock block (date, time and weather pill). Pinned above the pager, it shrinks
  * toward the top as [collapse] goes 0→1 so the apps grid gets the room back.
  *
  * The shrink is a pure [graphicsLayer] transform (GPU, no relayout) — the Portal is API 28 with a
@@ -334,12 +347,6 @@ fun ClockHeader(
             ) {
                 Text(stringResource(R.string.clock_indoor_temp_format, temperatures.indoorMin, temperatures.indoorMax), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.primary)
                 Text(stringResource(R.string.clock_outdoor_temp_format, temperatures.outdoor.takeUnless { it == "—" } ?: weather.temp), style = AppleTypography.bodySmall.copy(fontSize = 15.sp), color = AppleColors.secondary)
-            }
-        }
-        if (!connected && lastUpdateAt > 0L) {
-            Spacer(Modifier.height(8.dp * clockTheme.elementSpacing))
-            Box(Modifier.graphicsLayer { alpha = clockDetailAlpha(collapse()) }) {
-                StaleBanner(lastUpdateAt = lastUpdateAt)
             }
         }
     }
@@ -626,24 +633,46 @@ internal fun trayPillAccessibilityLabel(context: android.content.Context, pill: 
 }
 
 @Composable
-private fun StaleBanner(lastUpdateAt: Long) {
+fun ConnectionProblemBanner(
+    lastUpdateAt: Long,
+    usesMdnsAddress: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val elapsed by produceState(initialValue = 0L, lastUpdateAt) {
         while (true) {
-            value = (System.currentTimeMillis() - lastUpdateAt) / 1000L
+            value = if (lastUpdateAt > 0L) {
+                ((System.currentTimeMillis() - lastUpdateAt) / 1000L).coerceAtLeast(0L)
+            } else 0L
             kotlinx.coroutines.delay(1_000L)
         }
     }
     val ago = if (elapsed < 60) "${elapsed}s" else "${elapsed / 60}min"
-    Row(
-        modifier = Modifier.clip(AppleShapes.pill)
-            .background(Color(0x33FF9F0A), AppleShapes.pill)
-            .border(0.5.dp, Color(0x66FF9F0A), AppleShapes.pill)
-            .padding(horizontal = 14.dp, vertical = 5.dp),
+    Column(
+        modifier = modifier
+            .widthIn(max = 620.dp)
+            .fillMaxWidth()
+            .clip(AppleShapes.panel)
+            .background(Color(0xE6221B12), AppleShapes.panel)
+            .border(0.5.dp, Color(0x99FF9F0A), AppleShapes.panel)
+            .appleClickable(onClick)
+            .testTag("connectionProblemBanner")
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Text(
-            stringResource(R.string.clock_stale_banner_format, ago),
-            style = AppleTypography.bodySmall.copy(fontSize = 13.sp),
+            if (lastUpdateAt > 0L) stringResource(R.string.clock_stale_banner_format, ago)
+            else stringResource(R.string.connection_banner_unreachable),
+            style = AppleTypography.titleMedium,
             color = Color(0xFFFFC062),
+        )
+        Text(
+            stringResource(
+                if (usesMdnsAddress) R.string.connection_banner_mdns_hint
+                else R.string.connection_banner_generic_hint,
+            ),
+            style = AppleTypography.bodySmall,
+            color = AppleColors.secondary,
         )
     }
 }
