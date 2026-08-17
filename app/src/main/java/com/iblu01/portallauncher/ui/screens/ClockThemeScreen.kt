@@ -55,6 +55,10 @@ import com.iblu01.portallauncher.ui.theme.ClockDateFormat
 import com.iblu01.portallauncher.ui.theme.ClockTheme
 import com.iblu01.portallauncher.ui.theme.ClockTint
 import com.iblu01.portallauncher.ui.theme.clockFontFamily
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.GregorianCalendar
+import java.util.Locale
 import kotlin.math.roundToInt
 
 private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", glyph = WeatherGlyph("clear-day"))
@@ -230,12 +234,7 @@ fun ClockThemeScreen(
             ) {
                 ClockDateFormat.entries.forEach { format ->
                     val selected = format == theme.dateFormat
-                    val label = when (format) {
-                        ClockDateFormat.LONG -> stringResource(R.string.clock_date_format_long)
-                        ClockDateFormat.DAY_MONTH_YEAR -> stringResource(R.string.clock_date_format_day_month_year)
-                        ClockDateFormat.MONTH_DAY_YEAR -> stringResource(R.string.clock_date_format_month_day_year)
-                        ClockDateFormat.ISO -> stringResource(R.string.clock_date_format_iso)
-                    }
+                    val label = dateFormatExample(format)
                     Box(
                         Modifier
                             .clip(RoundedCornerShape(14.dp))
@@ -265,6 +264,12 @@ fun ClockThemeScreen(
             Icon(Icons.Filled.Close, stringResource(R.string.clock_theme_close), tint = AppleColors.secondary, modifier = Modifier.size(20.dp))
         }
     }
+}
+
+/** A fixed Tuesday makes every option self-explanatory while still following the app locale. */
+private fun dateFormatExample(format: ClockDateFormat): String {
+    val sample = GregorianCalendar(2026, Calendar.AUGUST, 18).time
+    return SimpleDateFormat(format.fullPattern, Locale.getDefault()).format(sample)
 }
 
 @Composable
