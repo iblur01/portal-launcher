@@ -253,6 +253,11 @@
     <string name="clock_theme_label_element_spacing">Element spacing</string>
     <string name="clock_theme_label_color">Color</string>
     <string name="clock_theme_label_format_24h">24-hour format</string>
+    <string name="clock_theme_label_date_format">Date format</string>
+    <string name="clock_date_format_long">Long</string>
+    <string name="clock_date_format_day_month_year">DD/MM/YYYY</string>
+    <string name="clock_date_format_month_day_year">MM/DD/YYYY</string>
+    <string name="clock_date_format_iso">YYYY-MM-DD</string>
     <string name="clock_theme_close">Close</string>
 
     <!-- ===== LAUNCHER HOME SCREEN ===== -->

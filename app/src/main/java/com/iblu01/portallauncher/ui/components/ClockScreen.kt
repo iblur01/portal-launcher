@@ -198,8 +198,8 @@ fun ClockHeader(
 ) {
 
     val time by rememberClock(if (clockTheme.format24h) "HH:mm" else "h:mm a")
-    val date by rememberClock("EEEE d MMMM")
-    val compactDate by rememberClock("EEE d MMM")
+    val date by rememberClock(clockTheme.dateFormat.fullPattern)
+    val compactDate by rememberClock(clockTheme.dateFormat.compactPattern)
     val compactScreen = rememberCompactClockScreen()
     val useCompactTemperatureHeader = connected && compactScreen
     val compactTemperaturesAvailable = compactIndoorTemperature(

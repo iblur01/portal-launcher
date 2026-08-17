@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,17 +53,20 @@ import com.iblu01.portallauncher.ui.components.WeatherUi
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.ui.theme.ClockFont
+import com.iblu01.portallauncher.ui.theme.ClockDateFormat
 import com.iblu01.portallauncher.ui.theme.ClockTheme
 import com.iblu01.portallauncher.ui.theme.ClockTint
 import com.iblu01.portallauncher.ui.theme.clockFontFamily
 import kotlin.math.roundToInt
 
-private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", city = "Appartement", condition = "Dégagé", glyph = WeatherGlyph("clear-day"))
+private val previewWeather = WeatherUi(temp = "19°", indoorTemp = "22°", glyph = WeatherGlyph("clear-day"))
 private val previewTemperatures = TemperatureSummary("22,5°", "24,5°", "19°")
-private val previewChips = listOf(
-    LauncherChip("doors", "door", "Portes & fenêtres", "2 ouvertes", "warning"),
-    LauncherChip("purifier", "air", "Purificateur", "En marche · auto", "active"),
-    LauncherChip("scenes", "scenes", "Scènes", "13 raccourcis", "ok"),
+
+@Composable
+private fun previewChips() = listOf(
+    LauncherChip("doors", "door", stringResource(R.string.pill_group_openings), stringResource(R.string.pill_openings_count_format, 2), "warning"),
+    LauncherChip("purifier", "air", stringResource(R.string.pill_group_purifier), pluralStringResource(R.plurals.pill_purifier_state, 1, stringResource(R.string.purifier_mode_auto)), "active"),
+    LauncherChip("scenes", "scenes", stringResource(R.string.pill_group_scenes), pluralStringResource(R.plurals.pill_scenes_count, 13, 13), "ok"),
 )
 
 /**
@@ -107,7 +111,7 @@ fun ClockThemeScreen(
             backgroundMode = backgroundMode,
             weather = previewWeather,
             temperatures = previewTemperatures,
-            chips = previewChips,
+            chips = previewChips(),
             onTap = {},
             onLongPress = {},
             pillsExpanded = false,
@@ -226,6 +230,32 @@ fun ClockThemeScreen(
                     onCheckedChange = { update(theme.copy(format24h = it)) },
                     colors = SwitchDefaults.colors(checkedTrackColor = AppleColors.accent),
                 )
+            }
+
+            ControlLabel(stringResource(R.string.clock_theme_label_date_format))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ClockDateFormat.entries.forEach { format ->
+                    val selected = format == theme.dateFormat
+                    val label = when (format) {
+                        ClockDateFormat.LONG -> stringResource(R.string.clock_date_format_long)
+                        ClockDateFormat.DAY_MONTH_YEAR -> stringResource(R.string.clock_date_format_day_month_year)
+                        ClockDateFormat.MONTH_DAY_YEAR -> stringResource(R.string.clock_date_format_month_day_year)
+                        ClockDateFormat.ISO -> stringResource(R.string.clock_date_format_iso)
+                    }
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (selected) AppleColors.accent else AppleColors.frostedFill)
+                            .border(0.5.dp, AppleColors.frostedBorder, RoundedCornerShape(14.dp))
+                            .clickable { update(theme.copy(dateFormat = format)) }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    ) {
+                        Text(label, style = AppleTypography.bodyLarge, color = if (selected) Color.White else AppleColors.primary)
+                    }
+                }
             }
         }
 
