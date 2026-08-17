@@ -210,6 +210,13 @@ private fun WeatherSummary(
                     color = AppleColors.secondary,
                 )
             }
+            if (weather.city.isNotBlank()) {
+                Text(
+                    weather.city,
+                    style = AppleTypography.bodyLarge.copy(fontSize = 17.sp),
+                    color = AppleColors.secondary,
+                )
+            }
         }
     } else {
         Row(
@@ -229,6 +236,9 @@ private fun WeatherSummary(
                 )
                 if (showCondition && weather.condition.isNotBlank()) {
                     Text(weather.condition, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+                }
+                if (weather.city.isNotBlank()) {
+                    Text(weather.city, style = AppleTypography.bodyLarge, color = AppleColors.secondary)
                 }
             }
         }

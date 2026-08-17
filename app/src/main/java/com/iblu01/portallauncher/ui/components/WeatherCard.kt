@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.iblu01.portallauncher.domain.model.ForecastPoint
+import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.PillRepository
 import java.util.Calendar
 import kotlin.math.roundToInt
@@ -40,6 +41,7 @@ class WeatherController(private val context: Context, private val pills: PillRep
         val temp = entity.attributes.optDouble("temperature").let { if (it.isNaN()) null else it }
         state = WeatherUi(
             temp = temp?.let { "${it.roundToInt()}°" } ?: "--°",
+            city = weatherCity(entity),
             condition = weatherLabel(context, condition),
             glyph = weatherGlyph(condition, isNight()),
             hourly = pills.hourlyForecast,
@@ -52,6 +54,13 @@ class WeatherController(private val context: Context, private val pills: PillRep
         return h < 7 || h >= 21
     }
 }
+
+/** HA integrations may expose the place explicitly or use the entity's display name for it. */
+internal fun weatherCity(entity: HaEntity): String =
+    sequenceOf("city", "location", "friendly_name")
+        .map { entity.attributes.optString(it).trim() }
+        .firstOrNull { it.isNotBlank() }
+        .orEmpty()
 
 /** Home Assistant condition → bundled Meteocons asset. */
 fun weatherGlyph(condition: String, night: Boolean): WeatherGlyph = when (condition.lowercase()) {
