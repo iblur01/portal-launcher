@@ -84,6 +84,7 @@ import com.iblu01.portallauncher.ui.LocalHaStates
 import com.iblu01.portallauncher.ui.components.controls.kelvinToColor
 import com.iblu01.portallauncher.ui.components.controls.VerticalColorTempSlider
 import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
+import com.iblu01.portallauncher.ui.components.controls.VerticalSwitch
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -244,42 +245,29 @@ fun LightDetailContent(
     }
 }
 
-/** The complete detail surface for lights whose only HA colour mode is `onoff`. */
+/** The shared vertical on/off control used when a light exposes no dimming or colour capability. */
 @Composable
 private fun OnOffLightControl(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    val onLabel = stringResource(R.string.light_state_on)
+    val offLabel = stringResource(R.string.light_state_off)
+    BoxWithConstraints(
         modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
-            modifier = Modifier
-                .widthIn(max = 360.dp)
-                .fillMaxWidth()
-                .clip(AppleShapes.card)
-                .background(AppleColors.frostedFill, AppleShapes.card)
-                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.card)
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(if (checked) R.string.light_state_on else R.string.light_state_off),
-                    style = AppleTypography.bodyLarge,
-                    color = AppleColors.primary,
-                )
-                Text(
-                    text = stringResource(if (checked) R.string.action_turn_off else R.string.action_turn_on),
-                    style = AppleTypography.bodySmall,
-                    color = AppleColors.secondary,
-                )
-            }
-            IosSwitch(checked = checked, onCheckedChange = onCheckedChange)
-        }
+        val ratio = 96f / 240f
+        val controlHeight = minOf(maxHeight, maxWidth / ratio, 300.dp)
+        val controlWidth = controlHeight * ratio
+        VerticalSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            accent = AppleColors.active,
+            label = { enabled -> if (enabled) onLabel else offLabel },
+            modifier = Modifier.size(controlWidth, controlHeight),
+        )
     }
 }
 
