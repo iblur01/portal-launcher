@@ -129,6 +129,11 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
 
+    // Camera center: HLS playback (the only Home Assistant camera format that carries audio).
+    // MJPEG has no audio and no container ExoPlayer understands, so it keeps its own decoder.
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.exoplayer.hls)
+
     // Remote configuration screen: LAN HTTP server + QR code for the phone to scan.
     implementation(libs.nanohttpd)
     implementation(libs.zxing.core)

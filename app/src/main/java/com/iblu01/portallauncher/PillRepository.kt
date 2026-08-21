@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.iblu01.portallauncher.domain.MediaSessionBuilder
+import com.iblu01.portallauncher.domain.home.CameraPreferences
 import com.iblu01.portallauncher.domain.home.HomePageBuilder
 import com.iblu01.portallauncher.domain.home.HomePillComposer
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
@@ -140,8 +141,36 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
     fun addListener(listener: Listener) { listeners += listener; listener.onData() }
     fun removeListener(listener: Listener) { listeners -= listener }
 
-    fun callService(domain: String, service: String, entityId: String?, data: Map<String, Any>? = null) {
-        activeRepo.value?.callService(domain, service, entityId, data)
+    fun callService(
+        domain: String,
+        service: String,
+        entityId: String?,
+        data: Map<String, Any>? = null,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val repo = activeRepo.value
+        if (repo == null) {
+            onResult?.invoke(false)
+            return
+        }
+        repo.callService(domain, service, entityId, data, onResult)
+    }
+
+    /** entity_id -> integration that created it. Empty until the entity registry loads. */
+    val entityPlatformByEntity: Map<String, String>
+        get() = activeRepo.value?.entityPlatformByEntity.orEmpty()
+
+    /**
+     * One-shot websocket request on the active connection (see [HaStateRepository.request]).
+     * [onResult] receives null when nothing is connected, so a caller always gets an answer.
+     */
+    fun request(payload: org.json.JSONObject, onResult: (org.json.JSONObject?) -> Unit) {
+        val repo = activeRepo.value
+        if (repo == null) {
+            onResult(null)
+            return
+        }
+        repo.request(payload, onResult)
     }
 
     /** Atomic preference reducer used by launcher, Maison and Settings entry points. */
@@ -249,7 +278,11 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
                 else combine(
                     repo.states(),
                     SettingsChangeBus.get().changes
-                        .filter { it == Prefs.HOME_PILL_PREFERENCES_CHANGE_KEY || it == PILL_RULES_CHANGE_KEY }
+                        .filter {
+                            it == Prefs.HOME_PILL_PREFERENCES_CHANGE_KEY ||
+                                it == Prefs.CAMERA_PREFERENCES_CHANGE_KEY ||
+                                it == PILL_RULES_CHANGE_KEY
+                        }
                         .map { Unit }
                         .onStart { emit(Unit) },
                 ) { snapshot, _ -> snapshot }
@@ -257,6 +290,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
             rulesProvider = { prefs.pillRules },
             haUrl = prefs.haUrl,
             homePreferencesProvider = { prefs.homePillPreferences },
+            cameraPreferencesProvider = { prefs.cameraPreferences },
         ).onEach { latestCatalog = it.catalog }
 
     /**
@@ -274,6 +308,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         rulesProvider: () -> List<PillRule>,
         haUrl: String,
         homePreferencesProvider: () -> HomePillPreferences = { HomePillPreferencesCodec.defaults() },
+        cameraPreferencesProvider: () -> CameraPreferences = { CameraPreferences() },
         dispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.Default,
         sampleMs: Long = SNAPSHOT_SAMPLE_MS,
     ): Flow<PillSnapshot> =
@@ -282,6 +317,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
             .scan(emptySet<String>() to (null as PillSnapshot?)) { (prevPrimaryIds, _), s ->
                 val rules = rulesProvider()   // read once per emission
                 val homePreferences = homePreferencesProvider()
+                val cameraPreferences = cameraPreferencesProvider()
                 val media = MediaSessionBuilder.build(s.states, haUrl, prevPrimaryIds)
                 val catalog = catalogBuilder.build(
                     rules = rules,
@@ -291,6 +327,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
                     areaIdByEntity = s.areaIdByEntity,
                     areaNameById = s.areaNameById,
                     manualGroups = homePreferences.manualGroups,
+                    cameraPreferences = cameraPreferences,
                     connected = s.connected,
                 )
                 val homeComposition = HomePillComposer.compose(catalog, homePreferences)

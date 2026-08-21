@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Scaffold
@@ -80,7 +81,9 @@ import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.PillRule
 import com.iblu01.portallauncher.PillCandidate
 import com.iblu01.portallauncher.AutoReturnUiState
+import com.iblu01.portallauncher.CameraPreferencesCodec
 import com.iblu01.portallauncher.HomePillPreferencesCodec
+import com.iblu01.portallauncher.domain.home.CameraPreferences
 import com.iblu01.portallauncher.MqttBridgeService
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
 import com.iblu01.portallauncher.session.AppClassification
@@ -150,6 +153,10 @@ class SettingsUiState {
     var haTestMessage by mutableStateOf<String?>(null)
     var mqttTest by mutableStateOf(ConnStatus.IDLE)
     var mqttTestMessage by mutableStateOf<String?>(null)
+    /** Cameras Home Assistant currently exposes, with their live reachability. */
+    val cameras = mutableStateListOf<CameraSettingsEntry>()
+    var cameraPreferences by mutableStateOf(CameraPreferencesCodec.defaults())
+    var camerasPillPinned by mutableStateOf(false)
 }
 
 interface SettingsCallbacks {
@@ -169,6 +176,10 @@ interface SettingsCallbacks {
     fun onLoadPillEntities()
     fun onSetPillEnabled(candidates: List<PillCandidate>, enabled: Boolean)
     fun onHomeSettingsAction(action: HomeSettingsAction)
+    /** Atomically edits the camera centre configuration. */
+    fun onCameraPreferences(transform: (CameraPreferences) -> CameraPreferences)
+    /** Pins or unpins the general "Cameras" pill, through the usual pinning rules. */
+    fun onCamerasPillPinned(pinned: Boolean)
     /** Writes the current arrangement to a file the user picks. */
     fun onExportLayout()
     /** Replaces the arrangement with one read from a file the user picks. */
@@ -178,6 +189,7 @@ interface SettingsCallbacks {
 private enum class SettingsPage {
     MAIN,
     HOME, HOME_CONTENT, HOME_APPS,
+    CONNECTED_HOME_CAMERAS,
     APPEARANCE, APPEARANCE_WALLPAPER, APPEARANCE_CLOCK,
     CONNECTED_HOME, CONNECTED_HOME_CONNECTION, CONNECTED_HOME_SESSIONS,
     DEVICE, DEVICE_GENERAL,
@@ -417,6 +429,14 @@ fun SettingsScreen(
                 onBack = { currentPage = SettingsPage.HOME }, showBack = showBack,
             )
             SettingsPage.HOME_APPS -> appPageContent(AppPageMode.HOME, R.string.settings_home_apps_title, { currentPage = SettingsPage.HOME }, showBack)
+            SettingsPage.CONNECTED_HOME_CAMERAS -> CamerasSettingsPage(
+                cameras = uiState.cameras,
+                preferences = uiState.cameraPreferences,
+                generalPillPinned = uiState.camerasPillPinned,
+                onPreferences = callbacks::onCameraPreferences,
+                onGeneralPillPinned = callbacks::onCamerasPillPinned,
+                onBack = { currentPage = SettingsPage.CONNECTED_HOME }, showBack = showBack,
+            )
             SettingsPage.APPEARANCE -> CategoryPage(
                 title = stringResource(R.string.settings_tile_wallpaper_title),
                 entries = listOf(
@@ -438,6 +458,7 @@ fun SettingsScreen(
                 entries = listOf(
                     CategoryEntry(stringResource(R.string.settings_connected_connection_title), homeSubtitle, Icons.Outlined.Home, SettingsPage.CONNECTED_HOME_CONNECTION),
                     CategoryEntry(stringResource(R.string.settings_connected_sessions_title), stringResource(R.string.settings_connected_sessions_subtitle), Icons.Outlined.Settings, SettingsPage.CONNECTED_HOME_SESSIONS),
+                    CategoryEntry(stringResource(R.string.settings_cameras_title), stringResource(R.string.settings_cameras_subtitle), Icons.Outlined.Videocam, SettingsPage.CONNECTED_HOME_CAMERAS),
                 ),
                 onNavigate = { currentPage = it }, onBack = { currentPage = SettingsPage.MAIN }, showBack = showBack,
                 leadingContent = { WebConfigShortcut() },

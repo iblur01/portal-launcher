@@ -6,10 +6,13 @@ import com.iblu01.portallauncher.HomePillPreferencesCodec
 import com.iblu01.portallauncher.PillCandidate
 import com.iblu01.portallauncher.PillKind
 import com.iblu01.portallauncher.PillRule
+import com.iblu01.portallauncher.PillSupport
+import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.localizedLabel
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
 import com.iblu01.portallauncher.domain.home.HomeSectionIds
 import com.iblu01.portallauncher.domain.home.ManualPillGroup
+import com.iblu01.portallauncher.domain.home.PillSpecials
 import com.iblu01.portallauncher.domain.home.PillRef
 import java.util.UUID
 
@@ -277,8 +280,9 @@ object HomeSettingsCatalogBuilder {
         )
     }
 
+    /** Shared with the live catalog so a scene or camera is never wrongly greyed out here. */
     private fun HaEntity.isIndividuallyAvailable(): Boolean =
-        state.trim().lowercase() !in setOf("unavailable", "unknown", "none", "")
+        PillSupport.isIndividuallyAvailable(this)
 }
 
 /** Pure projection used by Settings UI and accessible reorder actions. */
@@ -356,6 +360,10 @@ fun labelForSettingsRef(
     is PillRef.AreaGroup -> ref.areaId
     is PillRef.KindGroup -> ref.kind.localizedLabel(context)
     is PillRef.ManualGroup -> preferences.manualGroups.firstOrNull { it.id == ref.groupId }?.name ?: ref.groupId
+    is PillRef.Special -> when (ref.id) {
+        PillSpecials.CAMERAS -> context.getString(R.string.pill_cameras_label)
+        else -> ref.id
+    }
 }
 
 fun defaultHomePreferences(): HomePillPreferences = HomePillPreferencesCodec.defaults()

@@ -118,6 +118,7 @@ object HomePillPreferencesCodec {
         is PillRef.AreaGroup -> "area:${ref.areaId}"
         is PillRef.KindGroup -> "kind:${ref.kind.name}"
         is PillRef.ManualGroup -> "manual:${ref.groupId}"
+        is PillRef.Special -> "special:${ref.id}"
     }
 
     fun encodeGroupingMode(mode: HomeGroupingMode): String = when (mode) {
@@ -140,6 +141,7 @@ object HomePillPreferencesCodec {
             "area" -> PillRef.AreaGroup(id)
             "kind" -> runCatching { PillKind.valueOf(id) }.getOrNull()?.let(PillRef::KindGroup)
             "manual" -> PillRef.ManualGroup(id)
+            "special" -> PillRef.Special(id)
             else -> null
         }
     }

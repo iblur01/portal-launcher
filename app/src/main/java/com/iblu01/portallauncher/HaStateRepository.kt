@@ -115,6 +115,9 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         private set
     @Volatile var entityCategoryByEntity: Map<String, String> = emptyMap()
         private set
+    /** entity_id -> integration that created it (`onvif`, `reolink`…). Drives PTZ detection. */
+    @Volatile var entityPlatformByEntity: Map<String, String> = emptyMap()
+        private set
     @Volatile var entityRegistryResolved: Boolean = false
         private set
     private var areaNames: Map<String, String> = emptyMap()        // area_id -> name
@@ -171,7 +174,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         socket = client.newWebSocket(Request.Builder().url(wsUrl).build(), WsListener())
         scheduleWatchdog()
     }
-    fun stop() { enabled = false; retryHandler.removeCallbacksAndMessages(null); watchdogHandler.removeCallbacksAndMessages(null); socket?.close(1000, "screen stopped"); socket = null; connected = false; iconExecutor.shutdownNow(); notifyListeners() }
+    fun stop() { enabled = false; retryHandler.removeCallbacksAndMessages(null); watchdogHandler.removeCallbacksAndMessages(null); socket?.close(1000, "screen stopped"); socket = null; connected = false; iconExecutor.shutdownNow(); failPendingCalls(); notifyListeners() }
     private fun reconnect() {
         if (!enabled || token.isBlank()) return
         retryHandler.removeCallbacksAndMessages(null)
@@ -206,6 +209,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         connected = false
         socket?.close(4000, "watchdog: stale connection")
         socket = null
+        failPendingCalls()
         notifyListeners()
         start()
     }
@@ -225,9 +229,12 @@ class HaStateRepository(appContext: Context, private val url: String, private va
     private fun parseEntityRegistry(arr: JSONArray) {
         val areaMap = HashMap<String, String?>(); val devMap = HashMap<String, String?>()
         val categoryMap = HashMap<String, String>()
+        val platformMap = HashMap<String, String>()
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
             val eid = o.optString("entity_id"); if (eid.isBlank()) continue
+            o.optString("platform").takeIf { it.isNotBlank() && !o.isNull("platform") }
+                ?.let { platformMap[eid] = it }
             areaMap[eid] = o.optString("area_id").takeIf { it.isNotBlank() && !o.isNull("area_id") }
             devMap[eid] = o.optString("device_id").takeIf { it.isNotBlank() && !o.isNull("device_id") }
             o.optString("entity_category").takeIf { it.isNotBlank() && !o.isNull("entity_category") }
@@ -236,6 +243,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
         entityAreaId = areaMap; entityDeviceId = devMap
         deviceIdByEntity = devMap.mapNotNull { (entityId, deviceId) -> deviceId?.let { entityId to it } }.toMap()
         entityCategoryByEntity = categoryMap
+        entityPlatformByEntity = platformMap
     }
 
     /** JS-module resources only; a CSS or HTML resource can never register an icon set. */
@@ -371,9 +379,20 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                         resolveAreas()
                     } else if (id == 6) {
                         if (!msg.optBoolean("success")) Log.e(TAG, "subscribe_events failed: ${msg.optJSONObject("error")}")
+                    } else if (id >= 100 && pendingRequests.containsKey(id)) {
+                        val callback = pendingRequests.remove(id)
+                        val result = if (msg.optBoolean("success")) {
+                            msg.optJSONObject("result") ?: JSONObject()
+                        } else {
+                            Log.w(TAG, "websocket request $id failed: ${msg.optJSONObject("error")}")
+                            null
+                        }
+                        callback?.invoke(result)
                     } else if (id >= 100) {
-                        if (msg.optBoolean("success")) Log.i(TAG, "service call $id succeeded")
+                        val success = msg.optBoolean("success")
+                        if (success) Log.i(TAG, "service call $id succeeded")
                         else Log.e(TAG, "service call $id failed: ${msg.optJSONObject("error")}")
+                        pendingCalls.remove(id)?.invoke(success)
                     }
                 }
                 "event" -> {
@@ -405,6 +424,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
             Log.w(TAG, "WebSocket failed; scheduling reconnect", t)
             connected = false
             socket = null
+            failPendingCalls()
             notifyListeners()
             reconnect()
         }
@@ -416,6 +436,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
             Log.w(TAG, "WebSocket closed: code=$code reason=$reason; scheduling reconnect")
             connected = false
             socket = null
+            failPendingCalls()
             notifyListeners()
             reconnect()
         }
@@ -423,8 +444,68 @@ class HaStateRepository(appContext: Context, private val url: String, private va
 
     private var msgIdCounter = 100
 
-    fun callService(domain: String, service: String, entityId: String?, data: Map<String, Any>? = null) {
-        val socketRef = socket ?: return
+    /**
+     * Service calls awaiting their `result` frame, by message id. Home Assistant answers every
+     * `call_service` with an explicit success/failure, which is the only honest source for an
+     * action whose entity state does not change on success (a scene reports its activation time,
+     * a failed one reports nothing at all).
+     *
+     * Entries are removed when answered, and failed with `false` when the socket dies, so nothing
+     * stays pending forever and a caller can always re-enable its control.
+     */
+    private val pendingCalls = java.util.concurrent.ConcurrentHashMap<Int, (Boolean) -> Unit>()
+
+    /**
+     * Arbitrary websocket requests awaiting their `result`, by message id. Used by the camera
+     * center to ask Home Assistant for a stream url and for the service catalogue — both are
+     * request/response, not a subscription, so they share the same one-shot bookkeeping.
+     */
+    private val pendingRequests = java.util.concurrent.ConcurrentHashMap<Int, (JSONObject?) -> Unit>()
+
+    private fun failPendingCalls() {
+        val pending = pendingCalls.entries.toList()
+        pendingCalls.clear()
+        pending.forEach { it.value(false) }
+        val requests = pendingRequests.entries.toList()
+        pendingRequests.clear()
+        requests.forEach { it.value(null) }
+    }
+
+    /**
+     * Sends a one-shot websocket request built from [payload] (its `id` is filled in here) and
+     * hands the `result` object to [onResult], or `null` when the request failed, was refused, or
+     * the socket died first. [onResult] runs on the socket thread and must stay lightweight.
+     */
+    fun request(payload: JSONObject, onResult: (JSONObject?) -> Unit) {
+        val socketRef = socket
+        if (socketRef == null) {
+            onResult(null)
+            return
+        }
+        val id = synchronized(this) { msgIdCounter++ }
+        pendingRequests[id] = onResult
+        if (!socketRef.send(payload.put("id", id).toString())) {
+            pendingRequests.remove(id)?.invoke(null)
+        }
+    }
+
+    /**
+     * Sends a service call. [onResult] — when given — is invoked exactly once with Home Assistant's
+     * own verdict, or with `false` when the call could not be sent or the socket died first. It
+     * runs on the socket thread, so it must stay lightweight.
+     */
+    fun callService(
+        domain: String,
+        service: String,
+        entityId: String?,
+        data: Map<String, Any>? = null,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val socketRef = socket
+        if (socketRef == null) {
+            onResult?.invoke(false)
+            return
+        }
         val id = synchronized(this) { msgIdCounter++ }
         val msg = JSONObject().apply {
             put("id", id)
@@ -449,7 +530,12 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                 put("service_data", serviceData)
             }
         }
-        socketRef.send(msg.toString())
+        if (onResult != null) pendingCalls[id] = onResult
+        if (!socketRef.send(msg.toString())) {
+            pendingCalls.remove(id)?.invoke(false)
+            Log.w(TAG, "service call $id could not be queued: $domain.$service")
+            return
+        }
         Log.i(TAG, "service call $id sent: $domain.$service target=${entityId.orEmpty()}")
     }
 

@@ -57,7 +57,7 @@ class LauncherViewModelTest {
 
     private fun vm(
         source: MutableStateFlow<PillSnapshot>,
-        onCall: (String, String, String?, Map<String, Any>?) -> Unit = { _, _, _, _ -> },
+        onCall: (String, String, String?, Map<String, Any>?, ((Boolean) -> Unit)?) -> Unit = { _, _, _, _, _ -> },
         onPreferences: (((HomePillPreferences) -> HomePillPreferences) -> HomePillPreferences)? = null,
     ) = LauncherViewModel(source, onCall, onPreferences)
 
@@ -121,7 +121,7 @@ class LauncherViewModelTest {
         val calls = mutableListOf<String>()
         val model = vm(
             MutableStateFlow(emptySnapshot()),
-            onCall = { d, s, e, _ -> calls += "$d.$s@$e" },
+            onCall = { d, s, e, _, _ -> calls += "$d.$s@$e" },
         )
         model.callService("switch", "toggle", "switch.x")
         assertEquals(listOf("switch.toggle@switch.x"), calls)

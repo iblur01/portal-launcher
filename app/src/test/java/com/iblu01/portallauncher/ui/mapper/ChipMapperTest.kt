@@ -79,7 +79,7 @@ class ChipMapperTest {
             ChipAction.OpenPanel(PanelKind.SWITCH),
             chip(kind = PillKind.SWITCH, entityId = "input_boolean.guest").toChipAction(),
         )
-        assertEquals(ChipAction.ServiceToggle("fan", "toggle"), chip(kind = PillKind.FAN).toChipAction())
+        assertEquals(ChipAction.OpenPanel(PanelKind.FAN), chip(kind = PillKind.FAN).toChipAction())
     }
 
     @Test fun `other chips open their panel on tap`() {

@@ -339,6 +339,7 @@
     <string name="menu_open_controls">Open controls</string>
     <string name="menu_controls_stale">Cached data: controls are temporarily unavailable.</string>
     <string name="menu_hide_device">Stop showing this device</string>
+    <string name="menu_hide_scene">Stop showing this scene</string>
     <string name="menu_restore_device_hint">The device can be enabled again from the pill settings.</string>
     <string name="menu_move_drag">Move by dragging</string>
     <string name="menu_move_first">Place first</string>
@@ -349,6 +350,7 @@
     <string name="pill_ref_area_group">Room group</string>
     <string name="pill_ref_kind_group">Type group</string>
     <string name="pill_ref_manual_group">Manual group</string>
+    <string name="pill_ref_special">Launcher</string>
     <string name="auto_return_pill_label">Auto close</string>
     <string name="auto_return_cancel_desc">Cancel</string>
     <string name="bg_mode_system">Android wallpaper</string>
@@ -790,12 +792,72 @@
     <string name="pill_kind_siren">Siren</string>
     <string name="pill_kind_lawn_mower">Lawn mower</string>
     <string name="pill_kind_generic">Information</string>
+    <string name="pill_kind_camera">Cameras</string>
     <string name="pill_family_security">Security &amp; access</string>
     <string name="pill_family_comfort">Comfort</string>
     <string name="pill_family_appliances">Appliances</string>
     <string name="pill_family_lights">Lights</string>
     <string name="pill_family_media">Media</string>
     <string name="pill_family_home">Home</string>
+    <string name="pill_family_scenes">Scenes</string>
+    <string name="pill_family_cameras">Cameras</string>
+
+    <!-- Scenes: one-tap activation and its transient feedback -->
+    <string name="pill_scene_ready">Activate</string>
+    <string name="pill_scene_activating">Activating…</string>
+    <string name="pill_scene_activated">Activated</string>
+    <string name="pill_scene_failed">Failed</string>
+    <string name="pill_scene_activate_desc">Activate scene %1$s</string>
+
+    <!-- Camera center -->
+    <string name="pill_cameras_label">Cameras</string>
+    <string name="camera_state_streaming">Streaming</string>
+    <string name="camera_state_recording">Recording</string>
+    <string name="camera_state_idle">Idle</string>
+    <string name="camera_center_open_desc">Open the camera center</string>
+    <string name="camera_center_open_camera_desc">Open camera %1$s</string>
+    <string name="camera_center_title">Cameras</string>
+    <string name="camera_center_close">Close</string>
+    <string name="camera_center_close_desc">Close the camera center</string>
+    <string name="camera_center_mode_main">Main camera</string>
+    <string name="camera_center_mode_grid">Grid</string>
+    <string name="camera_center_mode_main_desc">Show the main camera full screen</string>
+    <string name="camera_center_mode_grid_desc">Show every camera in a grid</string>
+    <string name="camera_center_select_desc">Show camera %1$s</string>
+    <string name="camera_center_hide_desc">Stop showing camera %1$s</string>
+    <string name="camera_hide_confirm_title">Hide this camera?</string>
+    <string name="camera_hide_confirm_message">%1$s will no longer appear in the camera centre. You can restore it from Settings.</string>
+    <string name="camera_hide_confirm_action">Hide</string>
+    <string name="camera_center_empty">No camera to display</string>
+    <string name="camera_center_empty_hint">Choose the cameras to display in Settings.</string>
+    <string name="camera_stream_loading">Connecting…</string>
+    <string name="camera_stream_error">Stream unavailable</string>
+    <string name="camera_stream_unavailable">Camera unavailable</string>
+    <string name="camera_stream_retry">Retry</string>
+    <string name="camera_stream_retry_desc">Retry loading camera %1$s</string>
+    <string name="camera_audio_mute_desc">Mute the sound</string>
+    <string name="camera_audio_unmute_desc">Turn the sound on</string>
+    <string name="camera_audio_none">No audio track</string>
+    <string name="camera_ptz_up_desc">Tilt up</string>
+    <string name="camera_ptz_down_desc">Tilt down</string>
+    <string name="camera_ptz_left_desc">Pan left</string>
+    <string name="camera_ptz_right_desc">Pan right</string>
+    <string name="camera_ptz_zoom_in_desc">Zoom in</string>
+    <string name="camera_ptz_zoom_out_desc">Zoom out</string>
+
+    <!-- Camera settings -->
+    <string name="settings_cameras_title">Cameras</string>
+    <string name="settings_cameras_subtitle">Camera center, main camera and display mode</string>
+    <string name="settings_cameras_visible">Cameras shown in the centre</string>
+    <string name="settings_cameras_main">Main camera</string>
+    <string name="settings_cameras_default_mode">Default display mode</string>
+    <string name="settings_cameras_pin_general">Pin the Cameras pill</string>
+    <string name="settings_cameras_empty">No camera found in Home Assistant</string>
+    <string name="settings_cameras_order_hint">Move a camera to change its order in the centre.</string>
+    <string name="settings_camera_move_up_desc">Move %1$s up</string>
+    <string name="settings_camera_move_down_desc">Move %1$s down</string>
+    <string name="settings_camera_toggle_desc">Show %1$s in the camera centre</string>
+    <string name="settings_camera_main_desc">Use %1$s as the main camera</string>
     <string name="entity_state_unavailable">Unavailable</string>
     <string name="entity_state_home">At home</string>
     <string name="entity_state_away">Away</string>

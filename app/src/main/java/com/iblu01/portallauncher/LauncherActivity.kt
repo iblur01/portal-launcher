@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
+import kotlinx.coroutines.flow.filter
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +93,14 @@ import com.iblu01.portallauncher.ui.apps.LauncherLayoutStore
 import com.iblu01.portallauncher.ui.apps.ShortcutIconStore
 import com.iblu01.portallauncher.ui.apps.WidgetHostController
 import com.iblu01.portallauncher.ui.apps.WidgetOffer
+import com.iblu01.portallauncher.domain.home.CameraSupport
+import com.iblu01.portallauncher.domain.home.PtzAction
+import com.iblu01.portallauncher.ui.camera.CameraCenter
+import com.iblu01.portallauncher.ui.camera.CameraCenterEnvironment
+import com.iblu01.portallauncher.ui.camera.CameraCenterState
+import com.iblu01.portallauncher.ui.camera.CameraStreamResolver
+import com.iblu01.portallauncher.ui.scene.LocalSceneActivations
+import com.iblu01.portallauncher.ui.scene.rememberSceneActivations
 import com.iblu01.portallauncher.ui.components.AlertOverlay
 import com.iblu01.portallauncher.ui.components.AppUpdateOverlay
 import com.iblu01.portallauncher.ui.components.AmbientBackground
@@ -784,6 +793,71 @@ private fun PortalLauncherApp(
     // panelChip is resolved last-known-good by the VM.
     val panel by vm.panel.collectAsStateWithLifecycle()
     val panelChip by vm.panelChip.collectAsStateWithLifecycle()
+    // Scene taps and the camera center: both are surfaces of their own, neither is a side panel.
+    val sceneActivations = rememberSceneActivations(vm::callService)
+    var cameraPreferences by remember { mutableStateOf(prefs.cameraPreferences) }
+    LaunchedEffect(Unit) {
+        SettingsChangeBus.get().changes
+            .filter { it == Prefs.CAMERA_PREFERENCES_CHANGE_KEY }
+            .collect { cameraPreferences = prefs.cameraPreferences }
+    }
+    // Every camera Home Assistant exposes, *before* the centre's visibility list is applied: an
+    // individual camera pill must open its own camera even when the user hid it from the centre,
+    // and hiding every camera must not make the pills stop working.
+    // Read at invocation, never captured: the tray/home action callbacks are remembered against
+    // their pinned set, so a plain list captured here would freeze at its first value — empty,
+    // before Home Assistant has connected — and every camera tap would silently do nothing.
+    val cameraIdsNow: () -> List<String> = remember(pills) {
+        {
+            enabledCameraIds(pills.latestStates.values, prefs.pillRules)
+        }
+    }
+    // Recomposed with the catalog, for the effects below that must react to a camera appearing
+    // or disappearing rather than to a tap.
+    val availableCameraIds = remember(ui.catalog) { cameraIdsNow() }
+    var cameraCenter by remember { mutableStateOf(CameraCenterState()) }
+    // Resolved once the centre is opened, never at startup: a launcher whose user never looks at a
+    // camera must not spend a websocket round-trip on the service catalogue.
+    var haServices by remember { mutableStateOf<Map<String, Set<String>>>(emptyMap()) }
+    val cameraResolver = remember(pills, prefs.haUrl) {
+        CameraStreamResolver(baseUrl = prefs.haUrl, request = pills::request)
+    }
+    LaunchedEffect(cameraCenter.isOpen) {
+        if (cameraCenter.isOpen && haServices.isEmpty()) haServices = cameraResolver.services()
+    }
+    val cameraEnvironment = remember(cameraResolver, haServices, ui.catalog) {
+        CameraCenterEnvironment(
+            entityOf = { entityId -> pills.latestStates[entityId] },
+            labelOf = { entityId -> pills.latestStates[entityId]?.name ?: entityId.substringAfter('.') },
+            resolver = cameraResolver,
+            token = prefs.haToken,
+            capabilitiesOf = { entity ->
+                CameraSupport.capabilitiesOf(
+                    entity = entity,
+                    states = pills.latestStates,
+                    deviceIdByEntity = pills.latestDeviceIds,
+                    entityPlatformByEntity = pills.entityPlatformByEntity,
+                    services = haServices,
+                )
+            },
+            onPtz = { capabilities, entityId, action ->
+                // Always the active camera, never "the PTZ camera": the id comes from the tile.
+                val companion = capabilities.ptzEntityIds[action]
+                if (companion != null) {
+                    callServiceProvider("button", "press", companion)
+                } else {
+                    callServiceProvider("onvif", "ptz", entityId, ptzArguments(action))
+                }
+            },
+        )
+    }
+    // A camera removed from Home Assistant, or hidden from the centre while it is open, must not
+    // strand the surface: it falls back to another camera, and only an empty list closes it.
+    LaunchedEffect(availableCameraIds, cameraPreferences, cameraCenter.isOpen) {
+        if (cameraCenter.isOpen) {
+            cameraCenter = cameraCenter.reconciled(availableCameraIds, cameraPreferences)
+        }
+    }
     val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
     var availableUpdate by remember { mutableStateOf<AppRelease?>(null) }
     var updateDownloading by remember { mutableStateOf(false) }
@@ -822,7 +896,7 @@ private fun PortalLauncherApp(
     // must fall back to the clock on its own.
     val awayFromClock = pagerLayout.identityOf(pagerState.currentPage) != PageIdentity.Clock
     val userState = pillsExpanded || overlayVisible || awayFromClock || menuTarget != null ||
-        showHidden || armedPillReorderKey != null || pillDragActive
+        showHidden || armedPillReorderKey != null || pillDragActive || cameraCenter.isOpen
     // While an alarm is alerting the countdown is suspended outright: returning to the clock would
     // take the disarm keypad off screen exactly when it is needed.
     LaunchedEffect(panel.request, panel.source, userState, resumed, alarmAlerting) {
@@ -838,6 +912,7 @@ private fun PortalLauncherApp(
             if (panel.request != null && panel.source == PanelSource.USER) vm.onEvent(PanelEvent.Dismiss)
             if (pillsExpanded) pillsExpanded = false
             if (overlayVisible) overlayVisible = false
+            if (cameraCenter.isOpen) cameraCenter = cameraCenter.closed()
             if (menuTarget != null) menuTarget = null
             if (showHidden) showHidden = false
             homeEditing = false
@@ -902,6 +977,11 @@ private fun PortalLauncherApp(
     // Back never escapes the launcher: finishing a home activity gives a black flash while the
     // system restarts it. Innermost surface first, then the page, then nothing.
     BackHandler(enabled = true) {
+        // The camera centre covers the whole surface, so it is the innermost thing open.
+        if (cameraCenter.isOpen) {
+            cameraCenter = cameraCenter.closed()
+            return@BackHandler
+        }
         if (armedPillReorderKey != null) {
             armedPillReorderKey = null
             pillDragActive = false
@@ -932,6 +1012,7 @@ private fun PortalLauncherApp(
 
     // HOME pressed while already home: back to the resting screen, like any launcher.
     LaunchedEffect(homePresses) {
+        cameraCenter = cameraCenter.closed()
         menuTarget = null
         showHidden = false
         widgetPickerRequested = false
@@ -957,6 +1038,14 @@ private fun PortalLauncherApp(
             // Through the intercepting caller: immediate visual echo, HA takes over on its push.
             is ChipAction.ServiceToggle -> callServiceProvider(action.domain, action.service, chip.entityId)
             is ChipAction.OpenPanel -> vm.onEvent(PanelEvent.OpenChip(PanelRequest.Chip(chip.id, action.panelKind)))
+            // No panel, no confirmation: the scene runs, and the pill carries the outcome. The
+            // guard against a second call while one is in flight lives in the activation state.
+            is ChipAction.ActivateScene -> sceneActivations.activate(action.entityId)
+            is ChipAction.OpenCameraCenter -> cameraCenter = cameraCenter.opened(
+                target = action.entityId,
+                availableIds = cameraIdsNow(),
+                preferences = cameraPreferences,
+            )
         }
     }
     // Remembered against their (identity-preserved) sources: rebuilding these collections on every
@@ -974,15 +1063,25 @@ private fun PortalLauncherApp(
     val onOpenResolvedPill: (com.iblu01.portallauncher.domain.home.ResolvedPill) -> Unit = { pill ->
         when (pill.ref) {
             is PillRef.Device -> onChipClick(pill.chip)
+            // A launcher-provided entry backs no group: routing it to the group panel would open
+            // an empty one. It carries its own action, exactly like a device pill.
+            is PillRef.Special -> onChipClick(pill.chip)
             else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(pill.ref)))
         }
     }
     val onOpenResolvedCommands: (com.iblu01.portallauncher.domain.home.ResolvedPill) -> Unit = { pill ->
-        when (pill.ref) {
-            is PillRef.Device -> vm.onEvent(
+        val ref = pill.ref
+        when {
+            // Neither a camera nor a scene has commands to show: the details sheet would only
+            // list whatever sensors happen to sit on the same device. They do what a tap does.
+            // (Deliberately keyed on the kind: fans open their control panel on both gestures.)
+            pill.chip.kind == PillKind.CAMERA || pill.chip.kind == PillKind.SCENE ->
+                onChipClick(pill.chip)
+            ref is PillRef.Special -> onChipClick(pill.chip)
+            ref is PillRef.Device -> vm.onEvent(
                 PanelEvent.LongPressChip(PanelRequest.Chip(pill.chip.id, pill.chip.toPanelKind())),
             )
-            else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(pill.ref)))
+            else -> vm.onEvent(PanelEvent.OpenGroup(PanelRequest.Group(ref)))
         }
     }
     // One stable instance per pinned-set: the action callbacks read live values through the `ui`
@@ -1138,6 +1237,7 @@ private fun PortalLauncherApp(
     // and the stable per-entity state store to the whole subtree (design §8).
     CompositionLocalProvider(
         LocalCallService provides callServiceProvider,
+        LocalSceneActivations provides sceneActivations,
         LocalHaStates provides haStates,
         LocalAreas provides ui.areaByEntity,
     ) {
@@ -1459,6 +1559,28 @@ private fun PortalLauncherApp(
             onDismiss = { showHidden = false },
         )
 
+        // Drawn over every other launcher surface: the camera centre is a page of its own, not a
+        // card inside one. Its whole subtree — and therefore every player it owns — disappears
+        // when it closes.
+        CameraCenter(
+            state = cameraCenter,
+            environment = cameraEnvironment,
+            onClose = { cameraCenter = cameraCenter.closed() },
+            onSelect = { cameraCenter = cameraCenter.selected(it) },
+            onHide = { entityId ->
+                val updated = prefs.updateCameraPreferences { current ->
+                    current.copy(
+                        hidden = current.hidden + entityId,
+                        mainCameraId = current.mainCameraId.takeUnless { it == entityId },
+                    )
+                }
+                cameraPreferences = updated
+                cameraCenter = cameraCenter.reconciled(cameraIdsNow(), updated)
+            },
+            onMode = { cameraCenter = cameraCenter.withMode(it) },
+            modifier = Modifier.fillMaxSize(),
+        )
+
         AlertOverlay(
             message = alertMessage,
             onDismiss = { AlertOverlayState.dismiss() }
@@ -1652,4 +1774,27 @@ private fun MediaPlayerPanel(
         onDismiss = onDismiss,
         fullScreen = fullScreen,
     )
+}
+
+/** Cameras explicitly disabled in the device catalog must not leak into the camera centre. */
+internal fun enabledCameraIds(states: Collection<HaEntity>, rules: List<PillRule>): List<String> {
+    val rulesById = rules.associateBy(PillRule::entityId)
+    return states.asSequence()
+        .filter { it.domain == "camera" && rulesById[it.entityId]?.enabled != false }
+        .map(HaEntity::entityId)
+        .sorted()
+        .toList()
+}
+
+/**
+ * The ONVIF `ptz` service vocabulary. Each action moves exactly one axis, so the other fields are
+ * deliberately absent rather than sent as a neutral value.
+ */
+private fun ptzArguments(action: PtzAction): Map<String, Any> = when (action) {
+    PtzAction.PAN_LEFT -> mapOf("pan" to "LEFT")
+    PtzAction.PAN_RIGHT -> mapOf("pan" to "RIGHT")
+    PtzAction.TILT_UP -> mapOf("tilt" to "UP")
+    PtzAction.TILT_DOWN -> mapOf("tilt" to "DOWN")
+    PtzAction.ZOOM_IN -> mapOf("zoom" to "ZOOM_IN")
+    PtzAction.ZOOM_OUT -> mapOf("zoom" to "ZOOM_OUT")
 }

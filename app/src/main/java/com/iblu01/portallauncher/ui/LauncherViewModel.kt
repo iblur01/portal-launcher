@@ -93,7 +93,7 @@ private fun LauncherUiState.alarmAlert(): PanelRequest.Chip? {
  */
 class LauncherViewModel(
     snapshots: Flow<PillSnapshot>,
-    private val callServiceFn: (domain: String, service: String, entityId: String?, data: Map<String, Any>?) -> Unit,
+    private val callServiceFn: (domain: String, service: String, entityId: String?, data: Map<String, Any>?, onResult: ((Boolean) -> Unit)?) -> Unit,
     private val updateHomePreferencesFn: (((HomePillPreferences) -> HomePillPreferences) -> HomePillPreferences)? = null,
 ) : ViewModel() {
     /** Last emitted state; used to keep the previous *instance* of any content-equal projection. */
@@ -215,8 +215,18 @@ class LauncherViewModel(
         }
     }
 
-    fun callService(domain: String, service: String, entityId: String?, data: Map<String, Any>? = null) =
-        callServiceFn(domain, service, entityId, data)
+    /**
+     * Fire-and-forget by default. [onResult] — when given — receives Home Assistant's own verdict,
+     * which is the only honest outcome for an action whose entity state does not change on success
+     * (a scene records its activation time; a failed one records nothing).
+     */
+    fun callService(
+        domain: String,
+        service: String,
+        entityId: String?,
+        data: Map<String, Any>? = null,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) = callServiceFn(domain, service, entityId, data, onResult)
 
     /** General atomic preference reducer for the Maison/settings editors. */
     fun updateHomePillPreferences(
