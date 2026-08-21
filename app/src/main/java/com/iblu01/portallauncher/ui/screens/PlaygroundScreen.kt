@@ -781,6 +781,9 @@ private fun fakeCapabilityGroups(entities: Map<String, HaEntity>): List<HaCapabi
         )
     }
     return listOf(
+        HaCapabilityGroup(stringResource(R.string.playground_capability_light), listOf(
+            chip("light.onoff", PillKind.LIGHTS, "light", stringResource(R.string.playground_capability_on_off)),
+        )),
         HaCapabilityGroup(stringResource(R.string.playground_capability_cover), listOf(
             chip("cover.salon", PillKind.COVER, "cover", stringResource(R.string.playground_capability_position_stop)),
             chip("cover.simple", PillKind.COVER, "cover", stringResource(R.string.playground_capability_on_off)),
@@ -903,6 +906,7 @@ private fun rememberFakePanelEntities(): SnapshotStateMap<String, HaEntity> = re
     mutableStateMapOf<String, HaEntity>().apply { putAll(listOf(
         fakeEntity("light.salon", "on", "Salon", "{\"brightness\":184,\"color_temp_kelvin\":3800,\"supported_color_modes\":[\"color_temp\"]}"),
         fakeEntity("light.cuisine", "off", "Cuisine", "{\"brightness\":0}"),
+        fakeEntity("light.onoff", "off", "Lampe on/off", "{\"supported_color_modes\":[\"onoff\"]}"),
         fakeEntity("fan.purificateur", "on", "Purificateur", "{\"preset_mode\":\"auto\",\"preset_modes\":[\"auto\",\"sleep\",\"manual\",\"pet\"]}"),
         fakeEntity("person.alex", "home", "Alex", "{}"),
         fakeEntity("sensor.house_power", "846", "Puissance maison", "{\"unit_of_measurement\":\"W\"}"),

@@ -644,6 +644,7 @@
     <string name="playground_capability_climate">Climate</string>
     <string name="playground_capability_vacuum">Vacuum</string>
     <string name="playground_capability_security">Locks and alarms</string>
+    <string name="playground_capability_light">Light</string>
     <string name="playground_capability_modes">Modes + off</string>
     <string name="playground_capability_on_off">On / off</string>
     <string name="playground_capability_temperature_modes">Temperature + modes</string>

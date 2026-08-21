@@ -642,6 +642,7 @@
     <string name="playground_capability_climate">Thermostat</string>
     <string name="playground_capability_vacuum">Aspirateur</string>
     <string name="playground_capability_security">Serrures et alarmes</string>
+    <string name="playground_capability_light">Lampe</string>
     <string name="playground_capability_modes">Modes + arrêt</string>
     <string name="playground_capability_on_off">Marche / arrêt</string>
     <string name="playground_capability_temperature_modes">Température + modes</string>
