@@ -23,7 +23,7 @@ android {
 
     defaultConfig {
         applicationId = "com.iblu01.portallauncher"
-        minSdk = 28
+        minSdk = 27
         targetSdk = 28
         versionCode = 10
         versionName = "1.0.2"
