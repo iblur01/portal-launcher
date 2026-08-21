@@ -25,8 +25,8 @@ android {
         applicationId = "com.iblu01.portallauncher"
         minSdk = 27
         targetSdk = 28
-        versionCode = 10
-        versionName = "1.0.2"
+        versionCode = 11
+        versionName = "1.0.3-beta.1"
     }
 
     signingConfigs {

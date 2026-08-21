@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.3-beta.1
+
+### Added
+
+- **Camera center**: discover Home Assistant cameras, open a dedicated full-surface viewer, resolve still-image and MJPEG stream sources, and expose supported PTZ controls.
+- **Camera preferences**: choose which cameras appear, reorder them, and configure the camera center from Settings.
+- **Scene controls**: discover Home Assistant scenes and activate them directly from the Home page with clear success and failure feedback.
+- **On/off-only light panel**: lights without brightness or colour controls now get a complete switch-based detail surface.
+- **Android 8.1 support**: the minimum supported Android version is now API 27 for older wall displays such as LineageOS 15.1 devices.
+
+### Changed
+
+- Camera and scene pills now participate in Home page discovery, grouping, context menus and navigation.
+- Remote web configuration is fully localized in English and French.
+- Release tooling now resolves the repository and Android SDK from the active environment instead of relying on machine-specific paths.
+
+### Tests
+
+- Added coverage for camera discovery, preferences, stream URL handling, camera-center state, PTZ capabilities, scene activation, localization parity and preference upgrades.
+- Added interaction coverage for on/off-only light controls.
+
 ## 1.0.2
 
 ### Added
