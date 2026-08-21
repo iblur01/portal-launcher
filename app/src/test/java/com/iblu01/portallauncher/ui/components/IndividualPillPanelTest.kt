@@ -13,6 +13,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.core.app.ApplicationProvider
@@ -145,7 +147,7 @@ class IndividualPillPanelTest {
         val switch = rule.onNode(
             SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch) and hasClickAction(),
         )
-        switch.assertIsOff().performClick().assertIsOn().performClick().assertIsOff()
+        switch.assertIsOff().performTouchInput { swipeUp() }.assertIsOn().performClick().assertIsOff()
         rule.runOnIdle {
             org.junit.Assert.assertEquals(
                 listOf(
