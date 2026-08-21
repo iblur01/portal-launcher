@@ -176,7 +176,16 @@ fun LightDetailContent(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             DetailHeader(detail.label, onBack, closePanel)
-            if (!onOffOnly) {
+            if (onOffOnly) {
+                OnOffLightControl(
+                    checked = lightOn,
+                    onCheckedChange = { on ->
+                        lightOn = on
+                        callService("light", if (on) "turn_on" else "turn_off", detail.entityId)
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
                 Spacer(Modifier.height(16.dp))
 
                 // Live-while-dragging: send throttled updates on every change and the exact final
@@ -232,6 +241,45 @@ fun LightDetailContent(
                 callService("light", "turn_on", detail.entityId, mapOf("hs_color" to listOf(hue.toDouble(), saturation.toDouble())))
             },
         )
+    }
+}
+
+/** The complete detail surface for lights whose only HA colour mode is `onoff`. */
+@Composable
+private fun OnOffLightControl(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Row(
+            modifier = Modifier
+                .widthIn(max = 360.dp)
+                .fillMaxWidth()
+                .clip(AppleShapes.card)
+                .background(AppleColors.frostedFill, AppleShapes.card)
+                .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.card)
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(if (checked) R.string.light_state_on else R.string.light_state_off),
+                    style = AppleTypography.bodyLarge,
+                    color = AppleColors.primary,
+                )
+                Text(
+                    text = stringResource(if (checked) R.string.action_turn_off else R.string.action_turn_on),
+                    style = AppleTypography.bodySmall,
+                    color = AppleColors.secondary,
+                )
+            }
+            IosSwitch(checked = checked, onCheckedChange = onCheckedChange)
+        }
     }
 }
 

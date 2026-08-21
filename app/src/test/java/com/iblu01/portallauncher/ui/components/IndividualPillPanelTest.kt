@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.SemanticsMatcher
@@ -11,6 +12,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.core.app.ApplicationProvider
@@ -104,6 +106,55 @@ class IndividualPillPanelTest {
         rule.onNode(
             SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch) and hasClickAction(),
         ).assertIsOn()
+    }
+
+    @Test fun `onoff-only light panel exposes a switch and calls the light service`() {
+        val entity = HaEntity(
+            entityId = "light.spot_2",
+            state = "off",
+            attributes = JSONObject()
+                .put("friendly_name", "Spot 2")
+                .put("supported_color_modes", JSONArray(listOf("onoff"))),
+        )
+        val chip = LauncherChip(
+            id = entity.entityId,
+            icon = "light",
+            label = "Spot 2",
+            value = "Éteinte",
+            entityId = entity.entityId,
+            kind = PillKind.LIGHTS,
+            deviceState = entity.state,
+        )
+        val calls = mutableListOf<Triple<String, String, String?>>()
+        val recordingService = object : CallService {
+            override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) {
+                calls += Triple(domain, service, entityId)
+            }
+        }
+
+        rule.setContent {
+            CompositionLocalProvider(
+                LocalCallService provides recordingService,
+                LocalHaStates provides remember { HaStates().also { it.apply(mapOf(entity.entityId to entity)) } },
+                LocalAreas provides emptyMap(),
+            ) {
+                ChipActionsPanel(chip = chip, onDismiss = {})
+            }
+        }
+
+        val switch = rule.onNode(
+            SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch) and hasClickAction(),
+        )
+        switch.assertIsOff().performClick().assertIsOn().performClick().assertIsOff()
+        rule.runOnIdle {
+            org.junit.Assert.assertEquals(
+                listOf(
+                    Triple("light", "turn_on", "light.spot_2"),
+                    Triple("light", "turn_off", "light.spot_2"),
+                ),
+                calls,
+            )
+        }
     }
 
     @Test fun `plain fan shows running state once and exposes horizontal oscillation choices`() {
