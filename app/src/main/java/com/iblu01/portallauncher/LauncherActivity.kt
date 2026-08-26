@@ -727,31 +727,8 @@ private fun PortalLauncherApp(
     }.distinctBy { it.entityId }.sortedBy { it.playerNames.firstOrNull().orEmpty() }
     val haConnected = ui.connected
     val haLastUpdateAt = ui.lastUpdateAt
-    // Media-selection state stays local (moves to the panel reducer at step 6).
-    var activeMedia by remember { mutableStateOf<PlayingMedia?>(null) }
-    var secondaryMedia by remember { mutableStateOf(emptyList<PlayingMedia>()) }
-    var displayedSecondaryMedia by remember { mutableStateOf(emptyList<PlayingMedia>()) }
-    var selectedMediaEntityId by remember { mutableStateOf<String?>(null) }
+    val activeMedia = mediaSessions.firstOrNull()
     var browsedMediaEntityId by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(mediaSessions, selectedMediaEntityId) {
-        val selected = mediaSessions.firstOrNull { session ->
-            session.players.any { it.entityId == selectedMediaEntityId }
-        } ?: mediaSessions.firstOrNull()
-        activeMedia = selected
-        selectedMediaEntityId = selected?.entityId
-        secondaryMedia = mediaSessions.filterNot { it.entityId == selected?.entityId }
-    }
-    LaunchedEffect(mediaSessions, secondaryMedia) {
-        val activePlayerIds = mediaSessions.flatMap { it.players }.map { it.entityId }.toSet()
-        val recentlyRemoved = displayedSecondaryMedia.filter { session ->
-            session.players.none { it.entityId in activePlayerIds }
-        }
-        displayedSecondaryMedia = secondaryMedia + recentlyRemoved
-        if (recentlyRemoved.isNotEmpty()) {
-            delay(6_000)
-            displayedSecondaryMedia = secondaryMedia
-        }
-    }
     val weatherController = remember { WeatherController(context.applicationContext, pills) }
     val weather = weatherController.state
     DisposableEffect(weatherController) {
@@ -1144,17 +1121,6 @@ private fun PortalLauncherApp(
             armedPillReorderKey = null
         },
     ) }
-    val onSecondaryPlayPause: (PlayingMedia) -> Unit = { session ->
-        displayedSecondaryMedia = displayedSecondaryMedia.map {
-            if (it.entityId == session.entityId) it.copy(
-                state = if (it.state in setOf("playing", "buffering")) "paused" else "playing"
-            ) else it
-        }
-        session.players.forEach { player ->
-            callServiceProvider("media_player", "media_play_pause", player.entityId)
-        }
-    }
-
     val selectedChipKey = panel.request?.key
 
     val bottomGradientHeight by animateDpAsState(
@@ -1174,12 +1140,8 @@ private fun PortalLauncherApp(
         when (content) {
             is PanelContent.Media -> MediaPlayerPanel(
                 media = content.session,
-                secondaryMedia = displayedSecondaryMedia,
                 prefs = prefs,
-                mediaSessions = mediaSessions,
-                onSelectSession = { selectedMediaEntityId = it },
                 onDismiss = onPanelDismiss,
-                onSecondaryPlayPause = onSecondaryPlayPause,
                 fullScreen = compactScreen,
             )
             is PanelContent.ChipActions -> ChipActionsPanel(
@@ -1220,12 +1182,8 @@ private fun PortalLauncherApp(
                 } else {
                     MediaPlayerPanel(
                         media = selectedDevice,
-                        secondaryMedia = emptyList(),
                         prefs = prefs,
-                        mediaSessions = mediaDevices,
-                        onSelectSession = { browsedMediaEntityId = it },
                         onDismiss = { browsedMediaEntityId = null },
-                        onSecondaryPlayPause = onSecondaryPlayPause,
                         fullScreen = compactScreen,
                     )
                 }
@@ -1705,12 +1663,8 @@ private fun writeVisibleSectionOrder(
 @Composable
 private fun MediaPlayerPanel(
     media: PlayingMedia,
-    secondaryMedia: List<PlayingMedia>,
     prefs: Prefs,
-    mediaSessions: List<PlayingMedia>,
-    onSelectSession: (String?) -> Unit,
     onDismiss: () -> Unit,
-    onSecondaryPlayPause: (PlayingMedia) -> Unit,
     fullScreen: Boolean = false,
 ) {
     val callService = LocalCallService.current
@@ -1722,7 +1676,6 @@ private fun MediaPlayerPanel(
         else media
     MediaPlayerView(
         media = shownMedia,
-        secondaryMedia = secondaryMedia,
         haToken = prefs.haToken,
         onPlayPause = {
             callService("media_player", "media_play_pause", media.entityId)
@@ -1740,25 +1693,6 @@ private fun MediaPlayerPanel(
                 entityId,
                 mapOf("volume_level" to volumeFraction)
             )
-        },
-        onSecondaryPlayPause = onSecondaryPlayPause,
-        onSecondaryPrevious = { session ->
-            session.players.forEach { player ->
-                callService("media_player", "media_previous_track", player.entityId)
-            }
-        },
-        onSecondaryNext = { session ->
-            session.players.forEach { player ->
-                callService("media_player", "media_next_track", player.entityId)
-            }
-        },
-        onSelectSecondary = { session -> onSelectSession(session.entityId) },
-        onSwipePlayer = { direction ->
-            val currentIndex = mediaSessions.indexOfFirst { it.entityId == media.entityId }
-            if (currentIndex >= 0 && mediaSessions.size > 1) {
-                val nextIndex = (currentIndex + direction + mediaSessions.size) % mediaSessions.size
-                onSelectSession(mediaSessions[nextIndex].entityId)
-            }
         },
         onJoinPlayer = { entityId ->
             callService(

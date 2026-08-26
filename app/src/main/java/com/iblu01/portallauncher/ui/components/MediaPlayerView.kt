@@ -3,15 +3,9 @@ package com.iblu01.portallauncher.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,17 +30,14 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,10 +50,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,22 +70,20 @@ import com.iblu01.portallauncher.ui.components.controls.controlSize
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
-import kotlinx.coroutines.launch
 
 /** Height the wide layout keeps for [PanelHeader] (52.dp row + its vertical padding). */
 private val HeaderReservedHeight = 64.dp
 
 internal data class MediaDisclosure(
     val showAlbum: Boolean,
-    val secondaryPlayerCount: Int,
     val emphasizePrimary: Boolean,
 )
 
 /** Keeps primary playback controls while shedding secondary detail as usable height shrinks. */
 internal fun mediaDisclosureFor(widthDp: Float, heightDp: Float): MediaDisclosure = when {
-    heightDp <= 420f -> MediaDisclosure(showAlbum = false, secondaryPlayerCount = 0, emphasizePrimary = true)
-    heightDp <= 560f || widthDp <= 480f -> MediaDisclosure(showAlbum = false, secondaryPlayerCount = 1, emphasizePrimary = false)
-    else -> MediaDisclosure(showAlbum = true, secondaryPlayerCount = 2, emphasizePrimary = false)
+    heightDp <= 420f -> MediaDisclosure(showAlbum = false, emphasizePrimary = true)
+    heightDp <= 560f || widthDp <= 480f -> MediaDisclosure(showAlbum = false, emphasizePrimary = false)
+    else -> MediaDisclosure(showAlbum = true, emphasizePrimary = false)
 }
 
 /** Badge de source (logo + nom) incrusté en bas de la pochette, coins alignés sur ceux de la pochette. */
@@ -141,17 +127,11 @@ private fun BoxScope.CoverSourceBadge(
 @Composable
 fun MediaPlayerView(
     media: PlayingMedia,
-    secondaryMedia: List<PlayingMedia>,
     haToken: String,
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onVolumeChange: (String, Float) -> Unit,
-    onSecondaryPlayPause: (PlayingMedia) -> Unit,
-    onSecondaryPrevious: (PlayingMedia) -> Unit,
-    onSecondaryNext: (PlayingMedia) -> Unit,
-    onSelectSecondary: (PlayingMedia) -> Unit,
-    onSwipePlayer: (Int) -> Unit,
     onJoinPlayer: (String) -> Unit,
     onUnjoinPlayer: (String) -> Unit,
     onDismiss: (() -> Unit)? = null,
@@ -173,17 +153,6 @@ fun MediaPlayerView(
     var selectedGroupMembers by remember(media.entityId) { mutableStateOf(media.groupMemberIds.toSet()) }
     LaunchedEffect(media.groupMemberIds) {
         selectedGroupMembers = media.groupMemberIds.toSet()
-    }
-    var horizontalDrag by remember(media.entityId) { mutableFloatStateOf(0f) }
-    var swipeDirection by remember { mutableIntStateOf(0) }
-    val swipeOffset = remember { Animatable(0f) }
-    val swipeScope = rememberCoroutineScope()
-    LaunchedEffect(secondaryMedia.isEmpty()) {
-        if (secondaryMedia.isEmpty()) {
-            horizontalDrag = 0f
-            swipeDirection = 0
-            swipeOffset.snapTo(0f)
-        }
     }
     val fallbackSourceName = media.entityId.substringAfter('.').replace('_', ' ').replaceFirstChar { it.uppercase() }
     val sourceName = when (media.playerNames.size) {
@@ -212,76 +181,10 @@ fun MediaPlayerView(
         val panelInset = if (fullScreen) 0.dp else {
             (minOf(availableWidth, availableHeight) * 0.03f).coerceIn(10.dp, 20.dp)
         }
-        val availableWidthPx = with(LocalDensity.current) { availableWidth.toPx() }
         val wide = availableWidth > availableHeight
         val mediaDisclosure = mediaDisclosureFor(availableWidth.value, availableHeight.value)
-        val mainPlayer: @Composable () -> Unit = {
         Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-        val incomingMedia = when {
-            swipeDirection > 0 -> secondaryMedia.firstOrNull()
-            swipeDirection < 0 -> secondaryMedia.lastOrNull()
-            else -> null
-        }
-        if (incomingMedia != null) {
-            SwipeIncomingCard(
-                media = incomingMedia,
-                haToken = haToken,
-                modifier = Modifier.fillMaxSize().graphicsLayer {
-                    translationX = if (swipeDirection > 0) {
-                        availableWidthPx + swipeOffset.value
-                    } else {
-                        -availableWidthPx + swipeOffset.value
-                    }
-                    rotationZ = if (swipeDirection > 0) 2.2f else -2.2f
-                },
-            )
-        }
-        Box(
-            modifier = Modifier.fillMaxSize()
-                .graphicsLayer {
-                    translationX = swipeOffset.value
-                    rotationZ = (swipeOffset.value / availableWidthPx) * 2.2f
-                    alpha = 1f - (kotlin.math.abs(swipeOffset.value) / availableWidthPx * 0.18f).coerceIn(0f, 0.18f)
-                }
-                .pointerInput(media.entityId, secondaryMedia.size) {
-                    if (secondaryMedia.isEmpty()) return@pointerInput
-                    detectHorizontalDragGestures(
-                        onDragStart = { horizontalDrag = 0f; swipeDirection = 0 },
-                        onHorizontalDrag = { _, amount ->
-                            horizontalDrag += amount
-                            swipeDirection = if (horizontalDrag < 0f) 1 else -1
-                            swipeScope.launch { swipeOffset.snapTo(horizontalDrag.coerceIn(-availableWidthPx, availableWidthPx)) }
-                        },
-                        onDragEnd = {
-                            if (kotlin.math.abs(horizontalDrag) > 72f) {
-                                val direction = if (horizontalDrag < 0f) 1 else -1
-                                val exit = if (direction > 0) -availableWidthPx else availableWidthPx
-                                swipeScope.launch {
-                                    swipeOffset.animateTo(exit, tween(180))
-                                    onSwipePlayer(direction)
-                                    swipeOffset.snapTo(-exit)
-                                    swipeOffset.animateTo(0f, tween(240))
-                                    swipeDirection = 0
-                                }
-                            } else {
-                                swipeScope.launch {
-                                    swipeOffset.animateTo(0f, tween(180))
-                                    swipeDirection = 0
-                                }
-                            }
-                            horizontalDrag = 0f
-                        },
-                        onDragCancel = {
-                            horizontalDrag = 0f
-                            swipeScope.launch {
-                                swipeOffset.animateTo(0f, tween(180))
-                                swipeDirection = 0
-                            }
-                        },
-                    )
-                }
+            modifier = Modifier.fillMaxSize().padding(panelInset)
                 .clip(AppleShapes.panel)
                 .background(Color.Black.copy(alpha = 0.72f))
                 .then(
@@ -428,7 +331,7 @@ fun MediaPlayerView(
                 }
             }
         } else {
-            val artworkRatio = if (secondaryMedia.isEmpty()) 0.43f else 0.34f
+            val artworkRatio = 0.43f
             val artworkSize = minOf(availableWidth - 56.dp, availableHeight * artworkRatio, 310.dp)
             Column(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp),
@@ -531,60 +434,6 @@ fun MediaPlayerView(
                 }
             }
         }
-        }
-        }
-        }
-
-        if (wide && secondaryMedia.isNotEmpty() && mediaDisclosure.secondaryPlayerCount > 0) {
-            // Strip mode: main player 66% wide, secondary sessions stacked in the last third.
-            Row(modifier = Modifier.fillMaxSize().padding(panelInset), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(modifier = Modifier.weight(2f).fillMaxHeight()) { mainPlayer() }
-                Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    secondaryMedia.take(mediaDisclosure.secondaryPlayerCount).forEach { session ->
-                        MiniMediaPlayerVertical(
-                            media = session,
-                            haToken = haToken,
-                            onPlayPause = { onSecondaryPlayPause(session) },
-                            onPrevious = { onSecondaryPrevious(session) },
-                            onNext = { onSecondaryNext(session) },
-                            onSelect = { onSelectSecondary(session) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    if (secondaryMedia.size > mediaDisclosure.secondaryPlayerCount) {
-                        Text(
-                            stringResource(R.string.media_secondary_more_format, secondaryMedia.size - mediaDisclosure.secondaryPlayerCount),
-                            style = AppleTypography.bodySmall,
-                            color = AppleColors.secondary,
-                            modifier = Modifier.align(Alignment.CenterHorizontally),
-                        )
-                    }
-                }
-            }
-        } else {
-            Column(modifier = Modifier.fillMaxSize().padding(panelInset), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(modifier = Modifier.fillMaxWidth().weight(1f)) { mainPlayer() }
-                secondaryMedia.take(mediaDisclosure.secondaryPlayerCount).forEach { session ->
-                    MiniMediaPlayer(
-                        media = session,
-                        haToken = haToken,
-                        onPlayPause = { onSecondaryPlayPause(session) },
-                        onPrevious = { onSecondaryPrevious(session) },
-                        onNext = { onSecondaryNext(session) },
-                        onSelect = { onSelectSecondary(session) },
-                    )
-                }
-                if (secondaryMedia.size > mediaDisclosure.secondaryPlayerCount) {
-                    Text(
-                        stringResource(R.string.media_secondary_more_active_format, secondaryMedia.size - mediaDisclosure.secondaryPlayerCount),
-                        style = AppleTypography.bodySmall,
-                        color = AppleColors.secondary,
-                    )
-                }
-            }
         }
 
         if (groupDialogVisible) {
@@ -737,202 +586,6 @@ private fun MediaVolumePanel(
                         Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { slider() }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SwipeIncomingCard(
-    media: PlayingMedia,
-    haToken: String,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val request = remember(media.coverUrl, haToken) {
-        media.coverUrl?.let {
-            ImageRequest.Builder(context).data(it).addHeader("Authorization", "Bearer $haToken").build()
-        }
-    }
-    val rooms = when (media.playerNames.size) {
-        0 -> media.entityId.substringAfter('.').replace('_', ' ')
-        1 -> media.playerNames.first()
-        2 -> "${media.playerNames[0]} + ${media.playerNames[1]}"
-        else -> stringResource(R.string.media_source_many_format, media.playerNames.first(), media.playerNames.size - 1)
-    }
-    Box(
-        modifier = modifier.clip(AppleShapes.panel).background(Color.Black.copy(alpha = 0.86f))
-            .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel),
-    ) {
-        if (request != null) AsyncImage(
-            model = request,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().blur(42.dp).alpha(0.3f),
-        )
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.18f), Color.Black.copy(alpha = 0.92f)))))
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(rooms, style = AppleTypography.bodySmall, color = AppleColors.secondary)
-            Box(
-                modifier = Modifier.padding(vertical = 18.dp).fillMaxWidth(0.86f).weight(1f, fill = false)
-                    .clip(RoundedCornerShape(28.dp)).background(Color.White.copy(alpha = 0.08f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (request != null) AsyncImage(
-                    model = request,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                ) else Icon(Icons.Outlined.MusicNote, null, tint = AppleColors.secondary, modifier = Modifier.size(72.dp))
-            }
-            Text(media.title, style = AppleTypography.headlineLarge.copy(fontSize = 25.sp), color = AppleColors.primary, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-            Text(media.artist, style = AppleTypography.titleMedium, color = AppleColors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-@Composable
-private fun MiniMediaPlayer(
-    media: PlayingMedia,
-    haToken: String,
-    onPlayPause: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onSelect: () -> Unit,
-) {
-    val context = LocalContext.current
-    val request = remember(media.coverUrl, haToken) {
-        media.coverUrl?.let {
-            ImageRequest.Builder(context).data(it).addHeader("Authorization", "Bearer $haToken").build()
-        }
-    }
-    val rooms = when (media.playerNames.size) {
-        0 -> media.entityId.substringAfter('.').replace('_', ' ')
-        1 -> media.playerNames.first()
-        2 -> "${media.playerNames[0]} + ${media.playerNames[1]}"
-        else -> "${media.playerNames.first()} + ${media.playerNames.size - 1} autres"
-    }
-    val playing = media.state == "playing" || media.state == "buffering"
-    Row(
-        modifier = Modifier.fillMaxWidth().height(58.dp).clip(RoundedCornerShape(18.dp))
-            .background(AppleColors.frostedFill).border(0.5.dp, AppleColors.frostedBorder, RoundedCornerShape(18.dp))
-            .clickable(onClick = onSelect)
-            .padding(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(
-            modifier = Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(Color.White.copy(alpha = 0.08f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (request != null) AsyncImage(
-                model = request,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            ) else Icon(Icons.Outlined.MusicNote, null, tint = AppleColors.secondary, modifier = Modifier.size(22.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(rooms, style = AppleTypography.bodySmall.copy(fontSize = 11.sp), color = AppleColors.secondary, maxLines = 1)
-            Text(media.title, style = AppleTypography.titleMedium.copy(fontSize = 14.sp), color = AppleColors.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(media.artist, style = AppleTypography.bodySmall.copy(fontSize = 11.sp), color = AppleColors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        IconButton(onClick = onPrevious, modifier = Modifier.size(30.dp)) {
-            Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_mini_previous_desc_format, rooms), tint = AppleColors.primary, modifier = Modifier.size(20.dp))
-        }
-        IconButton(onClick = onPlayPause, modifier = Modifier.size(38.dp).background(Color.White, CircleShape)) {
-            Icon(
-                if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                if (playing) stringResource(R.string.media_mini_pause_desc_format, rooms) else stringResource(R.string.media_mini_play_desc_format, rooms),
-                tint = Color.Black,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-        IconButton(onClick = onNext, modifier = Modifier.size(30.dp)) {
-            Icon(Icons.Filled.SkipNext, stringResource(R.string.media_mini_next_desc_format, rooms), tint = AppleColors.primary, modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-/** Compact vertical card for a secondary session, used in the 33% column of strip mode. */
-@Composable
-private fun MiniMediaPlayerVertical(
-    media: PlayingMedia,
-    haToken: String,
-    onPlayPause: () -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val request = remember(media.coverUrl, haToken) {
-        media.coverUrl?.let {
-            ImageRequest.Builder(context).data(it).addHeader("Authorization", "Bearer $haToken").build()
-        }
-    }
-    val rooms = when (media.playerNames.size) {
-        0 -> media.entityId.substringAfter('.').replace('_', ' ')
-        1 -> media.playerNames.first()
-        2 -> "${media.playerNames[0]} + ${media.playerNames[1]}"
-        else -> "${media.playerNames.first()} + ${media.playerNames.size - 1} autres"
-    }
-    val playing = media.state == "playing" || media.state == "buffering"
-    Column(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-            .background(AppleColors.frostedFill).border(0.5.dp, AppleColors.frostedBorder, RoundedCornerShape(18.dp))
-            .clickable(onClick = onSelect)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // Square cover bounded by both card width and remaining height, centered.
-        Box(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .aspectRatio(1f, matchHeightConstraintsFirst = true)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.08f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (request != null) AsyncImage(
-                    model = request,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                ) else Icon(Icons.Outlined.MusicNote, null, tint = AppleColors.secondary, modifier = Modifier.size(28.dp))
-            }
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(rooms, style = AppleTypography.bodySmall.copy(fontSize = 11.sp), color = AppleColors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(media.title, style = AppleTypography.titleMedium.copy(fontSize = 14.sp), color = AppleColors.primary, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-            Text(media.artist, style = AppleTypography.bodySmall.copy(fontSize = 11.sp), color = AppleColors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            IconButton(onClick = onPrevious, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_vertical_previous_desc_format, rooms), tint = AppleColors.primary, modifier = Modifier.size(20.dp))
-            }
-            IconButton(onClick = onPlayPause, modifier = Modifier.size(38.dp).background(Color.White, CircleShape)) {
-                Icon(
-                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    if (playing) stringResource(R.string.media_vertical_pause_desc_format, rooms) else stringResource(R.string.media_vertical_play_desc_format, rooms),
-                    tint = Color.Black,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            IconButton(onClick = onNext, modifier = Modifier.size(30.dp)) {
-                Icon(Icons.Filled.SkipNext, stringResource(R.string.media_vertical_next_desc_format, rooms), tint = AppleColors.primary, modifier = Modifier.size(20.dp))
             }
         }
     }

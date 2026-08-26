@@ -672,14 +672,12 @@ fun PlaygroundScreen(onBack: () -> Unit) {
                     )
                     is FakePanelSelection.Media -> MediaPlayerView(
                         media = fakeMedia,
-                        secondaryMedia = emptyList(),
                         haToken = "",
                         onPlayPause = { fakeMediaPlaying = !fakeMediaPlaying },
                         onPrevious = { fakeTrackIndex = (fakeTrackIndex - 1 + fakeTracks.size) % fakeTracks.size },
                         onNext = { fakeTrackIndex = (fakeTrackIndex + 1) % fakeTracks.size },
                         onVolumeChange = { _, volume -> fakeMediaVolume = volume.toInt().coerceIn(0, 100) },
-                        onSecondaryPlayPause = {}, onSecondaryPrevious = {}, onSecondaryNext = {},
-                        onSelectSecondary = {}, onSwipePlayer = {}, onJoinPlayer = {}, onUnjoinPlayer = {},
+                        onJoinPlayer = {}, onUnjoinPlayer = {},
                         onDismiss = { selectedFakePanel = null },
                         fullScreen = fullscreenPanel,
                         modifier = (
