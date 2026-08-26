@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -478,6 +479,29 @@ private fun MediaCoverFlow(
     val sessions = remember(media.entityId, devices) {
         devices.distinctBy { it.entityId }.ifEmpty { listOf(media) }
     }
+    val sessionSetKey = sessions.map(PlayingMedia::entityId)
+    key(sessionSetKey) {
+        MediaCoverPager(
+            media = media,
+            sessions = sessions,
+            haToken = haToken,
+            artworkSize = artworkSize,
+            artworkCorner = artworkCorner,
+            onSelectMedia = onSelectMedia,
+        )
+    }
+}
+
+/** Pager state must not survive a change to [sessions]; its old page may no longer exist. */
+@Composable
+private fun MediaCoverPager(
+    media: PlayingMedia,
+    sessions: List<PlayingMedia>,
+    haToken: String,
+    artworkSize: Dp,
+    artworkCorner: Dp,
+    onSelectMedia: (PlayingMedia) -> Unit,
+) {
     val initialPage = sessions.indexOfFirst { it.entityId == media.entityId }.coerceAtLeast(0)
     val pagerState = rememberPagerState(initialPage = initialPage) { sessions.size }
     val scope = rememberCoroutineScope()
@@ -506,9 +530,9 @@ private fun MediaCoverFlow(
                 pageSpacing = if (hasMultiple) 6.dp else 0.dp,
                 beyondViewportPageCount = if (hasMultiple) 1 else 0,
                 userScrollEnabled = hasMultiple,
-                key = { sessions[it].entityId },
+                key = { coverFlowSessionKey(sessions, it) },
             ) { page ->
-                val session = sessions[page]
+                val session = sessions.getOrNull(page) ?: return@HorizontalPager
                 val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
                     .coerceIn(-1f, 1f)
                 val distance = pageOffset.absoluteValue
@@ -555,6 +579,10 @@ private fun MediaCoverFlow(
         }
     }
 }
+
+/** Lazy layout may query one stale index during the frame where its backing list shrinks. */
+internal fun coverFlowSessionKey(sessions: List<PlayingMedia>, index: Int): String =
+    sessions.getOrNull(index)?.entityId ?: "removed-media-session:$index"
 
 @Composable
 private fun BoxScope.MediaCover(media: PlayingMedia, haToken: String, artworkCorner: Dp) {
