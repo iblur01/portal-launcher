@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,7 +44,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,7 +77,6 @@ import com.iblu01.portallauncher.ui.components.controls.controlSize
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
-import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
 /** Height the wide layout keeps for [PanelHeader] (52.dp row + its vertical padding). */
@@ -504,8 +503,6 @@ private fun MediaCoverPager(
 ) {
     val initialPage = sessions.indexOfFirst { it.entityId == media.entityId }.coerceAtLeast(0)
     val pagerState = rememberPagerState(initialPage = initialPage) { sessions.size }
-    val scope = rememberCoroutineScope()
-
     LaunchedEffect(media.entityId, sessions) {
         val target = sessions.indexOfFirst { it.entityId == media.entityId }
         if (target >= 0 && target != pagerState.settledPage) pagerState.scrollToPage(target)
@@ -522,12 +519,18 @@ private fun MediaCoverPager(
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val hasMultiple = sessions.size > 1
-            val sidePeek = if (hasMultiple) (maxWidth * 0.075f).coerceIn(10.dp, 22.dp) else 0.dp
+            val coverSize = if (hasMultiple) {
+                minOf(maxHeight, maxWidth * 0.78f)
+            } else {
+                minOf(maxWidth, maxHeight)
+            }
+            val sidePeek = ((maxWidth - coverSize) / 2).coerceAtLeast(0.dp)
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = sidePeek),
-                pageSpacing = if (hasMultiple) 6.dp else 0.dp,
+                pageSize = PageSize.Fixed(coverSize),
+                pageSpacing = if (hasMultiple) 2.dp else 0.dp,
                 beyondViewportPageCount = if (hasMultiple) 1 else 0,
                 userScrollEnabled = hasMultiple,
                 key = { coverFlowSessionKey(sessions, it) },
@@ -537,24 +540,26 @@ private fun MediaCoverPager(
                     .coerceIn(-1f, 1f)
                 val distance = pageOffset.absoluteValue
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            rotationY = pageOffset * 16f
-                            scaleX = 1f - distance * 0.10f
-                            scaleY = 1f - distance * 0.10f
-                            alpha = 1f - distance * 0.32f
-                            cameraDistance = 20f * density
-                        }
-                        .clip(RoundedCornerShape(artworkCorner))
-                        .background(Color.White.copy(alpha = 0.07f))
-                        .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(artworkCorner))
-                        .clickable(enabled = page != pagerState.settledPage) {
-                            scope.launch { pagerState.animateScrollToPage(page) }
-                        },
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    MediaCover(session, haToken, artworkCorner)
+                    Box(
+                        modifier = Modifier
+                            .size(coverSize)
+                            .graphicsLayer {
+                                rotationY = pageOffset * 14f
+                                scaleX = 1f - distance * 0.08f
+                                scaleY = 1f - distance * 0.08f
+                                alpha = 1f - distance * 0.24f
+                                cameraDistance = 20f * density
+                            }
+                            .clip(RoundedCornerShape(artworkCorner))
+                            .background(Color.White.copy(alpha = 0.07f))
+                            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(artworkCorner)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MediaCover(session, haToken, artworkCorner)
+                    }
                 }
             }
         }
