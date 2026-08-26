@@ -3,8 +3,8 @@ package com.iblu01.portallauncher.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.outlined.Speaker
@@ -22,20 +22,35 @@ import com.iblu01.portallauncher.R
 import androidx.compose.ui.res.stringResource
 import com.iblu01.portallauncher.ui.theme.*
 
-/** First level of media navigation: every HA player, including idle and off devices. */
+/** First level of media navigation: active sessions only, supplied by the panel router. */
 @Composable
-fun MediaDevicesPanel(devices: List<PlayingMedia>, onSelect: (PlayingMedia) -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize().padding(horizontal = 14.dp.scaled(), vertical = 16.dp.scaled())) {
-        Box(Modifier.fillMaxSize().clip(AppleShapes.panel).background(Color.Black.copy(alpha = 0.72f)).border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel)) {
+fun MediaDevicesPanel(
+    devices: List<PlayingMedia>,
+    onSelect: (PlayingMedia) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    fullScreen: Boolean = false,
+) {
+    Box(modifier.fillMaxSize().then(if (fullScreen) Modifier else Modifier.padding(horizontal = 14.dp.scaled(), vertical = 16.dp.scaled()))) {
+        Box(Modifier.fillMaxSize().clip(AppleShapes.panel).background(if (fullScreen) Color.Black else Color.Black.copy(alpha = 0.72f)).then(if (fullScreen) Modifier else Modifier.border(0.5.dp, AppleColors.frostedBorder, AppleShapes.panel))) {
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.16f), Color.Black.copy(alpha = 0.94f)))))
             Column(Modifier.fillMaxSize().padding(horizontal = 24.dp.scaled(), vertical = 20.dp.scaled())) {
                 PanelHeader(stringResource(R.string.media_players_title), titleIcon = Icons.Outlined.Speaker, accent = AppleColors.accent, onClose = onDismiss)
                 Spacer(Modifier.height(14.dp))
                 Text(stringResource(R.string.media_choose_player), style = AppleTypography.bodySmall, color = AppleColors.secondary)
                 Spacer(Modifier.height(12.dp))
-                Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    devices.forEach { device -> MediaDeviceRow(device, onSelect) }
-                    if (devices.isEmpty()) Text(stringResource(R.string.media_no_player), style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+                if (devices.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.media_no_player), style = AppleTypography.bodyLarge, color = AppleColors.secondary)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentPadding = PaddingValues(bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp),
+                    ) {
+                        items(devices, key = { it.entityId }) { device -> MediaDeviceRow(device, onSelect) }
+                    }
                 }
             }
         }

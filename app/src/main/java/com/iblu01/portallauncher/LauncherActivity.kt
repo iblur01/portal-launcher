@@ -923,11 +923,15 @@ private fun PortalLauncherApp(
             if (req.panelKind == PanelKind.MEDIA) liveMediaDevices() else emptyList(),
         )
         is PanelRequest.Group -> (livePanelGroup ?: lastPanelGroup)?.let { group ->
-            PanelContent.Group(
-                group = group,
-                selectedDevice = panelChip,
-                deviceRequested = req.device != null,
-            )
+            if (group.chip.kind == PillKind.MEDIA) {
+                PanelContent.MediaBrowser
+            } else {
+                PanelContent.Group(
+                    group = group,
+                    selectedDevice = panelChip,
+                    deviceRequested = req.device != null,
+                )
+            }
         }
         null -> null
     }
@@ -962,6 +966,10 @@ private fun PortalLauncherApp(
         if (armedPillReorderKey != null) {
             armedPillReorderKey = null
             pillDragActive = false
+            return@BackHandler
+        }
+        if (browsedMediaEntityId != null) {
+            browsedMediaEntityId = null
             return@BackHandler
         }
         when (
@@ -1175,10 +1183,15 @@ private fun PortalLauncherApp(
             PanelContent.MediaBrowser -> {
                 // Materialised in the panel's own scope: only an open media browser subscribes
                 // to the media_player entities.
-                val mediaDevices = liveMediaDevices()
+                val mediaDevices = activeMediaDevices(liveMediaDevices())
                 val selectedDevice = mediaDevices.firstOrNull { it.entityId == browsedMediaEntityId }
                 if (selectedDevice == null) {
-                    MediaDevicesPanel(mediaDevices, onSelect = { browsedMediaEntityId = it.entityId }, onDismiss = onPanelDismiss)
+                    MediaDevicesPanel(
+                        devices = mediaDevices,
+                        onSelect = { browsedMediaEntityId = it.entityId },
+                        onDismiss = onPanelDismiss,
+                        fullScreen = compactScreen,
+                    )
                 } else {
                     MediaPlayerPanel(
                         media = selectedDevice,
@@ -1595,6 +1608,11 @@ internal fun resolveChipPanelContent(
 } else {
     panelChip?.let(PanelContent::ChipActions)
 }
+
+/** Only sessions that are currently broadcasting belong in the media browser. */
+internal fun activeMediaDevices(devices: List<PlayingMedia>): List<PlayingMedia> = devices
+    .filter { it.state.equals("playing", ignoreCase = true) || it.state.equals("buffering", ignoreCase = true) }
+    .distinctBy { it.entityId }
 
 /** Pure preference reducer used by Maison's accessible section-order controls. */
 internal fun moveVisibleHomeSection(
