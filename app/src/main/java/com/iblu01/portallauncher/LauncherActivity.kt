@@ -1146,12 +1146,20 @@ private fun PortalLauncherApp(
 
     val sidePanel: @Composable (PanelContent) -> Unit = { content ->
         when (content) {
-            is PanelContent.Media -> MediaPlayerPanel(
-                media = content.session,
-                prefs = prefs,
-                onDismiss = onPanelDismiss,
-                fullScreen = compactScreen,
-            )
+            is PanelContent.Media -> {
+                val mediaDevices = activeMediaDevices(liveMediaDevices())
+                val selectedDevice = mediaDevices.firstOrNull { it.entityId == browsedMediaEntityId }
+                    ?: mediaDevices.firstOrNull { it.entityId == content.session.entityId }
+                    ?: content.session
+                MediaPlayerPanel(
+                    media = selectedDevice,
+                    mediaDevices = mediaDevices,
+                    onSelectMedia = { browsedMediaEntityId = it.entityId },
+                    prefs = prefs,
+                    onDismiss = onPanelDismiss,
+                    fullScreen = compactScreen,
+                )
+            }
             is PanelContent.ChipActions -> ChipActionsPanel(
                 chip = content.chip,
                 onDismiss = onPanelDismiss,
@@ -1195,6 +1203,8 @@ private fun PortalLauncherApp(
                 } else {
                     MediaPlayerPanel(
                         media = selectedDevice,
+                        mediaDevices = mediaDevices,
+                        onSelectMedia = { browsedMediaEntityId = it.entityId },
                         prefs = prefs,
                         onDismiss = { browsedMediaEntityId = null },
                         fullScreen = compactScreen,
@@ -1681,6 +1691,8 @@ private fun writeVisibleSectionOrder(
 @Composable
 private fun MediaPlayerPanel(
     media: PlayingMedia,
+    mediaDevices: List<PlayingMedia> = listOf(media),
+    onSelectMedia: (PlayingMedia) -> Unit = {},
     prefs: Prefs,
     onDismiss: () -> Unit,
     fullScreen: Boolean = false,
@@ -1694,6 +1706,8 @@ private fun MediaPlayerPanel(
         else media
     MediaPlayerView(
         media = shownMedia,
+        mediaDevices = mediaDevices,
+        onSelectMedia = onSelectMedia,
         haToken = prefs.haToken,
         onPlayPause = {
             callService("media_player", "media_play_pause", media.entityId)

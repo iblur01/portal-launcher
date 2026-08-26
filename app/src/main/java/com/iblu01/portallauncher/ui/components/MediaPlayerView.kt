@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.Image
@@ -17,6 +18,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +51,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
@@ -70,6 +76,8 @@ import com.iblu01.portallauncher.ui.components.controls.controlSize
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 
 /** Height the wide layout keeps for [PanelHeader] (52.dp row + its vertical padding). */
 private val HeaderReservedHeight = 64.dp
@@ -127,6 +135,8 @@ private fun BoxScope.CoverSourceBadge(
 @Composable
 fun MediaPlayerView(
     media: PlayingMedia,
+    mediaDevices: List<PlayingMedia> = listOf(media),
+    onSelectMedia: (PlayingMedia) -> Unit = {},
     haToken: String,
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
@@ -251,34 +261,14 @@ fun MediaPlayerView(
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(artworkSize)
-                                .clip(RoundedCornerShape(artworkCorner))
-                                .background(Color.White.copy(alpha = 0.07f))
-                                .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(artworkCorner)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (imageRequest != null) {
-                                AsyncImage(
-                                    model = imageRequest,
-                                    contentDescription = stringResource(R.string.media_cover_desc_format, media.title),
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            } else if (!media.hasMedia) {
-                                HaEntityIcon(
-                                    entityId = media.entityId,
-                                    contentDescription = stringResource(R.string.media_player_icon_desc_format, sourceName),
-                                    tint = AppleColors.secondary,
-                                    size = 64.dp,
-                                    fallback = Icons.Outlined.MusicNote,
-                                )
-                            } else {
-                                Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(64.dp))
-                            }
-                            CoverSourceBadge(media.source, media.entityId, artworkCorner)
-                        }
+                        MediaCoverFlow(
+                            media = media,
+                            devices = mediaDevices,
+                            haToken = haToken,
+                            artworkSize = artworkSize,
+                            artworkCorner = artworkCorner,
+                            onSelectMedia = onSelectMedia,
+                        )
                     }
 
                     Column(
@@ -369,29 +359,14 @@ fun MediaPlayerView(
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(artworkSize)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(Color.White.copy(alpha = 0.07f))
-                        .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(28.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                        if (imageRequest != null) {
-                            AsyncImage(model = imageRequest, contentDescription = stringResource(R.string.media_cover_desc_format, media.title), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                        } else if (!media.hasMedia) {
-                            HaEntityIcon(
-                                entityId = media.entityId,
-                                contentDescription = stringResource(R.string.media_player_icon_desc_format, sourceName),
-                                tint = AppleColors.secondary,
-                                size = 82.dp,
-                                fallback = Icons.Outlined.MusicNote,
-                            )
-                        } else {
-                            Icon(Icons.Outlined.MusicNote, stringResource(R.string.media_no_cover_desc), tint = AppleColors.secondary, modifier = Modifier.size(82.dp))
-                    }
-                    CoverSourceBadge(media.source, media.entityId, 28.dp)
-                }
+                MediaCoverFlow(
+                    media = media,
+                    devices = mediaDevices,
+                    haToken = haToken,
+                    artworkSize = artworkSize,
+                    artworkCorner = 28.dp,
+                    onSelectMedia = onSelectMedia,
+                )
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -489,6 +464,132 @@ fun MediaPlayerView(
             }
         }
     }
+}
+
+@Composable
+private fun MediaCoverFlow(
+    media: PlayingMedia,
+    devices: List<PlayingMedia>,
+    haToken: String,
+    artworkSize: Dp,
+    artworkCorner: Dp,
+    onSelectMedia: (PlayingMedia) -> Unit,
+) {
+    val sessions = remember(media.entityId, devices) {
+        devices.distinctBy { it.entityId }.ifEmpty { listOf(media) }
+    }
+    val initialPage = sessions.indexOfFirst { it.entityId == media.entityId }.coerceAtLeast(0)
+    val pagerState = rememberPagerState(initialPage = initialPage) { sessions.size }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(media.entityId, sessions) {
+        val target = sessions.indexOfFirst { it.entityId == media.entityId }
+        if (target >= 0 && target != pagerState.settledPage) pagerState.scrollToPage(target)
+    }
+    LaunchedEffect(pagerState.settledPage, sessions) {
+        sessions.getOrNull(pagerState.settledPage)
+            ?.takeIf { it.entityId != media.entityId }
+            ?.let(onSelectMedia)
+    }
+
+    Column(
+        modifier = Modifier.size(artworkSize),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            val hasMultiple = sessions.size > 1
+            val sidePeek = if (hasMultiple) (maxWidth * 0.075f).coerceIn(10.dp, 22.dp) else 0.dp
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = sidePeek),
+                pageSpacing = if (hasMultiple) 6.dp else 0.dp,
+                beyondViewportPageCount = if (hasMultiple) 1 else 0,
+                userScrollEnabled = hasMultiple,
+                key = { sessions[it].entityId },
+            ) { page ->
+                val session = sessions[page]
+                val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+                    .coerceIn(-1f, 1f)
+                val distance = pageOffset.absoluteValue
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            rotationY = pageOffset * 16f
+                            scaleX = 1f - distance * 0.10f
+                            scaleY = 1f - distance * 0.10f
+                            alpha = 1f - distance * 0.32f
+                            cameraDistance = 20f * density
+                        }
+                        .clip(RoundedCornerShape(artworkCorner))
+                        .background(Color.White.copy(alpha = 0.07f))
+                        .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(artworkCorner))
+                        .clickable(enabled = page != pagerState.settledPage) {
+                            scope.launch { pagerState.animateScrollToPage(page) }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MediaCover(session, haToken, artworkCorner)
+                }
+            }
+        }
+        if (sessions.size > 1) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.height(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                sessions.forEachIndexed { index, _ ->
+                    val selected = index == pagerState.settledPage
+                    Box(
+                        Modifier
+                            .width(if (selected) 16.dp else 6.dp)
+                            .height(6.dp)
+                            .clip(CircleShape)
+                            .background(if (selected) AppleColors.primary else AppleColors.tertiary.copy(alpha = 0.55f)),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.MediaCover(media: PlayingMedia, haToken: String, artworkCorner: Dp) {
+    val context = LocalContext.current
+    val request = remember(media.coverUrl, haToken) {
+        media.coverUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            ImageRequest.Builder(context).data(url).addHeader("Authorization", "Bearer $haToken").build()
+        }
+    }
+    val sourceName = media.playerNames.firstOrNull()
+        ?: media.entityId.substringAfter('.').replace('_', ' ')
+    if (request != null) {
+        AsyncImage(
+            model = request,
+            contentDescription = stringResource(R.string.media_cover_desc_format, media.title),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+    } else if (!media.hasMedia) {
+        HaEntityIcon(
+            entityId = media.entityId,
+            contentDescription = stringResource(R.string.media_player_icon_desc_format, sourceName),
+            tint = AppleColors.secondary,
+            size = 64.dp,
+            fallback = Icons.Outlined.MusicNote,
+        )
+    } else {
+        Icon(
+            Icons.Outlined.MusicNote,
+            stringResource(R.string.media_no_cover_desc),
+            tint = AppleColors.secondary,
+            modifier = Modifier.size(64.dp),
+        )
+    }
+    CoverSourceBadge(media.source, media.entityId, artworkCorner)
 }
 
 @Composable
