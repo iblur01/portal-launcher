@@ -107,6 +107,11 @@
     <string name="settings_connected_connection_title">Home Assistant et MQTT</string>
     <string name="settings_connected_sessions_title">Sessions d’applications</string>
     <string name="settings_connected_sessions_subtitle">Applications externes autorisées</string>
+    <string name="settings_integrations_title">Intégrations Home Assistant</string>
+    <string name="settings_integrations_subtitle">Choisir ce que Portal peut utiliser</string>
+    <string name="settings_integrations_intro">Toutes les intégrations sont actives par défaut. En désactiver une masque ses entités uniquement dans Portal.</string>
+    <string name="settings_integrations_empty">Connectez Home Assistant pour découvrir vos intégrations.</string>
+    <string name="settings_integrations_counts">%1$d appareils · %2$d entités</string>
     <string name="settings_device_general_title">Écran, navigation et langue</string>
     <string name="settings_device_general_subtitle">Veille, retour automatique, langue et assistant</string>
     <string name="settings_app_page_title">Appareil</string>
@@ -182,6 +187,8 @@
     <string name="update_popup_install">Mettre à jour maintenant</string>
     <string name="update_popup_later">Me le rappeler plus tard</string>
     <string name="update_popup_ignore">Ignorer cette version</string>
+    <string name="update_popup_install_hint">Portal demandera d’abord l’accès root pour une mise à jour sans confirmation. Sans root, l’installateur Android s’ouvrira. Mise à jour possible depuis un ordinateur : adb install -r portal-launcher.apk</string>
+    <string name="settings_info_update_method">Portal tente d’abord une installation root. Sans root, Android demande une confirmation. Dépannage depuis un ordinateur : adb install -r portal-launcher.apk</string>
 
     <!-- ===== PILL SETTINGS PAGE ===== -->
     <string name="pills_page_title">Contenu affiché</string>
@@ -784,6 +791,10 @@
     <string name="pill_kind_media">Médias</string>
     <string name="pill_kind_purifier">Purificateur</string>
     <string name="pill_kind_timer">Minuteur</string>
+    <string name="timer_state_running">En cours</string>
+    <string name="timer_state_paused">En pause</string>
+    <string name="timer_state_idle">Prêt</string>
+    <string name="timer_action_cancel">Annuler le minuteur</string>
     <string name="pill_kind_humidifier">Humidificateur</string>
     <string name="pill_kind_water_heater">Chauffe-eau</string>
     <string name="pill_kind_valve">Vanne</string>
@@ -846,6 +857,54 @@
     <!-- Réglages caméra -->
     <string name="settings_cameras_title">Caméras</string>
     <string name="settings_cameras_subtitle">Centre caméra, caméra principale et mode d\'affichage</string>
+    <!-- Assistant vocal (satellite Pipecat Assist) -->
+    <string name="settings_voice_title">Assistant vocal</string>
+    <string name="settings_voice_subtitle">Mot de réveil et serveur Pipecat Assist</string>
+    <string name="settings_voice_intro">Le panneau détecte le mot de réveil localement, puis ouvre seulement à ce moment une session avec l\'add-on Pipecat Assist de Home Assistant. Rien n\'est transmis pendant l\'attente.</string>
+    <string name="settings_voice_section_server">Serveur</string>
+    <string name="settings_voice_section_wake">Mot de réveil</string>
+    <string name="settings_voice_microphone">Autorisation du microphone</string>
+    <string name="settings_voice_microphone_allowed">Autorisée</string>
+    <string name="settings_voice_microphone_blocked">Requise — toucher pour autoriser</string>
+    <string name="settings_voice_microphone_warning">Le microphone est bloqué. La détection du mot de réveil ne peut pas fonctionner tant que l’autorisation n’est pas accordée.</string>
+    <string name="settings_voice_enabled">Activer l\'assistant vocal</string>
+    <string name="settings_voice_url">Adresse de l\'add-on</string>
+    <string name="settings_voice_token">Jeton satellite</string>
+    <string name="settings_voice_url_invalid">Adresse non reconnue</string>
+    <string name="settings_voice_connection_status">Connexion Pipecat</string>
+    <string name="settings_voice_connection_test_hint">Toucher pour ouvrir une vraie session de test avec Pipecat.</string>
+    <string name="settings_voice_connection_stop_hint">Une session Pipecat est active. Toucher pour la fermer.</string>
+    <string name="settings_voice_connection_connecting">Connexion…</string>
+    <string name="settings_voice_connection_connected">Connecté</string>
+    <string name="settings_voice_connection_error">Échec de connexion</string>
+    <string name="settings_voice_connection_no_microphone">Microphone bloqué</string>
+    <string name="settings_voice_connection_invalid">Configuration invalide</string>
+    <string name="settings_voice_connection_ready">Prêt — non connecté</string>
+    <string name="settings_voice_connection_disabled">Désactivé</string>
+    <string name="settings_voice_live_score">Signal du mot de réveil en direct : %1$d%%</string>
+    <string name="settings_voice_microphone_level">Niveau du microphone en direct : %1$d%%</string>
+    <string name="settings_voice_wake_detected">Mot de réveil détecté — confiance %1$d%%</string>
+    <string name="settings_voice_wake_not_detected">Aucun mot de réveil détecté pour le moment</string>
+    <string name="settings_voice_wake_active">Sélectionné</string>
+    <string name="settings_voice_threshold">Seuil de déclenchement (%)</string>
+    <string name="settings_voice_threshold_hint">Plus bas = plus sensible. Le score en direct doit dépasser ce seuil.</string>
+    <string name="settings_voice_idle">Raccrocher après un silence (s)</string>
+    <string name="settings_voice_calibration">Calibration micro / haut-parleur</string>
+    <string name="settings_voice_calibration_not_run">Non calibré — appuyer pour lancer</string>
+    <string name="settings_voice_calibration_measuring">Mesure du bruit ambiant…</string>
+    <string name="settings_voice_calibration_playing">Lecture du signal de test…</string>
+    <string name="settings_voice_calibration_done">Calibré — bruit de fond %1$.1f‰, gain ×%2$.1f</string>
+    <string name="settings_voice_calibration_failed_speaker">Échec — signal inaudible. Augmentez le volume média puis réessayez.</string>
+    <string name="settings_voice_calibration_failed_mic">Échec — micro indisponible. Fermez la session vocale puis réessayez.</string>
+    <string name="settings_voice_calibration_hint">Joue un court signal sur le haut-parleur et écoute avec le micro pour régler la sensibilité du mot de réveil à cette pièce.</string>
+    <string name="settings_voice_calibration_silence_hint">Gardez la pièce silencieuse un instant…</string>
+    <string name="settings_voice_calibration_tone_hint">Un signal de test est en cours — ne parlez pas.</string>
+    <string name="voice_phase_connecting">Connexion…</string>
+    <string name="voice_phase_listening">À l\'écoute</string>
+    <string name="voice_phase_thinking">Réflexion…</string>
+    <string name="voice_phase_speaking">Réponse en cours</string>
+    <string name="voice_phase_error">Assistant vocal indisponible</string>
+    <string name="voice_stop_desc">Terminer la session vocale</string>
     <string name="settings_cameras_visible">Caméras affichées dans le centre</string>
     <string name="settings_cameras_main">Caméra principale</string>
     <string name="settings_cameras_default_mode">Mode d\'affichage par défaut</string>
@@ -1349,4 +1408,18 @@
     <string name="settings_app_label_root_setup">Configuration automatique (root)</string>
     <string name="settings_app_value_root_available">Disponible</string>
     <string name="settings_app_value_root_done">Configuré</string>
+    <string name="config_transfer_receiving_title">Réception de votre configuration</string>
+    <string name="config_transfer_receiving_body">Un autre Portal Launcher a autorisé cet appareil. Gardez les deux appareils sur le même réseau pendant la copie sécurisée des réglages et identifiants.</string>
+    <string name="config_transfer_received_title">Configuration reçue</string>
+    <string name="config_transfer_received_body">Vos réglages et identifiants sont prêts sur cet appareil.</string>
+    <string name="config_transfer_failed_title">Transfert interrompu</string>
+    <string name="config_transfer_failed_body">Aucun réglage n’a été appliqué partiellement. Relancez l’onboarding pour réessayer ou poursuivez la configuration manuelle.</string>
+    <string name="config_transfer_open_launcher">Ouvrir Portal Launcher</string>
+    <string name="config_transfer_nearby_title">Configurer un appareil à proximité ?</string>
+    <string name="config_transfer_nearby_body">%1$s attend une configuration. Portal Launcher va copier de façon sécurisée les réglages et identifiants de cet appareil.</string>
+    <string name="config_transfer_approve">Partager et configurer</string>
+    <string name="config_transfer_not_now">Pas maintenant</string>
+    <string name="config_transfer_sending">Envoi de la configuration…</string>
+    <string name="config_transfer_sent">Configuration envoyée</string>
+    <string name="config_transfer_send_failed">Impossible d’envoyer la configuration. Gardez les deux appareils sur le même réseau puis réessayez.</string>
 </resources>

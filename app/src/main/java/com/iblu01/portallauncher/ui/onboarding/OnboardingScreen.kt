@@ -23,6 +23,7 @@ import com.iblu01.portallauncher.ui.onboarding.screens.MqttConfigurationStep
 import com.iblu01.portallauncher.ui.onboarding.screens.MqttTestStep
 import com.iblu01.portallauncher.ui.onboarding.screens.PillsIntroStep
 import com.iblu01.portallauncher.ui.onboarding.screens.RemoteControlStep
+import com.iblu01.portallauncher.ui.onboarding.screens.ReceiveConfigStep
 import com.iblu01.portallauncher.ui.onboarding.screens.SystemSetupStep
 import com.iblu01.portallauncher.ui.onboarding.screens.TapAppStep
 import com.iblu01.portallauncher.ui.onboarding.screens.WelcomeStep
@@ -69,6 +70,11 @@ fun OnboardingScreen(
                     viewModel.skipOnboarding()
                     onFinish(false)
                 },
+            )
+
+            OnboardingStep.RECEIVE_CONFIG -> ReceiveConfigStep(
+                state = state,
+                onFinish = { onFinish(false) },
             )
 
             OnboardingStep.SYSTEM_SETUP -> SystemSetupStep(

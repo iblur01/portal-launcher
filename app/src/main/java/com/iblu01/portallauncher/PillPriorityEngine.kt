@@ -228,7 +228,7 @@ class PillPriorityEngine(internal val context: Context) {
                 visible = reading == null || reading > 0.1f
                 score = 4; visual = "info"
             }
-            PillKind.TIMER -> { visible = s !in inactive; score = 62; visual = "active" }
+            PillKind.TIMER -> { visible = s == "active"; score = 62; visual = "active" }
             PillKind.THERMOSTAT -> {
                 val heating = s in setOf("heat", "cool", "heat_cool", "auto", "dry", "fan_only")
                 score = rule.kind.basePriority; visual = if (heating) "active" else "ok"
@@ -388,6 +388,7 @@ class PillPriorityEngine(internal val context: Context) {
             }
             PillKind.SWITCH -> when (s) { "on" -> context.getString(R.string.pill_switch_on); "off" -> context.getString(R.string.pill_switch_off); else -> rawDisplay }
             PillKind.GENERIC -> if (e.domain == "binary_sensor") friendlyEntityState(context, e) else rawDisplay
+            PillKind.TIMER -> formatTimerDuration(timerStateOf(e, nowMs).remainingSeconds)
             PillKind.FAN -> when (s) {
                 "on" -> e.attributes.optInt("percentage", -1).let { if (it in 0..100) context.getString(R.string.pill_fan_on_format, it.toString()) else context.getString(R.string.pill_fan_on) }
                 "off" -> context.getString(R.string.pill_fan_off)

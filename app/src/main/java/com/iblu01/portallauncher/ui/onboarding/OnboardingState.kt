@@ -104,6 +104,13 @@ data class OnboardingApp(
     val recommended: Boolean = false,
 )
 
+sealed interface ConfigReceiveState {
+    data object Waiting : ConfigReceiveState
+    data object Receiving : ConfigReceiveState
+    data object Applied : ConfigReceiveState
+    data object Failed : ConfigReceiveState
+}
+
 /**
  * Whole onboarding state. Immutable, owned by [OnboardingViewModel]; screens receive it and emit
  * intents back, so no composable writes to `Prefs` directly.
@@ -115,6 +122,7 @@ data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.WELCOME,
     val flags: OnboardingFlags = OnboardingFlags(),
     val isLoading: Boolean = false,
+    val configReceiveState: ConfigReceiveState = ConfigReceiveState.Waiting,
 
     val systemCapabilities: SystemCapabilities = SystemCapabilities(),
     val justGranted: Capability? = null,
@@ -173,7 +181,7 @@ data class OnboardingUiState(
     override fun toString(): String =
         "OnboardingUiState(step=$step, flags=$flags, haUrl=$haUrl, haToken=${redact(haToken)}, " +
             "haTest=$haTest, mqttHost=$mqttHost:$mqttPort, mqttPassword=${redact(mqttPassword)}, " +
-            "mqttTest=$mqttTest, hidden=${hiddenPackages.size})"
+            "mqttTest=$mqttTest, configReceiveState=$configReceiveState, hidden=${hiddenPackages.size})"
 
     private fun redact(secret: String) = if (secret.isBlank()) "<empty>" else "***"
 }

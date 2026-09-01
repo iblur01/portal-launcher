@@ -33,11 +33,13 @@ import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
+import com.iblu01.portallauncher.voice.VoiceAssistantController
 
 @AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {
     @Inject lateinit var prefs: Prefs
     @Inject lateinit var pills: PillRepository
+    @Inject lateinit var voice: VoiceAssistantController
     private val uiState = SettingsUiState()
     private var settingsCatalogConnected = false
     private val pillListener = PillRepository.Listener {
@@ -118,15 +120,24 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             PortalTheme {
                 val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
+                val voiceState by voice.state.collectAsStateWithLifecycle()
+                val voiceCalibrationState by voice.micCalibration.collectAsStateWithLifecycle()
                 SettingsScreen(
                     prefs = prefs,
                     uiState = uiState,
                     callbacks = callbacks,
                     installedApps = apps,
                     haStates = pills.latestStates,
+                    haPlatforms = pills.entityPlatformByEntity,
+                    haDeviceIds = pills.latestDeviceIds,
                     autoReturnState = autoReturnState,
                     onAutoReturnCancel = autoReturnTimer::onInteraction,
                     initialPage = intent?.getStringExtra(EXTRA_PAGE),
+                    voiceState = voiceState,
+                    voiceCalibrationState = voiceCalibrationState,
+                    onVoiceStartTest = voice::startSessionNow,
+                    onVoiceStopTest = voice::stopSession,
+                    onVoiceCalibrate = voice::startMicCalibration,
                 )
             }
         }
@@ -143,6 +154,7 @@ class SettingsActivity : ComponentActivity() {
         pills.addListener(pillListener)
         MqttBridgeService.start(this)
         autoReturnTimer.start()
+        voice.onResume()
     }
 
     private fun webConfigSignature(): String = listOf(
@@ -154,6 +166,7 @@ class SettingsActivity : ComponentActivity() {
     override fun onPause() {
         pills.removeListener(pillListener)
         autoReturnTimer.stop()
+        voice.onPause()
         super.onPause()
     }
 

@@ -29,4 +29,9 @@ class AppUpdateManagerTest {
         assertEquals("Fix translations", release.notes)
         assertEquals("https://example/portal.apk", release.apkUrl)
     }
+
+    @Test fun `root installer shell quotes APK paths`() {
+        assertEquals("'/data/user/0/portal/cache/update.apk'", AppUpdateManager.shellQuote("/data/user/0/portal/cache/update.apk"))
+        assertEquals("'/tmp/Portal'\\''s update.apk'", AppUpdateManager.shellQuote("/tmp/Portal's update.apk"))
+    }
 }

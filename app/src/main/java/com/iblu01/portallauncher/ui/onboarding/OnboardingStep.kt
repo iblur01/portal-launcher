@@ -9,6 +9,7 @@ package com.iblu01.portallauncher.ui.onboarding
  */
 enum class OnboardingStep {
     WELCOME,
+    RECEIVE_CONFIG,
     SYSTEM_SETUP,
     GRID,
     BACKGROUND,
@@ -26,7 +27,7 @@ enum class OnboardingStep {
 
     val chapter: OnboardingChapter
         get() = when (this) {
-            WELCOME, SYSTEM_SETUP, GRID, BACKGROUND -> OnboardingChapter.LAUNCHER
+            WELCOME, RECEIVE_CONFIG, SYSTEM_SETUP, GRID, BACKGROUND -> OnboardingChapter.LAUNCHER
             HOME_ASSISTANT_INTRO, HOME_ASSISTANT_CREDENTIALS, HOME_ASSISTANT_TEST,
             PILLS_INTRO, REMOTE_CONTROL, MQTT_CONFIGURATION, MQTT_TEST -> OnboardingChapter.HOME
             HIDDEN_APPS, TAP_APP, GESTURES, COMPLETE -> OnboardingChapter.FINISH
@@ -61,6 +62,9 @@ data class OnboardingFlags(
 
 /** Steps [flags] takes out of the flow entirely. */
 private fun OnboardingFlags.isSkipped(step: OnboardingStep): Boolean = when (step) {
+    // Entered only by an incoming transfer offer; never part of manual onboarding navigation.
+    OnboardingStep.RECEIVE_CONFIG -> true
+
     OnboardingStep.HOME_ASSISTANT_CREDENTIALS,
     OnboardingStep.HOME_ASSISTANT_TEST,
     OnboardingStep.PILLS_INTRO,

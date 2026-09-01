@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material.icons.outlined.Settings
@@ -66,6 +67,7 @@ import com.iblu01.portallauncher.ui.components.ClockHeaderCollapsedHeight
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.iblu01.portallauncher.AppLanguage
+import com.iblu01.portallauncher.AppUpdateManager
 import com.iblu01.portallauncher.Prefs
 import com.iblu01.portallauncher.RootProvisioning
 import com.iblu01.portallauncher.PortalApp
@@ -190,8 +192,9 @@ private enum class SettingsPage {
     MAIN,
     HOME, HOME_CONTENT, HOME_APPS,
     CONNECTED_HOME_CAMERAS,
+    CONNECTED_HOME_INTEGRATIONS,
     APPEARANCE, APPEARANCE_WALLPAPER, APPEARANCE_CLOCK,
-    CONNECTED_HOME, CONNECTED_HOME_CONNECTION, CONNECTED_HOME_SESSIONS,
+    CONNECTED_HOME, CONNECTED_HOME_CONNECTION, CONNECTED_HOME_SESSIONS, CONNECTED_HOME_VOICE,
     DEVICE, DEVICE_GENERAL,
     ABOUT,
 }
@@ -229,9 +232,16 @@ fun SettingsScreen(
     callbacks: SettingsCallbacks,
     installedApps: List<AppEntry> = emptyList(),
     haStates: Map<String, HaEntity> = emptyMap(),
+    haPlatforms: Map<String, String> = emptyMap(),
+    haDeviceIds: Map<String, String> = emptyMap(),
     autoReturnState: AutoReturnUiState = AutoReturnUiState(),
     onAutoReturnCancel: (() -> Unit)? = null,
     initialPage: String? = null,
+    voiceState: com.iblu01.portallauncher.voice.VoiceUiState = com.iblu01.portallauncher.voice.VoiceUiState(),
+    voiceCalibrationState: com.iblu01.portallauncher.voice.MicCalibrationState? = null,
+    onVoiceStartTest: () -> Unit = {},
+    onVoiceStopTest: () -> Unit = {},
+    onVoiceCalibrate: () -> Unit = {},
 ) {
     // First-run configuration is its own flow now (ui.onboarding), not a page of the settings, so
     // the settings always open on their own root — even when no home has been connected. Callers
@@ -437,6 +447,13 @@ fun SettingsScreen(
                 onGeneralPillPinned = callbacks::onCamerasPillPinned,
                 onBack = { currentPage = SettingsPage.CONNECTED_HOME }, showBack = showBack,
             )
+            SettingsPage.CONNECTED_HOME_INTEGRATIONS -> HaIntegrationsSettingsPage(
+                prefs = prefs,
+                platformByEntity = haPlatforms,
+                deviceIdByEntity = haDeviceIds,
+                onBack = { currentPage = SettingsPage.CONNECTED_HOME },
+                showBack = showBack,
+            )
             SettingsPage.APPEARANCE -> CategoryPage(
                 title = stringResource(R.string.settings_tile_wallpaper_title),
                 entries = listOf(
@@ -457,8 +474,10 @@ fun SettingsScreen(
                 title = stringResource(R.string.settings_tile_home_title),
                 entries = listOf(
                     CategoryEntry(stringResource(R.string.settings_connected_connection_title), homeSubtitle, Icons.Outlined.Home, SettingsPage.CONNECTED_HOME_CONNECTION),
+                    CategoryEntry(stringResource(R.string.settings_integrations_title), stringResource(R.string.settings_integrations_subtitle), Icons.Outlined.Dashboard, SettingsPage.CONNECTED_HOME_INTEGRATIONS),
                     CategoryEntry(stringResource(R.string.settings_connected_sessions_title), stringResource(R.string.settings_connected_sessions_subtitle), Icons.Outlined.Settings, SettingsPage.CONNECTED_HOME_SESSIONS),
                     CategoryEntry(stringResource(R.string.settings_cameras_title), stringResource(R.string.settings_cameras_subtitle), Icons.Outlined.Videocam, SettingsPage.CONNECTED_HOME_CAMERAS),
+                    CategoryEntry(stringResource(R.string.settings_voice_title), stringResource(R.string.settings_voice_subtitle), Icons.Outlined.Mic, SettingsPage.CONNECTED_HOME_VOICE),
                 ),
                 onNavigate = { currentPage = it }, onBack = { currentPage = SettingsPage.MAIN }, showBack = showBack,
                 leadingContent = { WebConfigShortcut() },
@@ -480,6 +499,16 @@ fun SettingsScreen(
                 onTestHa = { callbacks.onTestHaApi(haUrl, haToken) },
                 onTestMqtt = { callbacks.onTestMqtt(host, port.toIntOrNull() ?: 1883, username, password) },
                 onBack = { save(); currentPage = SettingsPage.CONNECTED_HOME },
+                showBack = showBack,
+            )
+            SettingsPage.CONNECTED_HOME_VOICE -> VoiceAssistantSettingsPage(
+                prefs = prefs,
+                voiceState = voiceState,
+                calibrationState = voiceCalibrationState,
+                onStartConnectionTest = onVoiceStartTest,
+                onStopConnectionTest = onVoiceStopTest,
+                onCalibrate = onVoiceCalibrate,
+                onBack = { currentPage = SettingsPage.CONNECTED_HOME },
                 showBack = showBack,
             )
             SettingsPage.CONNECTED_HOME_SESSIONS -> appPageContent(AppPageMode.CONNECTED_HOME, R.string.settings_connected_sessions_title, { currentPage = SettingsPage.CONNECTED_HOME }, showBack)
@@ -1399,17 +1428,16 @@ private fun InformationPage(
             }
             withContext(Dispatchers.Main) {
                 result.onSuccess { apkFile ->
-                    val apkUri = androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        apkFile
-                    )
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(apkUri, "application/vnd.android.package-archive")
-                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                    scope.launch(Dispatchers.IO) {
+                        val installedWithRoot = AppUpdateManager.installWithRoot(apkFile)
+                        withContext(Dispatchers.Main) {
+                            updateState = UpdateState.IDLE
+                            if (!installedWithRoot) {
+                                runCatching { AppUpdateManager.launchInstaller(context, apkFile) }
+                                    .onFailure { updateState = UpdateState.ERROR }
+                            }
+                        }
                     }
-                    runCatching { context.startActivity(intent) }
-                    updateState = UpdateState.IDLE
                 }.onFailure {
                     updateState = UpdateState.ERROR
                 }
@@ -1436,6 +1464,11 @@ private fun InformationPage(
         }
 
         SettingsSection(title = stringResource(R.string.settings_info_section_updates)) {
+            Text(
+                text = stringResource(R.string.settings_info_update_method),
+                style = AppleTypography.bodyMedium,
+                color = AppleColors.secondary,
+            )
             val isBusy = updateState == UpdateState.CHECKING ||
                 updateState == UpdateState.DOWNLOADING
 

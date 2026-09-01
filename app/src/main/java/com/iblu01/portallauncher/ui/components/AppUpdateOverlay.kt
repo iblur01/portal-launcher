@@ -33,6 +33,7 @@ fun AppUpdateOverlay(
     release: AppRelease?,
     downloading: Boolean,
     onInstall: () -> Unit,
+    onCancel: () -> Unit,
     onLater: () -> Unit,
     onIgnore: () -> Unit,
 ) {
@@ -59,6 +60,13 @@ fun AppUpdateOverlay(
                 style = AppleTypography.titleLarge,
                 color = AppleColors.secondary,
             )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.update_popup_install_hint),
+                style = AppleTypography.bodyMedium,
+                color = AppleColors.secondary,
+                textAlign = TextAlign.Center,
+            )
             if (release.notes.isNotBlank()) {
                 Spacer(Modifier.height(20.dp))
                 MarkdownText(
@@ -77,20 +85,23 @@ fun AppUpdateOverlay(
                 onClick = onInstall,
             )
             Spacer(Modifier.height(10.dp))
-            Row(
+            if (downloading) {
+                PillButton(
+                    label = stringResource(android.R.string.cancel),
+                    onClick = onCancel,
+                )
+            } else Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 PillButton(
                     label = stringResource(R.string.update_popup_later),
                     modifier = Modifier.weight(1f),
-                    enabled = !downloading,
                     onClick = onLater,
                 )
                 PillButton(
                     label = stringResource(R.string.update_popup_ignore),
                     modifier = Modifier.weight(1f),
-                    enabled = !downloading,
                     onClick = onIgnore,
                 )
             }

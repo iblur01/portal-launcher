@@ -3,7 +3,9 @@ import com.iblu01.portallauncher.domain.model.PlayingMedia
 import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -71,6 +73,10 @@ import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.LocalHaStates
 import com.iblu01.portallauncher.ui.HaStates
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.iblu01.portallauncher.ui.components.VoiceAssistantOverlay
+import com.iblu01.portallauncher.voice.VoiceAssistantController
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.iblu01.portallauncher.ui.mapper.predictState
@@ -103,6 +109,7 @@ import com.iblu01.portallauncher.ui.scene.LocalSceneActivations
 import com.iblu01.portallauncher.ui.scene.rememberSceneActivations
 import com.iblu01.portallauncher.ui.components.AlertOverlay
 import com.iblu01.portallauncher.ui.components.AppUpdateOverlay
+import com.iblu01.portallauncher.ui.components.ConfigTransferOverlay
 import com.iblu01.portallauncher.ui.components.AmbientBackground
 import androidx.compose.ui.res.stringResource
 import com.iblu01.portallauncher.ui.components.AppContextMenu
@@ -174,6 +181,16 @@ class LauncherActivity : ComponentActivity() {
 
     @Inject lateinit var prefs: Prefs
     @Inject lateinit var pills: PillRepository
+    @Inject lateinit var voice: VoiceAssistantController
+    /** Asked at most once per launcher process; denying it leaves the assistant idle, not looping. */
+    private var micPermissionAsked = false
+    private val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        // Either way the controller re-evaluates: granted starts the wake engine, denied parks it
+        // in MISSING_PERMISSION instead of retrying on every resume.
+        if (granted) voice.onResume()
+    }
     private var lastLaunchMs = 0L
     private lateinit var autoReturnTimer: AutoReturnTimer
     private lateinit var appList: AppListStore
@@ -224,6 +241,7 @@ class LauncherActivity : ComponentActivity() {
                 PortalLauncherApp(
                     prefs = prefs,
                     pills = pills,
+                    voice = voice,
                     autoReturnTimer = autoReturnTimer,
                     appList = appList,
                     layout = layout,
@@ -320,10 +338,13 @@ class LauncherActivity : ComponentActivity() {
         layout.reload()
         applyPowerPolicy()
         DeviceStateHub.onLauncherForeground(true, this)
+        requestMicPermissionIfNeeded()
+        voice.onResume()
         enableImmersive()
     }
 
     override fun onPause() {
+        voice.onPause()
         DeviceStateHub.onLauncherForeground(false, this)
         super.onPause()
     }
@@ -336,6 +357,20 @@ class LauncherActivity : ComponentActivity() {
         // finish() still reaches onDestroy(), so only stop the store when startup got that far.
         if (::appList.isInitialized) appList.stop()
         super.onDestroy()
+    }
+
+    /**
+     * The wake word needs RECORD_AUDIO, and a wall panel has no other moment to ask: there is no
+     * onboarding step for it and settings may be driven remotely. Asking on the first resume after
+     * the feature is switched on keeps the grant in the user's hands without a dedicated screen.
+     */
+    private fun requestMicPermissionIfNeeded() {
+        if (micPermissionAsked || !prefs.voiceAssistantEnabled) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) return
+        micPermissionAsked = true
+        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -509,6 +544,7 @@ private const val LAUNCHER_PAGE_SCRIM = 0.45f
 private fun PortalLauncherApp(
     prefs: Prefs,
     pills: PillRepository,
+    voice: VoiceAssistantController,
     autoReturnTimer: AutoReturnTimer,
     appList: AppListStore,
     layout: LauncherLayoutStore,
@@ -606,7 +642,7 @@ private fun PortalLauncherApp(
     // Fed straight from the raw socket stream, bypassing the sampled transform pipeline: the
     // store's per-entity granularity makes each apply a cheap mostly-reference-equal walk, and
     // conflate() keeps only the latest full snapshot if the main thread falls behind a burst.
-    LaunchedEffect(pills) { pills.rawSnapshots().conflate().collect { haStates.apply(it.states) } }
+    LaunchedEffect(pills) { pills.rawSnapshots(prefs).conflate().collect { haStates.apply(it.states) } }
     // Single interception point for every UI-originated service call (chips, panels, media):
     // the predicted state is written into the store *before* the network call, so the pressed
     // control repaints on the next frame even with HA unreachable (P3). Unpredictable services
@@ -838,6 +874,7 @@ private fun PortalLauncherApp(
     val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
     var availableUpdate by remember { mutableStateOf<AppRelease?>(null) }
     var updateDownloading by remember { mutableStateOf(false) }
+    var updateJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     // A wall launcher may stay alive for weeks, so checking only at Activity creation is not
     // enough. Wake hourly, but hit GitHub at most once per day and only while Portal is visible.
@@ -1185,6 +1222,9 @@ private fun PortalLauncherApp(
                 onDismiss = onPanelDismiss,
                 onCollectiveAction = { calls ->
                     calls.forEach { call -> callServiceProvider(call.domain, call.service, call.entityId) }
+                },
+                onMemberPowerAction = { call ->
+                    callServiceProvider(call.domain, call.service, call.entityId)
                 },
                 fullScreen = compactScreen,
             )
@@ -1580,14 +1620,31 @@ private fun PortalLauncherApp(
                 val release = availableUpdate ?: return@AppUpdateOverlay
                 if (updateDownloading) return@AppUpdateOverlay
                 updateDownloading = true
-                pagerScope.launch {
-                    runCatching { withContext(Dispatchers.IO) { AppUpdateManager.download(context, release) } }
-                        .onSuccess { apk -> AppUpdateManager.launchInstaller(context, apk) }
+                updateJob = pagerScope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            val apk = AppUpdateManager.download(context, release)
+                            apk to AppUpdateManager.installWithRoot(apk)
+                        }
+                    }
+                        .onSuccess { (apk, installedWithRoot) ->
+                            // A successful root install normally kills this old process. If it did
+                            // not, leave the overlay usable. Otherwise use Android's installer.
+                            updateDownloading = false
+                            updateJob = null
+                            if (!installedWithRoot) AppUpdateManager.launchInstaller(context, apk)
+                        }
                         .onFailure {
                             updateDownloading = false
+                            updateJob = null
                             Toast.makeText(context, R.string.settings_info_check_error, Toast.LENGTH_LONG).show()
                         }
                 }
+            },
+            onCancel = {
+                updateJob?.cancel()
+                updateJob = null
+                updateDownloading = false
             },
             onLater = {
                 if (!updateDownloading) {
@@ -1602,6 +1659,10 @@ private fun PortalLauncherApp(
                 }
             },
         )
+        val voiceState by voice.state.collectAsStateWithLifecycle()
+        VoiceAssistantOverlay(state = voiceState, onStop = voice::stopSession)
+
+        ConfigTransferOverlay(prefs)
     }
     }
 }

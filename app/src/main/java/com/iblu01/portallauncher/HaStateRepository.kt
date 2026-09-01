@@ -151,6 +151,7 @@ class HaStateRepository(appContext: Context, private val url: String, private va
                     dailyForecast = dailyForecast,
                     deviceIdByEntity = deviceIdByEntity,
                     entityCategoryByEntity = entityCategoryByEntity,
+                    entityPlatformByEntity = entityPlatformByEntity,
                     entityRegistryResolved = entityRegistryResolved,
                     areaIdByEntity = areaIdByEntity,
                     areaNameById = areaNameById,

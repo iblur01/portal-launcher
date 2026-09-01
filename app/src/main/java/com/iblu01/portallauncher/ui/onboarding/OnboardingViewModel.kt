@@ -12,6 +12,8 @@ import com.iblu01.portallauncher.HaInstance
 import com.iblu01.portallauncher.PillSupport
 import com.iblu01.portallauncher.HaMdnsDiscovery
 import com.iblu01.portallauncher.Prefs
+import com.iblu01.portallauncher.transfer.ConfigReceiverServer
+import com.iblu01.portallauncher.transfer.ConfigTransferAdvertiser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +52,43 @@ class OnboardingViewModel @Inject constructor(
     private var haDiscovery: HaMdnsDiscovery? = null
     private var brokerDiscovery: MqttMdnsDiscovery? = null
     private var runningTest: Job? = null
+    private var configReceiver: ConfigReceiverServer? = null
+    private var configAdvertiser: ConfigTransferAdvertiser? = null
+
+    init {
+        startConfigReceiver()
+    }
+
+    private fun startConfigReceiver() {
+        if (prefs.onboardingCompleted || configReceiver != null) return
+        val server = ConfigReceiverServer.launch(
+            displayName = prefs.deviceName,
+            onOffer = {
+                goTo(OnboardingStep.RECEIVE_CONFIG)
+                _state.update { it.copy(configReceiveState = ConfigReceiveState.Receiving) }
+            },
+            onPayload = { payload ->
+                val applied = prefs.importTransferPayload(payload)
+                _state.update {
+                    it.copy(
+                        step = OnboardingStep.RECEIVE_CONFIG,
+                        configReceiveState = if (applied) ConfigReceiveState.Applied else ConfigReceiveState.Failed,
+                    )
+                }
+                if (applied) configAdvertiser?.stop()
+                applied
+            },
+        ) ?: return
+        configReceiver = server
+        ConfigTransferAdvertiser(context).also { advertiser ->
+            configAdvertiser = advertiser
+            advertiser.start(
+                serviceName = prefs.deviceName,
+                port = server.listeningPort,
+                attributes = server.advertisementAttributes(),
+            )
+        }
+    }
 
     /** Candidates behind [OnboardingUiState.pillOptions], kept out of the UI state (raw JSON). */
     private var pillCandidates: List<com.iblu01.portallauncher.PillCandidate> = emptyList()
@@ -566,6 +605,8 @@ class OnboardingViewModel @Inject constructor(
     override fun onCleared() {
         haDiscovery?.stop()
         brokerDiscovery?.stop()
+        configAdvertiser?.stop()
+        configReceiver?.stop()
         super.onCleared()
     }
 }

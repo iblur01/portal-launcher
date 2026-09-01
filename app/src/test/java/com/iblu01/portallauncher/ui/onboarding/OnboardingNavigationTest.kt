@@ -14,7 +14,8 @@ class OnboardingNavigationTest {
     @Test
     fun `full flow visits every step in order`() {
         val visited = generateSequence(OnboardingStep.WELCOME) { nextStep(it, everything) }.toList()
-        assertEquals(OnboardingStep.values().toList(), visited)
+        assertEquals(OnboardingStep.values().filterNot { it == OnboardingStep.RECEIVE_CONFIG }, visited)
+        assertFalse(OnboardingStep.RECEIVE_CONFIG in visited)
     }
 
     @Test
@@ -30,6 +31,7 @@ class OnboardingNavigationTest {
     @Test
     fun `back mirrors forward on every step`() {
         OnboardingStep.values().forEach { step ->
+            if (step == OnboardingStep.RECEIVE_CONFIG) return@forEach
             val next = nextStep(step, everything) ?: return@forEach
             assertEquals("back from $next", step, previousStep(next, everything))
         }

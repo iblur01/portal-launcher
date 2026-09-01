@@ -18,8 +18,13 @@ import com.iblu01.portallauncher.ui.theme.ClockTint
 import com.iblu01.portallauncher.photo.TransportPolicy
 import com.iblu01.portallauncher.ui.components.systemWallpaperSupported
 import com.iblu01.portallauncher.ui.components.wallpaperFile
+import org.json.JSONArray
+import org.json.JSONObject
 
 private val backgroundModeKeys = setOf("system", "neutral", "custom", "immich")
+
+/** Bundled openWakeWord model used until the user picks another one. */
+const val DEFAULT_WAKE_WORD = "wakeword/hey_jarvis_v0.1.onnx"
 
 class Prefs(private val context: Context) {
     private val sp = plainPrefs(context)
@@ -278,6 +283,139 @@ class Prefs(private val context: Context) {
             .apply()
     }
 
+    /**
+     * Versioned, in-memory snapshot used by nearby configuration transfer. Secrets stay in their
+     * own section so the receiver writes them back through its encrypted store. Device identity,
+     * onboarding progress and OS-owned widget ids are deliberately local and never exported.
+     */
+    fun exportTransferPayload(): ByteArray {
+        val plain = JSONObject()
+        sp.all.forEach { (key, value) ->
+            if (key !in TRANSFER_LOCAL_KEYS && key !in TRANSFER_SECRET_KEYS && !key.startsWith("onboarding_")) {
+                putTransferValue(plain, key, sanitizeTransferValue(key, value))
+            }
+        }
+        val secrets = JSONObject()
+        TRANSFER_SECRET_KEYS.forEach { key ->
+            if (secure.contains(key)) putTransferValue(secrets, key, secure.all[key])
+        }
+        return JSONObject()
+            .put("version", TRANSFER_PAYLOAD_VERSION)
+            .put("plain", plain)
+            .put("secure", secrets)
+            .toString()
+            .toByteArray(Charsets.UTF_8)
+    }
+
+    /**
+     * Validates the complete snapshot before writing. Secrets commit first; completion is part of
+     * the final plain-store commit, so an interrupted import returns to onboarding rather than
+     * launching with a partially configured profile.
+     */
+    fun importTransferPayload(payload: ByteArray): Boolean = synchronized(transferLock) {
+        if (payload.isEmpty() || payload.size > TRANSFER_MAX_BYTES) return false
+        val root = runCatching { JSONObject(String(payload, Charsets.UTF_8)) }.getOrNull()
+            ?: return false
+        if (root.optInt("version", -1) != TRANSFER_PAYLOAD_VERSION) return false
+        val plain = root.optJSONObject("plain") ?: return false
+        val secrets = root.optJSONObject("secure") ?: return false
+        val plainValues = decodeTransferObject(plain, allowSecrets = false) ?: return false
+        val secretValues = decodeTransferObject(secrets, allowSecrets = true) ?: return false
+
+        val secureEditor = secure.edit()
+        TRANSFER_SECRET_KEYS.forEach(secureEditor::remove)
+        secretValues.forEach { (key, value) -> putEditorValue(secureEditor, key, value) }
+        if (!secureEditor.commit()) return false
+
+        val plainEditor = sp.edit()
+        sp.all.keys.filter {
+            it !in TRANSFER_LOCAL_KEYS && it !in TRANSFER_SECRET_KEYS && !it.startsWith("onboarding_")
+        }
+            .forEach(plainEditor::remove)
+        plainValues.forEach { (key, value) -> putEditorValue(plainEditor, key, value) }
+        plainEditor
+            .putBoolean("onboarding_completed", true)
+            .putInt("onboarding_version", com.iblu01.portallauncher.ui.onboarding.ONBOARDING_VERSION)
+            .remove("onboarding_step")
+        plainEditor.commit()
+    }
+
+    private fun sanitizeTransferValue(key: String, value: Any?): Any? {
+        if (key != "app_placements" || value !is String) return value
+        return runCatching {
+            val source = JSONArray(value)
+            val clean = JSONArray()
+            for (index in 0 until source.length()) {
+                source.optJSONObject(index)?.takeIf { !it.optString("k").startsWith("wg:") }
+                    ?.let(clean::put)
+            }
+            clean.toString()
+        }.getOrDefault("[]")
+    }
+
+    private fun putTransferValue(target: JSONObject, key: String, value: Any?) {
+        val encoded = when (value) {
+            null -> JSONObject.NULL
+            is Set<*> -> JSONArray(value.filterIsInstance<String>())
+            is String, is Boolean, is Int, is Long, is Float, is Double -> value
+            else -> return
+        }
+        target.put(key, JSONObject().put("type", transferType(value)).put("value", encoded))
+    }
+
+    private fun transferType(value: Any?): String = when (value) {
+        is Boolean -> "boolean"
+        is Int -> "int"
+        is Long -> "long"
+        is Float -> "float"
+        is Double -> "float"
+        is Set<*> -> "strings"
+        else -> "string"
+    }
+
+    private fun decodeTransferObject(source: JSONObject, allowSecrets: Boolean): Map<String, Any>? {
+        val result = LinkedHashMap<String, Any>()
+        val keys = source.keys().asSequence().toList()
+        if (keys.size > TRANSFER_MAX_KEYS) return null
+        for (key in keys) {
+            if (key.length > 128 || key in TRANSFER_LOCAL_KEYS || key.startsWith("onboarding_")) return null
+            if (allowSecrets != (key in TRANSFER_SECRET_KEYS)) return null
+            val entry = source.optJSONObject(key) ?: return null
+            val value: Any = when (entry.optString("type")) {
+                "string" -> entry.optString("value").also {
+                    if (it.length > TRANSFER_MAX_STRING) return null
+                }
+                "boolean" -> entry.optBoolean("value")
+                "int" -> entry.optInt("value")
+                "long" -> entry.optLong("value")
+                "float" -> entry.optDouble("value").toFloat()
+                "strings" -> {
+                    val array = entry.optJSONArray("value") ?: return null
+                    if (array.length() > TRANSFER_MAX_SET) return null
+                    (0 until array.length()).map {
+                        array.optString(it).also { value ->
+                            if (value.length > TRANSFER_MAX_STRING) return null
+                        }
+                    }.toSet()
+                }
+                else -> return null
+            }
+            result[key] = value
+        }
+        return result
+    }
+
+    private fun putEditorValue(editor: SharedPreferences.Editor, key: String, value: Any) {
+        when (value) {
+            is String -> editor.putString(key, value)
+            is Boolean -> editor.putBoolean(key, value)
+            is Int -> editor.putInt(key, value)
+            is Long -> editor.putLong(key, value)
+            is Float -> editor.putFloat(key, value)
+            is Set<*> -> editor.putStringSet(key, value.filterIsInstance<String>().toSet())
+        }
+    }
+
     var haUrl: String
         get() = sp.getString("ha_url", "http://homeassistant.local:8123") ?: "http://homeassistant.local:8123"
         set(value) = sp.edit().putString("ha_url", value.trim().trimEnd('/').ifEmpty { "http://homeassistant.local:8123" }).apply()
@@ -285,6 +423,67 @@ class Prefs(private val context: Context) {
     var haToken: String
         get() = secure.getString("ha_token", "") ?: ""
         set(value) = secure.edit().putString("ha_token", value.trim()).apply()
+
+    // --- Voice assistant (Pipecat Assist add-on satellite, see voice.VoiceAssistantController) --
+    var voiceAssistantEnabled: Boolean
+        get() = sp.getBoolean("voice_enabled", false)
+        set(value) = sp.edit().putBoolean("voice_enabled", value).apply()
+
+    /**
+     * Whatever the user pasted from the add-on page: the `/api/offer` URL, the ESPHome satellite
+     * `ws://` URL, or a bare `host:port`. Normalised at read time by `parseVoiceEndpoint`, so the
+     * raw string is stored as typed and stays recognisable in settings.
+     */
+    var voiceAssistantUrl: String
+        get() = sp.getString("voice_url", "") ?: ""
+        set(value) = sp.edit().putString("voice_url", value.trim().take(2048)).apply()
+
+    /** Add-on "satellite shared secret". Sent as a bearer token, never in the URL. */
+    var voiceAssistantToken: String
+        get() = secure.getString("voice_token", "") ?: ""
+        set(value) = secure.edit().putString("voice_token", value.trim().take(512)).apply()
+
+    val hasVoiceAssistantToken: Boolean
+        get() = secure.getString("voice_token", "").orEmpty().isNotBlank()
+
+    /** openWakeWord model, as an assets-relative path. See app/src/main/assets/wakeword. */
+    var voiceAssistantWakeWord: String
+        get() = sp.getString("voice_wake_word", DEFAULT_WAKE_WORD) ?: DEFAULT_WAKE_WORD
+        set(value) = sp.edit().putString("voice_wake_word", value).apply()
+
+    /**
+     * Detection threshold, in percent. Lower is more sensitive; noisy rooms want higher.
+     * False wakes are handled by the engine's consecutive-frame patience rather than by a tighter
+     * threshold, so this stays where detection range is best.
+     */
+    var voiceAssistantThreshold: Int
+        get() = sp.getInt("voice_threshold", 50)
+        set(value) = sp.edit().putInt("voice_threshold", value.coerceIn(1, 95)).apply()
+
+    /**
+     * Speaker-loop calibration measured by voice.MicCalibrator; null until the user has run it.
+     * Raw measurements are stored (not the derived engine parameters) so the derivation can
+     * change across app updates without a re-calibration.
+     */
+    var voiceMicCalibration: com.iblu01.portallauncher.voice.MicCalibration?
+        get() {
+            val floor = sp.getFloat("voice_mic_noise_floor", -1f)
+            val playback = sp.getFloat("voice_mic_playback_rms", -1f)
+            if (floor < 0f || playback <= 0f) return null
+            return com.iblu01.portallauncher.voice.MicCalibration(floor, playback)
+        }
+        set(value) = sp.edit()
+            .putFloat("voice_mic_noise_floor", value?.noiseFloor ?: -1f)
+            .putFloat("voice_mic_playback_rms", value?.playbackRms ?: -1f)
+            .apply()
+
+    /**
+     * In-turn silence ceiling while an exchange is under way. The windows right after connect and
+     * after a bot answer are shorter and fixed (see VoiceAssistantController).
+     */
+    var voiceAssistantIdleSeconds: Int
+        get() = sp.getInt("voice_idle_seconds", 20)
+        set(value) = sp.edit().putInt("voice_idle_seconds", value.coerceIn(5, 300)).apply()
 
     // --- Immich photo source (see photo.immich) ------------------------------------------------
     var immichUrl: String
@@ -339,6 +538,19 @@ class Prefs(private val context: Context) {
     var pillRules: List<PillRule>
         get() = PillRuleCodec.decode(sp.getString("pill_rules", "[]") ?: "[]")
         set(value) = sp.edit().putString("pill_rules", PillRuleCodec.encode(value)).apply()
+
+    /** Integration domains hidden only inside Portal. Home Assistant is never modified. */
+    var disabledHaIntegrations: Set<String>
+        get() = sp.getStringSet(DISABLED_HA_INTEGRATIONS_KEY, emptySet())
+            ?.mapTo(sortedSetOf()) { it.trim().lowercase() }
+            .orEmpty()
+        set(value) {
+            sp.edit().putStringSet(
+                DISABLED_HA_INTEGRATIONS_KEY,
+                value.mapNotNull { it.trim().lowercase().takeIf(String::isNotBlank) }.toSet(),
+            ).apply()
+            SettingsChangeBus.get().emit(DISABLED_HA_INTEGRATIONS_KEY)
+        }
 
     /**
      * Persistent Home-page layout, kept separate from live [LauncherChip] rendering models.
@@ -650,11 +862,23 @@ class Prefs(private val context: Context) {
     companion object {
         const val DEFAULT_HA_PACKAGE = "io.homeassistant.companion.android"
         const val HOME_PILL_PREFERENCES_CHANGE_KEY = "homePillPreferences"
+        const val DISABLED_HA_INTEGRATIONS_KEY = "disabled_ha_integrations"
         private const val HOME_PILL_PREFERENCES_KEY = "home_pill_preferences"
         private val homePillPreferencesLock = Any()
         const val CAMERA_PREFERENCES_CHANGE_KEY = "cameraPreferences"
         private const val CAMERA_PREFERENCES_KEY = "camera_preferences"
         private val cameraPreferencesLock = Any()
+        private val transferLock = Any()
+        private const val TRANSFER_PAYLOAD_VERSION = 1
+        private const val TRANSFER_MAX_BYTES = 1024 * 1024
+        private const val TRANSFER_MAX_KEYS = 512
+        private const val TRANSFER_MAX_STRING = 256 * 1024
+        private const val TRANSFER_MAX_SET = 4096
+        private val TRANSFER_SECRET_KEYS = setOf("ha_token", "password", "immich_api_key")
+        private val TRANSFER_LOCAL_KEYS = setOf(
+            "device_id", "device_name", "widget_ids", "root_provisioned",
+            "update_last_check_at", "update_remind_after", "ignored_update_version",
+        )
 
         // Building EncryptedSharedPreferences spins up a Keystore MasterKey + Tink (heavy crypto,
         // reflection via sun.misc.Unsafe) — ~hundreds of ms. Prefs() is constructed all over,
