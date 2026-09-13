@@ -31,8 +31,8 @@ android {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
 
-        versionCode = 11
-        versionName = "1.0.3-beta.1"
+        versionCode = 12
+        versionName = "1.0.4"
     }
 
     signingConfigs {

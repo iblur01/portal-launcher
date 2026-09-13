@@ -1,25 +1,68 @@
 # Changelog
 
-## 1.0.3-beta.1
+## 1.0.4
 
 ### Added
 
-- **Camera center**: discover Home Assistant cameras, open a dedicated full-surface viewer, resolve still-image and MJPEG stream sources, and expose supported PTZ controls.
+- **Experimental Gemini Live voice assistant**: direct speech-to-speech conversations with configurable Gemini model, voice and system instructions, plus an in-app connection probe, microphone calibration, daily session limit, tool log and remembered facts.
+- **Local wake-word detection**: always-ready activation while Portal owns the foreground, including its screensaver and display-off state, powered by bundled openWakeWord/ONNX models with selectable wake words, sensitivity controls and audible ready/end cues.
+- **Voice-controlled Home Assistant**: inspect and control lights, switches, covers, climate devices, fans, locks, media players, vacuums and vacuum rooms; multi-step requests can be planned before execution and delayed actions can be scheduled or cancelled.
+- **Voice-controlled Portal settings**: pin a device to the front of Home pills, switch Home grouping between room and type, show or hide the Home page, change screen timeout, auto-return, clock format, grid scale, wallpaper and assistant behaviour, or open an installed Android application by name.
+- **Assistant sleep and accidental-wake handling**: ask the assistant to deactivate for a duration or indefinitely, with automatic reactivation for timed sleeps; conversations that clearly are not addressed to Portal are dismissed silently.
+- **Assistant safety guards**: actions that may grant physical access require an on-screen confirmation, and unsafe actions cannot be scheduled for unattended execution.
+- **Linked-device configuration transfer**: discover another Portal on the local network and copy its configuration during onboarding, including layout, Home Assistant, MQTT and Gemini credentials.
+- **Encrypted transfer sessions**: each transfer uses an ephemeral P-256 ECDH exchange, HKDF-SHA256 key derivation, AES-256-GCM payload encryption, a short-lived one-shot session, user consent and automatic public-key fingerprint verification.
+- **Redesigned onboarding on device and web**: provider selection, dedicated Home Assistant, MQTT and Gemini steps, apps, background, display, clock and behaviour settings, plus a final review and a live launcher preview.
+- **Rich MQTT notifications**: display icons, titles, detail lines, custom colours, severity levels, timers, repeatable tones and remotely rendered Home Assistant TTS or guarded audio URLs.
+- **Dedicated alarm state overlay**: the alarm topic supports retained publication so the broker can restore its state after a restart; entry/exit countdowns have distinct presentation, and critical or triggered states can black out the launcher and require the alarm code.
+- **Action lock / guest mode**: a retained MQTT command can disable regular controls without blocking the authenticated alarm panel.
+- **Camera center**: discover Home Assistant cameras, open a dedicated full-surface viewer, resolve HLS or MJPEG stream sources, and expose supported PTZ controls.
 - **Camera preferences**: choose which cameras appear, reorder them, and configure the camera center from Settings.
 - **Scene controls**: discover Home Assistant scenes and activate them directly from the Home page with clear success and failure feedback.
+- **Adaptive media cover flow**: browse active media sessions, switch players with swipe navigation and keep the selected session stable as players appear or disappear.
+- **Timer panel**: countdown state and formatting are shared between timer notifications and launcher surfaces.
 - **On/off-only light panel**: lights without brightness or colour controls now get a complete switch-based detail surface.
 - **Android 8.1 support**: the minimum supported Android version is now API 27 for older wall displays such as LineageOS 15.1 devices.
+- **Home Assistant deployment helpers**: documented notification/alarm payloads, ready-to-import scripts and automations, and a command-line notification sender.
+- **Root-first unattended updates**: supported rooted panels can install an in-app update directly, with the Android package installer retained as the fallback.
 
 ### Changed
 
+- The voice assistant now uses the Gemini Live WebSocket protocol directly and exposes a dedicated experimental settings page; both the assistant overlay and its settings carry a **Beta** badge.
+- The onboarding state is coordinated across the panel and phone so either surface can drive the same setup without overwriting newer choices from the other channel.
+- Remote configuration now covers the full launcher setup instead of only connection credentials, and includes responsive desktop/mobile layouts with provider branding.
+- Home Assistant integrations, cameras, entities and manual groups can be configured from dedicated sections in the remote setup flow.
 - Camera and scene pills now participate in Home page discovery, grouping, context menus and navigation.
+- Media sessions use the generic panel routing and navigation model instead of a standalone player path.
+- Vertical switches share one immediate tap-and-drag gesture implementation across switch-only and light panels.
+- MQTT now consumes separate notification, alarm, voice-start, voice-mute and action-lock topics, with retained state restored when the broker republishes it.
 - Remote web configuration is fully localized in English and French.
+- The Android build targets JVM 17 and packages only ARM ABIs required by supported wall panels.
 - Release tooling now resolves the repository and Android SDK from the active environment instead of relying on machine-specific paths.
+
+### Security
+
+- Home Assistant tokens, MQTT passwords and Gemini API keys use encrypted preferences when the Android Keystore is available and are included only inside the encrypted linked-device transfer payload.
+- Remote web configuration adds stricter access-code, editor-session, revision and request validation, with generic error responses that do not leak credentials or internal exception details.
+- Notification audio accepts only HTTP(S) sources from explicitly trusted hosts; Home Assistant-generated TTS URLs are resolved through the authenticated local API.
+
+### Performance
+
+- Wake-word recognition runs locally while Portal owns the foreground, while Gemini streaming starts only after activation instead of keeping a permanent cloud audio session open.
+- Camera playback selects MJPEG or HLS according to the entity and aborts MJPEG requests promptly when a stream is closed.
+- ARM-only native packaging avoids shipping emulator ONNX binaries in panel APKs.
+
+### i18n
+
+- Added matching English and French copy for voice assistance, onboarding, linked-device transfer, notifications, alarms, cameras and expanded remote configuration.
 
 ### Tests
 
+- Added suites for Gemini Live protocol handling, connection probing, wake-word guards, voice planning, Home Assistant tools, vacuum-room matching, Portal settings and assistant safety confirmations.
+- Added coverage for encrypted configuration transfer, protocol parsing, session expiry, discovery constraints and transfer of sensitive settings.
+- Added tests for notification payloads, alarm transitions, action locking, countdowns, web-config security and the two-channel onboarding coordinator.
 - Added coverage for camera discovery, preferences, stream URL handling, camera-center state, PTZ capabilities, scene activation, localization parity and preference upgrades.
-- Added interaction coverage for on/off-only light controls.
+- Extended launcher routing, media panel, vertical-control, Home pill, settings-picker and feature non-regression coverage.
 
 ## 1.0.2
 

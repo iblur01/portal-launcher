@@ -434,7 +434,12 @@ internal fun matchesQuery(haystack: String, query: String): Boolean {
     val words = searchWords(query)
     if (words.isEmpty()) return false
     val hay = normalizeRoom(haystack)
-    return words.all { it in hay }
+    return words.all { word ->
+        when (word) {
+            "fenetre", "window" -> "fenetre" in hay || "window" in hay
+            else -> word in hay
+        }
+    }
 }
 
 /**
