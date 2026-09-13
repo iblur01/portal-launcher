@@ -10,7 +10,10 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.iblu01.portallauncher.ui.onboarding.screens.BackgroundStep
 import com.iblu01.portallauncher.ui.onboarding.screens.CompletionStep
 import com.iblu01.portallauncher.ui.onboarding.screens.GesturesStep
@@ -23,6 +26,7 @@ import com.iblu01.portallauncher.ui.onboarding.screens.MqttConfigurationStep
 import com.iblu01.portallauncher.ui.onboarding.screens.MqttTestStep
 import com.iblu01.portallauncher.ui.onboarding.screens.PillsIntroStep
 import com.iblu01.portallauncher.ui.onboarding.screens.RemoteControlStep
+import com.iblu01.portallauncher.ui.onboarding.screens.ReceiveConfigStep
 import com.iblu01.portallauncher.ui.onboarding.screens.SystemSetupStep
 import com.iblu01.portallauncher.ui.onboarding.screens.TapAppStep
 import com.iblu01.portallauncher.ui.onboarding.screens.WelcomeStep
@@ -45,6 +49,10 @@ fun OnboardingScreen(
     onConfigureWithPhone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val metrics = LocalContext.current.resources.displayMetrics
+    val channelAvailability = onboardingChannelAvailability(
+        PhysicalScreenMetrics(metrics.widthPixels, metrics.heightPixels, metrics.xdpi, metrics.ydpi)
+    )
     AnimatedContent(
         targetState = state.step,
         transitionSpec = {
@@ -65,10 +73,17 @@ fun OnboardingScreen(
             OnboardingStep.WELCOME -> WelcomeStep(
                 state = state,
                 onContinue = viewModel::continueFromWelcome,
+                channelAvailability = channelAvailability,
+                onConfigureWithWeb = onConfigureWithPhone,
                 onSkipEverything = {
                     viewModel.skipOnboarding()
                     onFinish(false)
                 },
+            )
+
+            OnboardingStep.RECEIVE_CONFIG -> ReceiveConfigStep(
+                state = state,
+                onFinish = { onFinish(false) },
             )
 
             OnboardingStep.SYSTEM_SETUP -> SystemSetupStep(
@@ -166,6 +181,13 @@ fun OnboardingScreen(
                 onLater = viewModel::skipMqtt,
                 onContinue = viewModel::goNext,
             )
+
+            // Gemini is configured by the reference Web flow. A stale device-side resume marker
+            // must still progress safely instead of rendering a fake or divergent form.
+            OnboardingStep.GEMINI -> {
+                LaunchedEffect(Unit) { viewModel.goNext() }
+                Box(Modifier.fillMaxSize())
+            }
 
             OnboardingStep.HIDDEN_APPS -> HiddenAppsStep(
                 state = state,

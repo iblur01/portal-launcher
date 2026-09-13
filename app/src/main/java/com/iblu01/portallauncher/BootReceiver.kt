@@ -10,6 +10,8 @@ class BootReceiver : BroadcastReceiver() {
             DeviceStateHub.init(context)
             ScreenControl.enableAccessibility(context)
             SleepScheduler.apply(context)
+            // Alarms do not survive a reboot; the queue does, so it is rearmed from disk.
+            com.iblu01.portallauncher.voice.VoiceScheduler.arm(context)
             MqttBridgeService.start(context)
         }
     }

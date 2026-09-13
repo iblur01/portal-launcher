@@ -1,5 +1,6 @@
 package com.iblu01.portallauncher.ui.components
 
+import com.iblu01.portallauncher.domain.model.PlayingMedia
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,10 +23,25 @@ class PanelDisclosureTest {
         assertFalse(policy.emphasizeSummary)
     }
 
-    @Test fun `small media panel preserves controls and removes secondary detail`() {
+    @Test fun `small media panel preserves controls and removes optional detail`() {
         val policy = mediaDisclosureFor(widthDp = 788f, heightDp = 394f)
         assertFalse(policy.showAlbum)
-        assertEquals(0, policy.secondaryPlayerCount)
         assertTrue(policy.emphasizePrimary)
+    }
+
+    @Test fun `cover flow key remains safe while the session list shrinks`() {
+        val onlySession = PlayingMedia(
+            entityId = "media_player.living",
+            title = "Track",
+            artist = "Artist",
+            album = null,
+            state = "playing",
+            coverUrl = null,
+            volumePercent = 30,
+            isMuted = false,
+        )
+
+        assertEquals("media_player.living", coverFlowSessionKey(listOf(onlySession), 0))
+        assertEquals("removed-media-session:1", coverFlowSessionKey(listOf(onlySession), 1))
     }
 }

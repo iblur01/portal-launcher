@@ -28,6 +28,8 @@ import androidx.compose.material.icons.outlined.SensorDoor
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,7 +40,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
  */
 fun launcherIcon(key: String): ImageVector = when (key.lowercase()) {
     // Widgets / devices
-    "washer", "timer" -> Icons.Outlined.CleaningServices
+    "washer" -> Icons.Outlined.CleaningServices
+    "timer" -> Icons.Outlined.Timer
     "window", "opening", "cover", "shutter", "blind" -> Icons.Outlined.SensorDoor
     "door", "porte" -> Icons.Outlined.SensorDoor
     "motion", "movement", "occupancy" -> Icons.Outlined.DirectionsRun
@@ -54,6 +57,7 @@ fun launcherIcon(key: String): ImageVector = when (key.lowercase()) {
     "energy", "power", "consumption" -> Icons.Outlined.Bolt
     "media", "tv", "speaker" -> Icons.Outlined.Tv
     "scene", "scenes", "script", "shortcut" -> Icons.Outlined.AutoAwesome
+    "camera", "cameras", "camera_center" -> Icons.Outlined.Videocam
     "presence", "person", "people" -> Icons.Outlined.Group
     "security" -> Icons.Outlined.Security
     "shield" -> Icons.Outlined.Shield

@@ -22,6 +22,22 @@ sealed interface PillRef {
     data class ManualGroup(val groupId: String) : PillRef {
         override val stableKey: String = "manual:$groupId"
     }
+
+    /**
+     * A launcher-provided entry that no single HA entity backs — currently only the general
+     * "Cameras" pill. Kept as a first-class [PillRef] so pinning, ordering and persistence reuse
+     * the existing machinery instead of growing a parallel one.
+     */
+    data class Special(val id: String) : PillRef {
+        override val stableKey: String = "special:$id"
+    }
+}
+
+/** Ids of the launcher-provided [PillRef.Special] entries. */
+object PillSpecials {
+    const val CAMERAS = "cameras"
+
+    val cameras = PillRef.Special(CAMERAS)
 }
 
 /** How the Maison catalog is organized into sections: by device type or by room. */
@@ -122,6 +138,8 @@ data class PillCatalogSnapshot(
     val resolvedDevices: Map<PillRef.Device, ResolvedPill> = emptyMap(),
     /** Explicitly disabled rules stay discoverable in Settings but are hidden everywhere else. */
     val disabledDeviceRefs: Set<PillRef.Device> = emptySet(),
+    /** Launcher-provided entries (the general "Cameras" pill); absent when nothing backs them. */
+    val specials: Map<PillRef.Special, ResolvedPill> = emptyMap(),
 ) {
     fun isVisible(ref: PillRef): Boolean = when (ref) {
         is PillRef.Device -> ref !in disabledDeviceRefs
@@ -132,6 +150,7 @@ data class PillCatalogSnapshot(
         is PillRef.Device -> resolvedDevices[ref] ?: devices[ref]?.let {
             ResolvedPill(ref, it, availability[ref] ?: Availability.UNAVAILABLE, setOf(ref.entityId))
         }
+        is PillRef.Special -> specials[ref]
         else -> groups[ref]?.let { group ->
             val alert = group.resolvedMembers.mapNotNull { it.alert }.maxByOrNull { it.severity.rank }
             ResolvedPill(

@@ -1062,30 +1062,55 @@ fun VerticalSwitch(
             .border(0.5.dp, AppleColors.frostedBorder, shape)
             .then(
                 if (!enabled) Modifier else Modifier.pointerInput(checked) {
-                    detectTapGestures { onCheckedChange(!checked) }
-                },
-            )
-            .then(
-                if (!enabled) Modifier else Modifier.pointerInput(Unit) {
                     fun fractionAt(y: Float): Float {
                         val thumbPx = size.height * 0.5f
                         val insetPx = inset.toPx()
                         val travelPx = (size.height - thumbPx - insetPx * 2).coerceAtLeast(1f)
                         return ((y - insetPx - thumbPx / 2f) / travelPx).coerceIn(0f, 1f)
                     }
-                    detectVerticalDragGestures(
-                        onDragStart = { dragFraction = fractionAt(it.y) },
-                        onVerticalDrag = { change, _ ->
-                            val previous = dragFraction
-                            val next = fractionAt(change.position.y)
-                            dragFraction = next
-                            if (previous != null && (previous < 0.5f) != (next < 0.5f)) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+
+                    // One gesture detector owns both taps and drags. Two competing pointerInput
+                    // handlers let the tap recognizer consume DOWN before the drag recognizer
+                    // reached touch slop, which made the thumb look draggable but stay blocked.
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val startY = down.position.y
+                        var currentY = startY
+                        var dragging = false
+                        down.consume()
+
+                        var pressed = true
+                        while (pressed) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                            if (change == null) {
+                                pressed = false
+                            } else {
+                                currentY = change.position.y
+                                if (!dragging && kotlin.math.abs(currentY - startY) >= viewConfiguration.touchSlop) {
+                                    dragging = true
+                                    dragFraction = fractionAt(currentY)
+                                } else if (dragging) {
+                                    val previous = dragFraction
+                                    val next = fractionAt(currentY)
+                                    dragFraction = next
+                                    if (previous != null && (previous < 0.5f) != (next < 0.5f)) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }
+                                }
+                                change.consume()
+                                pressed = change.pressed
                             }
-                        },
-                        onDragEnd = { dragFraction?.let { onCheckedChange(it < 0.5f) }; dragFraction = null },
-                        onDragCancel = { dragFraction = null },
-                    )
+                        }
+
+                        if (dragging) {
+                            val wanted = fractionAt(currentY) < 0.5f
+                            dragFraction = null
+                            if (wanted != checked) onCheckedChange(wanted)
+                        } else {
+                            onCheckedChange(!checked)
+                        }
+                    }
                 },
             )
             .semantics {

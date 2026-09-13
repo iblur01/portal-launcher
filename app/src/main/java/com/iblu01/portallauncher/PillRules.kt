@@ -31,6 +31,7 @@ enum class PillKind(@StringRes val labelRes: Int, val icon: String, val basePrio
     VALVE(R.string.pill_kind_valve, "valve", 30),
     SIREN(R.string.pill_kind_siren, "shield", 45),
     LAWN_MOWER(R.string.pill_kind_lawn_mower, "mower", 28),
+    CAMERA(R.string.pill_kind_camera, "camera", 14),
     GENERIC(R.string.pill_kind_generic, "sensor", 15),
 }
 
@@ -92,6 +93,8 @@ enum class PillFamily(@StringRes val labelRes: Int, val kinds: Set<PillKind>) {
     APPLIANCES(R.string.pill_family_appliances, setOf(PillKind.APPLIANCE, PillKind.VACUUM, PillKind.SWITCH, PillKind.VALVE, PillKind.LAWN_MOWER)),
     LIGHTS(R.string.pill_family_lights, setOf(PillKind.LIGHTS)),
     MEDIA(R.string.pill_family_media, setOf(PillKind.MEDIA)),
+    SCENES(R.string.pill_family_scenes, setOf(PillKind.SCENE)),
+    CAMERAS(R.string.pill_family_cameras, setOf(PillKind.CAMERA)),
     HOME(R.string.pill_family_home, setOf(PillKind.TIMER, PillKind.GENERIC));
 
     companion object {
@@ -112,7 +115,18 @@ fun friendlyEntityState(context: Context, e: HaEntity): String {
     }
     return when {
         s == "unavailable" -> context.getString(R.string.entity_state_unavailable)
-        s in setOf("unknown", "none", "") -> "—"
+        s in setOf("unknown", "none", "") && e.domain != "scene" -> "—"
+        // A scene's state is the ISO timestamp of its last activation (or `unknown` when it has
+        // never run): neither is a state the user acts on, so the pill advertises the action.
+        e.domain == "scene" -> context.getString(R.string.pill_scene_ready)
+        e.domain == "camera" -> when (s) {
+            "streaming" -> context.getString(R.string.camera_state_streaming)
+            "recording" -> context.getString(R.string.camera_state_recording)
+            "off" -> context.getString(R.string.light_state_off)
+            // Home Assistant reports an available camera as `idle` while nobody is watching its
+            // stream. It is still powered and reachable, so presenting it as asleep is misleading.
+            else -> context.getString(R.string.light_state_on)
+        }
         e.domain in setOf("person", "device_tracker") -> when (s) { "home" -> context.getString(R.string.entity_state_home); "not_home" -> context.getString(R.string.entity_state_away); else -> raw.replaceFirstChar { it.uppercase() } }
         e.domain == "lock" -> when (s) { "locked" -> context.getString(R.string.pill_lock_locked); "unlocked" -> context.getString(R.string.pill_lock_unlocked); "locking" -> context.getString(R.string.pill_lock_locking); "unlocking" -> context.getString(R.string.pill_lock_unlocking); else -> raw.replaceFirstChar { it.uppercase() } }
         s == "on" -> when (e.deviceClass) {
@@ -189,6 +203,23 @@ object PillRuleCodec {
 }
 
 object PillSupport {
+    /**
+     * Whether an entity is usable right now.
+     *
+     * Domain-aware on purpose: a scene's state is the timestamp of its last activation, so one
+     * that has never run reports `unknown`, and a camera reports `idle`/`unknown` until it
+     * streams. Neither is unavailable — only Home Assistant's explicit `unavailable` is. Reading
+     * the generic rule for them would make a brand-new scene impossible to pin.
+     */
+    fun isIndividuallyAvailable(e: HaEntity): Boolean {
+        val state = e.state.trim().lowercase()
+        return if (e.domain in statelessActionDomains) state != "unavailable"
+        else state !in setOf("unavailable", "unknown", "none", "")
+    }
+
+    /** Domains whose entities act instead of holding a state worth reading back. */
+    internal val statelessActionDomains = setOf("scene", "camera")
+
     private val openingClasses = setOf("door", "window", "opening", "garage_door")
     /** Only short-lived movement signals remain eligible; location/presence is intentionally out. */
     private val motionClasses = setOf("motion", "occupancy", "moving")
@@ -202,7 +233,7 @@ object PillSupport {
     )
     fun isSupported(e: HaEntity) = isPrimary(e)
     fun isAllowedAsPersistedChip(rule: PillRule, e: HaEntity): Boolean {
-        if (e.domain in setOf("button", "input_button", "number", "input_number", "select", "input_select", "camera")) return false
+        if (e.domain in setOf("button", "input_button", "number", "input_number", "select", "input_select")) return false
         if (e.domain == "sensor" && e.deviceClass in setOf(
                 "illuminance", "atmospheric_pressure", "pressure", "absolute_humidity", "moisture",
                 "signal_strength", "water", "volume", "volume_flow_rate", "volume_storage",
@@ -217,6 +248,9 @@ object PillSupport {
         e.domain in setOf("light", "media_player", "fan", "switch", "cover") -> true
         e.domain in setOf("lock", "vacuum", "timer", "climate", "alarm_control_panel") -> true
         e.domain in setOf("humidifier", "water_heater", "valve", "siren", "lawn_mower", "input_boolean") -> true
+        // Scenes are stateless one-shot actions and cameras open the camera center; both are
+        // discoverable pills, both stay opt-in (see [isAutomaticallyEnabled]).
+        e.domain in setOf("scene", "camera") -> true
         e.domain == "binary_sensor" && e.deviceClass in (openingClasses + motionClasses) -> true
         // Only the appliance's MAIN state sensor is a primary pill; sub-sensors like
         // "_etat_du_cycle" get absorbed as related (see candidates()), not shown separately.
@@ -225,6 +259,8 @@ object PillSupport {
         else -> false
     }
     fun kind(e: HaEntity): PillKind = when {
+        e.domain == "scene" -> PillKind.SCENE
+        e.domain == "camera" -> PillKind.CAMERA
         e.domain == "light" -> PillKind.LIGHTS
         e.domain == "media_player" -> PillKind.MEDIA
         e.domain == "fan" && (e.entityId.contains("purif") || e.name.contains("purif", ignoreCase = true)) -> PillKind.PURIFIER

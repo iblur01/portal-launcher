@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.iblu01.portallauncher.domain.MediaSessionBuilder
+import com.iblu01.portallauncher.domain.home.CameraPreferences
 import com.iblu01.portallauncher.domain.home.HomePageBuilder
 import com.iblu01.portallauncher.domain.home.HomePillComposer
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
@@ -114,7 +115,9 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         // Lightweight listener: refresh the raw-state cache + one-time auto-init, then notify.
         // No select/media/temperature work here — that lives in snapshotFlow only.
         repo.addListener { states, connected ->
-            latestStates = states
+            val disabled = prefs.disabledHaIntegrations
+            latestStates = if (!repo.entityRegistryResolved || disabled.isEmpty()) states else
+                states.filterKeys { repo.entityPlatformByEntity[it] !in disabled }
             latestConnected = connected
             latestDeviceIds = repo.deviceIdByEntity
             lightAreas = repo.areaByEntity
@@ -140,8 +143,36 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
     fun addListener(listener: Listener) { listeners += listener; listener.onData() }
     fun removeListener(listener: Listener) { listeners -= listener }
 
-    fun callService(domain: String, service: String, entityId: String?, data: Map<String, Any>? = null) {
-        activeRepo.value?.callService(domain, service, entityId, data)
+    fun callService(
+        domain: String,
+        service: String,
+        entityId: String?,
+        data: Map<String, Any>? = null,
+        onResult: ((Boolean) -> Unit)? = null,
+    ) {
+        val repo = activeRepo.value
+        if (repo == null) {
+            onResult?.invoke(false)
+            return
+        }
+        repo.callService(domain, service, entityId, data, onResult)
+    }
+
+    /** entity_id -> integration that created it. Empty until the entity registry loads. */
+    val entityPlatformByEntity: Map<String, String>
+        get() = activeRepo.value?.entityPlatformByEntity.orEmpty()
+
+    /**
+     * One-shot websocket request on the active connection (see [HaStateRepository.request]).
+     * [onResult] receives null when nothing is connected, so a caller always gets an answer.
+     */
+    fun request(payload: org.json.JSONObject, onResult: (org.json.JSONObject?) -> Unit) {
+        val repo = activeRepo.value
+        if (repo == null) {
+            onResult(null)
+            return
+        }
+        repo.request(payload, onResult)
     }
 
     /** Atomic preference reducer used by launcher, Maison and Settings entry points. */
@@ -227,8 +258,36 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
      * fresh connection exactly like [snapshotFlow].
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun rawSnapshots(): Flow<com.iblu01.portallauncher.domain.model.HaSnapshot> =
-        activeRepo.flatMapLatest { repo -> repo?.states() ?: emptyFlow() }
+    fun rawSnapshots(prefs: Prefs): Flow<com.iblu01.portallauncher.domain.model.HaSnapshot> =
+        filteredSnapshots(prefs)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun filteredSnapshots(prefs: Prefs): Flow<com.iblu01.portallauncher.domain.model.HaSnapshot> =
+        activeRepo.flatMapLatest { repo ->
+            if (repo == null) emptyFlow()
+            else combine(
+                repo.states(),
+                SettingsChangeBus.get().changes
+                    .filter { it == Prefs.DISABLED_HA_INTEGRATIONS_KEY }
+                    .map { Unit }
+                    .onStart { emit(Unit) },
+            ) { snapshot, _ ->
+                val disabled = prefs.disabledHaIntegrations
+                if (!snapshot.entityRegistryResolved || disabled.isEmpty()) snapshot else {
+                    val visibleIds = snapshot.states.keys.filterTo(hashSetOf()) {
+                        snapshot.entityPlatformByEntity[it] !in disabled
+                    }
+                    snapshot.copy(
+                        states = snapshot.states.filterKeys(visibleIds::contains),
+                        deviceIdByEntity = snapshot.deviceIdByEntity.filterKeys(visibleIds::contains),
+                        entityCategoryByEntity = snapshot.entityCategoryByEntity.filterKeys(visibleIds::contains),
+                        entityPlatformByEntity = snapshot.entityPlatformByEntity.filterKeys(visibleIds::contains),
+                        areaByEntity = snapshot.areaByEntity.filterKeys(visibleIds::contains),
+                        areaIdByEntity = snapshot.areaIdByEntity.filterKeys(visibleIds::contains),
+                    )
+                }
+            }
+        }
 
     /**
      * The single transform pipeline (Findings 6/7): raw [HaStateRepository.states] → selected chips
@@ -244,19 +303,21 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
     @OptIn(ExperimentalCoroutinesApi::class)
     fun snapshotFlow(prefs: Prefs): Flow<PillSnapshot> =
         transformSnapshots(
-            source = activeRepo.flatMapLatest { repo ->
-                if (repo == null) emptyFlow()
-                else combine(
-                    repo.states(),
-                    SettingsChangeBus.get().changes
-                        .filter { it == Prefs.HOME_PILL_PREFERENCES_CHANGE_KEY || it == PILL_RULES_CHANGE_KEY }
-                        .map { Unit }
-                        .onStart { emit(Unit) },
-                ) { snapshot, _ -> snapshot }
-            },
+            source = combine(
+                filteredSnapshots(prefs),
+                SettingsChangeBus.get().changes
+                    .filter {
+                        it == Prefs.HOME_PILL_PREFERENCES_CHANGE_KEY ||
+                            it == Prefs.CAMERA_PREFERENCES_CHANGE_KEY ||
+                            it == PILL_RULES_CHANGE_KEY
+                    }
+                    .map { Unit }
+                    .onStart { emit(Unit) },
+            ) { snapshot, _ -> snapshot },
             rulesProvider = { prefs.pillRules },
             haUrl = prefs.haUrl,
             homePreferencesProvider = { prefs.homePillPreferences },
+            cameraPreferencesProvider = { prefs.cameraPreferences },
         ).onEach { latestCatalog = it.catalog }
 
     /**
@@ -274,6 +335,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         rulesProvider: () -> List<PillRule>,
         haUrl: String,
         homePreferencesProvider: () -> HomePillPreferences = { HomePillPreferencesCodec.defaults() },
+        cameraPreferencesProvider: () -> CameraPreferences = { CameraPreferences() },
         dispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.Default,
         sampleMs: Long = SNAPSHOT_SAMPLE_MS,
     ): Flow<PillSnapshot> =
@@ -282,6 +344,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
             .scan(emptySet<String>() to (null as PillSnapshot?)) { (prevPrimaryIds, _), s ->
                 val rules = rulesProvider()   // read once per emission
                 val homePreferences = homePreferencesProvider()
+                val cameraPreferences = cameraPreferencesProvider()
                 val media = MediaSessionBuilder.build(s.states, haUrl, prevPrimaryIds)
                 val catalog = catalogBuilder.build(
                     rules = rules,
@@ -291,6 +354,7 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
                     areaIdByEntity = s.areaIdByEntity,
                     areaNameById = s.areaNameById,
                     manualGroups = homePreferences.manualGroups,
+                    cameraPreferences = cameraPreferences,
                     connected = s.connected,
                 )
                 val homeComposition = HomePillComposer.compose(catalog, homePreferences)

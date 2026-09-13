@@ -7,7 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebConfigServerTest {
-
     private fun candidate(entityId: String) = PillCandidate(
         primary = HaEntity(entityId, "on", JSONObject()),
         kind = PillKind.LIGHTS,
@@ -16,125 +15,212 @@ class WebConfigServerTest {
     )
 
     @Test
-    fun `enabling a known entity keeps its rule and flips the flag`() {
-        val existing = listOf(PillRule("light.kitchen", PillKind.LIGHTS, "Kitchen", enabled = false, priorityBoost = 7))
-
-        val merged = mergePillSelection(existing, listOf("light.kitchen" to true), emptyList())
-
-        assertEquals(1, merged.size)
-        assertTrue(merged[0].enabled)
-        assertEquals(7, merged[0].priorityBoost)
-    }
-
-    @Test
-    fun `enabling an unknown entity adds its discovered candidate`() {
+    fun `pill selection preserves known rules and adds discovered enabled entities`() {
+        val existing = listOf(PillRule("light.kitchen", PillKind.LIGHTS, "Kitchen", false, 7))
         val merged = mergePillSelection(
-            existing = emptyList(),
-            selection = listOf("light.hall" to true),
-            candidates = listOf(candidate("light.hall")),
+            existing,
+            listOf("light.kitchen" to true, "light.hall" to true, "light.unknown" to false),
+            listOf(candidate("light.hall")),
         )
 
-        assertEquals(listOf("light.hall"), merged.map { it.entityId })
-        assertTrue(merged[0].enabled)
+        assertTrue(merged.first { it.entityId == "light.kitchen" }.enabled)
+        assertEquals(7, merged.first { it.entityId == "light.kitchen" }.priorityBoost)
+        assertTrue(merged.any { it.entityId == "light.hall" })
+        assertFalse(merged.any { it.entityId == "light.unknown" })
     }
 
     @Test
-    fun `disabling an unknown entity adds nothing`() {
-        val merged = mergePillSelection(emptyList(), listOf("light.hall" to false), listOf(candidate("light.hall")))
-
-        assertTrue(merged.isEmpty())
-    }
-
-    @Test
-    fun `entities absent from the selection are left untouched`() {
-        val existing = listOf(PillRule("lock.front", PillKind.LOCK, "Front", enabled = true))
-
-        val merged = mergePillSelection(existing, listOf("light.hall" to true), listOf(candidate("light.hall")))
-
-        assertEquals(existing[0], merged.first { it.entityId == "lock.front" })
-        assertEquals(2, merged.size)
-    }
-
-    @Test
-    fun `the served page carries the access code and no placeholder`() {
+    fun `configuration shell is local dense and exposes required states`() {
         val page = WebConfigPage.render("AB2C-D3EF")
+        val css = WebConfigPage.asset("webconfig.css")
 
         assertTrue(page.contains("AB2C-D3EF"))
         assertFalse(page.contains("%TOKEN%"))
+        assertFalse(page.contains("cdn.tailwindcss.com"))
+        assertTrue(page.contains("id=\"loading-state\""))
+        assertTrue(page.contains("id=\"offline-state\""))
+        assertTrue(page.contains("id=\"request-error\""))
+        assertTrue(page.contains("id=\"conflict-state\""))
+        assertTrue(page.contains("Session en lecture seule"))
+        assertTrue(page.contains("id=\"take-over\""))
+        assertTrue(page.contains("id=\"defaults-warning\""))
+        assertTrue(page.contains("id=\"device-preview\""))
+        assertTrue(css.contains("font-variant-numeric: tabular-nums"))
+        assertFalse(css.contains("linear-gradient"))
+        assertFalse(css.contains("shadow"))
+        assertFalse(css.contains("border-radius: 18px"))
     }
 
     @Test
-    fun `configuration page exposes three guided steps then a close-tab confirmation`() {
+    fun `client sends strict concurrency envelope on every mutation`() {
+        val script = WebConfigPage.asset("config.js")
+
+        assertTrue(script.contains("session_id: sessionId"))
+        assertTrue(script.contains("expected_revision: snapshot ? snapshot.revision : -1"))
+        assertTrue(script.contains("error.status === 409"))
+        assertTrue(script.contains("take_over"))
+        assertTrue(script.contains("launcherBody('preview_launcher')"))
+        assertTrue(script.contains("command: 'revert_launcher'"))
+        assertTrue(script.contains("launcherBody('save_launcher')"))
+        assertTrue(script.contains("new EventSource"))
+        assertTrue(script.contains("startPolling"))
+        assertTrue(script.contains("var mutationQueue = Promise.resolve()"))
+        assertFalse(script.contains("var previewQueue"))
+        assertTrue(script.contains("preview_sequence: activePreviewSequence"))
+        assertTrue(script.contains("data.editor_owned"))
+        assertTrue(script.contains("data.device_ack === true"))
+        assertFalse(script.contains("data.preview && data.preview.device_ack"))
+        assertTrue(script.contains("el('reset-onboarding').disabled = value"))
+        assertTrue(script.contains("if (!data.editor_active || data.editor_owned)"))
+        assertTrue(script.contains("if (previewDirty)"))
+        assertTrue(script.contains("providerDraftDirty"))
+        assertTrue(script.contains("markConnected(null)"))
+        assertTrue(script.contains("showFieldError"))
+        assertTrue(script.contains("aria-invalid"))
+        assertTrue(script.contains("return post('/api/test-"))
+    }
+
+    @Test
+    fun `server rejects incomplete or malformed mutation envelopes`() {
+        assertEquals(null, webCommandEnvelope(JSONObject()))
+        assertEquals(null, webCommandEnvelope(JSONObject().put("session_id", "browser-123")))
+        assertEquals(null, webCommandEnvelope(JSONObject().put("expected_revision", 4)))
+        assertEquals(
+            null,
+            webCommandEnvelope(JSONObject().put("session_id", "bad session").put("expected_revision", 4)),
+        )
+        assertEquals(
+            null,
+            webCommandEnvelope(JSONObject().put("session_id", "browser-123").put("expected_revision", "4")),
+        )
+        assertEquals(
+            null,
+            webCommandEnvelope(JSONObject().put("session_id", "browser-123").put("expected_revision", 4.5)),
+        )
+        assertEquals(
+            null,
+            webCommandEnvelope(JSONObject().put("session_id", "browser-123").put("expected_revision", 4.0)),
+        )
+        assertEquals(
+            "browser-123" to 4L,
+            webCommandEnvelope(JSONObject().put("session_id", "browser-123").put("expected_revision", 4)),
+        )
+    }
+
+    @Test
+    fun `strict mutation fields reject coercion and missing values`() {
+        assertEquals(null, strictBoolean(JSONObject(), "enabled"))
+        assertEquals(null, strictBoolean(JSONObject().put("enabled", "true"), "enabled"))
+        assertEquals(true, strictBoolean(JSONObject().put("enabled", true), "enabled"))
+        assertEquals(null, strictInt(JSONObject().put("port", "1883"), "port"))
+        assertEquals(null, strictInt(JSONObject().put("port", 1883.0), "port"))
+        assertEquals(1883, strictInt(JSONObject().put("port", 1883), "port"))
+        assertEquals(null, strictFloat(JSONObject().put("grid", "1.0"), "grid"))
+        assertEquals(1.0f, strictFloat(JSONObject().put("grid", 1.0), "grid"))
+    }
+
+    @Test
+    fun `mqtt remains independent and gemini is explicitly optional`() {
         val page = WebConfigPage.render("AB2C-D3EF")
-
-        assertTrue(page.contains("data-step=\"0\""))
-        assertTrue(page.contains("data-step=\"1\""))
-        assertTrue(page.contains("data-step=\"2\""))
-        assertFalse(page.contains("data-step=\"3\""))
-        assertFalse(page.contains("id=\"load_pills\""))
-        assertTrue(page.contains("id=\"saved-view\""))
-        assertTrue(page.contains("Vous pouvez fermer cet onglet"))
-        assertTrue(page.contains("id=\"next\""))
-        assertTrue(page.contains("id=\"back\""))
-        assertTrue(page.contains("id=\"ha_mdns_warning\""))
-        assertTrue(page.contains("adresse IP locale du serveur"))
-        assertTrue(page.contains("id=\"ha_check_host\""))
-        assertTrue(page.contains("id=\"ha_check_port\""))
-        assertTrue(page.contains("id=\"ha_check_token\""))
-        assertTrue(page.contains("id=\"mqtt_check_host\""))
-        assertTrue(page.contains("id=\"mqtt_check_port\""))
-        assertTrue(page.contains("id=\"mqtt_check_auth\""))
-        assertTrue(page.contains("id=\"mqtt_mdns_warning\""))
-        assertTrue(page.contains("id=\"server-offline-view\""))
-        assertTrue(page.contains("Le launcher n’est pas en mode configuration"))
-    }
-
-    @Test
-    fun `home step tests host then port then token before continuing`() {
         val script = WebConfigPage.asset("config.js")
 
-        val host = script.indexOf("runHaCheck('host')")
-        val port = script.indexOf("runHaCheck('port')", host + 1)
-        val token = script.indexOf("runHaCheck('token')", port + 1)
-        val continueToMqtt = script.indexOf("showStep(1)", token + 1)
-
-        assertTrue(script.contains("/api/test-ha"))
-        assertTrue(host >= 0)
-        assertTrue(port > host)
-        assertTrue(token > port)
-        assertTrue(continueToMqtt > token)
+        assertTrue(page.contains("Home Assistant n’active pas MQTT"))
+        assertTrue(page.contains("Ignorer MQTT"))
+        assertTrue(page.contains("Ignorer Gemini"))
+        assertTrue(page.contains("L’échec de Gemini ne bloque pas"))
+        assertFalse(script.contains("mqttSkipped || haSkipped"))
+        assertFalse(script.contains("providerState.mqtt = providerState.ha"))
     }
 
     @Test
-    fun `mqtt step tests host then port then authentication before continuing`() {
+    fun `lot four shell exposes dense home catalogs and advanced optional voice controls`() {
+        val page = WebConfigPage.render("AB2C-D3EF")
         val script = WebConfigPage.asset("config.js")
 
-        val host = script.indexOf("runMqttCheck('host')")
-        val port = script.indexOf("runMqttCheck('port')", host + 1)
-        val auth = script.indexOf("runMqttCheck('auth')", port + 1)
-        val continueToSummary = script.indexOf("showStep(2)", auth + 1)
-
-        assertTrue(script.contains("/api/test-mqtt"))
-        assertTrue(host >= 0)
-        assertTrue(port > host)
-        assertTrue(auth > port)
-        assertTrue(continueToSummary > auth)
+        assertTrue(page.contains("id=\"ha-integrations-table\""))
+        assertTrue(page.contains("id=\"ha-entities-table\""))
+        assertTrue(page.contains("id=\"ha-cameras-table\""))
+        assertTrue(page.contains("id=\"home-grouping\""))
+        assertTrue(page.contains("id=\"gemini-prompt\""))
+        assertTrue(page.contains("id=\"gemini-wake-word\""))
+        assertTrue(page.contains("id=\"gemini-daily-limit\""))
+        assertTrue(page.contains("id=\"request-microphone\""))
+        assertTrue(page.contains("id=\"home-sections-table\""))
+        assertTrue(page.contains("id=\"manual-groups-table\""))
+        assertTrue(page.contains("id=\"add-manual-group\""))
+        assertTrue(script.contains("request('/api/ha/catalog')"))
+        assertTrue(script.contains("post('/api/config/home'"))
+        assertTrue(script.contains("voice_daily_limit"))
+        assertTrue(script.contains("member-move"))
+        assertTrue(script.contains("section.item_order"))
+        assertTrue(script.contains("homeDraftDirty"))
+        assertFalse(script.contains("providerState.mqtt = providerState.ha"))
     }
 
     @Test
-    fun `access page asks for token without exposing one`() {
-        val page = WebConfigPage.renderAccess(invalidCode = false)
+    fun `access page and configuration page have no network asset dependency`() {
+        val access = WebConfigPage.renderAccess(invalidCode = false)
+        val config = WebConfigPage.render("AB2C-D3EF")
 
-        assertTrue(page.contains("name=\"t\""))
-        assertTrue(page.contains("cdn.tailwindcss.com"))
-        assertTrue(page.contains("content=\"false\""))
-        assertFalse(page.contains("%INVALID_CODE%"))
+        assertFalse(access.contains("cdn.tailwindcss.com"))
+        assertFalse(config.contains("cdn.tailwindcss.com"))
+        assertFalse(access.contains("https://"))
+        assertFalse(config.contains("https://"))
+        assertTrue(access.contains("name=\"t\""))
+        assertTrue(access.contains("aria-describedby=\"access-help\""))
+        assertTrue(config.contains("Réseau local de confiance requis"))
+        assertTrue(config.contains("utilise HTTP sur le réseau local"))
+        assertTrue(config.contains("value=\"custom\""))
+        assertTrue(config.contains("value=\"immich\""))
+        assertFalse(config.contains("Image · Lot 3"))
+        assertTrue(config.contains("id=\"title-system\">Accès système"))
+        assertTrue(config.contains("id=\"title-clock\">Horloge"))
+        assertTrue(config.contains("id=\"title-apps\">Applications"))
+        assertTrue(config.contains("id=\"title-behavior\">Comportement"))
+        assertTrue(config.contains("image/jpeg,image/png,image/webp"))
+        assertTrue(config.contains("id=\"transport-warning\" class=\"notice warning compact\" role=\"note\""))
+        assertTrue(WebConfigPage.asset("webconfig.css").contains("(min-width: 721px) and (max-width: 1050px)"))
+        assertTrue(WebConfigPage.asset("webconfig.css").contains("min-height: 44px"))
     }
 
     @Test
-    fun `access page explains an invalid code`() {
-        val page = WebConfigPage.renderAccess(invalidCode = true)
+    fun `english shell keeps functional labels translated`() {
+        val page = WebConfigPage.render("AB2C-D3EF", "en")
+        val access = WebConfigPage.renderAccess(invalidCode = true, language = "en")
 
-        assertTrue(page.contains("content=\"true\""))
+        assertTrue(page.contains("lang=\"en\""))
+        assertTrue(page.contains("Read-only session"))
+        assertTrue(page.contains("Take over editing"))
+        assertFalse(page.contains("Session en lecture seule"))
+        assertFalse(page.contains("Reprendre la main"))
+        assertTrue(access.contains("Remote configuration"))
+        assertTrue(access.contains("content=\"true\""))
+    }
+
+    @Test
+    fun `lot three client exposes strict launcher configuration routes and states`() {
+        val page = WebConfigPage.render("AB2C-D3EF")
+        val script = WebConfigPage.asset("config.js")
+
+        assertTrue(page.contains("id=\"capability-loading\""))
+        assertTrue(page.contains("id=\"capability-error\""))
+        assertTrue(page.contains("id=\"apps-empty\""))
+        assertTrue(page.contains("id=\"apps-filter-empty\""))
+        assertTrue(script.contains("post('/api/system/action'"))
+        assertTrue(script.contains("post('/api/background/upload'"))
+        assertTrue(script.contains("post('/api/config/background'"))
+        assertTrue(script.contains("post('/api/config/clock'"))
+        assertTrue(script.contains("post('/api/config/apps'"))
+        assertTrue(script.contains("post('/api/config/behavior'"))
+        assertTrue(script.contains("post('/api/test-immich'"))
+        assertFalse(script.contains("transition: all"))
+    }
+
+    @Test
+    fun `browser language wins with panel language as fallback`() {
+        assertEquals("en", webLanguage("en-US,en;q=0.9,fr;q=0.8", "fr"))
+        assertEquals("fr", webLanguage("de-DE,de;q=0.9", "fr"))
+        assertEquals("en", webLanguage(null, ""))
+        assertEquals("fr", webLanguage("en-US", "en", "fr"))
     }
 }

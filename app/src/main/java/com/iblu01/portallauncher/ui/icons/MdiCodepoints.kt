@@ -1,6 +1,7 @@
 package com.iblu01.portallauncher.ui.icons
 
 import android.content.Context
+import android.content.res.AssetFileDescriptor
 import android.util.LruCache
 import android.util.Log
 import java.io.FileInputStream
@@ -35,6 +36,13 @@ object MdiCodepoints {
      */
     private val memo = LruCache<String, String>(256)
     private const val MISS = ""
+    /**
+     * Held for the life of the process on purpose: the channel below borrows this descriptor's fd,
+     * so letting the [AssetFileDescriptor] go out of scope has it finalized and closed underneath
+     * the channel — every lookup then fails with "Bad file descriptor" and every icon silently
+     * falls back.
+     */
+    private var assetFd: AssetFileDescriptor? = null
     private var channel: FileChannel? = null
     private var baseOffset = 0L
     private var recordCount = 0
@@ -46,6 +54,7 @@ object MdiCodepoints {
         if (unavailable) return null
         return runCatching {
             val fd = context.assets.openFd(ASSET)
+            assetFd = fd
             baseOffset = fd.startOffset
             recordCount = (fd.length / RECORD_BYTES).toInt()
             FileInputStream(fd.fileDescriptor).channel.also { channel = it }

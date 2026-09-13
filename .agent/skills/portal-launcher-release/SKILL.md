@@ -11,7 +11,7 @@ This skill fully automates the release process for the `iblur01/portal-launcher`
 
 ## Prerequisites
 
-The repo must be at `/home/tdelannoy-fdi/dev/perso/portal-launcher`. The signing keystore is in `~/.portal-launcher-signing/portal-launcher-release.jks` and the credentials are in `app/local.properties` (gitignored).
+Run this skill from the root of the `portal-launcher` repository. The signing keystore is in `~/.portal-launcher-signing/portal-launcher-release.jks` and the credentials are in `app/local.properties` (gitignored).
 
 ## Workflow
 
@@ -85,12 +85,12 @@ git push origin "vX.Y.Z-beta"
 ### Step 8 — Build signed APK
 
 ```bash
-ANDROID_HOME=/home/tdelannoy-fdi/android-sdk JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew clean assembleRelease
+ANDROID_HOME="$ANDROID_HOME" JAVA_HOME="$JAVA_HOME" ./gradlew clean assembleRelease
 ```
 
 Verify the signature with `apksigner`:
 ```bash
-/home/tdelannoy-fdi/Android/Sdk/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
+"$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --verbose app/build/outputs/apk/release/app-release.apk
 ```
 
 ### Step 9 — Create the GitHub release with the APK

@@ -1,99 +1,902 @@
 <!doctype html>
-<html lang="fr" class="h-full bg-black">
+<html lang="%LANG%">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#000000">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f6f8fa">
   <meta name="portal-token" content="%TOKEN%">
-  <title>Configuration du panneau</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Onboarding Portal</title>
   <link rel="stylesheet" href="webconfig.css">
 </head>
-<body class="min-h-full bg-black text-white antialiased">
-  <main class="wizard-shell">
-    <header class="wizard-topbar">
-      <div>
-        <p class="wizard-brand">Portal</p>
-        <p id="progress-label" class="wizard-progress-label">Maison · étape 1 sur 3</p>
-      </div>
-      <div id="progress-dots" class="progress-dots" aria-label="Progression"></div>
-    </header>
-
-    <form id="config-form" class="wizard-body" novalidate>
-      <div class="wizard-context" aria-live="polite">
-        <p id="step-chapter" class="wizard-chapter">Maison</p>
-        <h1 id="step-title">Connectez Home Assistant</h1>
-        <p id="step-description">Indiquez l’adresse de votre maison et son jeton d’accès.</p>
-      </div>
-
-      <div class="wizard-workspace">
-        <section class="wizard-step" data-step="0" aria-label="Home Assistant">
-          <div class="settings-group">
-            <label class="wizard-field" for="ha_url"><span>Adresse</span><input id="ha_url" type="url" inputmode="url" placeholder="http://homeassistant.local:8123" required></label>
-            <p id="ha_url_error" class="field-error hidden">Saisissez une adresse commençant par http:// ou https://.</p>
-            <p id="ha_mdns_warning" class="field-warning hidden">Les adresses en <strong>.local</strong> utilisent le DNS local (mDNS), qui peut ne pas fonctionner sur certains écrans. Si la connexion échoue, utilisez plutôt l’adresse IP locale du serveur.</p>
-            <label class="wizard-field" for="ha_token"><span>Jeton longue durée</span><input id="ha_token" type="password" autocomplete="off" placeholder="Jeton Home Assistant" required></label>
-            <p id="ha_token_error" class="field-error hidden">Le jeton d’accès est nécessaire.</p>
+<body>
+  <div class="app-shell">
+    <header class="mobile-header">
+<strong>Portal</strong>
+<span id="mobile-progress" class="tabular">1 / 11</span>
+</header>
+    <aside class="sidebar" aria-label="Navigation onboarding">
+      <div class="brand-row">
+<strong>Portal</strong>
+<label class="language">
+<span class="sr-only">Langue</span>
+<select id="language-select" aria-label="Langue">
+<option value="fr">FR</option>
+<option value="en">EN</option>
+</select>
+</label>
+</div>
+      <nav id="step-navigation" aria-label="Étapes">
+        <button type="button" data-target="system">
+<span>Appareil</span>
+<small>Accès système</small>
+</button>
+        <button type="button" data-target="display">
+<span>Interface</span>
+<small>Affichage</small>
+</button>
+        <button type="button" data-target="background">
+<span>Interface</span>
+<small>Fond</small>
+</button>
+        <button type="button" data-target="clock">
+<span>Interface</span>
+<small>Horloge</small>
+</button>
+        <button type="button" data-target="apps">
+<span>Interface</span>
+<small>Applications</small>
+</button>
+        <button type="button" data-target="behavior">
+<span>Appareil</span>
+<small>Comportement</small>
+</button>
+        <button type="button" data-target="providers">
+<span>Services</span>
+<small>Providers</small>
+</button>
+        <button type="button" data-target="ha">
+<span>Maison</span>
+<small>Home Assistant</small>
+</button>
+        <button type="button" data-target="mqtt">
+<span>Services</span>
+<small>MQTT</small>
+<em>Facultatif</em>
+</button>
+        <button type="button" data-target="gemini">
+<span>Services</span>
+<small>Gemini</small>
+<em>Facultatif</em>
+</button>
+        <button type="button" data-target="review">
+<span>Finalisation</span>
+<small>Vérification</small>
+</button>
+      </nav>
+      <div class="sidebar-footer">
+<div class="connection-line">
+<span id="connection-dot" class="status-dot pending" aria-hidden="true">
+</span>
+<span id="connection-state">Connexion</span>
+<span id="latency" class="tabular">— ms</span>
+</div>
+<button id="reset-onboarding" type="button" class="text-button danger">Recommencer</button>
+</div>
+    </aside>
+    <main class="workspace">
+      <div id="loading-state" class="state-block" role="status" aria-live="polite" aria-label="Chargement de la configuration">
+<div class="skeleton-line wide">
+</div>
+<div class="skeleton-line">
+</div>
+<div class="skeleton-row">
+</div>
+<div class="skeleton-row">
+</div>
+<div class="skeleton-row">
+</div>
+</div>
+      <section id="conflict-state" class="notice warning hidden" role="alert">
+<div>
+<strong id="conflict-title">Session en lecture seule</strong>
+<p id="conflict-detail">Un autre navigateur modifie cet appareil.</p>
+</div>
+<div class="notice-actions">
+<button id="reload-snapshot" type="button" class="button secondary">Recharger</button>
+<button id="take-over" type="button" class="button primary">Reprendre la main</button>
+</div>
+</section>
+      <section id="offline-state" class="notice error hidden" role="alert">
+<div>
+<strong>Panneau hors ligne</strong>
+<p id="offline-detail">Dernière réponse inconnue.</p>
+</div>
+<button id="retry-server" type="button" class="button secondary">Réessayer</button>
+</section>
+      <section id="request-error" class="notice error hidden" role="alert">
+<div>
+<strong>Commande refusée</strong>
+<p id="request-error-detail">
+</p>
+</div>
+</section>
+      <section id="transport-warning" class="notice warning compact" role="note">
+<div>
+<strong>Réseau local de confiance requis</strong>
+<p>Cette session utilise HTTP sur le réseau local. Utilisez un réseau privé.</p>
+</div>
+</section>
+      <form id="config-form" class="hidden" aria-busy="false" novalidate>
+        <section class="step" data-page="system" aria-labelledby="title-system">
+          <header class="page-header">
+<div>
+<p>Appareil</p>
+<h1 id="title-system">Accès système</h1>
+</div>
+<span class="step-counter tabular">
+</span>
+</header>
+          <div id="capability-loading" class="table-state">Lecture des autorisations…</div>
+          <div id="capability-list" class="data-list hidden" aria-live="polite">
+            <div class="data-row">
+<span>
+<strong>Launcher par défaut</strong>
+<small>Essentiel</small>
+</span>
+<span id="cap-default-launcher" class="status-label">—</span>
+<button type="button" class="button secondary" data-system-action="default_launcher">Ouvrir</button>
+</div>
+            <div class="data-row">
+<span>
+<strong>Contrôle de l’écran</strong>
+<small>Essentiel</small>
+</span>
+<span id="cap-screen-control" class="status-label">—</span>
+<button type="button" class="button secondary" data-system-action="screen_control">Ouvrir</button>
+</div>
+            <div class="data-row">
+<span>
+<strong>Luminosité</strong>
+<small>Réglage du panneau</small>
+</span>
+<span id="cap-brightness" class="status-label">—</span>
+<button type="button" class="button secondary" data-system-action="brightness">Ouvrir</button>
+</div>
+            <div class="data-row">
+<span>
+<strong>Notifications</strong>
+<small>Pastilles d’apps</small>
+</span>
+<span id="cap-notifications" class="status-label">—</span>
+<button type="button" class="button secondary" data-system-action="notifications">Ouvrir</button>
+</div>
           </div>
-          <div id="ha_test_status" class="connection-checks hidden" aria-live="polite">
-            <div class="connection-check" data-check="host"><span>Adresse</span><strong id="ha_check_host">En attente</strong></div>
-            <div class="connection-check" data-check="port"><span>Port</span><strong id="ha_check_port">En attente</strong></div>
-            <div class="connection-check" data-check="token"><span>Jeton</span><strong id="ha_check_token">En attente</strong></div>
-            <p id="ha_test_error" class="status"></p>
-          </div>
-          <button id="toggle-ha-token" class="text-action" type="button">Afficher le jeton</button>
+          <div id="capability-error" class="table-state error hidden">Autorisations indisponibles. <button type="button" id="retry-capabilities" class="text-button">Réessayer</button>
+</div>
         </section>
-
-        <section class="wizard-step hidden" data-step="1" aria-label="MQTT">
-          <p class="step-note">Les identifiants MQTT sont distincts de ceux de Home Assistant.</p>
-          <div class="settings-group">
-            <label class="wizard-field" for="broker_host"><span>Serveur</span><input id="broker_host" type="text" autocomplete="off" placeholder="192.168.1.10" required></label>
-            <p id="mqtt_mdns_warning" class="field-warning hidden">Les adresses en <strong>.local</strong> utilisent le DNS local (mDNS), qui peut ne pas fonctionner sur certains écrans. Si la connexion échoue, utilisez plutôt l’adresse IP locale du serveur.</p>
-            <label class="wizard-field" for="broker_port"><span>Port</span><input id="broker_port" type="number" min="1" max="65535" inputmode="numeric" required></label>
-            <p id="mqtt_error" class="field-error hidden">Renseignez un serveur et un port compris entre 1 et 65535.</p>
-            <label class="wizard-field" for="username"><span>Utilisateur</span><input id="username" type="text" autocomplete="off"></label>
-            <label class="wizard-field" for="password"><span>Mot de passe</span><input id="password" type="password" autocomplete="off"></label>
-            <label class="wizard-field" for="device_name"><span>Nom du panneau</span><input id="device_name" type="text" autocomplete="off" placeholder="Panneau salon"></label>
-          </div>
-          <div id="mqtt_test_status" class="connection-checks hidden" aria-live="polite">
-            <div class="connection-check" data-mqtt-check="host"><span>Serveur</span><strong id="mqtt_check_host">En attente</strong></div>
-            <div class="connection-check" data-mqtt-check="port"><span>Port</span><strong id="mqtt_check_port">En attente</strong></div>
-            <div class="connection-check" data-mqtt-check="auth"><span>Authentification</span><strong id="mqtt_check_auth">En attente</strong></div>
-            <p id="mqtt_test_error" class="status"></p>
-          </div>
+        <section class="step hidden" data-page="display" aria-labelledby="title-display">
+          <header class="page-header">
+<div>
+<p>Interface</p>
+<h1 id="title-display">Affichage</h1>
+</div>
+<span class="step-counter tabular">
+</span>
+</header>
+          <div class="section-block">
+<div class="section-title">
+<h2>Taille des icônes</h2>
+<output id="grid-value" for="grid-scale" class="tabular">1,00</output>
+</div>
+<div class="choice-grid" role="group" aria-label="Préréglages">
+<button type="button" class="choice" data-scale="0.82">
+<strong>Compact</strong>
+<span>0,82</span>
+</button>
+<button type="button" class="choice" data-scale="1">
+<strong>Équilibré</strong>
+<span>1,00</span>
+</button>
+<button type="button" class="choice" data-scale="1.18">
+<strong>Confort</strong>
+<span>1,18</span>
+</button>
+</div>
+<label class="range-field" for="grid-scale">
+<span class="range-label">
+<span>Échelle</span>
+<span class="range-bounds tabular">0,70 — 1,30</span>
+</span>
+<input id="grid-scale" type="range" min="0.7" max="1.3" step="0.01" value="1">
+</label>
+<dl class="metrics">
+<div>
+<dt>Colonnes</dt>
+<dd id="columns-value" class="tabular">6</dd>
+</div>
+<div>
+<dt>Lignes</dt>
+<dd id="rows-value" class="tabular">4</dd>
+</div>
+<div>
+<dt>Applications visibles</dt>
+<dd id="apps-value" class="tabular">24</dd>
+</div>
+<div>
+<dt>Écran</dt>
+<dd id="device-metrics" class="tabular">—</dd>
+</div>
+</dl>
+</div>
+          <section class="preview-pane" aria-labelledby="preview-title">
+<div class="preview-header">
+<div>
+<p>Aperçu de la grille</p>
+<h2 id="preview-title">Panneau</h2>
+</div>
+<span id="preview-status" class="ack pending">En attente</span>
+</div>
+<div class="preview-layout">
+<div id="device-preview" class="device-preview" data-background="neutral">
+<img id="live-device-screen" class="live-device-screen hidden" alt="Écran Android du panneau en direct">
+<img id="preview-background-image" class="preview-background-image hidden" alt="">
+<div id="preview-unavailable" class="preview-unavailable">Capture Android indisponible</div>
+<div id="preview-clock" class="preview-clock tabular">08:42</div>
+<div id="preview-date" class="preview-date">vendredi 11 septembre</div>
+<div id="preview-grid" class="preview-grid" aria-hidden="true">
+</div>
+<div id="preview-overlay" class="preview-overlay">
+</div>
+</div>
+<dl class="preview-meta">
+<div class="hidden">
+<dt>Simulation</dt>
+<dd id="simulation-state">Synchronisée</dd>
+</div>
+<div>
+<dt>Panneau</dt>
+<dd id="device-state">Connexion</dd>
+</div>
+<div class="hidden">
+<dt>Révision</dt>
+<dd id="revision-value" class="tabular">—</dd>
+</div>
+</dl>
+</div>
+</section>
         </section>
-
-        <section class="wizard-step hidden" data-step="2" aria-label="Vérification">
-          <div class="summary-group">
-            <div class="summary-row"><span>Home Assistant</span><strong id="summary-ha"></strong></div>
-            <div class="summary-row"><span>MQTT</span><strong id="summary-mqtt"></strong></div>
-            <div class="summary-row"><span>Panneau</span><strong id="summary-device"></strong></div>
-          </div>
-          <p id="config_status" class="status" aria-live="polite"></p>
+        <section class="step hidden" data-page="background" aria-labelledby="title-background">
+          <header class="page-header">
+<div>
+<p>Interface</p>
+<h1 id="title-background">Fond</h1>
+</div>
+<span class="step-counter tabular">
+</span>
+</header>
+          <div class="section-block">
+<fieldset>
+<legend>Source</legend>
+<div class="segmented">
+<label>
+<input type="radio" name="background-mode" value="neutral">
+<span>Neutre</span>
+</label>
+<label>
+<input type="radio" name="background-mode" value="system">
+<span>Système</span>
+</label>
+<label>
+<input type="radio" name="background-mode" value="custom">
+<span>Image</span>
+</label>
+<label>
+<input type="radio" name="background-mode" value="immich">
+<span>Immich</span>
+</label>
+</div>
+</fieldset>
+            <div id="custom-background-fields" class="field-list hidden">
+<label>
+<span>Fichier</span>
+<input id="background-file" type="file" accept="image/jpeg,image/png,image/webp">
+</label>
+</div>
+<p id="background-upload-state" class="credential-state hidden">
+</p>
+            <div id="immich-background-fields" class="field-list hidden">
+<label>
+<span>Adresse</span>
+<input id="immich-url" type="url" placeholder="photos.maison.lan">
+</label>
+<label>
+<span>Clé API</span>
+<input id="immich-key" type="password" autocomplete="off">
+</label>
+<label class="switch-row">
+<span>Autoriser HTTP</span>
+<input id="immich-insecure" type="checkbox">
+</label>
+<label>
+<span>Albums</span>
+<select id="immich-albums" multiple aria-label="Albums Immich">
+</select>
+</label>
+<label class="switch-row">
+<span>Ordre aléatoire</span>
+<input id="immich-shuffle" type="checkbox" checked>
+</label>
+<label>
+<span>Actualisation (min)</span>
+<input id="immich-refresh" type="number" min="5" max="1440" value="60">
+</label>
+<label>
+<span>Cadence (s)</span>
+<input id="immich-cadence" type="number" min="5" max="3600" value="30">
+</label>
+<button id="test-immich" type="button" class="button secondary inline-field-action">Tester et charger les albums</button>
+</div>
+            <div class="section-title">
+<label for="background-opacity">Assombrissement</label>
+<output id="opacity-value" for="background-opacity" class="tabular">25 %</output>
+</div>
+<label class="range-field" for="background-opacity">
+<span class="range-label">
+<span>Opacité</span>
+<span class="range-bounds tabular">0 — 60 %</span>
+</span>
+<input id="background-opacity" type="range" min="0" max="0.6" step="0.01" value="0.25">
+</label>
+</div>
         </section>
-      </div>
-
-      <section id="saved-view" class="completion-view hidden" aria-live="polite">
-        <div class="completion-check" aria-hidden="true">✓</div>
-        <h1>Configuration enregistrée</h1>
-        <p>Le panneau a bien reçu les nouveaux réglages.</p>
-        <strong>Vous pouvez fermer cet onglet.</strong>
-      </section>
-
-      <section id="server-offline-view" class="completion-view hidden" aria-live="assertive">
-        <div class="offline-symbol" aria-hidden="true">!</div>
-        <h1>Le launcher n’est pas en mode configuration</h1>
-        <p>Rouvrez « Configurer depuis un autre appareil » sur le panneau, puis scannez le nouveau QR code.</p>
-        <button id="retry-server" type="button" class="secondary-button">Réessayer</button>
-      </section>
-
-      <footer class="wizard-navigation">
-        <button id="back" type="button" class="nav-button nav-back hidden">Précédent</button>
-        <button id="next" type="button" class="nav-button nav-primary">Continuer</button>
-      </footer>
-    </form>
-  </main>
-  <script src="config.js"></script>
+        <section class="step hidden" data-page="clock" aria-labelledby="title-clock">
+<header class="page-header">
+<div>
+<p>Interface</p>
+<h1 id="title-clock">Horloge</h1>
+</div>
+<span class="step-counter tabular">
+</span>
+</header>
+<div class="field-list">
+<label>
+<span>Police</span>
+<select id="clock-font">
+<option value="space_grotesk">Space Grotesk</option>
+<option value="inter">Inter</option>
+<option value="jetbrains_mono">JetBrains Mono</option>
+<option value="oswald">Oswald</option>
+<option value="playfair">Playfair Display</option>
+<option value="montserrat">Montserrat</option>
+<option value="orbitron">Orbitron</option>
+<option value="teko">Teko</option>
+<option value="roboto_slab">Roboto Slab</option>
+<option value="exo2">Exo 2</option>
+</select>
+</label>
+<label>
+<span>Graisse</span>
+<input id="clock-weight" type="number" min="100" max="900" step="100" value="900">
+</label>
+<label>
+<span>Taille</span>
+<input id="clock-size" type="range" min="90" max="180" step="1" value="138">
+</label>
+<label>
+<span>Espacement des lettres</span>
+<input id="clock-letter-spacing" type="range" min="-2" max="12" step="0.5" value="0">
+</label>
+<label>
+<span>Teinte</span>
+<select id="clock-tint">
+<option value="white">Blanc</option>
+<option value="amber">Ambre</option>
+<option value="mint">Vert</option>
+<option value="blue">Bleu</option>
+<option value="pink">Rose</option>
+<option value="violet">Violet</option>
+</select>
+</label>
+<label class="switch-row">
+<span>Format 24 h</span>
+<input id="clock-24h" type="checkbox" checked>
+</label>
+<label>
+<span>Date</span>
+<select id="clock-date-format">
+<option value="long">Jour et mois</option>
+<option value="weekday_month_day">Jour, mois, date</option>
+<option value="short_weekday_day_month">Jour court et date</option>
+<option value="short_weekday_month_day">Jour court, mois, date</option>
+<option value="month_day_text">Mois et date</option>
+<option value="day_month_text">Date et mois</option>
+<option value="day_month_year">JJ/MM/AAAA</option>
+<option value="month_day_year">MM/JJ/AAAA</option>
+<option value="iso">ISO</option>
+</select>
+</label>
+<label>
+<span>Espacement des blocs</span>
+<input id="clock-element-spacing" type="range" min="0.4" max="2" step="0.1" value="1">
+</label>
+</div>
+</section>
+        <section class="step hidden" data-page="apps" aria-labelledby="title-apps">
+<header class="page-header">
+<div>
+<p>Interface</p>
+<h1 id="title-apps">Applications</h1>
+</div>
+<span id="apps-count" class="step-counter tabular">0</span>
+</header>
+<div class="toolbar">
+<input id="apps-search" type="search" placeholder="Rechercher un nom ou package">
+<select id="apps-filter" aria-label="Filtre">
+<option value="all">Toutes</option>
+<option value="visible">Visibles</option>
+<option value="hidden">Masquées</option>
+<option value="system">Système</option>
+</select>
+</div>
+<div class="field-list apps-options">
+<label>
+<span>Pack d’icônes</span>
+<select id="icon-pack">
+</select>
+</label>
+<label class="switch-row">
+<span>Pastilles de notification</span>
+<input id="notification-dots" type="checkbox">
+</label>
+<label>
+<span>Application au tap</span>
+<select id="tap-app">
+<option value="">Aucune</option>
+</select>
+</label>
+</div>
+<div id="apps-loading" class="table-state">Chargement des applications…</div>
+<div id="apps-empty" class="table-state hidden">Aucune application installée.</div>
+<div id="apps-filter-empty" class="table-state hidden">Aucun résultat pour ces filtres. <button id="reset-app-filter" type="button" class="text-button">Réinitialiser</button>
+</div>
+<div class="app-table-wrap hidden" id="apps-table-wrap">
+<table class="app-table">
+<thead>
+<tr>
+<th>Application</th>
+<th>Package</th>
+<th>Type</th>
+<th>Visible</th>
+<th>Ordre</th>
+</tr>
+</thead>
+<tbody id="apps-table">
+</tbody>
+</table>
+</div>
+</section>
+        <section class="step hidden" data-page="behavior" aria-labelledby="title-behavior">
+<header class="page-header">
+<div>
+<p>Appareil</p>
+<h1 id="title-behavior">Comportement</h1>
+</div>
+<span class="step-counter tabular">
+</span>
+</header>
+<div class="field-list">
+<label class="switch-row">
+<span>Écran toujours actif</span>
+<input id="keep-screen-on" type="checkbox">
+</label>
+<label class="switch-row">
+<span>Veille automatique</span>
+<input id="screen-timeout-enabled" type="checkbox" checked>
+</label>
+<label>
+<span>Délai de veille (min)</span>
+<input id="screen-timeout-minutes" type="number" min="1" max="240" value="10">
+</label>
+<label class="switch-row">
+<span>Retour automatique</span>
+<input id="auto-return-enabled" type="checkbox" checked>
+</label>
+<label>
+<span>Délai de retour (s)</span>
+<input id="auto-return-delay" type="number" min="5" max="60" value="10">
+</label>
+<label class="switch-row">
+<span>Gestes compris</span>
+<input id="gestures-seen" type="checkbox">
+</label>
+</div>
+</section>
+        <section class="step hidden" data-page="providers" aria-labelledby="title-providers">
+          <header class="page-header">
+<div>
+<p>Services</p>
+<h1 id="title-providers">Providers</h1>
+</div>
+<span class="step-counter tabular">
+</span>
+</header>
+          <div class="provider-list">
+<label class="provider-row">
+<span class="provider-mark" aria-hidden="true"><img src="logo-home-assistant.svg" alt=""></span>
+<span>
+<strong>Home Assistant</strong>
+<small>Entités, commandes et caméras</small>
+</span>
+<input id="provider-ha" type="checkbox">
+</label>
+<label class="provider-row">
+<span class="provider-mark" aria-hidden="true"><img src="logo-mqtt.svg" alt=""></span>
+<span>
+<strong>MQTT</strong>
+<small>Contrôle distant du panneau</small>
+</span>
+<em>Facultatif</em>
+<input id="provider-mqtt" type="checkbox">
+</label>
+<label class="provider-row">
+<span class="provider-mark" aria-hidden="true"><img src="logo-gemini.svg" alt=""></span>
+<span>
+<strong>Gemini</strong>
+<small>Assistant vocal</small>
+</span>
+<em>Facultatif</em>
+<input id="provider-gemini" type="checkbox">
+</label>
+</div>
+<p id="no-providers-state" class="inline-note">Aucun provider sélectionné. Portal utilisera uniquement les fonctions locales.</p>
+<p class="inline-note">Chaque provider est indépendant. Home Assistant n’active pas MQTT.</p>
+        </section>
+        <section class="step hidden" data-page="ha" aria-labelledby="title-ha">
+          <header class="page-header">
+<div>
+<p>Maison</p>
+<h1 id="title-ha">Home Assistant</h1>
+</div>
+<span class="optional-badge">Facultatif</span>
+</header>
+          <div class="field-list">
+<label>
+<span>Adresse</span>
+<input id="ha-url" type="url" inputmode="url" placeholder="http://192.168.14.203:8123">
+</label>
+<label>
+<span>Jeton longue durée</span>
+<input id="ha-token" type="password" autocomplete="off" placeholder="••••••••••••" aria-describedby="ha-configured">
+</label>
+</div>
+<p id="ha-configured" class="credential-state hidden">Jeton déjà configuré. Laissez le champ vide pour le conserver.</p>
+<div id="ha-test-status" class="check-list hidden" aria-live="polite">
+<div data-check="host">
+<span>Adresse</span>
+<strong>En attente</strong>
+</div>
+<div data-check="port">
+<span>Port</span>
+<strong>En attente</strong>
+</div>
+<div data-check="token">
+<span>API</span>
+<strong>En attente</strong>
+</div>
+</div>
+<button id="skip-ha" type="button" class="button secondary inline-action">Ignorer Home Assistant</button>
+          <div class="section-block">
+<div class="section-title">
+<h2>Maison</h2>
+<button id="load-ha-catalog" type="button" class="button secondary">Charger</button>
+</div>
+<div id="ha-catalog-state" class="table-state">Enregistrez la connexion pour charger les entités.</div>
+<div id="ha-catalog" class="hidden">
+<div class="toolbar">
+<input id="ha-search" type="search" placeholder="Rechercher une entité">
+<select id="ha-domain-filter" aria-label="Type">
+<option value="">Tous les types</option>
+</select>
+<select id="ha-availability-filter" aria-label="Disponibilité">
+<option value="">Toute disponibilité</option>
+<option value="available">Disponible</option>
+<option value="unavailable">Indisponible</option>
+</select>
+</div>
+<h2>Intégrations</h2>
+<div class="app-table-wrap">
+<table class="app-table">
+<thead>
+<tr>
+<th>
+<input id="ha-integrations-all" type="checkbox" aria-label="Activer toutes les intégrations">
+</th>
+<th>Intégration</th>
+<th>Entités</th>
+</tr>
+</thead>
+<tbody id="ha-integrations-table">
+</tbody>
+</table>
+</div>
+<div class="section-title">
+<h2>Entités</h2>
+<span id="ha-entity-count" class="tabular">
+</span>
+</div>
+<div class="app-table-wrap">
+<table class="app-table">
+<thead>
+<tr>
+<th>Active</th>
+<th>Entité</th>
+<th>Type</th>
+<th>État</th>
+<th>Épinglage</th>
+</tr>
+</thead>
+<tbody id="ha-entities-table">
+</tbody>
+</table>
+</div>
+<div id="ha-cameras-block" class="hidden">
+<h2>Caméras</h2>
+<div class="app-table-wrap">
+<table class="app-table">
+<thead>
+<tr>
+<th>Visible</th>
+<th>Caméra</th>
+<th>Principale</th>
+<th>Ordre</th>
+</tr>
+</thead>
+<tbody id="ha-cameras-table">
+</tbody>
+</table>
+</div>
+<label>
+<span>Mode</span>
+<select id="camera-mode">
+<option value="main">Principale</option>
+<option value="grid">Grille</option>
+</select>
+</label>
+<label class="switch-row">
+<span>Pill Caméras</span>
+<input id="camera-pill" type="checkbox">
+</label>
+</div>
+<div class="field-list">
+<label>
+<span>Regroupement</span>
+<select id="home-grouping">
+<option value="type">Par type</option>
+<option value="room">Par pièce</option>
+</select>
+</label>
+<label class="switch-row">
+<span>Page Maison</span>
+<input id="home-enabled" type="checkbox" checked>
+</label>
+</div>
+<div class="section-title"><h2>Sections</h2><span id="home-sections-count" class="tabular"></span></div>
+<div class="app-table-wrap"><table class="app-table"><thead><tr><th>Visible</th><th>Section</th><th>Ordre</th><th>Items</th></tr></thead><tbody id="home-sections-table"></tbody></table></div>
+<div class="section-title"><h2>Groupes manuels</h2><span id="manual-groups-count" class="tabular"></span></div>
+<div class="toolbar group-create"><input id="manual-group-name" type="text" maxlength="64" placeholder="Nom du groupe" aria-label="Nom du groupe"><button id="add-manual-group" type="button" class="button secondary">Créer un groupe</button></div>
+<div id="manual-groups-empty" class="table-state">Aucun groupe manuel.</div>
+<div class="app-table-wrap"><table class="app-table"><thead><tr><th>Groupe</th><th>Membres</th><th>Ordre</th><th>Actions</th></tr></thead><tbody id="manual-groups-table"></tbody></table></div>
+<button id="save-home" type="button" class="button secondary">Enregistrer Maison</button>
+</div>
+</div>
+        </section>
+        <section class="step hidden" data-page="mqtt" aria-labelledby="title-mqtt">
+          <header class="page-header">
+<div>
+<p>Services</p>
+<h1 id="title-mqtt">MQTT</h1>
+</div>
+<span class="optional-badge">Facultatif</span>
+</header>
+          <div class="field-list">
+<label>
+<span>Hôte</span>
+<input id="broker-host" type="text" autocomplete="off" placeholder="192.168.14.20">
+</label>
+<label>
+<span>Port</span>
+<input id="broker-port" class="tabular" type="number" min="1" max="65535" inputmode="numeric" value="1883">
+</label>
+<label>
+<span>Utilisateur</span>
+<input id="mqtt-username" type="text" autocomplete="off">
+</label>
+<label>
+<span>Mot de passe</span>
+<input id="mqtt-password" type="password" autocomplete="off" aria-describedby="mqtt-configured">
+</label>
+<label>
+<span>Nom du panneau</span>
+<input id="device-name" type="text" autocomplete="off" placeholder="panel-cuisine">
+</label>
+</div>
+<p id="mqtt-configured" class="credential-state hidden">Identifiants déjà configurés. Laissez le mot de passe vide pour le conserver.</p>
+<div id="mqtt-test-status" class="check-list hidden" aria-live="polite">
+<div data-check="host">
+<span>Hôte</span>
+<strong>En attente</strong>
+</div>
+<div data-check="port">
+<span>Port</span>
+<strong>En attente</strong>
+</div>
+<div data-check="auth">
+<span>Authentification</span>
+<strong>En attente</strong>
+</div>
+</div>
+<button id="skip-mqtt" type="button" class="button secondary inline-action">Ignorer MQTT</button>
+        </section>
+        <section class="step hidden" data-page="gemini" aria-labelledby="title-gemini">
+          <header class="page-header">
+<div>
+<p>Services</p>
+<h1 id="title-gemini">Gemini</h1>
+</div>
+<span class="optional-badge">Facultatif</span>
+</header>
+          <div class="notice warning static">
+<div>
+<strong>Connexion Internet requise</strong>
+<p>L’échec de Gemini ne bloque pas l’activation de Portal.</p>
+</div>
+</div>
+<div class="field-list">
+<label class="switch-row">
+<span>Assistant actif</span>
+<input id="gemini-enabled" type="checkbox">
+</label>
+<label>
+<span>Clé Google AI Studio</span>
+<input id="gemini-key" type="password" autocomplete="off" placeholder="••••••••••••" aria-describedby="gemini-configured">
+</label>
+<label>
+<span>Modèle Live</span>
+<select id="gemini-model">
+<option value="">Tester la clé pour charger les modèles</option>
+</select>
+</label>
+<label>
+<span>Voix</span>
+<select id="gemini-voice">
+<option>Puck</option>
+<option>Charon</option>
+<option>Kore</option>
+<option>Fenrir</option>
+<option>Aoede</option>
+</select>
+</label>
+</div>
+<details class="advanced-settings">
+<summary>Réglages avancés</summary>
+<div class="field-list">
+<label>
+<span>Instruction</span>
+<textarea id="gemini-prompt" maxlength="4096" rows="4">
+</textarea>
+</label>
+<label class="switch-row">
+<span>Interruption vocale</span>
+<input id="gemini-barge-in" type="checkbox">
+</label>
+<label>
+<span>Wake word</span>
+<select id="gemini-wake-word">
+</select>
+</label>
+<label>
+<span>Seuil (%)</span>
+<input id="gemini-threshold" type="number" min="1" max="95" value="50">
+</label>
+<label>
+<span>Délai d’inactivité (s)</span>
+<input id="gemini-idle" type="number" min="5" max="300" value="20">
+</label>
+<label>
+<span>Limite quotidienne</span>
+<input id="gemini-daily-limit" type="number" min="0" max="5000" value="200">
+</label>
+</div>
+</details>
+<p id="gemini-configured" class="credential-state hidden">Clé déjà configurée. Laissez le champ vide pour la conserver.</p>
+<div class="data-list">
+<div class="data-row">
+<span>
+<strong>Microphone</strong>
+<small>Autorisation confirmée sur le panneau</small>
+</span>
+<button id="request-microphone" type="button" class="button secondary">Autoriser</button>
+</div>
+<div class="data-row">
+<span>
+<strong>Calibration</strong>
+<small id="gemini-calibration-state">Non effectuée</small>
+</span>
+<span class="optional-badge">Sur le panneau</span>
+</div>
+</div>
+<div id="gemini-test-status" class="check-list hidden" aria-live="polite">
+<div data-check="key">
+<span>Clé API</span>
+<strong>En attente</strong>
+</div>
+<div data-check="model">
+<span>Modèle Live</span>
+<strong>En attente</strong>
+</div>
+</div>
+<button id="skip-gemini" type="button" class="button secondary inline-action">Ignorer Gemini</button>
+        </section>
+        <section class="step hidden" data-page="review" aria-labelledby="title-review">
+          <header class="page-header">
+<div>
+<p>Finalisation</p>
+<h1 id="title-review">Vérification</h1>
+</div>
+<span class="step-counter tabular">
+</span>
+</header>
+          <dl class="review-list">
+<div>
+<dt>Affichage</dt>
+<dd><span id="review-display"></span> <button type="button" class="text-button review-edit" data-target="display">Modifier</button>
+</dd>
+</div>
+<div>
+<dt>Fond</dt>
+<dd><span id="review-background"></span> <button type="button" class="text-button review-edit" data-target="background">Modifier</button>
+</dd>
+</div>
+<div>
+<dt>Home Assistant</dt>
+<dd><span id="review-ha"></span> <button type="button" class="text-button review-edit" data-target="ha">Modifier</button>
+</dd>
+</div>
+<div>
+<dt>MQTT</dt>
+<dd><span id="review-mqtt"></span> <button type="button" class="text-button review-edit" data-target="mqtt">Modifier</button>
+</dd>
+</div>
+<div>
+<dt>Gemini</dt>
+<dd><span id="review-gemini"></span> <button type="button" class="text-button review-edit" data-target="gemini">Modifier</button>
+</dd>
+</div>
+</dl>
+<label id="defaults-warning" class="confirm-row hidden">
+<input id="accept-defaults" type="checkbox">
+<span>
+<strong>Utiliser les valeurs par défaut</strong>
+<small>Aucun provider n’est configuré. Portal restera utilisable et pourra être réglé plus tard.</small>
+</span>
+</label>
+        </section>
+        <footer class="form-actions">
+<button id="revert" type="button" class="button secondary hidden">Annuler l’aperçu</button>
+<span class="action-spacer">
+</span>
+<button id="back" type="button" class="button secondary">Précédent</button>
+<button id="next" type="submit" class="button primary">Continuer</button>
+</footer>
+      </form>
+      <section id="saved-state" class="state-block hidden" aria-live="polite">
+<h1 id="title-complete" tabindex="-1">Onboarding terminé</h1>
+<p>Le panneau ouvre Portal. Cet onglet peut être fermé.</p>
+</section>
+    </main>
+  </div>
+  <script src="config.js?lang=%LANG%">
+</script>
 </body>
 </html>

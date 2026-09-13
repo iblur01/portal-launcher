@@ -45,6 +45,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,16 +60,22 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.LauncherChip
 import com.iblu01.portallauncher.PillKind
+import com.iblu01.portallauncher.formatTimerDuration
+import com.iblu01.portallauncher.timerStateOf
 import com.iblu01.portallauncher.ui.components.controls.contentColorOn
 import com.iblu01.portallauncher.ui.components.controls.kelvinToColor
 import com.iblu01.portallauncher.ui.icons.HaIcon
 import com.iblu01.portallauncher.ui.mapper.withLiveState
+import com.iblu01.portallauncher.ui.scene.LocalSceneActivations
+import com.iblu01.portallauncher.ui.scene.sceneStatusLabel
+import com.iblu01.portallauncher.ui.scene.sceneVisualState
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -74,6 +83,7 @@ import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.ui.theme.PortalTheme
 import com.iblu01.portallauncher.ui.theme.scaled
 import com.iblu01.portallauncher.ui.theme.stateColor
+import kotlinx.coroutines.delay
 
 private val NeutralDeviceStates = setOf(
     "off", "stopped", "stop", "idle", "standby", "paused", "docked",
@@ -126,7 +136,16 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
     val live = if (chip.deviceState != null && chip.entityId.isNotBlank() && ',' !in chip.entityId) {
         rememberEntity(chip.entityId)
     } else null
-    @Suppress("NAME_SHADOWING") val chip = chip.withLiveState(androidx.compose.ui.platform.LocalContext.current, live)
+    @Suppress("NAME_SHADOWING") var chip = chip.withLiveState(androidx.compose.ui.platform.LocalContext.current, live)
+    // A scene has no state to read back, so its pill carries the outcome of the tap itself:
+    // in progress, done, or failed — after which it returns to advertising the action.
+    if (chip.kind == PillKind.SCENE) {
+        val status = LocalSceneActivations.current?.statusOf(chip.entityId)
+        chip = chip.copy(
+            value = stringResource(sceneStatusLabel(status)),
+            state = sceneVisualState(status),
+        )
+    }
     val target = selectedChipAccent(launcherChipAccent(chip), selected)
     val accent by animateColorAsState(target, AppleMotion.spring(), label = "chipAccent")
     val animatedProgress by animateFloatAsState(chip.progress, AppleMotion.spring(), label = "chipProgress")
@@ -200,12 +219,31 @@ fun StatusChip(chip: LauncherChip, modifier: Modifier = Modifier, selected: Bool
                 color = if (selected) selectedSubtitle else AppleColors.secondary,
                 maxLines = 1,
             )
-            Text(
-                chip.value,
-                style = AppleTypography.titleLarge.copy(fontSize = AppleTypography.titleLarge.fontSize.scaled()),
-                color = if (selected) SelectedChipContent else AppleColors.primary,
-                maxLines = 1,
-            )
+            if (chip.kind == PillKind.TIMER && live != null) {
+                var nowMs by remember(live) { mutableLongStateOf(System.currentTimeMillis()) }
+                LaunchedEffect(live) {
+                    if (live.state.equals("active", true)) while (true) {
+                        delay(1_000L - System.currentTimeMillis() % 1_000L)
+                        nowMs = System.currentTimeMillis()
+                    }
+                }
+                Text(
+                    formatTimerDuration(timerStateOf(live, nowMs).remainingSeconds),
+                    style = AppleTypography.titleLarge.copy(
+                        fontSize = AppleTypography.titleLarge.fontSize.scaled(),
+                        fontFeatureSettings = "tnum",
+                    ),
+                    color = if (selected) SelectedChipContent else AppleColors.primary,
+                    maxLines = 1,
+                )
+            } else {
+                Text(
+                    chip.value,
+                    style = AppleTypography.titleLarge.copy(fontSize = AppleTypography.titleLarge.fontSize.scaled()),
+                    color = if (selected) SelectedChipContent else AppleColors.primary,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

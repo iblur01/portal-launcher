@@ -31,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Scaffold
@@ -65,6 +67,7 @@ import com.iblu01.portallauncher.ui.components.ClockHeaderCollapsedHeight
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.iblu01.portallauncher.AppLanguage
+import com.iblu01.portallauncher.AppUpdateManager
 import com.iblu01.portallauncher.Prefs
 import com.iblu01.portallauncher.RootProvisioning
 import com.iblu01.portallauncher.PortalApp
@@ -80,7 +83,9 @@ import com.iblu01.portallauncher.HaEntity
 import com.iblu01.portallauncher.PillRule
 import com.iblu01.portallauncher.PillCandidate
 import com.iblu01.portallauncher.AutoReturnUiState
+import com.iblu01.portallauncher.CameraPreferencesCodec
 import com.iblu01.portallauncher.HomePillPreferencesCodec
+import com.iblu01.portallauncher.domain.home.CameraPreferences
 import com.iblu01.portallauncher.MqttBridgeService
 import com.iblu01.portallauncher.domain.home.HomePillPreferences
 import com.iblu01.portallauncher.session.AppClassification
@@ -108,7 +113,6 @@ import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.components.backgroundModes
 import com.iblu01.portallauncher.ui.settings.HomeSettingsAction
 import com.iblu01.portallauncher.ui.settings.SettingsPillCatalog
-import com.iblu01.portallauncher.ui.onboarding.OnboardingActivity
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import java.net.URL
@@ -150,6 +154,10 @@ class SettingsUiState {
     var haTestMessage by mutableStateOf<String?>(null)
     var mqttTest by mutableStateOf(ConnStatus.IDLE)
     var mqttTestMessage by mutableStateOf<String?>(null)
+    /** Cameras Home Assistant currently exposes, with their live reachability. */
+    val cameras = mutableStateListOf<CameraSettingsEntry>()
+    var cameraPreferences by mutableStateOf(CameraPreferencesCodec.defaults())
+    var camerasPillPinned by mutableStateOf(false)
 }
 
 interface SettingsCallbacks {
@@ -169,6 +177,10 @@ interface SettingsCallbacks {
     fun onLoadPillEntities()
     fun onSetPillEnabled(candidates: List<PillCandidate>, enabled: Boolean)
     fun onHomeSettingsAction(action: HomeSettingsAction)
+    /** Atomically edits the camera centre configuration. */
+    fun onCameraPreferences(transform: (CameraPreferences) -> CameraPreferences)
+    /** Pins or unpins the general "Cameras" pill, through the usual pinning rules. */
+    fun onCamerasPillPinned(pinned: Boolean)
     /** Writes the current arrangement to a file the user picks. */
     fun onExportLayout()
     /** Replaces the arrangement with one read from a file the user picks. */
@@ -178,8 +190,10 @@ interface SettingsCallbacks {
 private enum class SettingsPage {
     MAIN,
     HOME, HOME_CONTENT, HOME_APPS,
+    CONNECTED_HOME_CAMERAS,
+    CONNECTED_HOME_INTEGRATIONS,
     APPEARANCE, APPEARANCE_WALLPAPER, APPEARANCE_CLOCK,
-    CONNECTED_HOME, CONNECTED_HOME_CONNECTION, CONNECTED_HOME_SESSIONS,
+    CONNECTED_HOME, CONNECTED_HOME_CONNECTION, CONNECTED_HOME_SESSIONS, CONNECTED_HOME_VOICE,
     DEVICE, DEVICE_GENERAL,
     ABOUT,
 }
@@ -217,9 +231,17 @@ fun SettingsScreen(
     callbacks: SettingsCallbacks,
     installedApps: List<AppEntry> = emptyList(),
     haStates: Map<String, HaEntity> = emptyMap(),
+    haPlatforms: Map<String, String> = emptyMap(),
+    haDeviceIds: Map<String, String> = emptyMap(),
     autoReturnState: AutoReturnUiState = AutoReturnUiState(),
     onAutoReturnCancel: (() -> Unit)? = null,
     initialPage: String? = null,
+    voiceState: com.iblu01.portallauncher.voice.VoiceUiState = com.iblu01.portallauncher.voice.VoiceUiState(),
+    voiceCalibrationState: com.iblu01.portallauncher.voice.MicCalibrationState? = null,
+    voiceToolCalls: List<com.iblu01.portallauncher.voice.VoiceToolCall> = emptyList(),
+    onVoiceStartTest: () -> Unit = {},
+    onVoiceStopTest: () -> Unit = {},
+    onVoiceCalibrate: () -> Unit = {},
 ) {
     // First-run configuration is its own flow now (ui.onboarding), not a page of the settings, so
     // the settings always open on their own root — even when no home has been connected. Callers
@@ -417,6 +439,21 @@ fun SettingsScreen(
                 onBack = { currentPage = SettingsPage.HOME }, showBack = showBack,
             )
             SettingsPage.HOME_APPS -> appPageContent(AppPageMode.HOME, R.string.settings_home_apps_title, { currentPage = SettingsPage.HOME }, showBack)
+            SettingsPage.CONNECTED_HOME_CAMERAS -> CamerasSettingsPage(
+                cameras = uiState.cameras,
+                preferences = uiState.cameraPreferences,
+                generalPillPinned = uiState.camerasPillPinned,
+                onPreferences = callbacks::onCameraPreferences,
+                onGeneralPillPinned = callbacks::onCamerasPillPinned,
+                onBack = { currentPage = SettingsPage.CONNECTED_HOME }, showBack = showBack,
+            )
+            SettingsPage.CONNECTED_HOME_INTEGRATIONS -> HaIntegrationsSettingsPage(
+                prefs = prefs,
+                platformByEntity = haPlatforms,
+                deviceIdByEntity = haDeviceIds,
+                onBack = { currentPage = SettingsPage.CONNECTED_HOME },
+                showBack = showBack,
+            )
             SettingsPage.APPEARANCE -> CategoryPage(
                 title = stringResource(R.string.settings_tile_wallpaper_title),
                 entries = listOf(
@@ -437,7 +474,10 @@ fun SettingsScreen(
                 title = stringResource(R.string.settings_tile_home_title),
                 entries = listOf(
                     CategoryEntry(stringResource(R.string.settings_connected_connection_title), homeSubtitle, Icons.Outlined.Home, SettingsPage.CONNECTED_HOME_CONNECTION),
+                    CategoryEntry(stringResource(R.string.settings_integrations_title), stringResource(R.string.settings_integrations_subtitle), Icons.Outlined.Dashboard, SettingsPage.CONNECTED_HOME_INTEGRATIONS),
                     CategoryEntry(stringResource(R.string.settings_connected_sessions_title), stringResource(R.string.settings_connected_sessions_subtitle), Icons.Outlined.Settings, SettingsPage.CONNECTED_HOME_SESSIONS),
+                    CategoryEntry(stringResource(R.string.settings_cameras_title), stringResource(R.string.settings_cameras_subtitle), Icons.Outlined.Videocam, SettingsPage.CONNECTED_HOME_CAMERAS),
+                    CategoryEntry(stringResource(R.string.settings_voice_title), stringResource(R.string.settings_voice_subtitle), Icons.Outlined.Mic, SettingsPage.CONNECTED_HOME_VOICE),
                 ),
                 onNavigate = { currentPage = it }, onBack = { currentPage = SettingsPage.MAIN }, showBack = showBack,
                 leadingContent = { WebConfigShortcut() },
@@ -459,6 +499,17 @@ fun SettingsScreen(
                 onTestHa = { callbacks.onTestHaApi(haUrl, haToken) },
                 onTestMqtt = { callbacks.onTestMqtt(host, port.toIntOrNull() ?: 1883, username, password) },
                 onBack = { save(); currentPage = SettingsPage.CONNECTED_HOME },
+                showBack = showBack,
+            )
+            SettingsPage.CONNECTED_HOME_VOICE -> VoiceAssistantSettingsPage(
+                prefs = prefs,
+                voiceState = voiceState,
+                toolCalls = voiceToolCalls,
+                calibrationState = voiceCalibrationState,
+                onStartConnectionTest = onVoiceStartTest,
+                onStopConnectionTest = onVoiceStopTest,
+                onCalibrate = onVoiceCalibrate,
+                onBack = { currentPage = SettingsPage.CONNECTED_HOME },
                 showBack = showBack,
             )
             SettingsPage.CONNECTED_HOME_SESSIONS -> appPageContent(AppPageMode.CONNECTED_HOME, R.string.settings_connected_sessions_title, { currentPage = SettingsPage.CONNECTED_HOME }, showBack)
@@ -779,13 +830,13 @@ private fun AppPage(
                 onClick = { showLanguagePage = true },
             )
             SettingsDivider()
-            // The first-run assistant is offered again from here, and only from here: it never
-            // reopens by itself once it has been completed.
+            // Reset is deliberately performed from the authenticated browser UI. The panel only
+            // opens a short-lived LAN session and never exposes a destructive local shortcut.
             SettingsRow(
                 label = stringResource(R.string.onb_settings_restart_setup_label),
                 onClick = {
                     settingsContext.startActivity(
-                        OnboardingActivity.intent(settingsContext, reset = true)
+                        com.iblu01.portallauncher.WebConfigActivity.onboardingIntent(settingsContext)
                     )
                 },
             )
@@ -1378,17 +1429,16 @@ private fun InformationPage(
             }
             withContext(Dispatchers.Main) {
                 result.onSuccess { apkFile ->
-                    val apkUri = androidx.core.content.FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        apkFile
-                    )
-                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(apkUri, "application/vnd.android.package-archive")
-                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                    scope.launch(Dispatchers.IO) {
+                        val installedWithRoot = AppUpdateManager.installWithRoot(apkFile)
+                        withContext(Dispatchers.Main) {
+                            updateState = UpdateState.IDLE
+                            if (!installedWithRoot) {
+                                runCatching { AppUpdateManager.launchInstaller(context, apkFile) }
+                                    .onFailure { updateState = UpdateState.ERROR }
+                            }
+                        }
                     }
-                    runCatching { context.startActivity(intent) }
-                    updateState = UpdateState.IDLE
                 }.onFailure {
                     updateState = UpdateState.ERROR
                 }
@@ -1415,6 +1465,11 @@ private fun InformationPage(
         }
 
         SettingsSection(title = stringResource(R.string.settings_info_section_updates)) {
+            Text(
+                text = stringResource(R.string.settings_info_update_method),
+                style = AppleTypography.bodyMedium,
+                color = AppleColors.secondary,
+            )
             val isBusy = updateState == UpdateState.CHECKING ||
                 updateState == UpdateState.DOWNLOADING
 

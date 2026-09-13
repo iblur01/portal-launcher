@@ -44,6 +44,7 @@ class ChipMapperTest {
         assertEquals(PanelKind.LIGHTS, chip(id = "light.kitchen", kind = PillKind.LIGHTS).toPanelKind())
         assertEquals(PanelKind.MEDIA, chip(id = "media_player.living", kind = PillKind.MEDIA).toPanelKind())
         assertEquals(PanelKind.PURIFIER, chip(id = "fan.purifier", kind = PillKind.PURIFIER).toPanelKind())
+        assertEquals(PanelKind.TIMER, chip(id = "timer.pasta", kind = PillKind.TIMER).toPanelKind())
     }
 
     // --- alarm-vs-generic-safety split (was SidePanel.kt:179) ----------------------------------
@@ -79,13 +80,14 @@ class ChipMapperTest {
             ChipAction.OpenPanel(PanelKind.SWITCH),
             chip(kind = PillKind.SWITCH, entityId = "input_boolean.guest").toChipAction(),
         )
-        assertEquals(ChipAction.ServiceToggle("fan", "toggle"), chip(kind = PillKind.FAN).toChipAction())
+        assertEquals(ChipAction.OpenPanel(PanelKind.FAN), chip(kind = PillKind.FAN).toChipAction())
     }
 
     @Test fun `other chips open their panel on tap`() {
         assertEquals(ChipAction.OpenPanel(PanelKind.LOCK), chip(kind = PillKind.LOCK).toChipAction())
         assertEquals(ChipAction.OpenPanel(PanelKind.MEDIA), chip(id = "media_group").toChipAction())
         assertEquals(ChipAction.OpenPanel(PanelKind.LIGHTS), chip(id = "lights_group").toChipAction())
+        assertEquals(ChipAction.OpenPanel(PanelKind.TIMER), chip(kind = PillKind.TIMER).toChipAction())
     }
 
 }

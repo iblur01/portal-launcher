@@ -84,6 +84,7 @@ import com.iblu01.portallauncher.ui.LocalHaStates
 import com.iblu01.portallauncher.ui.components.controls.kelvinToColor
 import com.iblu01.portallauncher.ui.components.controls.VerticalColorTempSlider
 import com.iblu01.portallauncher.ui.components.controls.VerticalFillSlider
+import com.iblu01.portallauncher.ui.components.controls.VerticalSwitch
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleMotion
 import com.iblu01.portallauncher.ui.theme.AppleShapes
@@ -176,7 +177,16 @@ fun LightDetailContent(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             DetailHeader(detail.label, onBack, closePanel)
-            if (!onOffOnly) {
+            if (onOffOnly) {
+                OnOffLightControl(
+                    checked = lightOn,
+                    onCheckedChange = { on ->
+                        lightOn = on
+                        callService("light", if (on) "turn_on" else "turn_off", detail.entityId)
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
                 Spacer(Modifier.height(16.dp))
 
                 // Live-while-dragging: send throttled updates on every change and the exact final
@@ -231,6 +241,32 @@ fun LightDetailContent(
                 brightness = max(brightness, 0.5f)
                 callService("light", "turn_on", detail.entityId, mapOf("hs_color" to listOf(hue.toDouble(), saturation.toDouble())))
             },
+        )
+    }
+}
+
+/** The shared vertical on/off control used when a light exposes no dimming or colour capability. */
+@Composable
+private fun OnOffLightControl(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val onLabel = stringResource(R.string.light_state_on)
+    val offLabel = stringResource(R.string.light_state_off)
+    BoxWithConstraints(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        val ratio = 96f / 240f
+        val controlHeight = minOf(maxHeight, maxWidth / ratio, 300.dp)
+        val controlWidth = controlHeight * ratio
+        VerticalSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            accent = AppleColors.active,
+            label = { enabled -> if (enabled) onLabel else offLabel },
+            modifier = Modifier.size(controlWidth, controlHeight),
         )
     }
 }

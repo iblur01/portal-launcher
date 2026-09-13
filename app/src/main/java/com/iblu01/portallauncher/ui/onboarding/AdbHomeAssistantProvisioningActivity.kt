@@ -35,9 +35,9 @@ class AdbHomeAssistantProvisioningActivity : ComponentActivity() {
         lifecycleScope.launch {
             when (val result = tester.test(url, token) { }) {
                 is TestState.Success -> {
-                    prefs.haUrl = OnboardingUrls.normalizeHaUrl(url)
-                    prefs.haToken = token
-                    prefs.homeAssistantOnboardingSkipped = false
+                    OnboardingCoordinator(prefs).executeLocal(
+                        OnboardingCommand.SaveHomeAssistant(url, SecretInput.of(token))
+                    )
                     SettingsChangeBus.get().emit("haUrl")
                     SettingsChangeBus.get().emit("haToken")
                     Log.i(TAG, "Home Assistant credentials provisioned")

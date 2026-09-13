@@ -38,6 +38,10 @@ class OnboardingActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
+            if (prefs.onboardingCompleted) {
+                finishOnboarding(openSettings = false)
+                return@registerForActivityResult
+            }
             viewModel.refreshExternalConfiguration()
             viewModel.testHomeAssistant()
         }
@@ -59,7 +63,9 @@ class OnboardingActivity : ComponentActivity() {
 
         // A dev trigger may ask for a clean run (see the debug manifest / ADB commands in README).
         if (intent?.getBooleanExtra(EXTRA_RESET, false) == true) {
-            prefs.resetOnboarding()
+            OnboardingCoordinator(prefs).executeLocal(
+                OnboardingCommand.ResetProgress(confirmed = true, channel = OnboardingChannel.DEVICE)
+            )
         }
 
         setContent {
@@ -74,7 +80,10 @@ class OnboardingActivity : ComponentActivity() {
                         onOpenSystemSetting = ::openSystemSetting,
                         onFinish = ::finishOnboarding,
                         onConfigureWithPhone = {
-                            webConfigLauncher.launch(Intent(this, WebConfigActivity::class.java))
+                            OnboardingCoordinator(prefs).executeLocal(
+                                OnboardingCommand.SelectChannel(OnboardingChannel.WEB)
+                            )
+                            webConfigLauncher.launch(WebConfigActivity.onboardingIntent(this))
                         },
                     )
                 }

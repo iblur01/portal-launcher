@@ -44,6 +44,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.iblu01.portallauncher.OpacityPreviewActivity
 import com.iblu01.portallauncher.PortalApp
 import com.iblu01.portallauncher.Prefs
+import com.iblu01.portallauncher.ui.onboarding.OnboardingCoordinator
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.photo.DisplaySize
 import com.iblu01.portallauncher.photo.OkHttpTransport
@@ -75,11 +76,8 @@ import kotlinx.coroutines.withContext
 /*
  * The four background branches.
  *
- * `Prefs` is touched here — and only here among the onboarding screens — for the Immich settings:
- * the ViewModel exposes no Immich surface, and the photo source reads its configuration straight
- * from `Prefs`. The access stays contained in this file, is limited to the `immich*` keys plus a
- * read-only `bgOverlayOpacity` (needed to show the slider at its real position after the full-screen
- * preview has written to it), and the API key is never logged nor rendered unmasked.
+ * Immich still owns its rich Prefs model, but every write crosses [OnboardingCoordinator] so the
+ * Web client's revision is invalidated. The API key is never logged nor rendered unmasked.
  */
 
 // --- Calm ---------------------------------------------------------------------------------------
@@ -144,6 +142,7 @@ internal fun ImmichSubPage(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember(context) { Prefs(context.applicationContext) }
+    val coordinator = remember(prefs) { OnboardingCoordinator(prefs) }
 
     var url by remember { mutableStateOf(prefs.immichUrl) }
     var apiKey by remember { mutableStateOf(prefs.immichApiKey) }
@@ -163,7 +162,7 @@ internal fun ImmichSubPage(
         onBack = onBack,
         onValidate = if (connected) {
             {
-                prefs.immichAlbumIds = albumIds
+                coordinator.updateLocalConfiguration { stored -> stored.immichAlbumIds = albumIds }
                 context.applicationContext.let { app ->
                     (app as? PortalApp)?.photoCoordinator?.reconfigure(
                         PhotoCoordinatorConfig(
@@ -197,7 +196,7 @@ internal fun ImmichSubPage(
                 value = url,
                 onValueChange = {
                     url = it
-                    prefs.immichUrl = it
+                    coordinator.updateLocalConfiguration { stored -> stored.immichUrl = it }
                     test = ImmichTest.Idle
                 },
             )
@@ -207,7 +206,7 @@ internal fun ImmichSubPage(
                 value = apiKey,
                 onValueChange = {
                     apiKey = it
-                    prefs.immichApiKey = it
+                    coordinator.updateLocalConfiguration { stored -> stored.immichApiKey = it }
                     test = ImmichTest.Idle
                 },
                 isPassword = true,
@@ -245,7 +244,9 @@ internal fun ImmichSubPage(
                         valueText = "${IMMICH_CADENCES[cadenceIndex]} " +
                             stringResource(R.string.settings_seconds_short),
                         onValueChangeFinished = {
-                            prefs.immichCadenceSeconds = IMMICH_CADENCES[cadenceIndex]
+                            coordinator.updateLocalConfiguration { stored ->
+                                stored.immichCadenceSeconds = IMMICH_CADENCES[cadenceIndex]
+                            }
                         },
                     )
                     SettingsDivider()
@@ -254,7 +255,7 @@ internal fun ImmichSubPage(
                         checked = shuffle,
                         onCheckedChange = {
                             shuffle = it
-                            prefs.immichShuffle = it
+                            coordinator.updateLocalConfiguration { stored -> stored.immichShuffle = it }
                         },
                     )
                 }
@@ -268,7 +269,9 @@ internal fun ImmichSubPage(
                                 onCheckedChange = { checked ->
                                     albumIds = if (checked) albumIds + album.id
                                     else albumIds - album.id
-                                    prefs.immichAlbumIds = albumIds
+                                    coordinator.updateLocalConfiguration { stored ->
+                                        stored.immichAlbumIds = albumIds
+                                    }
                                 },
                             )
                         }
@@ -509,7 +512,7 @@ private fun readOverlayOpacity(context: Context): Float =
     Prefs(context.applicationContext).bgOverlayOpacity
 
 private fun openOpacityPreview(context: Context) {
-    val intent = Intent(context, OpacityPreviewActivity::class.java)
+    val intent = OpacityPreviewActivity.onboardingIntent(context)
     if (context !is android.app.Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     runCatching { context.startActivity(intent) }
 }

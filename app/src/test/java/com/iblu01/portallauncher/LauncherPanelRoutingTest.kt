@@ -56,4 +56,12 @@ class LauncherPanelRoutingTest {
         )
         assertEquals(PanelContent.ChipActions(light), lightContent)
     }
+
+    @Test fun `media browser only exposes sessions that are currently broadcasting`() {
+        val paused = media.copy(entityId = "media_player.bedroom", state = "paused")
+        val idle = media.copy(entityId = "media_player.kitchen", state = "idle")
+        val buffering = media.copy(entityId = "media_player.office", state = "buffering")
+
+        assertEquals(listOf(media, buffering), activeMediaDevices(listOf(media, paused, idle, buffering)))
+    }
 }

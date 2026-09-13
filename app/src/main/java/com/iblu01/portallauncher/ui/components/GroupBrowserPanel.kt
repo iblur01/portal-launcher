@@ -15,15 +15,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -104,6 +114,7 @@ fun GroupBrowserPanel(
     onBack: () -> Unit,
     onDismiss: () -> Unit,
     onCollectiveAction: (List<GroupServiceCall>) -> Unit,
+    onMemberPowerAction: (GroupServiceCall) -> Unit = {},
     modifier: Modifier = Modifier,
     fullScreen: Boolean = false,
 ) {
@@ -181,6 +192,13 @@ fun GroupBrowserPanel(
             Spacer(Modifier.height(14.dp.scaled()))
             if (group.resolvedMembers.isEmpty()) {
                 GroupEmptyState(Modifier.weight(1f))
+            } else if (group.isLightsSelector()) {
+                LightsSelectorGrid(
+                    members = group.resolvedMembers,
+                    onSelectMember = onSelectMember,
+                    onPowerAction = onMemberPowerAction,
+                    modifier = Modifier.weight(1f),
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
@@ -192,6 +210,125 @@ fun GroupBrowserPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Light groups are controls, not a navigation list: make every lamp and its switch visible. */
+private fun PillGroupSnapshot.isLightsSelector(): Boolean =
+    chip.kind == PillKind.LIGHTS || resolvedMembers.all { it.chip.kind == PillKind.LIGHTS }
+
+@Composable
+private fun LightsSelectorGrid(
+    members: List<ResolvedPill>,
+    onSelectMember: (ResolvedPill) -> Unit,
+    onPowerAction: (GroupServiceCall) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 178.dp.scaled()),
+        modifier = modifier.fillMaxWidth().testTag("lightsSelectorGrid"),
+        contentPadding = PaddingValues(bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp.scaled()),
+        verticalArrangement = Arrangement.spacedBy(10.dp.scaled()),
+    ) {
+        gridItems(members, key = { it.ref.stableKey }) { member ->
+            LightSelectorCard(member, onSelectMember, onPowerAction)
+        }
+    }
+}
+
+@Composable
+private fun LightSelectorCard(
+    member: ResolvedPill,
+    onSelectMember: (ResolvedPill) -> Unit,
+    onPowerAction: (GroupServiceCall) -> Unit,
+) {
+    val available = member.availability == Availability.AVAILABLE
+    var isOn by remember(member.chip.entityId, member.chip.deviceState) {
+        mutableStateOf(member.chip.deviceState.equals("on", ignoreCase = true))
+    }
+    val openLabel = stringResource(R.string.home_open_item, member.chip.label)
+    val stateLabel = when (member.availability) {
+        Availability.AVAILABLE -> if (isOn) stringResource(R.string.light_state_on) else stringResource(R.string.light_state_off)
+        Availability.STALE -> stringResource(R.string.group_stale_state)
+        Availability.UNAVAILABLE -> stringResource(R.string.group_device_unavailable)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 76.dp)
+            .alpha(if (available) 1f else 0.62f)
+            .background(
+                if (isOn && available) AppleColors.accent.copy(alpha = 0.16f) else AppleColors.frostedFill,
+                AppleShapes.section,
+            )
+            .border(
+                0.5.dp,
+                if (isOn && available) AppleColors.accent.copy(alpha = 0.42f) else AppleColors.frostedBorder,
+                AppleShapes.section,
+            )
+            .then(
+                if (available) Modifier.clickable(
+                    role = Role.Button,
+                    onClickLabel = openLabel,
+                ) { onSelectMember(member) } else Modifier,
+            )
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = "${member.chip.label}, $stateLabel"
+                if (!available) disabled()
+            }
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .testTag("groupMember:${member.ref.stableKey}"),
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .background(
+                    if (isOn && available) AppleColors.accent else AppleColors.quaternary,
+                    AppleShapes.pill,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.Lightbulb,
+                contentDescription = null,
+                tint = if (isOn && available) Color.White else AppleColors.secondary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Column(Modifier.weight(1f).widthIn(min = 0.dp)) {
+            Text(
+                member.chip.label,
+                style = AppleTypography.titleMedium,
+                color = AppleColors.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                stateLabel,
+                style = AppleTypography.bodySmall.copy(fontSize = 12.sp),
+                color = if (isOn && available) AppleColors.accent else AppleColors.secondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (available && member.chip.entityId.isNotBlank()) {
+            IosSwitch(
+                checked = isOn,
+                modifier = Modifier.testTag("lightPower:${member.ref.stableKey}"),
+                onCheckedChange = { on ->
+                    isOn = on
+                    onPowerAction(
+                        GroupServiceCall("light", if (on) "turn_on" else "turn_off", member.chip.entityId),
+                    )
+                },
+            )
+        } else if (available) {
+            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = AppleColors.tertiary)
         }
     }
 }

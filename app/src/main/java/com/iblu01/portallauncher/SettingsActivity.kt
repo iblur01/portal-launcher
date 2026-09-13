@@ -17,6 +17,10 @@ import javax.inject.Inject
 import com.iblu01.portallauncher.ui.apps.LayoutBackup
 import com.iblu01.portallauncher.ui.components.AppEntry
 import com.iblu01.portallauncher.ui.components.ConnStatus
+import com.iblu01.portallauncher.domain.home.CameraPreferences
+import com.iblu01.portallauncher.domain.home.CameraSupport
+import com.iblu01.portallauncher.domain.home.PillSpecials
+import com.iblu01.portallauncher.ui.screens.CameraSettingsEntry
 import com.iblu01.portallauncher.ui.screens.SettingsCallbacks
 import com.iblu01.portallauncher.ui.screens.SettingsForm
 import com.iblu01.portallauncher.ui.screens.SettingsScreen
@@ -29,11 +33,13 @@ import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
+import com.iblu01.portallauncher.voice.VoiceAssistantController
 
 @AndroidEntryPoint
 class SettingsActivity : ComponentActivity() {
     @Inject lateinit var prefs: Prefs
     @Inject lateinit var pills: PillRepository
+    @Inject lateinit var voice: VoiceAssistantController
     private val uiState = SettingsUiState()
     private var settingsCatalogConnected = false
     private val pillListener = PillRepository.Listener {
@@ -114,15 +120,26 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             PortalTheme {
                 val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
+                val voiceState by voice.state.collectAsStateWithLifecycle()
+                val voiceCalibrationState by voice.micCalibration.collectAsStateWithLifecycle()
+                val voiceToolCalls by voice.toolCalls.collectAsStateWithLifecycle()
                 SettingsScreen(
                     prefs = prefs,
                     uiState = uiState,
                     callbacks = callbacks,
                     installedApps = apps,
                     haStates = pills.latestStates,
+                    haPlatforms = pills.entityPlatformByEntity,
+                    haDeviceIds = pills.latestDeviceIds,
                     autoReturnState = autoReturnState,
                     onAutoReturnCancel = autoReturnTimer::onInteraction,
                     initialPage = intent?.getStringExtra(EXTRA_PAGE),
+                    voiceState = voiceState,
+                    voiceCalibrationState = voiceCalibrationState,
+                    voiceToolCalls = voiceToolCalls,
+                    onVoiceStartTest = voice::startSessionNow,
+                    onVoiceStopTest = voice::stopSession,
+                    onVoiceCalibrate = voice::startMicCalibration,
                 )
             }
         }
@@ -139,6 +156,7 @@ class SettingsActivity : ComponentActivity() {
         pills.addListener(pillListener)
         MqttBridgeService.start(this)
         autoReturnTimer.start()
+        voice.onResume()
     }
 
     private fun webConfigSignature(): String = listOf(
@@ -150,6 +168,7 @@ class SettingsActivity : ComponentActivity() {
     override fun onPause() {
         pills.removeListener(pillListener)
         autoReturnTimer.stop()
+        voice.onPause()
         super.onPause()
     }
 
@@ -248,6 +267,9 @@ class SettingsActivity : ComponentActivity() {
         }
 
         override fun onLoadPillEntities() {
+            // Cameras come from the live cache, not from the /api/states round-trip below: they
+            // must list even while Home Assistant is unreachable, so the settings never lock up.
+            refreshCameras()
             uiState.pillLoading = true
             uiState.pillError = null
             Thread {
@@ -307,6 +329,46 @@ class SettingsActivity : ComponentActivity() {
             }
             refreshPillSettingsCatalog()
         }
+
+        override fun onCameraPreferences(transform: (CameraPreferences) -> CameraPreferences) {
+            uiState.cameraPreferences = prefs.updateCameraPreferences(transform)
+        }
+
+        override fun onCamerasPillPinned(pinned: Boolean) {
+            uiState.homePillPreferences = prefs.updateHomePillPreferences { current ->
+                val without = current.pinnedOrder.filterNot { it == PillSpecials.cameras }
+                current.copy(
+                    pinnedOrder = if (pinned) without + PillSpecials.cameras else without,
+                )
+            }
+            uiState.camerasPillPinned = pinned
+            refreshPillSettingsCatalog()
+        }
+    }
+
+    /**
+     * The cameras Home Assistant currently exposes. Read from the live state cache rather than
+     * from the preference, so a camera added in Home Assistant appears here with no extra step and
+     * a removed one simply stops being listed — without blocking the page or the other cameras.
+     */
+    private fun refreshCameras() {
+        uiState.cameraPreferences = prefs.cameraPreferences
+        uiState.camerasPillPinned = PillSpecials.cameras in prefs.homePillPreferences.pinnedOrder
+        // An empty state cache means "not connected yet", not "no camera": keep whatever is
+        // already listed instead of blanking the page on a reconnect.
+        if (pills.latestStates.isEmpty()) return
+        val cameras = pills.latestStates.values
+            .filter { it.domain == "camera" }
+            .sortedBy { it.name.lowercase() }
+            .map { entity ->
+                CameraSettingsEntry(
+                    entityId = entity.entityId,
+                    label = entity.name,
+                    available = CameraSupport.isAvailable(entity),
+                )
+            }
+        uiState.cameras.clear()
+        uiState.cameras.addAll(cameras)
     }
 
     private fun refreshPillSettingsCatalog() {
@@ -333,6 +395,10 @@ class SettingsActivity : ComponentActivity() {
             uiState.pillCandidates.clear()
             uiState.pillCandidates.addAll(candidates)
         }
+        // Cameras are resynchronized here rather than only from the pills page: the camera
+        // settings live under Connected home, and opening them directly must not show an empty
+        // list. This runs on resume and on every Home Assistant push, so the list stays live.
+        refreshCameras()
     }
 
     private fun resolveInstalledApps(): List<AppEntry> {

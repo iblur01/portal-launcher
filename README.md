@@ -37,6 +37,36 @@ Home Assistant controls. It is built for landscape devices from compact 5-inch d
 |---|---|---|
 | ![Clock screen](docs/screenshots/home-clock.jpg) | ![App grid](docs/screenshots/apps-grid.png) | ![Expanded pills](docs/screenshots/home-pills-expanded.jpg) |
 
+### Notifications
+
+Home Assistant publishes JSON on `portal/<deviceId>/notification`. The panel draws it as a banner
+over whatever is on screen, and can speak it aloud through a Home Assistant TTS engine.
+
+| Plain notification | Custom accent colour | Critical level |
+|---|---|---|
+| ![Notification](docs/screenshots/notification-info.jpg) | ![Coloured notification](docs/screenshots/notification-color.jpg) | ![Critical notification](docs/screenshots/notification-critical.jpg) |
+
+| Countdown timer | Detail lines |
+|---|---|
+| ![Timer notification](docs/screenshots/notification-timer.jpg) | ![Notification with items](docs/screenshots/notification-items.jpg) |
+
+### Alarm panel
+
+A second topic, `portal/<deviceId>/alarm`, carries the state of an alarm system. The panel decides
+how loudly to say it: the two states that demand a code black the screen out and put the keypad in
+the middle, the rest stay a banner.
+
+| Exit delay | Entry delay | Triggered |
+|---|---|---|
+| ![Arming](docs/screenshots/alarm-arming.jpg) | ![Entry delay](docs/screenshots/alarm-pending.jpg) | ![Triggered](docs/screenshots/alarm-triggered.jpg) |
+
+| Armed | Disarmed | Arming refused |
+|---|---|---|
+| ![Armed](docs/screenshots/alarm-armed.jpg) | ![Disarmed](docs/screenshots/alarm-disarmed.jpg) | ![Arming refused](docs/screenshots/alarm-failed.jpg) |
+
+While the entry delay or a triggered alarm is on screen, a tap does nothing: only the code, or Home
+Assistant itself, takes it down. Notifications keep arriving underneath without displacing it.
+
 More interface captures are available in [docs/screenshots](docs/screenshots).
 
 ## Quick start
@@ -92,6 +122,7 @@ For detailed setup, permissions, ADB provisioning and local web configuration, r
 - [Immich and photo sources](docs/photo-sources.md)
 - [Home pills technical specification](docs/PILLS_HOME_TECHNICAL_SPEC.md)
 - [MQTT session protocol](docs/session-protocol.md)
+- [Notifications and alarm payloads](docs/NOTIFICATION_PAYLOAD.md)
 - [Contributing](CONTRIBUTING.md)
 - [Version history](CHANGELOG.md)
 
