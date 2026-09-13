@@ -51,6 +51,8 @@ import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.components.PillButton
 import com.iblu01.portallauncher.ui.components.appleClickable
 import com.iblu01.portallauncher.ui.onboarding.OnboardingUiState
+import com.iblu01.portallauncher.ui.onboarding.OnboardingChannelAvailability
+import com.iblu01.portallauncher.ui.onboarding.OnboardingCoordinator
 import com.iblu01.portallauncher.ui.onboarding.components.LocalOnboardingLayout
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingNavigationBar
 import com.iblu01.portallauncher.ui.onboarding.components.OnboardingScaffold
@@ -70,10 +72,13 @@ fun WelcomeStep(
     state: OnboardingUiState,
     onContinue: () -> Unit,
     onSkipEverything: () -> Unit,
+    channelAvailability: OnboardingChannelAvailability,
+    onConfigureWithWeb: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { Prefs(context) }
+    val coordinator = remember(prefs) { OnboardingCoordinator(prefs) }
     var languageSelected by remember { mutableStateOf(prefs.onboardingLanguageSelected) }
     var askingToSkip by remember { mutableStateOf(false) }
 
@@ -82,8 +87,10 @@ fun WelcomeStep(
             state = state,
             onSelect = { language ->
                 val changed = prefs.appLanguage != language.code
-                prefs.appLanguage = language.code
-                prefs.onboardingLanguageSelected = true
+                coordinator.updateLocalConfiguration { stored ->
+                    stored.appLanguage = language.code
+                    stored.onboardingLanguageSelected = true
+                }
                 if (changed) {
                     restartOnboarding(context)
                 } else {
@@ -92,6 +99,25 @@ fun WelcomeStep(
             },
             modifier = modifier,
         )
+        return
+    }
+
+    if (channelAvailability == OnboardingChannelAvailability.WEB_REQUIRED) {
+        OnboardingScaffold(
+            step = state.step,
+            flags = state.flags,
+            title = stringResource(R.string.onb_web_required_title),
+            description = stringResource(R.string.onb_web_required_body),
+            modifier = modifier,
+            showProgress = false,
+            navigation = {
+                OnboardingNavigationBar(
+                    onBack = null,
+                    primaryLabel = stringResource(R.string.onb_web_open_action),
+                    onPrimary = onConfigureWithWeb,
+                )
+            },
+        ) { }
         return
     }
 
@@ -107,8 +133,8 @@ fun WelcomeStep(
                 onBack = null,
                 primaryLabel = stringResource(R.string.onb_welcome_action_primary),
                 onPrimary = onContinue,
-                secondaryLabel = stringResource(R.string.onb_welcome_action_secondary),
-                onSecondary = { askingToSkip = true },
+                secondaryLabel = stringResource(R.string.onb_web_open_action),
+                onSecondary = onConfigureWithWeb,
             )
         },
     ) {

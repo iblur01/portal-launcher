@@ -115,7 +115,9 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
         // Lightweight listener: refresh the raw-state cache + one-time auto-init, then notify.
         // No select/media/temperature work here — that lives in snapshotFlow only.
         repo.addListener { states, connected ->
-            latestStates = states
+            val disabled = prefs.disabledHaIntegrations
+            latestStates = if (!repo.entityRegistryResolved || disabled.isEmpty()) states else
+                states.filterKeys { repo.entityPlatformByEntity[it] !in disabled }
             latestConnected = connected
             latestDeviceIds = repo.deviceIdByEntity
             lightAreas = repo.areaByEntity
@@ -256,8 +258,36 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
      * fresh connection exactly like [snapshotFlow].
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun rawSnapshots(): Flow<com.iblu01.portallauncher.domain.model.HaSnapshot> =
-        activeRepo.flatMapLatest { repo -> repo?.states() ?: emptyFlow() }
+    fun rawSnapshots(prefs: Prefs): Flow<com.iblu01.portallauncher.domain.model.HaSnapshot> =
+        filteredSnapshots(prefs)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun filteredSnapshots(prefs: Prefs): Flow<com.iblu01.portallauncher.domain.model.HaSnapshot> =
+        activeRepo.flatMapLatest { repo ->
+            if (repo == null) emptyFlow()
+            else combine(
+                repo.states(),
+                SettingsChangeBus.get().changes
+                    .filter { it == Prefs.DISABLED_HA_INTEGRATIONS_KEY }
+                    .map { Unit }
+                    .onStart { emit(Unit) },
+            ) { snapshot, _ ->
+                val disabled = prefs.disabledHaIntegrations
+                if (!snapshot.entityRegistryResolved || disabled.isEmpty()) snapshot else {
+                    val visibleIds = snapshot.states.keys.filterTo(hashSetOf()) {
+                        snapshot.entityPlatformByEntity[it] !in disabled
+                    }
+                    snapshot.copy(
+                        states = snapshot.states.filterKeys(visibleIds::contains),
+                        deviceIdByEntity = snapshot.deviceIdByEntity.filterKeys(visibleIds::contains),
+                        entityCategoryByEntity = snapshot.entityCategoryByEntity.filterKeys(visibleIds::contains),
+                        entityPlatformByEntity = snapshot.entityPlatformByEntity.filterKeys(visibleIds::contains),
+                        areaByEntity = snapshot.areaByEntity.filterKeys(visibleIds::contains),
+                        areaIdByEntity = snapshot.areaIdByEntity.filterKeys(visibleIds::contains),
+                    )
+                }
+            }
+        }
 
     /**
      * The single transform pipeline (Findings 6/7): raw [HaStateRepository.states] → selected chips
@@ -273,20 +303,17 @@ class PillRepository @Inject constructor(@ApplicationContext private val appCont
     @OptIn(ExperimentalCoroutinesApi::class)
     fun snapshotFlow(prefs: Prefs): Flow<PillSnapshot> =
         transformSnapshots(
-            source = activeRepo.flatMapLatest { repo ->
-                if (repo == null) emptyFlow()
-                else combine(
-                    repo.states(),
-                    SettingsChangeBus.get().changes
-                        .filter {
-                            it == Prefs.HOME_PILL_PREFERENCES_CHANGE_KEY ||
-                                it == Prefs.CAMERA_PREFERENCES_CHANGE_KEY ||
-                                it == PILL_RULES_CHANGE_KEY
-                        }
-                        .map { Unit }
-                        .onStart { emit(Unit) },
-                ) { snapshot, _ -> snapshot }
-            },
+            source = combine(
+                filteredSnapshots(prefs),
+                SettingsChangeBus.get().changes
+                    .filter {
+                        it == Prefs.HOME_PILL_PREFERENCES_CHANGE_KEY ||
+                            it == Prefs.CAMERA_PREFERENCES_CHANGE_KEY ||
+                            it == PILL_RULES_CHANGE_KEY
+                    }
+                    .map { Unit }
+                    .onStart { emit(Unit) },
+            ) { snapshot, _ -> snapshot },
             rulesProvider = { prefs.pillRules },
             haUrl = prefs.haUrl,
             homePreferencesProvider = { prefs.homePillPreferences },

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.SensorDoor
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.Tv
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.WbSunny
@@ -39,7 +40,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
  */
 fun launcherIcon(key: String): ImageVector = when (key.lowercase()) {
     // Widgets / devices
-    "washer", "timer" -> Icons.Outlined.CleaningServices
+    "washer" -> Icons.Outlined.CleaningServices
+    "timer" -> Icons.Outlined.Timer
     "window", "opening", "cover", "shutter", "blind" -> Icons.Outlined.SensorDoor
     "door", "porte" -> Icons.Outlined.SensorDoor
     "motion", "movement", "occupancy" -> Icons.Outlined.DirectionsRun

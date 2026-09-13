@@ -85,6 +85,22 @@ object AppUpdateManager {
         })
     }
 
+    /**
+     * Tries the unattended install path offered by rooted/custom-ROM panels.
+     *
+     * The probe cache is deliberately cleared: a previous denial must not prevent Android's root
+     * manager from asking again when the user explicitly starts a later update. Call off the main
+     * thread. A false result means the caller should fall back to the system package installer.
+     */
+    fun installWithRoot(apk: File): Boolean {
+        RootShell.forgetProbe()
+        if (!RootShell.isAvailable()) return false
+        val output = RootShell.run(listOf("pm install -r ${shellQuote(apk.absolutePath)}"))
+        return output?.lineSequence()?.any { it.trim().equals("Success", ignoreCase = true) } == true
+    }
+
+    internal fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
+
     private const val LATEST_RELEASE_URL =
         "https://api.github.com/repos/iblur01/portal-launcher/releases/latest"
 }

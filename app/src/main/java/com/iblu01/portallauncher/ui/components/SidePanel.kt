@@ -166,7 +166,7 @@ private fun ChipActionsContent(
         PanelKind.WASHER -> false // The washer dial owns progress, phase and remaining time.
         PanelKind.ALARM -> false // The alarm state machine owns live status and incident copy.
         PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
-        PanelKind.LAWN_MOWER -> false
+        PanelKind.LAWN_MOWER, PanelKind.TIMER -> false
         PanelKind.COVER -> entity?.let {
             !it.supports(CoverFeature.SET_POSITION) || it.attributes.optInt("current_position", -1) !in 0..100
         } != false
@@ -208,7 +208,7 @@ private fun ChipActionsContent(
         // Center the control block vertically in the remaining space; it still scrolls if a
         // panel's content is taller than the panel (keypads, long detail lists).
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.OPENING, PanelKind.MOTION, PanelKind.PURIFIER, PanelKind.THERMOSTAT, PanelKind.VACUUM, PanelKind.ALARM, PanelKind.WASHER, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER)) {
+            if (chip.toPanelKind() in setOf(PanelKind.COVER, PanelKind.FAN, PanelKind.SWITCH, PanelKind.LOCK, PanelKind.OPENING, PanelKind.MOTION, PanelKind.PURIFIER, PanelKind.THERMOSTAT, PanelKind.VACUUM, PanelKind.ALARM, PanelKind.WASHER, PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN, PanelKind.LAWN_MOWER, PanelKind.TIMER)) {
                 // Vertical controls need finite panel constraints so they can fill the available
                 // height while preserving the same proportions as lights and covers.
                 when (chip.toPanelKind()) {
@@ -228,6 +228,7 @@ private fun ChipActionsContent(
                     PanelKind.VALVE -> ValveControl(chip, Modifier.fillMaxSize())
                     PanelKind.SIREN -> SirenControl(chip, Modifier.fillMaxSize())
                     PanelKind.LAWN_MOWER -> GenericHaEntityControl(chip, Modifier.fillMaxSize())
+                    PanelKind.TIMER -> TimerControl(chip, Modifier.fillMaxSize())
                     else -> Unit
                 }
             } else {
@@ -251,7 +252,7 @@ private fun ChipActionsContent(
                 PanelKind.OPENING, PanelKind.MOTION -> Unit // Bounded branch above.
                 PanelKind.ALARM, PanelKind.WASHER -> Unit // Bounded branch above.
                 PanelKind.HUMIDIFIER, PanelKind.WATER_HEATER, PanelKind.VALVE, PanelKind.SIREN,
-                PanelKind.LAWN_MOWER -> Unit // Bounded branch above.
+                PanelKind.LAWN_MOWER, PanelKind.TIMER -> Unit // Bounded branch above.
                 // Direct media pills are routed to MediaPlayerPanel upstream. A media member opened
                 // from a group can still reach this nested renderer, so retain a meaningful status
                 // row instead of presenting a completely empty panel.

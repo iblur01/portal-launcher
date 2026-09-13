@@ -114,6 +114,32 @@ class GroupBrowserPanelTest {
     }
 
     @Test
+    fun `light groups use the responsive selector and expose a direct power action`() {
+        val light = member("light.lampe", PillKind.LIGHTS)
+        val powerCalls = mutableListOf<GroupServiceCall>()
+        rule.setContent {
+            CompositionLocalProvider(LocalHaStates provides remember { HaStates() }) {
+                GroupBrowserPanel(
+                    group = group(listOf(light), GroupCollectiveAction.TURN_OFF),
+                    selectedDevice = null,
+                    deviceRequested = false,
+                    onSelectMember = {},
+                    onBack = {},
+                    onDismiss = {},
+                    onCollectiveAction = {},
+                    onMemberPowerAction = { powerCalls += it },
+                )
+            }
+        }
+
+        rule.onNodeWithTag("lightsSelectorGrid").assertIsDisplayed()
+        rule.onNodeWithTag("lightPower:${light.ref.stableKey}", useUnmergedTree = true).performClick()
+        rule.waitForIdle()
+
+        assertEquals(listOf(GroupServiceCall("light", "turn_on", "light.lampe")), powerCalls)
+    }
+
+    @Test
     fun `stale members remain visible but disabled and collective commands disappear`() {
         val stale = member("lock.porte", PillKind.LOCK, Availability.STALE)
         rule.setContent {

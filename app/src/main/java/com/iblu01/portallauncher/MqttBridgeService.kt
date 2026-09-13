@@ -32,6 +32,9 @@ import com.iblu01.portallauncher.session.SessionResult
 import com.iblu01.portallauncher.session.SessionRuntime
 import com.iblu01.portallauncher.session.SessionSerializer
 import com.iblu01.portallauncher.session.RealSessionTimeSource
+import com.iblu01.portallauncher.voice.VoiceAssistantController
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.concurrent.Executors
@@ -39,7 +42,11 @@ import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
+@AndroidEntryPoint
 class MqttBridgeService : Service() {
+    /** Shared with the launcher: the same singleton owns the microphone hand-off. */
+    @Inject lateinit var voice: VoiceAssistantController
+
     companion object {
         private const val TAG = "PortalLauncher"
         private const val CHANNEL = "portal_launcher_bridge"
@@ -119,6 +126,16 @@ class MqttBridgeService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /**
+     * The language chosen in Settings applies here too. Every Activity wraps its base context; a
+     * Service does not get that for free, and the alarm's own wording is composed right here, so
+     * without this the panel speaks and writes in the device language while the rest of the UI
+     * follows the user's choice.
+     */
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
+    }
+
     override fun onCreate() {
         super.onCreate()
         createChannel()
@@ -126,6 +143,17 @@ class MqttBridgeService : Service() {
         sessionAllowlist = prefs.appSessionAllowlist
         sessionCoordinator = createSessionCoordinator().also { it.setEnabled(prefs.appSessionsEnabled) }
         lastSessionsEnabled = prefs.appSessionsEnabled
+        // An away home that was locked stays locked through a reboot; reopening itself would be
+        // the one failure mode this switch exists to prevent.
+        ActionLockState.set(prefs.actionLocked)
+        // Same reasoning for the microphone: a panel muted before a power cut must not wake up
+        // listening again.
+        VoiceMuteState.restore(prefs)
+        VoiceMuteState.onChanged = { muted ->
+            publishVoiceMuteState(prefs)
+            voice.onConfigChanged()
+            if (muted) voice.stopSession()
+        }
 
         DeviceStateHub.init(this)
         DeviceStateHub.addListener(deviceStateListener)
@@ -169,6 +197,7 @@ class MqttBridgeService : Service() {
         screenReceiver?.let { runCatching { unregisterReceiver(it) } }
         audioReceiver?.let { runCatching { unregisterReceiver(it) } }
         DeviceStateHub.removeListener(deviceStateListener)
+        VoiceMuteState.onChanged = null
         super.onDestroy()
     }
 
@@ -270,6 +299,7 @@ class MqttBridgeService : Service() {
         pub(HaDiscovery.volumeMuteDiscoveryTopic(p.deviceId), HaDiscovery.volumeMuteConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.doorbellDiscoveryTopic(p.deviceId), HaDiscovery.doorbellConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.alertDiscoveryTopic(p.deviceId), HaDiscovery.alertConfigPayload(p.deviceId, p.deviceName))
+        pub(HaDiscovery.voiceDiscoveryTopic(p.deviceId), HaDiscovery.voiceConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.brightnessDiscoveryTopic(p.deviceId), HaDiscovery.brightnessConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.screenTimeoutDiscoveryTopic(p.deviceId), HaDiscovery.screenTimeoutConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.screenTimeoutMinutesDiscoveryTopic(p.deviceId), HaDiscovery.screenTimeoutMinutesConfigPayload(p.deviceId, p.deviceName))
@@ -277,6 +307,8 @@ class MqttBridgeService : Service() {
         pub(HaDiscovery.photoStatusDiscoveryTopic(p.deviceId), HaDiscovery.photoStatusConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.sessionDiscoveryTopic(p.deviceId), HaDiscovery.sessionConfigPayload(p.deviceId, p.deviceName))
         pub(HaDiscovery.sessionEnabledDiscoveryTopic(p.deviceId), HaDiscovery.sessionEnabledConfigPayload(p.deviceId, p.deviceName))
+        pub(HaDiscovery.actionLockDiscoveryTopic(p.deviceId), HaDiscovery.actionLockConfigPayload(p.deviceId, p.deviceName))
+        pub(HaDiscovery.voiceMuteDiscoveryTopic(p.deviceId), HaDiscovery.voiceMuteConfigPayload(p.deviceId, p.deviceName))
     }
 
     private fun publishInitialStates(p: Prefs) {
@@ -290,6 +322,8 @@ class MqttBridgeService : Service() {
         publishPowerState(p)
         publishPhotoStatus(p)
         publishSessionsEnabledState(p)
+        publishActionLockState(p)
+        publishVoiceMuteState(p)
         sessionCoordinator?.publishCurrentState()
     }
 
@@ -353,11 +387,24 @@ class MqttBridgeService : Service() {
                 }
                 AlertOverlayState.showAlert(msg)
             }
-            HaDiscovery.notificationCommandTopic(p.deviceId) -> {
-                if (payload.isNotEmpty()) {
-                    TonePlayer.play("alert")
-                    AlertOverlayState.showAlert(payload)
-                }
+            HaDiscovery.notificationCommandTopic(p.deviceId) -> showNotification(p, payload)
+            HaDiscovery.alarmCommandTopic(p.deviceId) -> showAlarm(p, payload)
+            HaDiscovery.actionLockCommandTopic(p.deviceId) -> {
+                val locked = payload.trim().uppercase() == "ON"
+                p.actionLocked = locked
+                ActionLockState.set(locked)
+                publishActionLockState(p)
+                toast(getString(if (locked) R.string.action_lock_on else R.string.action_lock_off))
+            }
+            HaDiscovery.voiceMuteCommandTopic(p.deviceId) -> {
+                VoiceMuteState.set(p, payload.trim().uppercase() == "ON")
+                toast(getString(if (VoiceMuteState.muted) R.string.voice_mute_on else R.string.voice_mute_off))
+            }
+            HaDiscovery.voiceCommandTopic(p.deviceId) -> {
+                // A muted assistant refuses the remote trigger too, otherwise the switch only
+                // hides the microphone instead of closing it.
+                if (VoiceMuteState.muted) Log.i(TAG, "voice: ignored remote start, assistant muted")
+                else startVoiceSession()
             }
             HaDiscovery.brightnessCommandTopic(p.deviceId) -> {
                 val pct = (payload.toIntOrNull() ?: return).coerceIn(0, 100)
@@ -388,6 +435,144 @@ class MqttBridgeService : Service() {
                 publishPowerState(p)
             }
         }
+    }
+
+    /**
+     * Remote "press to talk". The screen is woken and the launcher brought forward first: the
+     * session overlay lives in the launcher, so starting the session on a panel showing something
+     * else would leave the user talking to an invisible assistant. The launcher's own onResume
+     * would normally re-arm the wake engine and steal the microphone from the session, which
+     * VoiceAssistantController refuses while a session is live.
+     */
+    /**
+     * Shows a notification pushed by Home Assistant: a plain message, or the JSON payload parsed by
+     * [AlertPayload] carrying its own icon, level, chime and speech.
+     *
+     * Speech is always rendered on the Home Assistant side. Either the payload names a finished
+     * clip, or it carries the words and the panel asks Home Assistant for their URL with the
+     * credentials it already holds — it never synthesises anything itself.
+     */
+    private fun showNotification(p: Prefs, payload: String) {
+        if (AlertPayload.isDismiss(payload)) {
+            // Disarming during an entry delay lands here: the countdown and its beeps go at once.
+            AudioUrlPlayer.stop()
+            AlertOverlayState.dismiss()
+            return
+        }
+        val alert = AlertPayload.parse(payload) ?: return
+        if (alert.wake) ScreenControl.wake(this)
+
+        val clip = alert.playableAudio(p.haUrl)
+        when {
+            clip != null -> speak(alert, clip)
+            alert.audio != null -> {
+                Log.w(TAG, "notification audio refused, not the configured HA host: ${alert.audio}")
+                chimeAndShow(alert)
+            }
+            alert.tts != null -> {
+                // The overlay goes up now and the words are fetched behind it: a round trip to
+                // Home Assistant must not delay what the room can already read.
+                AlertOverlayState.show(alert, awaitAudio = alert.durationMs == null)
+                fetchSpeech(p, alert)
+            }
+            else -> chimeAndShow(alert)
+        }
+    }
+
+    /**
+     * The alarm's own layer, driven by state rather than by a composed notification: Home Assistant
+     * says `pending` or `triggered`, the panel decides whether that deserves the whole screen.
+     *
+     * An empty payload clears it — which is also what wiping the retained topic does.
+     */
+    private fun showAlarm(p: Prefs, payload: String) {
+        val state = AlarmState.parse(payload)
+        val alert = state?.toAlert(this)
+        if (alert == null) {
+            AlarmOverlayState.dismiss()
+            return
+        }
+        if (alert.wake) ScreenControl.wake(this)
+        AlarmOverlayState.show(alert)
+        val spokenAt = System.currentTimeMillis()
+        val chimeMs = alert.tone?.let { TonePlayer.play(it) } ?: 0L
+        alert.tts?.let { words ->
+            val baseUrl = p.haUrl
+            val token = p.haToken
+            Thread {
+                val clip = HaApiClient(baseUrl, token).ttsUrl(words, alert.engine, alert.language)
+                Log.i(TAG, "alarm speech: \"$words\" -> ${clip ?: "no url"}")
+                clip ?: return@Thread
+                // The chime has to be over before the announcement starts, or it never starts at
+                // all. Fetching the clip already ate part of that wait.
+                (chimeMs - (System.currentTimeMillis() - spokenAt)).takeIf { it > 0 }
+                    ?.let { runCatching { Thread.sleep(it) } }
+                AudioUrlPlayer.play(this, clip)
+            }.also { it.isDaemon = true }.start()
+        }
+    }
+
+    private fun publishVoiceMuteState(p: Prefs) {
+        publishRaw(
+            HaDiscovery.voiceMuteStateTopic(p.deviceId),
+            if (VoiceMuteState.muted) "ON" else "OFF",
+            1,
+            retained = true,
+        )
+    }
+
+    private fun publishActionLockState(p: Prefs) {
+        publishRaw(
+            HaDiscovery.actionLockStateTopic(p.deviceId),
+            if (p.actionLocked) "ON" else "OFF",
+            1,
+            retained = true,
+        )
+    }
+
+    private fun chimeAndShow(alert: AlertPayload) {
+        alert.tone?.let { TonePlayer.play(it) }
+        AlertOverlayState.show(alert)
+    }
+
+    private fun speak(alert: AlertPayload, clip: String) {
+        // With no explicit duration the notification stands until the announcement has been read
+        // out, however long that takes.
+        AlertOverlayState.show(alert, awaitAudio = alert.durationMs == null)
+        AudioUrlPlayer.play(this, clip) { AlertOverlayState.onAudioFinished() }
+    }
+
+    /** Asks Home Assistant to render [AlertPayload.tts], off the MQTT callback thread. */
+    private fun fetchSpeech(p: Prefs, alert: AlertPayload) {
+        val words = alert.tts ?: return
+        val baseUrl = p.haUrl
+        val token = p.haToken
+        Thread {
+            // The URL comes back over the authenticated REST call this panel made itself, so unlike
+            // an `audio` field pushed by whoever can reach the broker, it needs no host check.
+            val clip = HaApiClient(baseUrl, token).ttsUrl(words, alert.engine, alert.language)
+            if (clip == null) {
+                Log.w(TAG, "speech unavailable, falling back to the chime")
+                TonePlayer.play(alert.tone ?: AlertPayload.DEFAULT_TONE)
+                AlertOverlayState.onAudioFinished()
+                return@Thread
+            }
+            AudioUrlPlayer.play(this, clip) { AlertOverlayState.onAudioFinished() }
+        }.also { it.isDaemon = true }.start()
+    }
+
+    private fun startVoiceSession() {
+        ScreenControl.wake(this)
+        runCatching {
+            startActivity(
+                Intent(this, LauncherActivity::class.java).addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                )
+            )
+        }.onFailure { Log.w(TAG, "voice: could not bring the launcher forward", it) }
+        voice.startSessionNow()
     }
 
     private fun registerScreenReceiver() {

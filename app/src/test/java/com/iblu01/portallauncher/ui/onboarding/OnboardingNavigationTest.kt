@@ -9,12 +9,13 @@ import org.junit.Test
 /** The onboarding's branching, exercised without Android. */
 class OnboardingNavigationTest {
 
-    private val everything = OnboardingFlags()
+    private val everything = OnboardingFlags(geminiSkipped = false)
 
     @Test
     fun `full flow visits every step in order`() {
         val visited = generateSequence(OnboardingStep.WELCOME) { nextStep(it, everything) }.toList()
-        assertEquals(OnboardingStep.values().toList(), visited)
+        assertEquals(OnboardingStep.values().filterNot { it == OnboardingStep.RECEIVE_CONFIG }, visited)
+        assertFalse(OnboardingStep.RECEIVE_CONFIG in visited)
     }
 
     @Test
@@ -30,21 +31,22 @@ class OnboardingNavigationTest {
     @Test
     fun `back mirrors forward on every step`() {
         OnboardingStep.values().forEach { step ->
+            if (step == OnboardingStep.RECEIVE_CONFIG) return@forEach
             val next = nextStep(step, everything) ?: return@forEach
             assertEquals("back from $next", step, previousStep(next, everything))
         }
     }
 
     @Test
-    fun `the home assistant offer is still shown, and skipping it lands on the app cleanup`() {
+    fun `the home assistant offer is still shown, and skipping it lands on mqtt`() {
         val flags = OnboardingFlags(homeAssistantSkipped = true)
         // The offer itself is never skipped — it is where the user says no.
         assertEquals(OnboardingStep.HOME_ASSISTANT_INTRO, nextStep(OnboardingStep.BACKGROUND, flags))
-        assertEquals(OnboardingStep.HIDDEN_APPS, nextStep(OnboardingStep.HOME_ASSISTANT_INTRO, flags))
+        assertEquals(OnboardingStep.MQTT_CONFIGURATION, nextStep(OnboardingStep.HOME_ASSISTANT_INTRO, flags))
     }
 
     @Test
-    fun `skipping home assistant removes token pills and mqtt steps`() {
+    fun `skipping home assistant removes only its token and entity steps`() {
         val flags = OnboardingFlags(homeAssistantSkipped = true)
         val visited = generateSequence(OnboardingStep.WELCOME) { nextStep(it, flags) }.toList()
         listOf(
@@ -52,17 +54,18 @@ class OnboardingNavigationTest {
             OnboardingStep.HOME_ASSISTANT_TEST,
             OnboardingStep.PILLS_INTRO,
             OnboardingStep.REMOTE_CONTROL,
-            OnboardingStep.MQTT_CONFIGURATION,
-            OnboardingStep.MQTT_TEST,
         ).forEach { assertFalse("$it should be skipped", it in visited) }
         assertTrue(OnboardingStep.HOME_ASSISTANT_INTRO in visited)
+        assertTrue(OnboardingStep.MQTT_CONFIGURATION in visited)
+        assertTrue(OnboardingStep.MQTT_TEST in visited)
         assertTrue(OnboardingStep.COMPLETE in visited)
     }
 
     @Test
-    fun `back from hidden apps returns to the intro when home assistant was skipped`() {
+    fun `home assistant skip continues into independent mqtt configuration`() {
         val flags = OnboardingFlags(homeAssistantSkipped = true)
-        assertEquals(OnboardingStep.HOME_ASSISTANT_INTRO, previousStep(OnboardingStep.HIDDEN_APPS, flags))
+        assertEquals(OnboardingStep.MQTT_CONFIGURATION, nextStep(OnboardingStep.HOME_ASSISTANT_INTRO, flags))
+        assertEquals(OnboardingStep.MQTT_TEST, previousStep(OnboardingStep.HIDDEN_APPS, flags))
     }
 
     @Test
@@ -82,8 +85,9 @@ class OnboardingNavigationTest {
     }
 
     @Test
-    fun `a successful mqtt configuration leads to app cleanup`() {
-        assertEquals(OnboardingStep.HIDDEN_APPS, nextStep(OnboardingStep.MQTT_TEST, everything))
+    fun `a successful mqtt configuration leads to selected gemini`() {
+        assertEquals(OnboardingStep.GEMINI, nextStep(OnboardingStep.MQTT_TEST, everything))
+        assertEquals(OnboardingStep.HIDDEN_APPS, nextStep(OnboardingStep.GEMINI, everything))
     }
 
     @Test
@@ -104,7 +108,14 @@ class OnboardingNavigationTest {
     @Test
     fun `chapter progress ignores skipped steps`() {
         val flags = OnboardingFlags(homeAssistantSkipped = true)
-        assertEquals(listOf(OnboardingStep.HOME_ASSISTANT_INTRO), visibleSteps(OnboardingChapter.HOME, flags))
+        assertEquals(
+            listOf(
+                OnboardingStep.HOME_ASSISTANT_INTRO,
+                OnboardingStep.MQTT_CONFIGURATION,
+                OnboardingStep.MQTT_TEST,
+            ),
+            visibleSteps(OnboardingChapter.HOME, flags),
+        )
         assertEquals(0, indexInChapter(OnboardingStep.HOME_ASSISTANT_INTRO, flags))
         assertEquals(3, indexInChapter(OnboardingStep.BACKGROUND, flags))
     }

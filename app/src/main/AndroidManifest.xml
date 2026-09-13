@@ -16,6 +16,12 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Voice assistant. Runtime-granted; the wake word and the Pipecat session share this one
+         microphone, never at the same time (these panels predate concurrent capture). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
     <!--
         Deliberate kiosk capabilities. WRITE_SETTINGS is user-approved through the system screen;
         WRITE_SECURE_SETTINGS is optionally granted over ADB as documented in README.md.
@@ -176,6 +182,11 @@
 
         <receiver
             android:name=".SleepReceiver"
+            android:exported="false" />
+
+        <!-- Fires the actions the voice assistant promised for later (voice.VoiceScheduler). -->
+        <receiver
+            android:name=".VoiceScheduleReceiver"
             android:exported="false" />
 
         <provider

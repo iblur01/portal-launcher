@@ -22,6 +22,12 @@ nanohttpd = "2.3.1"
 zxing = "3.5.3"
 # Camera center: HLS playback with audio. 1.4.x still supports minSdk 21 (project targets 28).
 media3 = "1.4.1"
+# Voice assistant: Pipecat RTVI client + SmallWebRTC transport (self-hosted /api/offer), and
+# openWakeWord for the on-device wake word that gates the connection.
+# Pinned to the last release built with Kotlin 2.0.x: 1.2.x ships 2.3.10 metadata, which this
+# project's Kotlin 2.0.20 compiler refuses to read. The APIs used here are identical in both.
+openwakeword = "0.1.5"
+onnxruntime = "1.18.0"
 
 [libraries]
 paho-mqtt = { group = "org.eclipse.paho", name = "org.eclipse.paho.client.mqttv3", version.ref = "paho" }
@@ -52,6 +58,9 @@ json = { group = "org.json", name = "json", version.ref = "json" }
 media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3" }
 media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
+
+openwakeword = { group = "xyz.rementia", name = "openwakeword", version.ref = "openwakeword" }
+onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntime" }
 
 # MAD architecture: coroutines, lifecycle/ViewModel, immutable collections, test
 coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }

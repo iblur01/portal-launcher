@@ -20,7 +20,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.HaInstance
 import com.iblu01.portallauncher.ui.theme.AppleColors
@@ -398,6 +402,105 @@ fun SettingsTextField(
     }
 }
 
+/**
+ * The options actually shown. A stored value the list does not know about is kept at the top
+ * instead of being dropped: a model name Google has retired must stay visible and selected, or
+ * opening the settings page would silently swap it for something the user never chose.
+ */
+internal fun pickerChoices(value: String, options: List<String>): List<String> =
+    if (value.isBlank() || value in options) options else listOf(value) + options
+
+/**
+ * Label + current choice + a dropdown of the options, drawn like [SettingsTextField] so a field
+ * that becomes a closed list does not become a different-looking control.
+ *
+ * [options] is the list as the panel knows it; the stored [value] is always offered even when it
+ * is absent from that list, because a model name Google retired must stay visible and selected
+ * rather than silently swapped for something the user never chose.
+ */
+@Composable
+fun SettingsPicker(
+    label: String,
+    value: String,
+    options: List<String>,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    labelOf: (String) -> String = { it },
+    hint: String? = null,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val choices = remember(options, value) { pickerChoices(value, options) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = label,
+            style = AppleTypography.bodySmall,
+            color = AppleColors.secondary,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+        Box {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(AppleShapes.section)
+                    .background(AppleColors.background.copy(alpha = 0.5f), AppleShapes.section)
+                    .border(0.5.dp, AppleColors.frostedBorder, AppleShapes.section)
+                    .appleClickable { expanded = true }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (value.isBlank()) "—" else labelOf(value),
+                    style = AppleTypography.titleMedium,
+                    color = if (value.isBlank()) AppleColors.tertiary else AppleColors.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Outlined.ExpandMore,
+                    contentDescription = null,
+                    tint = AppleColors.tertiary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(AppleColors.frostedFill),
+            ) {
+                choices.forEach { option ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = labelOf(option),
+                                style = AppleTypography.titleMedium,
+                                color = if (option == value) AppleColors.accent else AppleColors.primary,
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            if (option != value) onSelect(option)
+                        },
+                    )
+                }
+            }
+        }
+        if (!hint.isNullOrBlank()) {
+            Text(
+                text = hint,
+                style = AppleTypography.bodySmall,
+                color = AppleColors.tertiary,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
 /** Label + integer value + slider (used for the screen-timeout minutes). */
 @Composable
 fun SettingsSlider(
@@ -514,6 +617,7 @@ fun SettingsSubPageHeader(
     modifier: Modifier = Modifier,
     showBack: Boolean = true,
     breadcrumb: String? = null,
+    badge: String? = null,
 ) {
     Row(
         modifier = modifier
@@ -549,12 +653,34 @@ fun SettingsSubPageHeader(
                     modifier = Modifier.appleClickable(onBack),
                 )
             }
-            Text(
-                title,
-                style = AppleTypography.headlineLarge,
-                color = AppleColors.primary,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    style = AppleTypography.headlineLarge,
+                    color = AppleColors.primary,
+                )
+                if (!badge.isNullOrBlank()) {
+                    Spacer(Modifier.width(10.dp))
+                    UtilityBadge(badge)
+                }
+            }
         }
+    }
+}
+
+/** Compact metadata badge for lifecycle/status qualifiers such as Beta. */
+@Composable
+fun UtilityBadge(text: String, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(4.dp)
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(AppleColors.elevated)
+            .border(1.dp, AppleColors.frostedBorder, shape)
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = text, style = AppleTypography.labelSmall, color = AppleColors.secondary)
     }
 }
 

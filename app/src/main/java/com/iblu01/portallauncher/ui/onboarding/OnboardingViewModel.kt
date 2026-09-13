@@ -12,6 +12,8 @@ import com.iblu01.portallauncher.HaInstance
 import com.iblu01.portallauncher.PillSupport
 import com.iblu01.portallauncher.HaMdnsDiscovery
 import com.iblu01.portallauncher.Prefs
+import com.iblu01.portallauncher.transfer.ConfigReceiverServer
+import com.iblu01.portallauncher.transfer.ConfigTransferAdvertiser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -44,12 +46,51 @@ class OnboardingViewModel @Inject constructor(
     private val mqttTester: MqttOnboardingTester,
 ) : ViewModel() {
 
+    private val coordinator = OnboardingCoordinator(prefs)
+
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<OnboardingUiState> = _state.asStateFlow()
 
     private var haDiscovery: HaMdnsDiscovery? = null
     private var brokerDiscovery: MqttMdnsDiscovery? = null
     private var runningTest: Job? = null
+    private var configReceiver: ConfigReceiverServer? = null
+    private var configAdvertiser: ConfigTransferAdvertiser? = null
+
+    init {
+        startConfigReceiver()
+    }
+
+    private fun startConfigReceiver() {
+        if (prefs.onboardingCompleted || configReceiver != null) return
+        val server = ConfigReceiverServer.launch(
+            displayName = prefs.deviceName,
+            onOffer = {
+                goTo(OnboardingStep.RECEIVE_CONFIG)
+                _state.update { it.copy(configReceiveState = ConfigReceiveState.Receiving) }
+            },
+            onPayload = { payload ->
+                val applied = prefs.importTransferPayload(payload)
+                _state.update {
+                    it.copy(
+                        step = OnboardingStep.RECEIVE_CONFIG,
+                        configReceiveState = if (applied) ConfigReceiveState.Applied else ConfigReceiveState.Failed,
+                    )
+                }
+                if (applied) configAdvertiser?.stop()
+                applied
+            },
+        ) ?: return
+        configReceiver = server
+        ConfigTransferAdvertiser(context).also { advertiser ->
+            configAdvertiser = advertiser
+            advertiser.start(
+                serviceName = prefs.deviceName,
+                port = server.listeningPort,
+                attributes = server.advertisementAttributes(),
+            )
+        }
+    }
 
     /** Candidates behind [OnboardingUiState.pillOptions], kept out of the UI state (raw JSON). */
     private var pillCandidates: List<com.iblu01.portallauncher.PillCandidate> = emptyList()
@@ -69,6 +110,7 @@ class OnboardingViewModel @Inject constructor(
             gridPreset = GridPreset.forScale(prefs.gridScale),
             gridManual = GridPreset.forScale(prefs.gridScale) == null,
             backgroundMode = prefs.backgroundMode,
+            backgroundOpacity = prefs.bgOverlayOpacity,
             haUrl = haUrl,
             haToken = prefs.haToken,
             mqttHost = prefs.brokerHost,
@@ -86,11 +128,14 @@ class OnboardingViewModel @Inject constructor(
 
     /** Moves to [step], persisting it so the flow can be resumed there. */
     private fun goTo(step: OnboardingStep) {
-        prefs.onboardingStep = step.name
+        coordinator.executeLocal(OnboardingCommand.Navigate(step))
         _state.update { it.copy(step = step) }
     }
 
-    fun continueFromWelcome() = goTo(OnboardingStep.SYSTEM_SETUP)
+    fun continueFromWelcome() {
+        coordinator.executeLocal(OnboardingCommand.SelectChannel(OnboardingChannel.DEVICE))
+        goTo(OnboardingStep.SYSTEM_SETUP)
+    }
 
     /** The main action of every step that has nothing else to do first. */
     fun goNext() {
@@ -171,12 +216,22 @@ class OnboardingViewModel @Inject constructor(
     fun adbSetHomeCommand(): String = capabilities.adbSetHomeCommand()
 
     fun selectGridPreset(preset: GridPreset) {
-        prefs.gridScale = preset.scale
+        val current = _state.value
+        coordinator.executeLocal(
+            OnboardingCommand.SaveLauncher(
+                preset.scale,
+                current.backgroundMode,
+                current.backgroundOpacity,
+            )
+        )
         _state.update { it.copy(gridScale = preset.scale, gridPreset = preset, gridManual = false) }
     }
 
     fun selectGridScale(scale: Float) {
-        prefs.gridScale = scale
+        val current = _state.value
+        coordinator.executeLocal(
+            OnboardingCommand.SaveLauncher(scale, current.backgroundMode, current.backgroundOpacity)
+        )
         _state.update {
             it.copy(gridScale = prefs.gridScale, gridPreset = GridPreset.forScale(prefs.gridScale))
         }
@@ -186,12 +241,19 @@ class OnboardingViewModel @Inject constructor(
 
     /** Applies a background mode live — the launcher reads [Prefs.backgroundMode] on next draw. */
     fun selectBackground(mode: String, configured: Boolean = false) {
-        prefs.backgroundMode = mode
+        val current = _state.value
+        coordinator.executeLocal(
+            OnboardingCommand.SaveLauncher(current.gridScale, mode, current.backgroundOpacity)
+        )
         _state.update { it.copy(backgroundMode = mode, backgroundConfigured = configured) }
     }
 
     fun setBackgroundOpacity(opacity: Float) {
-        prefs.bgOverlayOpacity = opacity
+        val current = _state.value
+        coordinator.executeLocal(
+            OnboardingCommand.SaveLauncher(current.gridScale, current.backgroundMode, opacity)
+        )
+        _state.update { it.copy(backgroundOpacity = prefs.bgOverlayOpacity) }
     }
 
     // --- Chapter 2: Home Assistant --------------------------------------------------------------
@@ -259,9 +321,12 @@ class OnboardingViewModel @Inject constructor(
             }
             if (result is TestState.Success) {
                 // Persisted through the app's existing encrypted store; never logged.
-                prefs.haUrl = OnboardingUrls.normalizeHaUrl(current.haUrl)
-                prefs.haToken = current.haToken
-                prefs.homeAssistantOnboardingSkipped = false
+                coordinator.executeLocal(
+                    OnboardingCommand.SaveHomeAssistant(
+                        url = current.haUrl,
+                        token = SecretInput.of(current.haToken),
+                    )
+                )
                 suggestMqttDefaults()
             }
             _state.update { it.copy(haTest = result) }
@@ -275,17 +340,18 @@ class OnboardingViewModel @Inject constructor(
         goTo(OnboardingStep.HOME_ASSISTANT_CREDENTIALS)
     }
 
-    /** Drops the Home Assistant branch: no token screen, no pills, no MQTT. */
+    /** Drops only Home Assistant and its entities. MQTT remains an independent provider. */
     fun skipHomeAssistant() {
         runningTest?.cancel()
-        prefs.homeAssistantOnboardingSkipped = true
+        coordinator.executeLocal(OnboardingCommand.SkipHomeAssistant)
+        val nextFlags = _state.value.flags.copy(homeAssistantSkipped = true)
         _state.update {
             it.copy(
-                flags = it.flags.copy(homeAssistantSkipped = true),
+                flags = nextFlags,
                 haTest = TestState.Idle,
             )
         }
-        goTo(OnboardingStep.HIDDEN_APPS)
+        goTo(nextStep(OnboardingStep.HOME_ASSISTANT_INTRO, nextFlags) ?: OnboardingStep.COMPLETE)
     }
 
     /** Abandons only the credentials screen, keeping the rest of the flow as it was. */
@@ -365,11 +431,12 @@ class OnboardingViewModel @Inject constructor(
     private fun persistPillRules(options: List<PillOption>) {
         val enabledById = options.associate { it.entityId to it.enabled }
         val existing = prefs.pillRules.associateBy { it.entityId }
-        prefs.pillRules = pillCandidates.map { candidate ->
+        val rules = pillCandidates.map { candidate ->
             val id = candidate.primary.entityId
             val rule = existing[id] ?: PillSupport.defaultRule(candidate)
             rule.copy(enabled = enabledById[id] ?: rule.enabled)
         }
+        coordinator.executeLocal(OnboardingCommand.SavePillRules(rules))
     }
 
     // --- Chapter 2: MQTT ------------------------------------------------------------------------
@@ -428,7 +495,7 @@ class OnboardingViewModel @Inject constructor(
 
     /** Enters the MQTT branch from the "control Portal from Home Assistant" screen. */
     fun configureMqtt() {
-        prefs.mqttOnboardingSkipped = false
+        coordinator.executeLocal(OnboardingCommand.ConfigureMqtt)
         _state.update { it.copy(flags = it.flags.copy(mqttSkipped = false)) }
         suggestMqttDefaults()
         goTo(OnboardingStep.MQTT_CONFIGURATION)
@@ -437,11 +504,12 @@ class OnboardingViewModel @Inject constructor(
     /** Keeps the Home Assistant connection, drops only the remote-control part. */
     fun skipMqtt() {
         runningTest?.cancel()
-        prefs.mqttOnboardingSkipped = true
+        coordinator.executeLocal(OnboardingCommand.SkipMqtt)
+        val nextFlags = _state.value.flags.copy(mqttSkipped = true)
         _state.update {
-            it.copy(flags = it.flags.copy(mqttSkipped = true), mqttTest = TestState.Idle)
+            it.copy(flags = nextFlags, mqttTest = TestState.Idle)
         }
-        goTo(OnboardingStep.HIDDEN_APPS)
+        goTo(nextStep(OnboardingStep.REMOTE_CONTROL, nextFlags) ?: OnboardingStep.COMPLETE)
     }
 
     fun testMqtt() {
@@ -459,11 +527,16 @@ class OnboardingViewModel @Inject constructor(
                 deviceId = prefs.deviceId,
             ) { phase -> _state.update { it.copy(mqttTest = TestState.Running(phase)) } }
             if (result is TestState.Success) {
-                prefs.brokerHost = current.mqttHost
-                prefs.brokerPort = current.mqttPort
-                prefs.username = if (current.mqttAuthEnabled) current.mqttUsername else ""
-                prefs.password = if (current.mqttAuthEnabled) current.mqttPassword else ""
-                prefs.deviceName = current.mqttDeviceName.ifBlank { prefs.deviceName }
+                coordinator.executeLocal(
+                    OnboardingCommand.SaveMqtt(
+                        host = current.mqttHost,
+                        port = current.mqttPort,
+                        authEnabled = current.mqttAuthEnabled,
+                        username = current.mqttUsername,
+                        password = SecretInput.of(current.mqttPassword),
+                        deviceName = current.mqttDeviceName.ifBlank { prefs.deviceName },
+                    )
+                )
             }
             _state.update { it.copy(mqttTest = result) }
         }
@@ -520,14 +593,15 @@ class OnboardingViewModel @Inject constructor(
     fun applyHiddenApps(packages: Set<String>) {
         val protectedPackages = _state.value.apps.filter { it.protected }.map { it.packageName }.toSet()
         val safe = packages - protectedPackages
-        prefs.hiddenApps = safe
-        prefs.appCleanupOnboardingSkipped = false
+        coordinator.executeLocal(OnboardingCommand.SaveHiddenApps(safe, skipped = false))
         _state.update { it.copy(hiddenPackages = safe) }
         goNext()
     }
 
     fun skipHiddenApps() {
-        prefs.appCleanupOnboardingSkipped = true
+        coordinator.executeLocal(
+            OnboardingCommand.SaveHiddenApps(_state.value.hiddenPackages, skipped = true)
+        )
         _state.update { it.copy(flags = it.flags.copy(appCleanupSkipped = true)) }
         goTo(OnboardingStep.TAP_APP)
     }
@@ -537,13 +611,13 @@ class OnboardingViewModel @Inject constructor(
      * not a postponed one: nothing happens on tap until an app is picked here or in the settings.
      */
     fun setTapApp(packageName: String) {
-        prefs.homeAssistantPackage = packageName
+        coordinator.executeLocal(OnboardingCommand.SaveTapApp(packageName))
         _state.update { it.copy(tapAppPackage = packageName) }
         goNext()
     }
 
     fun acknowledgeGestures() {
-        prefs.gestureHintsSeen = true
+        coordinator.executeLocal(OnboardingCommand.AcknowledgeGestures)
         goNext()
     }
 
@@ -556,16 +630,15 @@ class OnboardingViewModel @Inject constructor(
     fun skipOnboarding() = completeOnboarding()
 
     fun completeOnboarding() {
-        prefs.gestureHintsSeen = true
-        prefs.onboardingCompleted = true
-        prefs.onboardingVersion = ONBOARDING_VERSION
-        prefs.onboardingStep = ""
+        coordinator.executeLocal(OnboardingCommand.Complete(defaultsWarningAccepted = true))
         _state.update { it.copy(step = OnboardingStep.COMPLETE) }
     }
 
     override fun onCleared() {
         haDiscovery?.stop()
         brokerDiscovery?.stop()
+        configAdvertiser?.stop()
+        configReceiver?.stop()
         super.onCleared()
     }
 }

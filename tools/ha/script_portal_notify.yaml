@@ -1,0 +1,246 @@
+alias: Portal - notification
+description: 'Affiche une notification sur un panneau Portal : message, icône, couleur,
+  carillon, et la voix rendue par Home Assistant. Le panneau demande lui-même l''URL
+  de la voix à Home Assistant, il n''y a donc rien d''autre à configurer.'
+icon: mdi:bell-ring
+mode: queued
+max: 10
+fields:
+  panel:
+    name: Panneau
+    description: Le Portal à qui parler
+    required: true
+    selector:
+      device:
+        filter:
+          integration: mqtt
+          manufacturer: Meta
+          model: Meta Portal
+  message:
+    name: Message
+    required: true
+    example: Un colis vient d'être livré
+    selector:
+      text:
+        multiline: true
+  title:
+    name: Titre
+    description: Ligne au-dessus du message
+    selector:
+      text: {}
+  icon:
+    name: Icône
+    default: mdi:bell-ring
+    selector:
+      icon: {}
+  level:
+    name: Niveau
+    description: Couleur et durée par défaut
+    default: info
+    selector:
+      select:
+        options:
+        - value: info
+          label: Info (ambre, 5 s)
+        - value: warning
+          label: Avertissement (orange, 8 s)
+        - value: critical
+          label: Critique (rouge, jusqu'au tap)
+  color:
+    name: Couleur
+    description: Accent explicite, prioritaire sur le niveau
+    selector:
+      color_rgb: {}
+  duration:
+    name: Durée
+    description: 0 = durée du niveau, ou celle de la voix
+    default: 0
+    selector:
+      number:
+        min: 0
+        max: 120
+        unit_of_measurement: s
+        mode: box
+  speak:
+    name: Parler
+    description: Fait lire le message à voix haute
+    default: true
+    selector:
+      boolean: {}
+  speak_text:
+    name: Texte parlé
+    description: À dire à la place du message affiché
+    selector:
+      text:
+        multiline: true
+  engine:
+    name: Moteur TTS
+    description: Vide = le premier moteur de cette instance
+    selector:
+      entity:
+        filter:
+          domain: tts
+  language:
+    name: Langue
+    default: fr-FR
+    selector:
+      text: {}
+  tone:
+    name: Carillon
+    description: Joué quand il n'y a pas de voix, ou si la voix échoue
+    default: alert
+    selector:
+      select:
+        options:
+        - value: alert
+          label: Alerte (trois bips)
+        - value: doorbell
+          label: Sonnette (ding-dong)
+        - value: chime
+          label: Carillon (quatre notes)
+        - value: success
+          label: Succès (accord montant)
+        - value: error
+          label: Erreur (deux notes graves)
+        - value: ping
+          label: Ping (note unique)
+        - value: beep
+          label: Bip court
+        - value: siren
+          label: Sirène (deux tons alternés)
+        - value: none
+          label: Silence
+  wake:
+    name: Réveiller l'écran
+    default: true
+    selector:
+      boolean: {}
+  countdown:
+    name: Minuteur
+    description: 'Durée avant la fin : 20s, 10m, 1h30m, 1:30, ou un nombre de secondes'
+    selector:
+      text: {}
+  until:
+    name: Fin (instant)
+    description: Prioritaire sur le minuteur, ex. {{ state_attr('timer.cuisson','finishes_at')
+      }}
+    selector:
+      text: {}
+  end_message:
+    name: Message de fin
+    description: Remplace le message quand le compteur atteint zéro
+    selector:
+      text:
+        multiline: true
+  end_tone:
+    name: Carillon de fin
+    description: Sonne à zéro
+    default: alert
+    selector:
+      select:
+        options:
+        - value: alert
+          label: Alerte (trois bips)
+        - value: doorbell
+          label: Sonnette (ding-dong)
+        - value: chime
+          label: Carillon (quatre notes)
+        - value: success
+          label: Succès (accord montant)
+        - value: error
+          label: Erreur (deux notes graves)
+        - value: ping
+          label: Ping (note unique)
+        - value: beep
+          label: Bip court
+        - value: siren
+          label: Sirène (deux tons alternés)
+        - value: none
+          label: Silence
+  tick:
+    name: Bips de décompte
+    description: Joué chaque seconde pendant le minuteur (panneau d'alarme)
+    selector:
+      select:
+        options:
+        - value: alert
+          label: Alerte (trois bips)
+        - value: doorbell
+          label: Sonnette (ding-dong)
+        - value: chime
+          label: Carillon (quatre notes)
+        - value: success
+          label: Succès (accord montant)
+        - value: error
+          label: Erreur (deux notes graves)
+        - value: ping
+          label: Ping (note unique)
+        - value: beep
+          label: Bip court
+        - value: siren
+          label: Sirène (deux tons alternés)
+        - value: none
+          label: Silence
+  tick_urgent_at:
+    name: Bips rapides à partir de
+    description: Secondes restantes sous lesquelles les bips doublent de cadence
+    default: 10s
+    selector:
+      text: {}
+  repeat:
+    name: Répéter le carillon
+    description: Rejoue le carillon à cet intervalle tant que la notification est
+      là (sirène). Ex. 3s
+    selector:
+      text: {}
+  dismiss:
+    name: Effacer
+    description: Retire la notification en cours et ignore tous les autres champs
+    default: false
+    selector:
+      boolean: {}
+  keypad:
+    name: Clavier de désarmement
+    description: Écran plein avec le clavier au centre. Un tap ne referme plus la
+      notification.
+    selector:
+      entity:
+        filter:
+          domain: alarm_control_panel
+  blackout:
+    name: Fond noir
+    description: Masque le fond d'écran (implicite avec le clavier)
+    default: false
+    selector:
+      boolean: {}
+sequence:
+- variables:
+    panel_id: '{% set ids = device_attr(panel, ''identifiers'') | default([], true)
+      | list %} {{ ids[0][1] if ids else panel }}'
+    payload: "{{ {'message': message,\n    'title': title | default('', true),\n \
+      \   'icon': icon | default('', true),\n    'color': color is defined and color\
+      \ and '#%02X%02X%02X' | format(color[0], color[1], color[2]) or '',\n    'level':\
+      \ level | default('info', true),\n    'duration': (duration | default(0, true)\
+      \ | int) * 1000,\n    'tts': (speak_text | default('', true) or message) if\
+      \ speak | default(true) else '',\n    'engine': engine | default('', true),\n\
+      \    'language': language | default('', true),\n    'tone': tone | default('alert',\
+      \ true),\n    'countdown': countdown | default('', true),\n    'until': until\
+      \ | default('', true),\n    'end_message': end_message | default('', true),\n\
+      \    'end_tone': end_tone | default('alert', true),\n    'tick': tick | default('',\
+      \ true),\n    'tick_urgent_at': tick_urgent_at | default('10s', true),\n   \
+      \ 'repeat': repeat | default('', true),\n    'keypad': keypad | default('',\
+      \ true),\n    'blackout': blackout | default(false) or (keypad | default('',\
+      \ true) != ''),\n    'wake': wake | default(true)} | to_json }}"
+- if:
+  - condition: template
+    value_template: '{{ dismiss | default(false) }}'
+  then:
+  - action: mqtt.publish
+    data:
+      topic: portal/{{ panel_id }}/notification
+      payload: '{"dismiss": true}'
+  else:
+  - action: mqtt.publish
+    data:
+      topic: portal/{{ panel_id }}/notification
+      payload: '{{ payload }}'

@@ -1,0 +1,61 @@
+id: portal_alarme_panneau
+alias: Alarme - Panneau sur le Portal
+description: 'Publie l''état d''Alarmo sur le topic alarme des panneaux. Le panneau
+  décide seul de ce que chaque état mérite : plein écran et clavier pour les deux
+  états qui exigent un code, simple bandeau pour le reste. Publié en retained, donc
+  un panneau qui redémarre au milieu d''une alarme la retrouve.
+
+  La phrase dite à voix haute vient du panneau lui-même ; seul le moteur de synthèse
+  est imposé ici. Un "speak" dans la charge la remplace, "speak: false" fait taire
+  l''état.
+
+  Le moteur est la seconde clé Gemini : la première a un quota gratuit de 10 requêtes,
+  une fois vidé l''annonce retombe en silence. Repli possible : tts.google_translate_fr_fr,
+  illimité.'
+triggers:
+- trigger: state
+  entity_id: alarm_control_panel.alarmo
+  to:
+  - arming
+  - pending
+  - triggered
+  - armed_away
+  - armed_home
+  - armed_night
+  - armed_vacation
+  - armed_custom_bypass
+  - disarmed
+  id: etat
+- trigger: event
+  event_type: alarmo_failed_to_arm
+  id: echec
+variables:
+  panneaux:
+  - 117daa67dd009788
+  - 50e99189ffc0ef0d
+  etat: '{{ trigger.to_state.state if trigger.id == ''etat'' else ''failed_to_arm''
+    }}'
+  delai: '{% if trigger.id == ''etat'' %}{{ trigger.to_state.attributes.delay | int(0)
+    }}{% else %}0{% endif %}'
+  mode: "{% set labels = {'armed_away':'Absence','armed_home':'Présence','armed_night':'Nuit',\n\
+    \                 'armed_vacation':'Vacances','armed_custom_bypass':'Personnalisé'}\
+    \ %}\n{% if trigger.id == 'etat' %} {{ labels.get(trigger.to_state.attributes.next_state\
+    \ | default(etat, true), 'Absence') }} {% else %}Absence{% endif %}"
+  capteurs: "{{ states.binary_sensor\n   | selectattr('attributes.device_class', 'in',\
+    \ ['door','window','opening','garage_door'])\n   | selectattr('state', 'eq', 'on')\
+    \ | map(attribute='name') | list }}"
+  charge: "{{ {'state': etat,\n    'entity': 'alarm_control_panel.alarmo',\n    'mode':\
+    \ mode,\n    'delay': delai | int,\n    'sensors': capteurs,\n    'engine': 'tts.google_ai_tts_2',\n\
+    \    'language': 'fr-FR'} | to_json }}"
+conditions: []
+actions:
+- repeat:
+    for_each: '{{ panneaux }}'
+    sequence:
+    - action: mqtt.publish
+      data:
+        topic: portal/{{ repeat.item }}/alarm
+        payload: '{{ charge }}'
+        retain: true
+mode: queued
+max: 10

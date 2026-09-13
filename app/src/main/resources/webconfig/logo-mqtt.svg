@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="MQTT">
+  <rect width="32" height="32" rx="3" fill="#660066"/>
+  <path d="M5 6c11.6 0 21 9.4 21 21M5 11.8c8.4 0 15.2 6.8 15.2 15.2M5 17.6c5.2 0 9.4 4.2 9.4 9.4" fill="none" stroke="#fff" stroke-width="2.4"/>
+  <circle cx="6" cy="26" r="2" fill="#fff"/>
+</svg>

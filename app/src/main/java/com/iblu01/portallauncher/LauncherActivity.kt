@@ -3,7 +3,9 @@ import com.iblu01.portallauncher.domain.model.PlayingMedia
 import com.iblu01.portallauncher.domain.model.MediaPlayerVolume
 import com.iblu01.portallauncher.domain.model.TemperatureSummary
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -31,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
@@ -45,6 +48,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MicOff
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -71,6 +79,11 @@ import com.iblu01.portallauncher.ui.LocalAreas
 import com.iblu01.portallauncher.ui.LocalCallService
 import com.iblu01.portallauncher.ui.LocalHaStates
 import com.iblu01.portallauncher.ui.HaStates
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.iblu01.portallauncher.ui.components.VoiceAssistantOverlay
+import com.iblu01.portallauncher.voice.PortalCommand
+import com.iblu01.portallauncher.voice.VoiceAssistantController
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.iblu01.portallauncher.ui.mapper.predictState
@@ -103,6 +116,7 @@ import com.iblu01.portallauncher.ui.scene.LocalSceneActivations
 import com.iblu01.portallauncher.ui.scene.rememberSceneActivations
 import com.iblu01.portallauncher.ui.components.AlertOverlay
 import com.iblu01.portallauncher.ui.components.AppUpdateOverlay
+import com.iblu01.portallauncher.ui.components.ConfigTransferOverlay
 import com.iblu01.portallauncher.ui.components.AmbientBackground
 import androidx.compose.ui.res.stringResource
 import com.iblu01.portallauncher.ui.components.AppContextMenu
@@ -150,6 +164,10 @@ import com.iblu01.portallauncher.ui.onboarding.shouldRunOnboarding
 import com.iblu01.portallauncher.ui.home.HomePage
 import com.iblu01.portallauncher.ui.home.HomePageEditActions
 import com.iblu01.portallauncher.ui.theme.PortalTheme
+import com.iblu01.portallauncher.ui.theme.ClockDateFormat
+import com.iblu01.portallauncher.ui.theme.ClockFont
+import com.iblu01.portallauncher.ui.theme.ClockTheme
+import com.iblu01.portallauncher.ui.theme.ClockTint
 import com.iblu01.portallauncher.ui.theme.blurCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -174,6 +192,16 @@ class LauncherActivity : ComponentActivity() {
 
     @Inject lateinit var prefs: Prefs
     @Inject lateinit var pills: PillRepository
+    @Inject lateinit var voice: VoiceAssistantController
+    /** Asked at most once per launcher process; denying it leaves the assistant idle, not looping. */
+    private var micPermissionAsked = false
+    private val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        // Either way the controller re-evaluates: granted starts the wake engine, denied parks it
+        // in MISSING_PERMISSION instead of retrying on every resume.
+        if (granted) voice.onResume()
+    }
     private var lastLaunchMs = 0L
     private lateinit var autoReturnTimer: AutoReturnTimer
     private lateinit var appList: AppListStore
@@ -224,6 +252,7 @@ class LauncherActivity : ComponentActivity() {
                 PortalLauncherApp(
                     prefs = prefs,
                     pills = pills,
+                    voice = voice,
                     autoReturnTimer = autoReturnTimer,
                     appList = appList,
                     layout = layout,
@@ -313,6 +342,7 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        LauncherWebPreview.register(window.decorView)
         openingFromLauncher = false
         widgets.reload()
         pills.start(prefs)
@@ -320,10 +350,14 @@ class LauncherActivity : ComponentActivity() {
         layout.reload()
         applyPowerPolicy()
         DeviceStateHub.onLauncherForeground(true, this)
+        requestMicPermissionIfNeeded()
+        voice.onResume()
         enableImmersive()
     }
 
     override fun onPause() {
+        LauncherWebPreview.unregister(window.decorView)
+        voice.onPause()
         DeviceStateHub.onLauncherForeground(false, this)
         super.onPause()
     }
@@ -336,6 +370,20 @@ class LauncherActivity : ComponentActivity() {
         // finish() still reaches onDestroy(), so only stop the store when startup got that far.
         if (::appList.isInitialized) appList.stop()
         super.onDestroy()
+    }
+
+    /**
+     * The wake word needs RECORD_AUDIO, and a wall panel has no other moment to ask: there is no
+     * onboarding step for it and settings may be driven remotely. Asking on the first resume after
+     * the feature is switched on keeps the grant in the user's hands without a dedicated screen.
+     */
+    private fun requestMicPermissionIfNeeded() {
+        if (micPermissionAsked || !prefs.voiceAssistantEnabled) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) return
+        micPermissionAsked = true
+        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -509,6 +557,7 @@ private const val LAUNCHER_PAGE_SCRIM = 0.45f
 private fun PortalLauncherApp(
     prefs: Prefs,
     pills: PillRepository,
+    voice: VoiceAssistantController,
     autoReturnTimer: AutoReturnTimer,
     appList: AppListStore,
     layout: LauncherLayoutStore,
@@ -535,7 +584,35 @@ private fun PortalLauncherApp(
     var bgOverlayOpacity by remember { mutableStateOf(prefs.bgOverlayOpacity) }
     var clockTheme by remember { mutableStateOf(prefs.clockTheme) }
     var gridScale by remember { mutableStateOf(prefs.gridScale) }
+    var autoReturnSettingsVersion by remember { mutableStateOf(0) }
+    val browserPreview by LauncherWebPreview.preview.collectAsStateWithLifecycle()
     var notificationDotsEnabled by remember { mutableStateOf(prefs.notificationDots) }
+
+    LaunchedEffect(browserPreview) {
+        val preview = browserPreview
+        if (preview == null) {
+            gridScale = prefs.gridScale
+            backgroundMode = prefs.backgroundMode
+            bgOverlayOpacity = prefs.bgOverlayOpacity
+            clockTheme = prefs.clockTheme
+        } else {
+            gridScale = preview.gridScale
+            backgroundMode = preview.backgroundMode
+            bgOverlayOpacity = preview.backgroundOpacity
+            preview.clock?.let {
+                clockTheme = ClockTheme(
+                    font = ClockFont.fromKey(it.font),
+                    weight = it.weight,
+                    size = it.size,
+                    letterSpacing = it.letterSpacing,
+                    tint = ClockTint.fromKey(it.tint),
+                    format24h = it.format24h,
+                    dateFormat = ClockDateFormat.fromKey(it.dateFormat),
+                    elementSpacing = it.elementSpacing,
+                )
+            }
+        }
+    }
     val folderDefaultLabel = stringResource(R.string.folder_default_label)
     val dotPackages by NotificationDots.packages.collectAsStateWithLifecycle()
     // A folder shows a dot when any member does — otherwise foldering an app would silence it.
@@ -606,7 +683,7 @@ private fun PortalLauncherApp(
     // Fed straight from the raw socket stream, bypassing the sampled transform pipeline: the
     // store's per-entity granularity makes each apply a cheap mostly-reference-equal walk, and
     // conflate() keeps only the latest full snapshot if the main thread falls behind a burst.
-    LaunchedEffect(pills) { pills.rawSnapshots().conflate().collect { haStates.apply(it.states) } }
+    LaunchedEffect(pills) { pills.rawSnapshots(prefs).conflate().collect { haStates.apply(it.states) } }
     // Single interception point for every UI-originated service call (chips, panels, media):
     // the predicted state is written into the store *before* the network call, so the pressed
     // control repaints on the next frame even with HA unreachable (P3). Unpredictable services
@@ -614,6 +691,16 @@ private fun PortalLauncherApp(
     val callServiceProvider = remember(vm, haStates) {
         object : CallService {
             override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) {
+                // One gate for every control in the launcher: the service call is the single road
+                // from any tap to Home Assistant, so guarding it here leaves nothing to forget.
+                if (ActionLockState.blocks(domain)) {
+                    Toast.makeText(
+                        context,
+                        ActionLockState.reason ?: context.getString(R.string.action_lock_blocked),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    return
+                }
                 if (entityId != null && ',' !in entityId) {
                     haStates.applyOptimistic(entityId) { entity ->
                         predictState(service, entity.state)?.let { entity.copy(state = it) } ?: entity
@@ -632,6 +719,12 @@ private fun PortalLauncherApp(
         appPageCount = { appPages.value },
     )
     val latestPagerLayout by rememberUpdatedState(pagerLayout)
+
+    LaunchedEffect(browserPreview, pagerLayout.firstAppPage, pagerLayout.appPageCount) {
+        if (browserPreview != null && pagerLayout.appPageCount > 0) {
+            pagerState.scrollToPage(pagerLayout.firstAppPage)
+        }
+    }
 
     // Match Launcher3's wallpaper protocol: advertise the horizontal page step and continuously
     // report the pager position. WallpaperService handles static and live wallpaper movement;
@@ -663,6 +756,9 @@ private fun PortalLauncherApp(
                     backgroundMode = prefs.backgroundMode
                     wallpaperVersion++
                 }
+                "gridScale" -> gridScale = prefs.gridScale
+                "clockTheme" -> clockTheme = prefs.clockTheme
+                "autoReturn" -> autoReturnSettingsVersion++
                 "haUrl", "haToken" -> pills.start(prefs)
                 "iconPack" -> appList.refresh(force = true)
                 "notificationDots" -> notificationDotsEnabled = prefs.notificationDots
@@ -727,31 +823,8 @@ private fun PortalLauncherApp(
     }.distinctBy { it.entityId }.sortedBy { it.playerNames.firstOrNull().orEmpty() }
     val haConnected = ui.connected
     val haLastUpdateAt = ui.lastUpdateAt
-    // Media-selection state stays local (moves to the panel reducer at step 6).
-    var activeMedia by remember { mutableStateOf<PlayingMedia?>(null) }
-    var secondaryMedia by remember { mutableStateOf(emptyList<PlayingMedia>()) }
-    var displayedSecondaryMedia by remember { mutableStateOf(emptyList<PlayingMedia>()) }
-    var selectedMediaEntityId by remember { mutableStateOf<String?>(null) }
+    val activeMedia = mediaSessions.firstOrNull()
     var browsedMediaEntityId by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(mediaSessions, selectedMediaEntityId) {
-        val selected = mediaSessions.firstOrNull { session ->
-            session.players.any { it.entityId == selectedMediaEntityId }
-        } ?: mediaSessions.firstOrNull()
-        activeMedia = selected
-        selectedMediaEntityId = selected?.entityId
-        secondaryMedia = mediaSessions.filterNot { it.entityId == selected?.entityId }
-    }
-    LaunchedEffect(mediaSessions, secondaryMedia) {
-        val activePlayerIds = mediaSessions.flatMap { it.players }.map { it.entityId }.toSet()
-        val recentlyRemoved = displayedSecondaryMedia.filter { session ->
-            session.players.none { it.entityId in activePlayerIds }
-        }
-        displayedSecondaryMedia = secondaryMedia + recentlyRemoved
-        if (recentlyRemoved.isNotEmpty()) {
-            delay(6_000)
-            displayedSecondaryMedia = secondaryMedia
-        }
-    }
     val weatherController = remember { WeatherController(context.applicationContext, pills) }
     val weather = weatherController.state
     DisposableEffect(weatherController) {
@@ -793,6 +866,25 @@ private fun PortalLauncherApp(
     // panelChip is resolved last-known-good by the VM.
     val panel by vm.panel.collectAsStateWithLifecycle()
     val panelChip by vm.panelChip.collectAsStateWithLifecycle()
+
+    // The assistant asking for a panel goes through the same reducer as a tap: a voice-opened
+    // thermostat must toggle-close and Back out exactly like a touched one.
+    LaunchedEffect(vm, voice) {
+        voice.portalCommands.collect { command ->
+            when (command) {
+                is PortalCommand.ClosePanel -> vm.onEvent(PanelEvent.Dismiss)
+                is PortalCommand.ShowPanel -> when (command.kind) {
+                    PanelKind.WEATHER -> vm.onEvent(PanelEvent.WeatherTap)
+                    // Panels are addressed by chip: the assistant names a kind ("thermostat"),
+                    // and the chip currently carrying that kind is the one to open. No chip, no
+                    // panel — the home simply has no such device on this panel.
+                    else -> vm.uiState.value.chips
+                        .firstOrNull { it.toPanelKind() == command.kind }
+                        ?.let { vm.onEvent(PanelEvent.OpenChip(PanelRequest.Chip(it.id, command.kind))) }
+                }
+            }
+        }
+    }
     // Scene taps and the camera center: both are surfaces of their own, neither is a side panel.
     val sceneActivations = rememberSceneActivations(vm::callService)
     var cameraPreferences by remember { mutableStateOf(prefs.cameraPreferences) }
@@ -861,6 +953,7 @@ private fun PortalLauncherApp(
     val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
     var availableUpdate by remember { mutableStateOf<AppRelease?>(null) }
     var updateDownloading by remember { mutableStateOf(false) }
+    var updateJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     // A wall launcher may stay alive for weeks, so checking only at Activity creation is not
     // enough. Wake hourly, but hit GitHub at most once per day and only while Portal is visible.
@@ -899,7 +992,7 @@ private fun PortalLauncherApp(
         showHidden || armedPillReorderKey != null || pillDragActive || cameraCenter.isOpen
     // While an alarm is alerting the countdown is suspended outright: returning to the clock would
     // take the disarm keypad off screen exactly when it is needed.
-    LaunchedEffect(panel.request, panel.source, userState, resumed, alarmAlerting) {
+    LaunchedEffect(panel.request, panel.source, userState, resumed, alarmAlerting, autoReturnSettingsVersion) {
         val userPanelOpen = panel.request != null && panel.source == PanelSource.USER
         if (resumed && !alarmAlerting && (userPanelOpen || userState)) autoReturnTimer.start()
         else autoReturnTimer.stop()
@@ -946,11 +1039,15 @@ private fun PortalLauncherApp(
             if (req.panelKind == PanelKind.MEDIA) liveMediaDevices() else emptyList(),
         )
         is PanelRequest.Group -> (livePanelGroup ?: lastPanelGroup)?.let { group ->
-            PanelContent.Group(
-                group = group,
-                selectedDevice = panelChip,
-                deviceRequested = req.device != null,
-            )
+            if (group.chip.kind == PillKind.MEDIA) {
+                PanelContent.MediaBrowser
+            } else {
+                PanelContent.Group(
+                    group = group,
+                    selectedDevice = panelChip,
+                    deviceRequested = req.device != null,
+                )
+            }
         }
         null -> null
     }
@@ -985,6 +1082,10 @@ private fun PortalLauncherApp(
         if (armedPillReorderKey != null) {
             armedPillReorderKey = null
             pillDragActive = false
+            return@BackHandler
+        }
+        if (browsedMediaEntityId != null) {
+            browsedMediaEntityId = null
             return@BackHandler
         }
         when (
@@ -1144,17 +1245,6 @@ private fun PortalLauncherApp(
             armedPillReorderKey = null
         },
     ) }
-    val onSecondaryPlayPause: (PlayingMedia) -> Unit = { session ->
-        displayedSecondaryMedia = displayedSecondaryMedia.map {
-            if (it.entityId == session.entityId) it.copy(
-                state = if (it.state in setOf("playing", "buffering")) "paused" else "playing"
-            ) else it
-        }
-        session.players.forEach { player ->
-            callServiceProvider("media_player", "media_play_pause", player.entityId)
-        }
-    }
-
     val selectedChipKey = panel.request?.key
 
     val bottomGradientHeight by animateDpAsState(
@@ -1163,25 +1253,30 @@ private fun PortalLauncherApp(
         label = "bottomGradientHeight"
     )
 
-    val alertMessage = AlertOverlayState.activeMessage
+    val activeAlert = AlertOverlayState.activeAlert
+    val activeAlarm = AlarmOverlayState.activeAlert
     val blurRadius by animateDpAsState(
-        targetValue = if (alertMessage != null || overlayVisible) 16.dp else 0.dp,
+        targetValue = if (activeAlert != null || activeAlarm != null || overlayVisible) 16.dp else 0.dp,
         animationSpec = tween(300),
         label = "blurRadius"
     )
 
     val sidePanel: @Composable (PanelContent) -> Unit = { content ->
         when (content) {
-            is PanelContent.Media -> MediaPlayerPanel(
-                media = content.session,
-                secondaryMedia = displayedSecondaryMedia,
-                prefs = prefs,
-                mediaSessions = mediaSessions,
-                onSelectSession = { selectedMediaEntityId = it },
-                onDismiss = onPanelDismiss,
-                onSecondaryPlayPause = onSecondaryPlayPause,
-                fullScreen = compactScreen,
-            )
+            is PanelContent.Media -> {
+                val mediaDevices = activeMediaDevices(liveMediaDevices())
+                val selectedDevice = mediaDevices.firstOrNull { it.entityId == browsedMediaEntityId }
+                    ?: mediaDevices.firstOrNull { it.entityId == content.session.entityId }
+                    ?: content.session
+                MediaPlayerPanel(
+                    media = selectedDevice,
+                    mediaDevices = mediaDevices,
+                    onSelectMedia = { browsedMediaEntityId = it.entityId },
+                    prefs = prefs,
+                    onDismiss = onPanelDismiss,
+                    fullScreen = compactScreen,
+                )
+            }
             is PanelContent.ChipActions -> ChipActionsPanel(
                 chip = content.chip,
                 onDismiss = onPanelDismiss,
@@ -1208,24 +1303,30 @@ private fun PortalLauncherApp(
                 onCollectiveAction = { calls ->
                     calls.forEach { call -> callServiceProvider(call.domain, call.service, call.entityId) }
                 },
+                onMemberPowerAction = { call ->
+                    callServiceProvider(call.domain, call.service, call.entityId)
+                },
                 fullScreen = compactScreen,
             )
             PanelContent.MediaBrowser -> {
                 // Materialised in the panel's own scope: only an open media browser subscribes
                 // to the media_player entities.
-                val mediaDevices = liveMediaDevices()
+                val mediaDevices = activeMediaDevices(liveMediaDevices())
                 val selectedDevice = mediaDevices.firstOrNull { it.entityId == browsedMediaEntityId }
                 if (selectedDevice == null) {
-                    MediaDevicesPanel(mediaDevices, onSelect = { browsedMediaEntityId = it.entityId }, onDismiss = onPanelDismiss)
+                    MediaDevicesPanel(
+                        devices = mediaDevices,
+                        onSelect = { browsedMediaEntityId = it.entityId },
+                        onDismiss = onPanelDismiss,
+                        fullScreen = compactScreen,
+                    )
                 } else {
                     MediaPlayerPanel(
                         media = selectedDevice,
-                        secondaryMedia = emptyList(),
+                        mediaDevices = mediaDevices,
+                        onSelectMedia = { browsedMediaEntityId = it.entityId },
                         prefs = prefs,
-                        mediaSessions = mediaDevices,
-                        onSelectSession = { browsedMediaEntityId = it },
                         onDismiss = { browsedMediaEntityId = null },
-                        onSecondaryPlayPause = onSecondaryPlayPause,
                         fullScreen = compactScreen,
                     )
                 }
@@ -1582,8 +1683,17 @@ private fun PortalLauncherApp(
         )
 
         AlertOverlay(
-            message = alertMessage,
+            alert = activeAlert,
+            timerEndsAt = AlertOverlayState.timerEndsAt,
             onDismiss = { AlertOverlayState.dismiss() }
+        )
+
+        // Drawn last, so it covers everything: a notification arriving mid-intrusion must not be
+        // able to take the keypad off the screen.
+        AlertOverlay(
+            alert = activeAlarm,
+            timerEndsAt = AlarmOverlayState.timerEndsAt,
+            onDismiss = { AlarmOverlayState.dismiss() }
         )
 
         AutoReturnOverlay(state = autoReturnState, onCancel = { autoReturnTimer.onInteraction() })
@@ -1599,14 +1709,31 @@ private fun PortalLauncherApp(
                 val release = availableUpdate ?: return@AppUpdateOverlay
                 if (updateDownloading) return@AppUpdateOverlay
                 updateDownloading = true
-                pagerScope.launch {
-                    runCatching { withContext(Dispatchers.IO) { AppUpdateManager.download(context, release) } }
-                        .onSuccess { apk -> AppUpdateManager.launchInstaller(context, apk) }
+                updateJob = pagerScope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            val apk = AppUpdateManager.download(context, release)
+                            apk to AppUpdateManager.installWithRoot(apk)
+                        }
+                    }
+                        .onSuccess { (apk, installedWithRoot) ->
+                            // A successful root install normally kills this old process. If it did
+                            // not, leave the overlay usable. Otherwise use Android's installer.
+                            updateDownloading = false
+                            updateJob = null
+                            if (!installedWithRoot) AppUpdateManager.launchInstaller(context, apk)
+                        }
                         .onFailure {
                             updateDownloading = false
+                            updateJob = null
                             Toast.makeText(context, R.string.settings_info_check_error, Toast.LENGTH_LONG).show()
                         }
                 }
+            },
+            onCancel = {
+                updateJob?.cancel()
+                updateJob = null
+                updateDownloading = false
             },
             onLater = {
                 if (!updateDownloading) {
@@ -1621,6 +1748,34 @@ private fun PortalLauncherApp(
                 }
             },
         )
+        // Muted assistant: the only thing on the panel that says the microphone is closed, and
+        // the way back. Drawn above everything so it is still reachable while a panel is open.
+        if (VoiceMuteState.muted) {
+            IconButton(
+                onClick = { VoiceMuteState.set(prefs, false) },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.MicOff,
+                    contentDescription = stringResource(R.string.voice_mute_unmute),
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
+        val voiceState by voice.state.collectAsStateWithLifecycle()
+        VoiceAssistantOverlay(
+            state = voiceState,
+            onStop = voice::stopSession,
+            onConfirm = voice::confirmPendingAction,
+            onCancelConfirm = voice::cancelPendingAction,
+        )
+
+        ConfigTransferOverlay(prefs)
     }
     }
 }
@@ -1637,6 +1792,11 @@ internal fun resolveChipPanelContent(
 } else {
     panelChip?.let(PanelContent::ChipActions)
 }
+
+/** Only sessions that are currently broadcasting belong in the media browser. */
+internal fun activeMediaDevices(devices: List<PlayingMedia>): List<PlayingMedia> = devices
+    .filter { it.state.equals("playing", ignoreCase = true) || it.state.equals("buffering", ignoreCase = true) }
+    .distinctBy { it.entityId }
 
 /** Pure preference reducer used by Maison's accessible section-order controls. */
 internal fun moveVisibleHomeSection(
@@ -1705,12 +1865,10 @@ private fun writeVisibleSectionOrder(
 @Composable
 private fun MediaPlayerPanel(
     media: PlayingMedia,
-    secondaryMedia: List<PlayingMedia>,
+    mediaDevices: List<PlayingMedia> = listOf(media),
+    onSelectMedia: (PlayingMedia) -> Unit = {},
     prefs: Prefs,
-    mediaSessions: List<PlayingMedia>,
-    onSelectSession: (String?) -> Unit,
     onDismiss: () -> Unit,
-    onSecondaryPlayPause: (PlayingMedia) -> Unit,
     fullScreen: Boolean = false,
 ) {
     val callService = LocalCallService.current
@@ -1722,7 +1880,8 @@ private fun MediaPlayerPanel(
         else media
     MediaPlayerView(
         media = shownMedia,
-        secondaryMedia = secondaryMedia,
+        mediaDevices = mediaDevices,
+        onSelectMedia = onSelectMedia,
         haToken = prefs.haToken,
         onPlayPause = {
             callService("media_player", "media_play_pause", media.entityId)
@@ -1740,25 +1899,6 @@ private fun MediaPlayerPanel(
                 entityId,
                 mapOf("volume_level" to volumeFraction)
             )
-        },
-        onSecondaryPlayPause = onSecondaryPlayPause,
-        onSecondaryPrevious = { session ->
-            session.players.forEach { player ->
-                callService("media_player", "media_previous_track", player.entityId)
-            }
-        },
-        onSecondaryNext = { session ->
-            session.players.forEach { player ->
-                callService("media_player", "media_next_track", player.entityId)
-            }
-        },
-        onSelectSecondary = { session -> onSelectSession(session.entityId) },
-        onSwipePlayer = { direction ->
-            val currentIndex = mediaSessions.indexOfFirst { it.entityId == media.entityId }
-            if (currentIndex >= 0 && mediaSessions.size > 1) {
-                val nextIndex = (currentIndex + direction + mediaSessions.size) % mediaSessions.size
-                onSelectSession(mediaSessions[nextIndex].entityId)
-            }
         },
         onJoinPlayer = { entityId ->
             callService(

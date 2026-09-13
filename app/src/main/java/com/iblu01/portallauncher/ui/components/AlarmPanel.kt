@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.LauncherChip
@@ -346,13 +347,14 @@ private enum class ArmOption(
  * invalid code, so an unchanged state after the response window is treated as a rejected entry.
  */
 @Composable
-private fun AlarmKeypad(
+internal fun AlarmKeypad(
     entityId: String,
     service: String,
     currentState: String,
     prompt: String,
     accent: Color,
     onCancel: (() -> Unit)?,
+    maxKeyDiameter: Dp = 74.dp,
 ) {
     val callService = LocalCallService.current
     var submitCount by remember(service) { mutableIntStateOf(0) }
@@ -387,6 +389,7 @@ private fun AlarmKeypad(
         error = wrongCode,
         loading = waitingForHa,
         onErrorConsumed = { wrongCode = false },
+        maxKeyDiameter = maxKeyDiameter,
         onCancel = onCancel,
     )
 }
