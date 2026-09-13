@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
@@ -47,6 +48,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MicOff
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -76,6 +82,7 @@ import com.iblu01.portallauncher.ui.HaStates
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import com.iblu01.portallauncher.ui.components.VoiceAssistantOverlay
+import com.iblu01.portallauncher.voice.PortalCommand
 import com.iblu01.portallauncher.voice.VoiceAssistantController
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -157,6 +164,10 @@ import com.iblu01.portallauncher.ui.onboarding.shouldRunOnboarding
 import com.iblu01.portallauncher.ui.home.HomePage
 import com.iblu01.portallauncher.ui.home.HomePageEditActions
 import com.iblu01.portallauncher.ui.theme.PortalTheme
+import com.iblu01.portallauncher.ui.theme.ClockDateFormat
+import com.iblu01.portallauncher.ui.theme.ClockFont
+import com.iblu01.portallauncher.ui.theme.ClockTheme
+import com.iblu01.portallauncher.ui.theme.ClockTint
 import com.iblu01.portallauncher.ui.theme.blurCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -331,6 +342,7 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        LauncherWebPreview.register(window.decorView)
         openingFromLauncher = false
         widgets.reload()
         pills.start(prefs)
@@ -344,6 +356,7 @@ class LauncherActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        LauncherWebPreview.unregister(window.decorView)
         voice.onPause()
         DeviceStateHub.onLauncherForeground(false, this)
         super.onPause()
@@ -571,7 +584,35 @@ private fun PortalLauncherApp(
     var bgOverlayOpacity by remember { mutableStateOf(prefs.bgOverlayOpacity) }
     var clockTheme by remember { mutableStateOf(prefs.clockTheme) }
     var gridScale by remember { mutableStateOf(prefs.gridScale) }
+    var autoReturnSettingsVersion by remember { mutableStateOf(0) }
+    val browserPreview by LauncherWebPreview.preview.collectAsStateWithLifecycle()
     var notificationDotsEnabled by remember { mutableStateOf(prefs.notificationDots) }
+
+    LaunchedEffect(browserPreview) {
+        val preview = browserPreview
+        if (preview == null) {
+            gridScale = prefs.gridScale
+            backgroundMode = prefs.backgroundMode
+            bgOverlayOpacity = prefs.bgOverlayOpacity
+            clockTheme = prefs.clockTheme
+        } else {
+            gridScale = preview.gridScale
+            backgroundMode = preview.backgroundMode
+            bgOverlayOpacity = preview.backgroundOpacity
+            preview.clock?.let {
+                clockTheme = ClockTheme(
+                    font = ClockFont.fromKey(it.font),
+                    weight = it.weight,
+                    size = it.size,
+                    letterSpacing = it.letterSpacing,
+                    tint = ClockTint.fromKey(it.tint),
+                    format24h = it.format24h,
+                    dateFormat = ClockDateFormat.fromKey(it.dateFormat),
+                    elementSpacing = it.elementSpacing,
+                )
+            }
+        }
+    }
     val folderDefaultLabel = stringResource(R.string.folder_default_label)
     val dotPackages by NotificationDots.packages.collectAsStateWithLifecycle()
     // A folder shows a dot when any member does — otherwise foldering an app would silence it.
@@ -650,6 +691,16 @@ private fun PortalLauncherApp(
     val callServiceProvider = remember(vm, haStates) {
         object : CallService {
             override fun invoke(domain: String, service: String, entityId: String?, data: Map<String, Any>?) {
+                // One gate for every control in the launcher: the service call is the single road
+                // from any tap to Home Assistant, so guarding it here leaves nothing to forget.
+                if (ActionLockState.blocks(domain)) {
+                    Toast.makeText(
+                        context,
+                        ActionLockState.reason ?: context.getString(R.string.action_lock_blocked),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    return
+                }
                 if (entityId != null && ',' !in entityId) {
                     haStates.applyOptimistic(entityId) { entity ->
                         predictState(service, entity.state)?.let { entity.copy(state = it) } ?: entity
@@ -668,6 +719,12 @@ private fun PortalLauncherApp(
         appPageCount = { appPages.value },
     )
     val latestPagerLayout by rememberUpdatedState(pagerLayout)
+
+    LaunchedEffect(browserPreview, pagerLayout.firstAppPage, pagerLayout.appPageCount) {
+        if (browserPreview != null && pagerLayout.appPageCount > 0) {
+            pagerState.scrollToPage(pagerLayout.firstAppPage)
+        }
+    }
 
     // Match Launcher3's wallpaper protocol: advertise the horizontal page step and continuously
     // report the pager position. WallpaperService handles static and live wallpaper movement;
@@ -699,6 +756,9 @@ private fun PortalLauncherApp(
                     backgroundMode = prefs.backgroundMode
                     wallpaperVersion++
                 }
+                "gridScale" -> gridScale = prefs.gridScale
+                "clockTheme" -> clockTheme = prefs.clockTheme
+                "autoReturn" -> autoReturnSettingsVersion++
                 "haUrl", "haToken" -> pills.start(prefs)
                 "iconPack" -> appList.refresh(force = true)
                 "notificationDots" -> notificationDotsEnabled = prefs.notificationDots
@@ -806,6 +866,25 @@ private fun PortalLauncherApp(
     // panelChip is resolved last-known-good by the VM.
     val panel by vm.panel.collectAsStateWithLifecycle()
     val panelChip by vm.panelChip.collectAsStateWithLifecycle()
+
+    // The assistant asking for a panel goes through the same reducer as a tap: a voice-opened
+    // thermostat must toggle-close and Back out exactly like a touched one.
+    LaunchedEffect(vm, voice) {
+        voice.portalCommands.collect { command ->
+            when (command) {
+                is PortalCommand.ClosePanel -> vm.onEvent(PanelEvent.Dismiss)
+                is PortalCommand.ShowPanel -> when (command.kind) {
+                    PanelKind.WEATHER -> vm.onEvent(PanelEvent.WeatherTap)
+                    // Panels are addressed by chip: the assistant names a kind ("thermostat"),
+                    // and the chip currently carrying that kind is the one to open. No chip, no
+                    // panel — the home simply has no such device on this panel.
+                    else -> vm.uiState.value.chips
+                        .firstOrNull { it.toPanelKind() == command.kind }
+                        ?.let { vm.onEvent(PanelEvent.OpenChip(PanelRequest.Chip(it.id, command.kind))) }
+                }
+            }
+        }
+    }
     // Scene taps and the camera center: both are surfaces of their own, neither is a side panel.
     val sceneActivations = rememberSceneActivations(vm::callService)
     var cameraPreferences by remember { mutableStateOf(prefs.cameraPreferences) }
@@ -913,7 +992,7 @@ private fun PortalLauncherApp(
         showHidden || armedPillReorderKey != null || pillDragActive || cameraCenter.isOpen
     // While an alarm is alerting the countdown is suspended outright: returning to the clock would
     // take the disarm keypad off screen exactly when it is needed.
-    LaunchedEffect(panel.request, panel.source, userState, resumed, alarmAlerting) {
+    LaunchedEffect(panel.request, panel.source, userState, resumed, alarmAlerting, autoReturnSettingsVersion) {
         val userPanelOpen = panel.request != null && panel.source == PanelSource.USER
         if (resumed && !alarmAlerting && (userPanelOpen || userState)) autoReturnTimer.start()
         else autoReturnTimer.stop()
@@ -1174,9 +1253,10 @@ private fun PortalLauncherApp(
         label = "bottomGradientHeight"
     )
 
-    val alertMessage = AlertOverlayState.activeMessage
+    val activeAlert = AlertOverlayState.activeAlert
+    val activeAlarm = AlarmOverlayState.activeAlert
     val blurRadius by animateDpAsState(
-        targetValue = if (alertMessage != null || overlayVisible) 16.dp else 0.dp,
+        targetValue = if (activeAlert != null || activeAlarm != null || overlayVisible) 16.dp else 0.dp,
         animationSpec = tween(300),
         label = "blurRadius"
     )
@@ -1603,8 +1683,17 @@ private fun PortalLauncherApp(
         )
 
         AlertOverlay(
-            message = alertMessage,
+            alert = activeAlert,
+            timerEndsAt = AlertOverlayState.timerEndsAt,
             onDismiss = { AlertOverlayState.dismiss() }
+        )
+
+        // Drawn last, so it covers everything: a notification arriving mid-intrusion must not be
+        // able to take the keypad off the screen.
+        AlertOverlay(
+            alert = activeAlarm,
+            timerEndsAt = AlarmOverlayState.timerEndsAt,
+            onDismiss = { AlarmOverlayState.dismiss() }
         )
 
         AutoReturnOverlay(state = autoReturnState, onCancel = { autoReturnTimer.onInteraction() })
@@ -1659,8 +1748,32 @@ private fun PortalLauncherApp(
                 }
             },
         )
+        // Muted assistant: the only thing on the panel that says the microphone is closed, and
+        // the way back. Drawn above everything so it is still reachable while a panel is open.
+        if (VoiceMuteState.muted) {
+            IconButton(
+                onClick = { VoiceMuteState.set(prefs, false) },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.MicOff,
+                    contentDescription = stringResource(R.string.voice_mute_unmute),
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+
         val voiceState by voice.state.collectAsStateWithLifecycle()
-        VoiceAssistantOverlay(state = voiceState, onStop = voice::stopSession)
+        VoiceAssistantOverlay(
+            state = voiceState,
+            onStop = voice::stopSession,
+            onConfirm = voice::confirmPendingAction,
+            onCancelConfirm = voice::cancelPendingAction,
+        )
 
         ConfigTransferOverlay(prefs)
     }

@@ -1,8 +1,6 @@
 package com.iblu01.portallauncher.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -27,7 +25,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,9 +35,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -49,7 +46,11 @@ import androidx.compose.ui.unit.sp
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import androidx.compose.foundation.layout.Arrangement
 import com.iblu01.portallauncher.voice.VoicePhase
+import com.iblu01.portallauncher.voice.VoicePlan
+import com.iblu01.portallauncher.voice.VoiceTask
+import com.iblu01.portallauncher.voice.VoiceTaskStatus
 import com.iblu01.portallauncher.voice.VoiceUiState
 
 /**
@@ -59,14 +60,14 @@ import com.iblu01.portallauncher.voice.VoiceUiState
  *
  * The layer owns every touch while a session is live, so the launcher behind it cannot be poked
  * through the overlay; tapping anywhere is the hang-up gesture (plus an explicit close button for
- * accessibility). Everything animated lives in the draw phase ([drawBehind] reading animated
- * state), so the glow never triggers recomposition — the panel runs Android 9 with no live blur,
- * and this is the cheapest path to 60 fps there.
+ * accessibility). The animated backdrop is [EdgeGlow], shared with MQTT notifications.
  */
 @Composable
 fun VoiceAssistantOverlay(
     state: VoiceUiState,
     onStop: () -> Unit,
+    onConfirm: () -> Unit = {},
+    onCancelConfirm: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -78,13 +79,25 @@ fun VoiceAssistantOverlay(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) { detectTapGestures { onStop() } },
+                // Tap-anywhere hangs up, except while a guarded action is waiting: there the
+                // whole point is a deliberate press, and a stray touch must not read as either
+                // answer.
+                .pointerInput(state.pendingConfirmation) {
+                    detectTapGestures { if (state.pendingConfirmation == null) onStop() }
+                },
         ) {
             val compact = maxWidth < 600.dp
             val glowHeight = if (compact) 160.dp else 220.dp
 
-            VoiceGlow(
-                phase = state.phase,
+            val intensity by animateFloatAsState(
+                targetValue = glowIntensity(state.phase),
+                animationSpec = tween(400),
+                label = "voiceGlowIntensity",
+            )
+            EdgeGlow(
+                color = glowColor(state.phase),
+                edge = GlowEdge.BOTTOM,
+                intensity = intensity,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(glowHeight)
@@ -102,6 +115,13 @@ fun VoiceAssistantOverlay(
                 val userText = state.userText
                 val botText = state.error ?: state.botText
 
+                // The plan sits above the exchange: while the assistant works through it there
+                // is no speech to read, and the checklist is the only thing telling someone
+                // standing in front of the panel that anything is happening.
+                if (!state.plan.isEmpty) {
+                    TaskPlan(state.plan, compact)
+                    Spacer(Modifier.height(if (compact) 14.dp else 20.dp))
+                }
                 if (userText.isNotBlank()) {
                     Text(
                         text = "« $userText »",
@@ -126,6 +146,10 @@ fun VoiceAssistantOverlay(
                         maxLines = if (compact) 3 else 4,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
+                }
+                state.pendingConfirmation?.let { label ->
+                    ConfirmationRow(label, compact, onConfirm, onCancelConfirm)
                     Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
                 }
                 PhaseBadge(state.phase)
@@ -153,100 +177,141 @@ fun VoiceAssistantOverlay(
     }
 }
 
+/**
+ * The physical half of [com.iblu01.portallauncher.voice.VoiceGuard]: a lock, a garage or an alarm
+ * is never opened on a voice alone, so the assistant's request lands here and waits for a press
+ * from someone who is actually in front of the panel.
+ */
+@Composable
+private fun ConfirmationRow(
+    label: String,
+    compact: Boolean,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = stringResource(R.string.voice_confirm_title),
+            style = AppleTypography.labelSmall,
+            color = AppleColors.tertiary,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = if (compact) AppleTypography.titleMedium else AppleTypography.titleLarge,
+            color = AppleColors.warning,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(if (compact) 10.dp else 14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ConfirmationButton(
+                text = stringResource(R.string.voice_confirm_cancel),
+                color = AppleColors.secondary,
+                onClick = onCancel,
+            )
+            ConfirmationButton(
+                text = stringResource(R.string.voice_confirm_accept),
+                color = AppleColors.warning,
+                onClick = onConfirm,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConfirmationButton(text: String, color: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(color.copy(alpha = 0.18f))
+            .appleClickable(onClick)
+            .padding(horizontal = 22.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = text, style = AppleTypography.bodyLarge, color = color)
+    }
+}
+
+/**
+ * The announced plan as a checklist. Deliberately plain: a done step goes grey with a tick, the
+ * running one stays bright, a failed one is marked — nothing animates, because it is read at a
+ * glance from across a room, not watched.
+ */
+@Composable
+private fun TaskPlan(plan: VoicePlan, compact: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+    ) {
+        plan.tasks.forEach { task -> TaskRow(task, compact) }
+    }
+}
+
+@Composable
+private fun TaskRow(task: VoiceTask, compact: Boolean) {
+    val color = when (task.status) {
+        VoiceTaskStatus.RUNNING -> AppleColors.primary
+        VoiceTaskStatus.FAILED -> AppleColors.warning
+        VoiceTaskStatus.DONE -> AppleColors.tertiary
+        VoiceTaskStatus.PENDING -> AppleColors.secondary
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+            when (task.status) {
+                VoiceTaskStatus.DONE -> Icon(
+                    Icons.Outlined.Check,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(14.dp),
+                )
+                VoiceTaskStatus.FAILED -> Icon(
+                    Icons.Outlined.ErrorOutline,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(14.dp),
+                )
+                // The running step is the pulsing dot the phase badge uses, so the two read as
+                // one status channel rather than two.
+                VoiceTaskStatus.RUNNING -> Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(color),
+                )
+                VoiceTaskStatus.PENDING -> Box(
+                    Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.4f)),
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = task.title,
+            style = if (compact) AppleTypography.bodyLarge else AppleTypography.titleMedium,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 /** Glow colour per phase; the aura is the primary status channel, text merely confirms it. */
 private fun glowColor(phase: VoicePhase): Color = when (phase) {
     VoicePhase.ERROR -> AppleColors.warning
     else -> AppleColors.accent
 }
 
-/**
- * Bottom scrim + animated aura. All time-varying values are read inside [drawBehind], so the
- * infinite transitions invalidate the draw pass only, never composition or layout.
- */
-@Composable
-private fun VoiceGlow(phase: VoicePhase, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "voiceGlow")
-    // A slow travelling highlight, wrapped around the bottom edge like a light bar.
-    val shimmer by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing)),
-        label = "voiceGlowShimmer",
-    )
-    val breathe by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "voiceGlowBreathe",
-    )
-    // Intensity follows the session phase so listening reads brighter than thinking.
-    val intensity by animateFloatAsState(
-        targetValue = when (phase) {
-            VoicePhase.SPEAKING -> 1f
-            VoicePhase.LISTENING -> 0.85f
-            VoicePhase.ERROR -> 0.7f
-            VoicePhase.THINKING -> 0.5f
-            else -> 0.4f
-        },
-        animationSpec = tween(400),
-        label = "voiceGlowIntensity",
-    )
-    val color = glowColor(phase)
-
-    Box(
-        modifier.drawBehind {
-            // Legibility scrim: any wallpaper fades to near-black under the text.
-            drawRect(
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.45f to Color.Black.copy(alpha = 0.55f),
-                    1f to Color.Black.copy(alpha = 0.92f),
-                ),
-            )
-
-            val w = size.width
-            val h = size.height
-            val pulse = 0.75f + 0.25f * breathe
-
-            // Soft aura pool sliding along the bottom edge (two pools so the wrap is seamless).
-            val auraRadius = w * 0.45f
-            val auraAlpha = 0.20f * intensity * pulse
-            for (offset in floatArrayOf(shimmer, shimmer - 1f)) {
-                val cx = w * offset
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        0f to color.copy(alpha = auraAlpha),
-                        1f to Color.Transparent,
-                        center = Offset(cx, h),
-                        radius = auraRadius,
-                    ),
-                    radius = auraRadius,
-                    center = Offset(cx, h),
-                )
-            }
-
-            // Ambient wash so the edge glows even between the travelling pools.
-            drawRect(
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    1f to color.copy(alpha = 0.16f * intensity * pulse),
-                ),
-            )
-
-            // The light bar itself: a thin breathing line hugging the bottom edge.
-            val barHeight = (2.5f + 2.5f * breathe).dp.toPx()
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    0f to color.copy(alpha = 0.0f),
-                    0.2f to color.copy(alpha = 0.9f * intensity),
-                    0.8f to color.copy(alpha = 0.9f * intensity),
-                    1f to color.copy(alpha = 0.0f),
-                ),
-                topLeft = Offset(0f, h - barHeight),
-                size = androidx.compose.ui.geometry.Size(w, barHeight),
-            )
-        },
-    )
+/** Intensity follows the session phase, so listening reads brighter than thinking. */
+private fun glowIntensity(phase: VoicePhase): Float = when (phase) {
+    VoicePhase.SPEAKING -> 1f
+    VoicePhase.LISTENING -> 0.85f
+    VoicePhase.ERROR -> 0.7f
+    VoicePhase.THINKING -> 0.5f
+    else -> 0.4f
 }
 
 /** Tiny pulsing dot + phase label, the only chrome besides the close button. */
@@ -272,6 +337,8 @@ private fun PhaseBadge(phase: VoicePhase) {
             style = AppleTypography.labelSmall,
             color = AppleColors.tertiary,
         )
+        Spacer(Modifier.width(10.dp))
+        UtilityBadge(stringResource(R.string.voice_beta_badge))
     }
 }
 

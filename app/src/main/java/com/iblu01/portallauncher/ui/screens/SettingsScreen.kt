@@ -113,7 +113,6 @@ import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.components.backgroundModes
 import com.iblu01.portallauncher.ui.settings.HomeSettingsAction
 import com.iblu01.portallauncher.ui.settings.SettingsPillCatalog
-import com.iblu01.portallauncher.ui.onboarding.OnboardingActivity
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import java.net.URL
@@ -239,6 +238,7 @@ fun SettingsScreen(
     initialPage: String? = null,
     voiceState: com.iblu01.portallauncher.voice.VoiceUiState = com.iblu01.portallauncher.voice.VoiceUiState(),
     voiceCalibrationState: com.iblu01.portallauncher.voice.MicCalibrationState? = null,
+    voiceToolCalls: List<com.iblu01.portallauncher.voice.VoiceToolCall> = emptyList(),
     onVoiceStartTest: () -> Unit = {},
     onVoiceStopTest: () -> Unit = {},
     onVoiceCalibrate: () -> Unit = {},
@@ -504,6 +504,7 @@ fun SettingsScreen(
             SettingsPage.CONNECTED_HOME_VOICE -> VoiceAssistantSettingsPage(
                 prefs = prefs,
                 voiceState = voiceState,
+                toolCalls = voiceToolCalls,
                 calibrationState = voiceCalibrationState,
                 onStartConnectionTest = onVoiceStartTest,
                 onStopConnectionTest = onVoiceStopTest,
@@ -829,13 +830,13 @@ private fun AppPage(
                 onClick = { showLanguagePage = true },
             )
             SettingsDivider()
-            // The first-run assistant is offered again from here, and only from here: it never
-            // reopens by itself once it has been completed.
+            // Reset is deliberately performed from the authenticated browser UI. The panel only
+            // opens a short-lived LAN session and never exposes a destructive local shortcut.
             SettingsRow(
                 label = stringResource(R.string.onb_settings_restart_setup_label),
                 onClick = {
                     settingsContext.startActivity(
-                        OnboardingActivity.intent(settingsContext, reset = true)
+                        com.iblu01.portallauncher.WebConfigActivity.onboardingIntent(settingsContext)
                     )
                 },
             )

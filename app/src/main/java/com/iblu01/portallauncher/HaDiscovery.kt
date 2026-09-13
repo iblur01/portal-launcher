@@ -48,6 +48,24 @@ object HaDiscovery {
 
     fun soundCommandTopic(deviceId: String) = "portal/$deviceId/sound/play"
     fun notificationCommandTopic(deviceId: String) = "portal/$deviceId/notification"
+
+    /**
+     * The alarm's own topic, kept apart from notifications on purpose.
+     *
+     * Two reasons. A notification replaces whatever stands, so a parcel delivery would wipe an
+     * intrusion screen off the panel — unacceptable for the one thing that must not be dismissable.
+     * And an alarm is a *state*, not an event: published retained, a panel that reboots mid-alarm
+     * comes back showing it.
+     */
+    fun alarmCommandTopic(deviceId: String) = "portal/$deviceId/alarm"
+
+    fun actionLockDiscoveryTopic(deviceId: String) = "homeassistant/switch/${deviceId}_action_lock/config"
+    fun actionLockStateTopic(deviceId: String) = "portal/$deviceId/action_lock/state"
+    fun actionLockCommandTopic(deviceId: String) = "portal/$deviceId/action_lock/set"
+    fun actionLockConfigPayload(deviceId: String, deviceName: String): String {
+        val name = deviceName.escape()
+        return """{"name":"Controls Locked","unique_id":"${deviceId}_action_lock","device":${device(deviceId, name)},"state_topic":"${actionLockStateTopic(deviceId)}","command_topic":"${actionLockCommandTopic(deviceId)}","payload_on":"ON","payload_off":"OFF","state_on":"ON","state_off":"OFF","icon":"mdi:gesture-tap-button"}"""
+    }
     fun doorbellDiscoveryTopic(deviceId: String) = "homeassistant/button/${deviceId}_doorbell/config"
     fun alertDiscoveryTopic(deviceId: String) = "homeassistant/button/${deviceId}_alert/config"
     fun doorbellConfigPayload(deviceId: String, deviceName: String): String {
@@ -57,6 +75,21 @@ object HaDiscovery {
     fun alertConfigPayload(deviceId: String, deviceName: String): String {
         val name = deviceName.escape()
         return """{"name":"Alert","unique_id":"${deviceId}_alert","device":${device(deviceId, name)},"command_topic":"${soundCommandTopic(deviceId)}","payload_press":"alert","icon":"mdi:alert"}"""
+    }
+
+    fun voiceCommandTopic(deviceId: String) = "portal/$deviceId/voice/command"
+    fun voiceDiscoveryTopic(deviceId: String) = "homeassistant/button/${deviceId}_voice/config"
+    fun voiceConfigPayload(deviceId: String, deviceName: String): String {
+        val name = deviceName.escape()
+        return """{"name":"Voice Assistant","unique_id":"${deviceId}_voice","device":${device(deviceId, name)},"command_topic":"${voiceCommandTopic(deviceId)}","payload_press":"start","icon":"mdi:microphone-message"}"""
+    }
+
+    fun voiceMuteDiscoveryTopic(deviceId: String) = "homeassistant/switch/${deviceId}_voice_mute/config"
+    fun voiceMuteStateTopic(deviceId: String) = "portal/$deviceId/voice/mute/state"
+    fun voiceMuteCommandTopic(deviceId: String) = "portal/$deviceId/voice/mute/set"
+    fun voiceMuteConfigPayload(deviceId: String, deviceName: String): String {
+        val name = deviceName.escape()
+        return """{"name":"Assistant Muted","unique_id":"${deviceId}_voice_mute","device":${device(deviceId, name)},"state_topic":"${voiceMuteStateTopic(deviceId)}","command_topic":"${voiceMuteCommandTopic(deviceId)}","payload_on":"ON","payload_off":"OFF","state_on":"ON","state_off":"OFF","icon":"mdi:microphone-off"}"""
     }
 
     fun volumeMuteDiscoveryTopic(deviceId: String) = "homeassistant/switch/${deviceId}_volume_mute/config"
@@ -144,6 +177,10 @@ object HaDiscovery {
         screenTimeoutMinutesCommandTopic(deviceId),
         powerModeCommandTopic(deviceId),
         notificationCommandTopic(deviceId),
+        alarmCommandTopic(deviceId),
+        actionLockCommandTopic(deviceId),
+        voiceCommandTopic(deviceId),
+        voiceMuteCommandTopic(deviceId),
         sessionCommandTopic(deviceId),
     )
 

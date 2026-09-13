@@ -25,9 +25,8 @@ android {
         applicationId = "com.iblu01.portallauncher"
         minSdk = 27
         targetSdk = 28
-        // ONNX Runtime (wake word) and libwebrtc (voice session) ship ~28 MB of native code per
-        // ABI, and x86/x86_64 exist only for emulators — no wall panel this is sideloaded onto is
-        // x86. Keeping the two ARM ABIs cuts the APK by about 60 MB.
+        // ONNX Runtime (wake word) ships several MB of native code per ABI, and x86/x86_64 exist
+        // only for emulators — no wall panel this is sideloaded onto is x86.
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
@@ -119,10 +118,10 @@ androidComponents {
     }
 }
 
-// The Pipecat transport and openWakeWord both depend on a much newer androidx.core than this
-// project's AGP 8.3.2 / compileSdk 35 pair accepts (1.17 demands AGP 8.9 and compileSdk 36). Both
-// only use long-stable core APIs (ContextCompat, permission checks), so pinning core back is a far
-// smaller change than dragging the whole toolchain forward for two dependencies.
+// openWakeWord depends on a much newer androidx.core than this project's AGP 8.3.2 / compileSdk 35
+// pair accepts (1.17 demands AGP 8.9 and compileSdk 36). It only uses long-stable core APIs
+// (ContextCompat, permission checks), so pinning core back is a far smaller change than dragging
+// the whole toolchain forward for one dependency.
 configurations.configureEach {
     resolutionStrategy {
         force("androidx.core:core:1.13.1")
@@ -155,9 +154,8 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.hls)
 
-    // Voice assistant: on-device wake word, then a direct WebRTC session with the Pipecat
-    // add-on running on Home Assistant (see voice/VoiceAssistantController).
-    implementation(libs.pipecat.small.webrtc)
+    // Voice assistant: on-device wake word, then a direct Gemini Live WebSocket over okhttp
+    // (see voice/VoiceAssistantController). No SDK: the Live protocol is a dozen JSON messages.
     implementation(libs.openwakeword)
     implementation(libs.onnxruntime.android)
 

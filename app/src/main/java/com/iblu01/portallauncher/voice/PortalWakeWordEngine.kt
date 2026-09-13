@@ -69,6 +69,9 @@ class PortalWakeWordEngine(
     val detections: Flow<WakeWordDetection> = _detections.asSharedFlow()
     val microphoneLevels: Flow<Float> = _microphoneLevels.asSharedFlow()
     private var recordingJob: Job? = null
+
+    /** Slow RMS average driving the speech gain; see the capture loop. */
+    private var smoothedRms = 0f
     private val telemetry = WakeTelemetry()
 
     /**
@@ -100,11 +103,11 @@ class PortalWakeWordEngine(
                 TAG,
                 (
                     "wake %d frames in %d ms (load %.2fx real time, inference %.0f ms/frame), " +
-                        "rms mean %.4f peak %.4f, score peak %.3f"
+                        "rms mean %.4f peak %.4f gain %.1fx, score peak %.3f"
                     ).format(
                     Locale.US,
                     frames, elapsed, load, inferenceMsSum / frames,
-                    rmsSum / frames, rmsPeak, scorePeak,
+                    rmsSum / frames, rmsPeak, smoothedRms.let { if (it >= noiseGateRms) (MicCalibration.TARGET_SPEECH_RMS / it).coerceIn(1f, maxGain) else 1f }, scorePeak,
                 ),
             )
             frames = 0
@@ -135,8 +138,12 @@ class PortalWakeWordEngine(
                 // Honor wall panels deliver a notably quiet 16 kHz MIC stream. Bring speech into
                 // the range used to train openWakeWord, while leaving silence alone and capping
                 // gain so ambient noise cannot explode.
-                val gain = if (rms >= noiseGateRms) {
-                    (MicCalibration.TARGET_SPEECH_RMS / rms).coerceIn(1f, maxGain)
+                // Gain follows a slow average, never this frame: a per-frame AGC renormalises
+                // every 80 ms window to the same level, flattening the syllable envelope the
+                // classifier keys on. ~1.6 s EMA tracks the room and the talker, not phonemes.
+                smoothedRms = if (smoothedRms <= 0f) rms else smoothedRms * 0.95f + rms * 0.05f
+                val gain = if (smoothedRms >= noiseGateRms) {
+                    (MicCalibration.TARGET_SPEECH_RMS / smoothedRms).coerceIn(1f, maxGain)
                 } else 1f
                 val samples = if (gain > 1.01f) {
                     FloatArray(raw.size) { index -> (raw[index] * gain).coerceIn(-1f, 1f) }

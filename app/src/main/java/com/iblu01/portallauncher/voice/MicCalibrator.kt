@@ -19,7 +19,7 @@ sealed interface MicCalibrationState {
     data class Failed(val reason: MicCalibrationFailure) : MicCalibrationState
 }
 
-enum class MicCalibrationFailure { SPEAKER_INAUDIBLE, MIC_UNAVAILABLE }
+enum class MicCalibrationFailure { SPEAKER_INAUDIBLE, MIC_UNAVAILABLE, ROOM_NOT_SILENT }
 
 /**
  * Speaker-to-microphone loop calibration for the wake engine.
@@ -68,7 +68,11 @@ object MicCalibrator {
                         tone.release()
                     }
 
-                    if (playbackRms < noiseFloor * 2f || playbackRms < 0.001f) {
+                    if (noiseFloor > MicCalibration.MAX_PLAUSIBLE_NOISE_FLOOR) {
+                        // Someone talked during the silent step, or the previous tone was still
+                        // ringing. Storing it would derive a gate that swallows speech.
+                        MicCalibrationState.Failed(MicCalibrationFailure.ROOM_NOT_SILENT)
+                    } else if (playbackRms < noiseFloor * 2f || playbackRms < 0.001f) {
                         MicCalibrationState.Failed(MicCalibrationFailure.SPEAKER_INAUDIBLE)
                     } else {
                         MicCalibrationState.Done(MicCalibration(noiseFloor, playbackRms))

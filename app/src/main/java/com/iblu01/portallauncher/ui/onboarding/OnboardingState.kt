@@ -112,8 +112,8 @@ sealed interface ConfigReceiveState {
 }
 
 /**
- * Whole onboarding state. Immutable, owned by [OnboardingViewModel]; screens receive it and emit
- * intents back, so no composable writes to `Prefs` directly.
+ * Device projection of [OnboardingCoordinator]. Screens receive it and emit intents back, so no
+ * composable writes to `Prefs` directly.
  *
  * Secrets ([haToken], [mqttPassword]) live here for the duration of the flow only. They are never
  * logged and never written to a `SavedStateHandle` — persistence goes through the encrypted store.
@@ -135,6 +135,7 @@ data class OnboardingUiState(
     val gridManual: Boolean = false,
 
     val backgroundMode: String = "system",
+    val backgroundOpacity: Float = 0.25f,
     val backgroundConfigured: Boolean = false,
 
     val haDiscovery: DiscoveryState = DiscoveryState.Idle,

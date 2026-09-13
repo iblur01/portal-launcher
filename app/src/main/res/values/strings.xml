@@ -859,23 +859,51 @@
     <!-- Camera settings -->
     <string name="settings_cameras_title">Cameras</string>
     <string name="settings_cameras_subtitle">Camera center, main camera and display mode</string>
-    <!-- Voice assistant (Pipecat Assist satellite) -->
+    <!-- Voice assistant (Gemini Live) -->
     <string name="settings_voice_title">Voice assistant</string>
-    <string name="settings_voice_subtitle">Wake word and Pipecat Assist server</string>
-    <string name="settings_voice_intro">The panel listens for the wake word on-device and only then opens a session with the Pipecat Assist add-on running on Home Assistant. Nothing is streamed while it waits.</string>
-    <string name="settings_voice_section_server">Server</string>
+    <string name="voice_beta_badge">BETA</string>
+    <string name="settings_voice_subtitle">Wake word and Gemini Live assistant</string>
+    <string name="settings_voice_intro">The panel listens for the wake word on-device and only then opens a speech-to-speech session with Gemini Live. Nothing is streamed while it waits. The assistant controls Home Assistant through the connection configured on this panel, and hangs up by itself once the exchange is over.</string>
+    <string name="settings_voice_section_server">Gemini Live</string>
     <string name="settings_voice_section_wake">Wake word</string>
     <string name="settings_voice_microphone">Microphone permission</string>
     <string name="settings_voice_microphone_allowed">Allowed</string>
     <string name="settings_voice_microphone_blocked">Required — tap to allow</string>
     <string name="settings_voice_microphone_warning">The microphone is blocked. Wake-word detection cannot work until permission is granted.</string>
     <string name="settings_voice_enabled">Enable the voice assistant</string>
-    <string name="settings_voice_url">Add-on address</string>
-    <string name="settings_voice_token">Satellite token</string>
-    <string name="settings_voice_url_invalid">Unrecognised address</string>
-    <string name="settings_voice_connection_status">Pipecat connection</string>
-    <string name="settings_voice_connection_test_hint">Tap to open a real test session with Pipecat.</string>
-    <string name="settings_voice_connection_stop_hint">A Pipecat session is active. Tap to disconnect.</string>
+    <string name="settings_voice_api_key">Google AI Studio API key</string>
+    <string name="settings_voice_model">Live model</string>
+    <string name="settings_voice_voice_name">Voice</string>
+    <string name="settings_voice_prompt">Extra instructions</string>
+    <string name="settings_voice_prompt_placeholder">Rooms, habits, house rules…</string>
+    <string name="settings_voice_barge_in">Allow cutting the assistant off</string>
+    <string name="settings_voice_barge_in_supported">This panel reports an echo canceller: the microphone can stay open while the assistant speaks, so a word interrupts it. Turn this off if it starts cutting itself off.</string>
+    <string name="settings_voice_barge_in_unsupported">No echo canceller reported on this panel. With this on, the microphone hears the loudspeaker and the assistant interrupts itself in a loop.</string>
+    <string name="voice_error_daily_limit">Daily voice session limit reached</string>
+    <string name="voice_confirm_title">Confirm on the panel</string>
+    <string name="voice_confirm_accept">Confirm</string>
+    <string name="voice_confirm_cancel">Cancel</string>
+    <string name="settings_voice_section_limits">Limits and diagnostics</string>
+    <string name="settings_voice_daily_limit">Sessions per day</string>
+    <string name="settings_voice_daily_limit_hint">A false wake opens a billed session. 0 removes the ceiling.</string>
+    <string name="settings_voice_daily_limit_used">%1$d of %2$d used today</string>
+    <string name="settings_voice_daily_limit_off">No ceiling</string>
+    <string name="settings_voice_scheduled">Scheduled actions</string>
+    <string name="settings_voice_scheduled_none">None pending</string>
+    <string name="settings_voice_scheduled_entry">%1$s — in %2$d min</string>
+    <string name="settings_voice_facts">Remembered facts</string>
+    <string name="settings_voice_facts_none">Nothing remembered</string>
+    <string name="settings_voice_facts_clear">Forget everything</string>
+    <string name="settings_voice_tool_log">Last tool calls</string>
+    <string name="settings_voice_tool_log_none">No tool call in this session</string>
+    <string name="settings_voice_model_hint_live">List read from your Google account.</string>
+    <string name="settings_voice_model_hint_offline">Built-in list: enter a key to read the models your account actually offers.</string>
+    <string name="settings_voice_wake_model">Detection model</string>
+    <string name="settings_voice_wake_model_hint">Bundled models, plus any .onnx placed in %1$s.</string>
+    <string name="settings_voice_calibration_failed_noisy">Too much noise during the silent step: nothing was saved. Try again without speaking.</string>
+    <string name="settings_voice_connection_status">Gemini connection</string>
+    <string name="settings_voice_connection_test_hint">Tap to open a real test session with Gemini.</string>
+    <string name="settings_voice_connection_stop_hint">A session is active. Tap to disconnect.</string>
     <string name="settings_voice_connection_connecting">Connecting…</string>
     <string name="settings_voice_connection_connected">Connected</string>
     <string name="settings_voice_connection_error">Connection failed</string>
@@ -887,7 +915,6 @@
     <string name="settings_voice_microphone_level">Live microphone level: %1$d%%</string>
     <string name="settings_voice_wake_detected">Wake word detected — confidence %1$d%%</string>
     <string name="settings_voice_wake_not_detected">No wake word detected yet</string>
-    <string name="settings_voice_wake_active">Selected</string>
     <string name="settings_voice_threshold">Trigger threshold (%)</string>
     <string name="settings_voice_threshold_hint">Lower means more sensitive. The live score must exceed this threshold.</string>
     <string name="settings_voice_idle">Hang up after silence (s)</string>
@@ -907,6 +934,33 @@
     <string name="voice_phase_speaking">Speaking</string>
     <string name="voice_phase_error">Voice assistant unavailable</string>
     <string name="voice_stop_desc">End the voice session</string>
+    <string name="alert_overlay_title">Notification</string>
+    <string name="alarm_msg_arming">Arming, please leave</string>
+    <string name="alarm_msg_arming_mode">Arming in %1$s mode, please leave</string>
+    <string name="alarm_msg_pending">Disarm the system</string>
+    <string name="alarm_msg_triggered">Intrusion detected</string>
+    <string name="alarm_msg_armed">System armed</string>
+    <string name="alarm_msg_armed_mode">System armed in %1$s mode</string>
+    <string name="alarm_msg_disarmed">System disarmed</string>
+    <string name="alarm_msg_failed">Arming refused</string>
+    <string name="alarm_msg_failed_sensor">Arming refused, %1$s is open</string>
+    <string name="alarm_say_arming">Arming. You can leave now.</string>
+    <string name="alarm_say_arming_mode">Arming in %1$s mode. You can leave now.</string>
+    <string name="alarm_say_pending">Alarm. Disarm the system.</string>
+    <string name="alarm_say_triggered">Alarm, intrusion detected.</string>
+    <string name="alarm_say_armed">System armed.</string>
+    <string name="alarm_say_armed_mode">System armed, %1$s mode.</string>
+    <string name="alarm_say_disarmed">System disarmed.</string>
+    <string name="alarm_say_failed">Arming refused.</string>
+    <string name="alarm_say_failed_sensor">Arming refused, %1$s is still open.</string>
+    <string name="alarm_default_title">Alarm</string>
+    <string name="action_lock_on">Controls locked</string>
+    <string name="action_lock_off">Controls unlocked</string>
+    <string name="voice_mute_on">Assistant muted</string>
+    <string name="voice_mute_off">Assistant listening</string>
+    <string name="voice_mute_unmute">Assistant muted, tap to unmute</string>
+    <string name="action_lock_blocked">Controls are locked</string>
+    <string name="alert_overlay_more_items">+%1$d more</string>
     <string name="settings_cameras_visible">Cameras shown in the centre</string>
     <string name="settings_cameras_main">Main camera</string>
     <string name="settings_cameras_default_mode">Default display mode</string>
@@ -1353,8 +1407,8 @@
     <string name="onb_complete_action_open_settings">Open settings</string>
 
     <!-- ===== ONBOARDING — SETTINGS ===== -->
-    <string name="onb_settings_restart_setup_label">Restart setup assistant</string>
-    <string name="onb_settings_restart_setup_subtitle">Resume Portal\'s setup from the beginning.</string>
+    <string name="onb_settings_restart_setup_label">Manage setup in a browser</string>
+    <string name="onb_settings_restart_setup_subtitle">Open a secure page to update or restart Portal setup.</string>
 
     <!-- ===== ONBOARDING — PILLS DEMO LABELS ===== -->
     <string name="onb_pills_demo_pill_light">Living room light</string>
@@ -1424,4 +1478,7 @@
     <string name="config_transfer_sending">Sending configuration…</string>
     <string name="config_transfer_sent">Configuration sent</string>
     <string name="config_transfer_send_failed">The configuration could not be sent. Keep both devices on the same network and try again.</string>
+    <string name="onb_web_required_title">Continue in a browser</string>
+    <string name="onb_web_required_body">This panel is too compact for a comfortable setup. Open the secure setup page from a phone, tablet, or computer on the same network.</string>
+    <string name="onb_web_open_action">Set up in a browser</string>
 </resources>

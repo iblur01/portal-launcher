@@ -1,6 +1,10 @@
 package com.iblu01.portallauncher
 
+import android.Manifest
 import android.graphics.Bitmap
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +16,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,14 +40,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -53,12 +63,24 @@ import com.iblu01.portallauncher.ui.components.SettingsRow
 import com.iblu01.portallauncher.ui.components.SettingsSection
 import com.iblu01.portallauncher.ui.components.SettingsSubPageHeader
 import com.iblu01.portallauncher.ui.components.PillButton
+import com.iblu01.portallauncher.ui.components.AmbientBackground
+import com.iblu01.portallauncher.ui.components.wallpaperFile
+import com.iblu01.portallauncher.ui.onboarding.Capability
+import com.iblu01.portallauncher.ui.onboarding.OnboardingCapabilities
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleShapes
 import com.iblu01.portallauncher.ui.theme.AppleTypography
 import com.iblu01.portallauncher.ui.theme.PortalTheme
+import com.iblu01.portallauncher.ui.theme.ClockDateFormat
+import com.iblu01.portallauncher.ui.theme.ClockFont
+import com.iblu01.portallauncher.ui.theme.ClockTheme
+import com.iblu01.portallauncher.ui.theme.ClockTint
+import com.iblu01.portallauncher.ui.theme.clockFontFamily
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Remote configuration: shows a QR code for the URL of an embedded web server, so the panel's
@@ -76,6 +98,12 @@ class WebConfigActivity : ComponentActivity() {
     private var endpoint by mutableStateOf<Endpoint?>(null)
     private var homeAssistantSaved by mutableStateOf(false)
     private var mqttSaved by mutableStateOf(false)
+    private var browserConnected by mutableStateOf(false)
+    private var browserStep by mutableStateOf("GRID")
+    private var launcherPreview by mutableStateOf<WebLauncherPreview?>(null)
+    @Volatile private var serverGeneration = 0L
+    @Volatile private var systemActionPending = false
+    private var launcherPresented = false
 
     /** Address and access code of the running server; null while it is not listening. */
     data class Endpoint(val url: String, val code: String)
@@ -95,6 +123,13 @@ class WebConfigActivity : ComponentActivity() {
                     endpoint = endpoint,
                     homeAssistantSaved = homeAssistantSaved,
                     mqttSaved = mqttSaved,
+                    browserConnected = browserConnected,
+                    browserStep = browserStep,
+                    launcherPreview = launcherPreview,
+                    committedGridScale = prefs.gridScale,
+                    committedBackgroundMode = prefs.backgroundMode,
+                    committedBackgroundOpacity = prefs.bgOverlayOpacity,
+                    committedClockTheme = prefs.clockTheme,
                     onBack = ::finish,
                     onContinue = ::finish,
                 )
@@ -109,6 +144,7 @@ class WebConfigActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        systemActionPending = false
         hideSystemBars()
     }
 
@@ -118,7 +154,7 @@ class WebConfigActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        stopServer()
+        if (!systemActionPending) stopServer()
         super.onStop()
     }
 
@@ -134,29 +170,133 @@ class WebConfigActivity : ComponentActivity() {
 
     private fun startServer() {
         if (server != null) return
+        browserConnected = false
+        browserStep = "GRID"
+        launcherPreview = null
+        LauncherWebPreview.apply(null)
+        val generation = ++serverGeneration
         val mainHandler = Handler(Looper.getMainLooper())
         val started = WebConfigServer.launch(
             prefs = prefs,
             // Called from a server worker thread; the bridge is started and stopped from main.
             onMqttConfigChanged = {
                 mainHandler.post {
+                    if (generation != serverGeneration) return@post
                     MqttBridgeService.stop(this)
                     MqttBridgeService.start(this)
                 }
             },
             onConfigSaved = { section ->
                 mainHandler.post {
+                    if (generation != serverGeneration) return@post
                     if (section == WebConfigSection.HOME_ASSISTANT || section == WebConfigSection.ALL) {
                         homeAssistantSaved = true
                     }
                     if (section == WebConfigSection.MQTT || section == WebConfigSection.ALL) {
                         mqttSaved = true
                     }
+                    // The controller re-reads its settings on the next launcher resume, which
+                    // leaving the web config always goes through — the bus only says "re-read".
+                    if (section == WebConfigSection.VOICE || section == WebConfigSection.ALL) {
+                        SettingsChangeBus.get().emit("voiceGeminiApiKey")
+                    }
                     SettingsChangeBus.get().emit("haUrl")
                     SettingsChangeBus.get().emit("haToken")
                     SettingsChangeBus.get().emit("brokerHost")
                 }
             },
+            onOnboardingComplete = {
+                mainHandler.post {
+                    if (generation != serverGeneration) return@post
+                    setResult(RESULT_OK)
+                    finish()
+                }
+            },
+            onBrowserConnected = { snapshot ->
+                mainHandler.post {
+                    if (generation != serverGeneration) return@post
+                    browserConnected = true
+                    browserStep = snapshot.step.name
+                    if (!launcherPresented) {
+                        launcherPresented = true
+                        systemActionPending = true
+                        startActivity(
+                            Intent(this, LauncherActivity::class.java)
+                                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                        )
+                    }
+                }
+            },
+            onLauncherPreview = { preview ->
+                if (generation != serverGeneration) {
+                    false
+                } else if (Looper.myLooper() == Looper.getMainLooper()) {
+                    if (generation == serverGeneration) {
+                        launcherPreview = preview
+                        LauncherWebPreview.apply(preview)
+                        if (preview == null) {
+                            SettingsChangeBus.get().emit("gridScale")
+                            SettingsChangeBus.get().emit("backgroundMode")
+                            SettingsChangeBus.get().emit("bgOverlayOpacity")
+                        }
+                        true
+                    } else false
+                } else {
+                    val claimed = AtomicBoolean(false)
+                    val finished = CountDownLatch(1)
+                    val task = Runnable {
+                        if (claimed.compareAndSet(false, true) && generation == serverGeneration) {
+                            launcherPreview = preview
+                            LauncherWebPreview.apply(preview)
+                            if (preview == null) {
+                                SettingsChangeBus.get().emit("gridScale")
+                                SettingsChangeBus.get().emit("backgroundMode")
+                                SettingsChangeBus.get().emit("bgOverlayOpacity")
+                            }
+                        }
+                        finished.countDown()
+                    }
+                    mainHandler.post(task)
+                    if (finished.await(750, TimeUnit.MILLISECONDS)) {
+                        generation == serverGeneration
+                    } else if (claimed.compareAndSet(false, true)) {
+                        // The task has not started: cancel it so a negative ACK cannot apply late.
+                        mainHandler.removeCallbacks(task)
+                        false
+                    } else {
+                        // The main thread already claimed the tiny state update; it will apply.
+                        generation == serverGeneration
+                    }
+                }
+            },
+            onSystemAction = { action ->
+                if (action == "microphone") {
+                    mainHandler.post {
+                        if (generation == serverGeneration) requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 4301)
+                    }
+                    true
+                } else {
+                    val intent = when (action) {
+                        "default_launcher" -> OnboardingCapabilities(applicationContext)
+                            .settingsIntentFor(Capability.DEFAULT_LAUNCHER)
+                        "screen_control" -> OnboardingCapabilities(applicationContext)
+                            .settingsIntentFor(Capability.SCREEN_CONTROL)
+                        "brightness" -> OnboardingCapabilities(applicationContext)
+                            .settingsIntentFor(Capability.BRIGHTNESS)
+                        "notifications" -> Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                        else -> null
+                    }
+                    if (intent == null || intent.resolveActivity(packageManager) == null) false else {
+                        systemActionPending = true
+                        mainHandler.post {
+                            if (generation == serverGeneration) startActivity(intent)
+                            else systemActionPending = false
+                        }
+                        true
+                    }
+                }
+            },
+            onScreenCapture = LauncherWebPreview::capturePng,
         )
         val ip = localIpv4()
         if (started == null || ip == null) {
@@ -172,10 +312,16 @@ class WebConfigActivity : ComponentActivity() {
         )
     }
 
+
     private fun stopServer() {
+        serverGeneration += 1
+        server?.releaseOnboardingEditor()
         server?.stop()
         server = null
         endpoint = null
+        browserConnected = false
+        browserStep = "GRID"
+        launcherPreview = null
     }
 
     private fun hideSystemBars() {
@@ -185,6 +331,11 @@ class WebConfigActivity : ComponentActivity() {
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
     }
+
+    companion object {
+        fun onboardingIntent(context: Context): Intent =
+            Intent(context, WebConfigActivity::class.java)
+    }
 }
 
 @Composable
@@ -192,6 +343,13 @@ private fun WebConfigScreen(
     endpoint: WebConfigActivity.Endpoint?,
     homeAssistantSaved: Boolean,
     mqttSaved: Boolean,
+    browserConnected: Boolean,
+    browserStep: String,
+    launcherPreview: WebLauncherPreview?,
+    committedGridScale: Float,
+    committedBackgroundMode: String,
+    committedBackgroundOpacity: Float,
+    committedClockTheme: ClockTheme,
     onBack: () -> Unit,
     onContinue: () -> Unit,
 ) {
@@ -215,6 +373,19 @@ private fun WebConfigScreen(
                 title = stringResource(R.string.web_config_title),
                 onBack = onBack,
             )
+
+            if (browserConnected) {
+                ConnectedBrowserPreview(
+                    step = browserStep,
+                    preview = launcherPreview,
+                    committedGridScale = committedGridScale,
+                    committedBackgroundMode = committedBackgroundMode,
+                    committedBackgroundOpacity = committedBackgroundOpacity,
+                    committedClockTheme = committedClockTheme,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
+                return@Column
+            }
 
             if (homeAssistantSaved || mqttSaved) {
                 val complete = homeAssistantSaved && mqttSaved
@@ -334,6 +505,126 @@ private fun WebConfigScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ConnectedBrowserPreview(
+    step: String,
+    preview: WebLauncherPreview?,
+    committedGridScale: Float,
+    committedBackgroundMode: String,
+    committedBackgroundOpacity: Float,
+    committedClockTheme: ClockTheme,
+    modifier: Modifier = Modifier,
+) {
+    val scale = preview?.gridScale ?: committedGridScale
+    val mode = preview?.backgroundMode ?: committedBackgroundMode
+    val opacity = preview?.backgroundOpacity ?: committedBackgroundOpacity
+    val clockTheme = preview?.clock?.let {
+        ClockTheme(
+            font = ClockFont.fromKey(it.font), weight = it.weight, size = it.size,
+            letterSpacing = it.letterSpacing, tint = ClockTint.fromKey(it.tint),
+            format24h = it.format24h, dateFormat = ClockDateFormat.fromKey(it.dateFormat),
+            elementSpacing = it.elementSpacing,
+        )
+    } ?: committedClockTheme
+    val context = LocalContext.current
+    val previewApps = remember(context) {
+        context.packageManager.queryIntentActivities(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0,
+        ).map { it.loadLabel(context.packageManager).toString() }
+            .filter(String::isNotBlank).distinct().take(32)
+    }
+    val columns = (6f / scale).toInt().coerceIn(4, 8)
+    val surface = when (mode) {
+        "system" -> Color(0xFF1D2735)
+        "custom" -> Color(0xFF243447)
+        "immich" -> Color(0xFF26352D)
+        else -> Color(0xFF111318)
+    }
+    Column(
+        modifier = modifier.padding(top = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text("Navigateur connecté", style = AppleTypography.titleMedium, color = AppleColors.primary)
+                Text(step.replace('_', ' ').lowercase(), style = AppleTypography.bodySmall, color = AppleColors.secondary)
+            }
+            Text(
+                if (preview == null) "Réglages validés" else "Aperçu #${preview.sequence}",
+                style = AppleTypography.bodySmall,
+                color = if (preview == null) AppleColors.active else AppleColors.secondary,
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 720.dp)
+                .weight(1f)
+                .clip(RoundedCornerShape(6.dp))
+                .background(surface)
+                .border(1.dp, AppleColors.frostedBorder, RoundedCornerShape(6.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            AmbientBackground(
+                mode = mode,
+                wallpaperVersion = wallpaperFile(LocalContext.current).lastModified().hashCode(),
+                overlayOpacity = opacity,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    if (clockTheme.format24h) "08:42" else "8:42 AM",
+                    style = AppleTypography.headlineLarge.copy(
+                        fontFamily = clockFontFamily(clockTheme.font, FontWeight(clockTheme.weight)),
+                        fontWeight = FontWeight(clockTheme.weight),
+                        fontSize = (clockTheme.size / 3f).sp,
+                        letterSpacing = (clockTheme.letterSpacing / 3f).sp,
+                    ),
+                    color = clockTheme.tint.color,
+                    textAlign = TextAlign.Center,
+                )
+                repeat(4) { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        repeat(columns) { column ->
+                            val label = previewApps.getOrNull(row * columns + column).orEmpty()
+                            Box(
+                                Modifier
+                                    .size(42.dp * scale)
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(Color(0xFF30363D))
+                                    .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(5.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    label.take(2).uppercase(),
+                                    style = AppleTypography.bodySmall,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "${columns} colonnes · échelle ${"%.2f".format(scale)} · assombrissement ${(opacity * 100).toInt()} %",
+            style = AppleTypography.bodySmall,
+            color = AppleColors.secondary,
+        )
     }
 }
 

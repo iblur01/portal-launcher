@@ -1,0 +1,42 @@
+id: portal_machine_a_laver_fin
+alias: Machine à laver - Fin de cycle sur le Portal
+description: >-
+  Annonce la fin du cycle sur le Portal du salon, mais seulement quand quelqu'un
+  peut l'entendre : en journée ou en soirée, avec de l'activité dans la maison et
+  Théo présent. Le déclencheur exige un passage run → stop, donc un redémarrage de
+  Home Assistant machine à l'arrêt n'annonce rien.
+triggers:
+  - trigger: state
+    entity_id: sensor.machine_a_laver_machine_state
+    from: run
+    to: stop
+conditions:
+  - condition: time
+    after: "08:00:00"
+    before: "23:00:00"
+  - condition: state
+    entity_id: person.theo
+    state: home
+  - condition: or
+    conditions:
+      - condition: state
+        entity_id: binary_sensor.detecteur_de_presence_homekit
+        state: "on"
+      - condition: state
+        entity_id: binary_sensor.portal_du_salon_presence
+        state: "on"
+actions:
+  - action: script.portal_notify
+    data:
+      panel: 20ebb3b581b2a5f1a6a5e9201f8c1ac9
+      title: Buanderie
+      message: Le lave-linge a terminé son cycle.
+      icon: mdi:washing-machine
+      color: [48, 209, 88]
+      speak: true
+      speak_text: Le lave-linge a terminé son cycle, pense à sortir le linge.
+      engine: tts.google_ai_tts
+      language: fr-FR
+      tone: success
+      wake: true
+mode: single

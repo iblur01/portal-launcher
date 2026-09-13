@@ -99,14 +99,14 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `skipping home assistant scopes to home assistant, pills and mqtt only`() {
+    fun `skipping home assistant keeps mqtt available`() {
         val model = viewModel()
         model.skipHomeAssistant()
 
         assertTrue(prefs.homeAssistantOnboardingSkipped)
         assertFalse(prefs.mqttOnboardingSkipped)
         assertFalse(prefs.appCleanupOnboardingSkipped)
-        assertEquals(OnboardingStep.HIDDEN_APPS, model.state.value.step)
+        assertEquals(OnboardingStep.MQTT_CONFIGURATION, model.state.value.step)
         assertTrue(model.state.value.flags.homeAssistantSkipped)
     }
 

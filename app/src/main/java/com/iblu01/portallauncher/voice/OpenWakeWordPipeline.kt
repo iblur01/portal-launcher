@@ -161,8 +161,16 @@ class OpenWakeWordPipeline(context: Context, classifierAsset: String) : AutoClos
         options.close()
     }
 
-    private fun load(context: Context, asset: String): OrtSession =
-        context.assets.open(asset).use { env.createSession(it.readBytes(), options) }
+    /**
+     * An absolute path is a model the user dropped on the device (see [WakeWordCatalog]);
+     * anything else is one of the bundled assets.
+     */
+    private fun load(context: Context, path: String): OrtSession =
+        if (path.startsWith("/")) {
+            env.createSession(java.io.File(path).readBytes(), options)
+        } else {
+            context.assets.open(path).use { env.createSession(it.readBytes(), options) }
+        }
 
     private fun directFloats(size: Int): FloatBuffer =
         ByteBuffer.allocateDirect(size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()

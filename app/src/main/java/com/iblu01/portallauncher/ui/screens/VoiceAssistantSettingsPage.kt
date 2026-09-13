@@ -29,6 +29,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.iblu01.portallauncher.DEFAULT_GEMINI_LIVE_MODEL
+import com.iblu01.portallauncher.DEFAULT_GEMINI_VOICE
 import com.iblu01.portallauncher.Prefs
 import com.iblu01.portallauncher.R
 import com.iblu01.portallauncher.ui.components.SettingsDivider
@@ -39,36 +41,45 @@ import com.iblu01.portallauncher.ui.components.SettingsTextField
 import com.iblu01.portallauncher.ui.components.SettingsToggle
 import com.iblu01.portallauncher.ui.theme.AppleColors
 import com.iblu01.portallauncher.ui.theme.AppleTypography
+import androidx.compose.runtime.LaunchedEffect
+import com.iblu01.portallauncher.DEFAULT_WAKE_WORD
+import com.iblu01.portallauncher.ui.components.SettingsPicker
+import com.iblu01.portallauncher.voice.GeminiLive
+import com.iblu01.portallauncher.voice.GeminiProbe
+import com.iblu01.portallauncher.voice.WakeWordCatalog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.iblu01.portallauncher.voice.MicCalibrationFailure
 import com.iblu01.portallauncher.voice.MicCalibrationState
-import com.iblu01.portallauncher.voice.parseVoiceEndpoint
+import com.iblu01.portallauncher.voice.deviceHasEchoCanceler
 import com.iblu01.portallauncher.voice.wakeWordLabel
 import com.iblu01.portallauncher.voice.VoicePhase
+import com.iblu01.portallauncher.voice.VoiceScheduler
+import com.iblu01.portallauncher.voice.VoiceToolCall
 import com.iblu01.portallauncher.voice.VoiceUiState
-
-/** Wake-word models bundled in `assets/wakeword`. */
-private val WAKE_WORDS = listOf(
-    "wakeword/hey_jarvis_v0.1.onnx",
-    "wakeword/alexa_v0.1.onnx",
-)
 
 private data class VoiceDraft(
     val enabled: Boolean,
-    val url: String,
-    val token: String,
+    val apiKey: String,
+    val model: String,
+    val voice: String,
+    val prompt: String,
+    val bargeIn: Boolean,
+    val dailyLimit: Int,
     val wakeWord: String,
     val threshold: Int,
     val idleSeconds: Int,
 )
 
 /**
- * Pipecat Assist satellite settings. Text fields are committed on leave (like the Home Assistant
- * connection page) so a half-typed URL never restarts the wake engine mid-keystroke.
+ * Gemini Live assistant settings. Text fields are committed on leave (like the Home Assistant
+ * connection page) so a half-typed key never restarts the wake engine mid-keystroke.
  */
 @Composable
 fun VoiceAssistantSettingsPage(
     prefs: Prefs,
     voiceState: VoiceUiState = VoiceUiState(),
+    toolCalls: List<VoiceToolCall> = emptyList(),
     calibrationState: MicCalibrationState? = null,
     onStartConnectionTest: () -> Unit = {},
     onStopConnectionTest: () -> Unit = {},
@@ -88,21 +99,29 @@ fun VoiceAssistantSettingsPage(
     ) { granted -> hasMicPermission = granted }
 
     var enabled by remember { mutableStateOf(prefs.voiceAssistantEnabled) }
-    var url by remember { mutableStateOf(prefs.voiceAssistantUrl) }
-    var token by remember { mutableStateOf(prefs.voiceAssistantToken) }
+    var apiKey by remember { mutableStateOf(prefs.voiceGeminiApiKey) }
+    var model by remember { mutableStateOf(prefs.voiceGeminiModel) }
+    var voice by remember { mutableStateOf(prefs.voiceGeminiVoice) }
+    var prompt by remember { mutableStateOf(prefs.voiceGeminiPrompt) }
+    var bargeIn by remember { mutableStateOf(prefs.voiceBargeIn) }
+    var dailyLimit by remember { mutableStateOf(prefs.voiceDailySessionLimit) }
     var wakeWord by remember { mutableStateOf(prefs.voiceAssistantWakeWord) }
     var threshold by remember { mutableStateOf(prefs.voiceAssistantThreshold) }
     var idleSeconds by remember { mutableStateOf(prefs.voiceAssistantIdleSeconds) }
 
     val draft by rememberUpdatedState(
-        VoiceDraft(enabled, url, token, wakeWord, threshold, idleSeconds),
+        VoiceDraft(enabled, apiKey, model, voice, prompt, bargeIn, dailyLimit, wakeWord, threshold, idleSeconds),
     )
 
     DisposableEffect(Unit) {
         onDispose {
             prefs.voiceAssistantEnabled = draft.enabled
-            prefs.voiceAssistantUrl = draft.url
-            prefs.voiceAssistantToken = draft.token
+            prefs.voiceGeminiApiKey = draft.apiKey
+            prefs.voiceGeminiModel = draft.model
+            prefs.voiceGeminiVoice = draft.voice
+            prefs.voiceGeminiPrompt = draft.prompt
+            prefs.voiceBargeIn = draft.bargeIn
+            prefs.voiceDailySessionLimit = draft.dailyLimit
             prefs.voiceAssistantWakeWord = draft.wakeWord
             prefs.voiceAssistantThreshold = draft.threshold
             prefs.voiceAssistantIdleSeconds = draft.idleSeconds
@@ -111,14 +130,37 @@ fun VoiceAssistantSettingsPage(
         }
     }
 
-    val resolved = parseVoiceEndpoint(url)
+    val echoCancellerDetected = remember { deviceHasEchoCanceler() }
+
+    // Wake words come from what is actually on the device, so dropping an .onnx in makes it
+    // selectable without a release.
+    val wakeWords = remember { WakeWordCatalog.available(context).ifEmpty { listOf(DEFAULT_WAKE_WORD) } }
+
+    // The Live model list has no static truth: Google retires these previews on its own
+    // schedule. Asked once per visit when a key is stored, with the bundled names as the
+    // fallback so the field is never an empty dropdown.
+    var liveModels by remember { mutableStateOf(GeminiLive.FALLBACK_LIVE_MODELS) }
+    var modelsFromApi by remember { mutableStateOf(false) }
+    LaunchedEffect(apiKey.isNotBlank()) {
+        if (apiKey.isBlank()) return@LaunchedEffect
+        val probed = withContext(Dispatchers.IO) { GeminiProbe.listModels(apiKey) }
+        if (probed is GeminiProbe.Result.Ok && probed.live.isNotEmpty()) {
+            liveModels = probed.live.sorted()
+            modelsFromApi = true
+        }
+    }
 
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        SettingsSubPageHeader(stringResource(R.string.settings_voice_title), onBack, showBack = showBack)
+        SettingsSubPageHeader(
+            stringResource(R.string.settings_voice_title),
+            onBack,
+            showBack = showBack,
+            badge = stringResource(R.string.voice_beta_badge),
+        )
         Text(
             text = stringResource(R.string.settings_voice_intro),
             style = AppleTypography.bodyLarge,
@@ -134,21 +176,48 @@ fun VoiceAssistantSettingsPage(
             )
             SettingsDivider()
             SettingsTextField(
-                label = stringResource(R.string.settings_voice_url),
-                value = url,
-                onValueChange = { url = it },
-                placeholder = "http://homeassistant.local:7860/api/offer",
-            )
-            SettingsTextField(
-                label = stringResource(R.string.settings_voice_token),
-                value = token,
-                onValueChange = { token = it },
+                label = stringResource(R.string.settings_voice_api_key),
+                value = apiKey,
+                onValueChange = { apiKey = it },
                 isPassword = true,
             )
+            SettingsPicker(
+                label = stringResource(R.string.settings_voice_model),
+                value = model,
+                options = liveModels,
+                onSelect = { model = it },
+                hint = stringResource(
+                    if (modelsFromApi) R.string.settings_voice_model_hint_live else R.string.settings_voice_model_hint_offline,
+                ),
+            )
+            SettingsPicker(
+                label = stringResource(R.string.settings_voice_voice_name),
+                value = voice,
+                options = GeminiLive.VOICES,
+                onSelect = { voice = it },
+            )
+            SettingsTextField(
+                label = stringResource(R.string.settings_voice_prompt),
+                value = prompt,
+                onValueChange = { prompt = it },
+                placeholder = stringResource(R.string.settings_voice_prompt_placeholder),
+            )
+            SettingsDivider()
+            SettingsToggle(
+                label = stringResource(R.string.settings_voice_barge_in),
+                checked = bargeIn,
+                onCheckedChange = { bargeIn = it },
+            )
             Text(
-                text = resolved?.offerUrl ?: stringResource(R.string.settings_voice_url_invalid),
+                text = stringResource(
+                    if (echoCancellerDetected) {
+                        R.string.settings_voice_barge_in_supported
+                    } else {
+                        R.string.settings_voice_barge_in_unsupported
+                    },
+                ),
                 style = AppleTypography.bodySmall,
-                color = if (resolved == null) AppleColors.warning else AppleColors.tertiary,
+                color = if (echoCancellerDetected) AppleColors.tertiary else AppleColors.warning,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             )
             SettingsDivider()
@@ -161,8 +230,11 @@ fun VoiceAssistantSettingsPage(
                         // Test exactly what is currently visible in the form, even before the
                         // user leaves the page and triggers the normal DisposableEffect save.
                         prefs.voiceAssistantEnabled = enabled
-                        prefs.voiceAssistantUrl = url
-                        prefs.voiceAssistantToken = token
+                        prefs.voiceGeminiApiKey = apiKey
+                        prefs.voiceGeminiModel = model
+                        prefs.voiceGeminiVoice = voice
+                        prefs.voiceGeminiPrompt = prompt
+                        prefs.voiceBargeIn = bargeIn
                         prefs.voiceAssistantWakeWord = wakeWord
                         prefs.voiceAssistantThreshold = threshold
                         prefs.voiceAssistantIdleSeconds = idleSeconds
@@ -259,14 +331,14 @@ fun VoiceAssistantSettingsPage(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             )
             SettingsDivider()
-            WAKE_WORDS.forEachIndexed { index, asset ->
-                if (index > 0) SettingsDivider()
-                SettingsRow(
-                    label = wakeWordLabel(asset),
-                    value = if (asset == wakeWord) stringResource(R.string.settings_voice_wake_active) else null,
-                    onClick = { wakeWord = asset },
-                )
-            }
+            SettingsPicker(
+                label = stringResource(R.string.settings_voice_wake_model),
+                value = wakeWord,
+                options = wakeWords,
+                onSelect = { wakeWord = it },
+                labelOf = ::wakeWordLabel,
+                hint = stringResource(R.string.settings_voice_wake_model_hint, WakeWordCatalog.customDir(context).absolutePath),
+            )
             SettingsDivider()
             SettingsTextField(
                 label = stringResource(R.string.settings_voice_threshold),
@@ -288,6 +360,91 @@ fun VoiceAssistantSettingsPage(
             )
         }
 
+        SettingsSection(stringResource(R.string.settings_voice_section_limits)) {
+            SettingsTextField(
+                label = stringResource(R.string.settings_voice_daily_limit),
+                value = dailyLimit.toString(),
+                onValueChange = { value -> dailyLimit = value.toIntOrNull()?.coerceIn(0, 5000) ?: dailyLimit },
+                keyboardType = KeyboardType.Number,
+            )
+            Text(
+                text = stringResource(R.string.settings_voice_daily_limit_hint),
+                style = AppleTypography.bodySmall,
+                color = AppleColors.tertiary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+            SettingsDivider()
+
+            // Read straight from prefs rather than kept in state: this list changes when an
+            // alarm fires, not when the page is edited, and a stale queue on screen would be
+            // read as the queue itself being wrong.
+            val scheduled = remember(voiceState.phase) { VoiceScheduler.pending(prefs) }
+            SettingsRow(
+                label = stringResource(R.string.settings_voice_scheduled),
+                value = if (scheduled.isEmpty()) stringResource(R.string.settings_voice_scheduled_none) else scheduled.size.toString(),
+                onClick = {},
+            )
+            scheduled.forEach { action ->
+                Text(
+                    text = stringResource(
+                        R.string.settings_voice_scheduled_entry,
+                        action.title,
+                        ((action.atMs - System.currentTimeMillis()) / 60_000L).toInt().coerceAtLeast(0),
+                    ),
+                    style = AppleTypography.bodySmall,
+                    color = AppleColors.secondary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
+                )
+            }
+            SettingsDivider()
+
+            var facts by remember { mutableStateOf(prefs.voiceFacts) }
+            SettingsRow(
+                label = stringResource(R.string.settings_voice_facts),
+                value = if (facts.isEmpty()) {
+                    stringResource(R.string.settings_voice_facts_none)
+                } else {
+                    stringResource(R.string.settings_voice_facts_clear)
+                },
+                onClick = {
+                    prefs.voiceFacts = emptyList()
+                    facts = emptyList()
+                },
+            )
+            facts.forEach { fact ->
+                Text(
+                    text = fact,
+                    style = AppleTypography.bodySmall,
+                    color = AppleColors.secondary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 3.dp),
+                )
+            }
+            SettingsDivider()
+
+            // The journal: without it, "the assistant did the wrong thing" is unfalsifiable.
+            SettingsRow(
+                label = stringResource(R.string.settings_voice_tool_log),
+                value = toolCalls.size.takeIf { it > 0 }?.toString(),
+                onClick = {},
+            )
+            if (toolCalls.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.settings_voice_tool_log_none),
+                    style = AppleTypography.bodySmall,
+                    color = AppleColors.tertiary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+            }
+            toolCalls.forEach { call ->
+                Text(
+                    text = "${call.name} ${call.args}\n→ ${call.result}",
+                    style = AppleTypography.bodySmall,
+                    color = if (call.ok) AppleColors.tertiary else AppleColors.warning,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+        }
+
         Spacer(Modifier.height(32.dp))
     }
 }
@@ -300,6 +457,7 @@ private fun calibrationLabel(state: MicCalibrationState?, prefs: Prefs): String 
         when (state.reason) {
             MicCalibrationFailure.SPEAKER_INAUDIBLE -> R.string.settings_voice_calibration_failed_speaker
             MicCalibrationFailure.MIC_UNAVAILABLE -> R.string.settings_voice_calibration_failed_mic
+            MicCalibrationFailure.ROOM_NOT_SILENT -> R.string.settings_voice_calibration_failed_noisy
         },
     )
     else -> prefs.voiceMicCalibration?.let { calibration ->

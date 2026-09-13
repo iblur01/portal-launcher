@@ -184,6 +184,11 @@
             android:name=".SleepReceiver"
             android:exported="false" />
 
+        <!-- Fires the actions the voice assistant promised for later (voice.VoiceScheduler). -->
+        <receiver
+            android:name=".VoiceScheduleReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

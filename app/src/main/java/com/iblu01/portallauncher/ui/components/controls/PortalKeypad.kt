@@ -96,6 +96,8 @@ fun PinKeypad(
     loading: Boolean = false,
     showLetters: Boolean = true,
     haptics: Boolean = true,
+    /** Ceiling on a key's size. Raised by the full-screen alarm screen, where the keypad *is* the UI. */
+    maxKeyDiameter: Dp = 74.dp,
     onCancel: (() -> Unit)? = null,
 ) {
     val fixed = codeLength > 0
@@ -157,8 +159,8 @@ fun PinKeypad(
         // panels, so height now has an equal vote.
         val verticalChrome = if (!fixed && onCancel != null) 112.dp else 82.dp
         val heightDiameter = (maxHeight - verticalChrome) / 4.65f
-        val keyDiameter = minOf(widthDiameter, heightDiameter).coerceIn(38.dp, 74.dp)
-        val contentScale = (keyDiameter / 74.dp).coerceIn(0.65f, 1f)
+        val keyDiameter = minOf(widthDiameter, heightDiameter).coerceIn(38.dp, maxKeyDiameter)
+        val contentScale = (keyDiameter / 74.dp).coerceIn(0.65f, 1.6f)
         Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -305,7 +307,7 @@ private fun KeypadKey(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val contentScale = (diameter / 74.dp).coerceIn(0.65f, 1f)
+    val contentScale = (diameter / 74.dp).coerceIn(0.65f, 1.6f)
 
     // "cancel" / empty slots stay the grid's size but carry no circle.
     if (key.isEmpty()) {

@@ -1,6 +1,7 @@
 package com.iblu01.portallauncher.voice
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,59 +9,14 @@ import org.junit.Test
 class VoiceAssistantTest {
 
     @Test
-    fun `offer url is kept and its token extracted`() {
-        val endpoint = parseVoiceEndpoint("http://ha.example.com:7860/api/offer?token=s3cret")
-        assertEquals("http://ha.example.com:7860/api/offer", endpoint?.offerUrl)
-        assertEquals("s3cret", endpoint?.token)
-    }
-
-    /** The address the add-on page shows for ESPHome satellites: same host, different path. */
-    @Test
-    fun `esphome satellite websocket url is rewritten to the offer path`() {
-        val endpoint = parseVoiceEndpoint("ws://ha.example.com:7860/api/assist/esphome?token=abc&flow_id=x")
-        assertEquals("http://ha.example.com:7860/api/offer", endpoint?.offerUrl)
-        assertEquals("abc", endpoint?.token)
-    }
-
-    @Test
-    fun `bare host gets the add-on scheme port and path`() {
-        val endpoint = parseVoiceEndpoint("  homeassistant.local  ")
-        assertEquals("http://homeassistant.local:7860/api/offer", endpoint?.offerUrl)
-        assertNull(endpoint?.token)
-    }
-
-    @Test
-    fun `https and explicit port survive`() {
-        val endpoint = parseVoiceEndpoint("https://voice.example.com:8443")
-        assertEquals("https://voice.example.com:8443/api/offer", endpoint?.offerUrl)
-    }
-
-    @Test
-    fun `unusable input is rejected rather than guessed`() {
-        assertNull(parseVoiceEndpoint(""))
-        assertNull(parseVoiceEndpoint("   "))
-        assertNull(parseVoiceEndpoint("ftp://ha.example.com/api/offer"))
-    }
-
-    @Test
-    fun `percent encoded token is decoded`() {
-        val endpoint = parseVoiceEndpoint("http://ha:7860/api/offer?token=a%2Fb%3Dc")
-        assertEquals("a/b=c", endpoint?.token)
-    }
-
-    @Test
-    fun `transport states map onto phases`() {
-        assertEquals(VoicePhase.CONNECTING, phaseForTransportState("Connecting", VoicePhase.WAITING_FOR_WAKE))
-        assertEquals(VoicePhase.LISTENING, phaseForTransportState("Ready", VoicePhase.CONNECTING))
-        assertEquals(VoicePhase.WAITING_FOR_WAKE, phaseForTransportState("Disconnected", VoicePhase.SPEAKING))
-        assertEquals(VoicePhase.ERROR, phaseForTransportState("Error", VoicePhase.LISTENING))
-    }
-
-    /** A live turn's finer phase must not be flattened by a repeated transport notification. */
-    @Test
-    fun `connected does not overwrite an in-progress turn`() {
-        assertEquals(VoicePhase.SPEAKING, phaseForTransportState("Connected", VoicePhase.SPEAKING))
-        assertEquals(VoicePhase.THINKING, phaseForTransportState("Ready", VoicePhase.THINKING))
+    fun `voice sleep accepts minutes hours converted to minutes and indefinite mode`() {
+        val now = 1_000_000L
+        assertEquals(now + 15 * 60_000L, voiceSleepUntil(now, 15, false))
+        assertEquals(now + 120 * 60_000L, voiceSleepUntil(now, 120, false))
+        assertEquals(Long.MAX_VALUE, voiceSleepUntil(now, null, true))
+        assertNull(voiceSleepUntil(now, null, false))
+        assertNull(voiceSleepUntil(now, 0, false))
+        assertNull(voiceSleepUntil(now, MAX_VOICE_SLEEP_MINUTES.toLong() + 1, false))
     }
 
     @Test
@@ -68,9 +24,10 @@ class VoiceAssistantTest {
         // Quiet room: gate stays at the historical default, never below.
         assertEquals(0.002f, MicCalibration(noiseFloor = 0.0001f, playbackRms = 0.05f).noiseGateRms, 1e-6f)
         // Normal room: 3x the floor.
-        assertEquals(0.009f, MicCalibration(noiseFloor = 0.003f, playbackRms = 0.05f).noiseGateRms, 1e-6f)
-        // Loud room: capped so distant speech is not gated away.
-        assertEquals(0.02f, MicCalibration(noiseFloor = 0.05f, playbackRms = 0.2f).noiseGateRms, 1e-6f)
+        assertEquals(0.0045f, MicCalibration(noiseFloor = 0.0015f, playbackRms = 0.05f).noiseGateRms, 1e-6f)
+        // Loud room: capped below anything measured as speech on this panel, so a high floor can
+        // never gate a real sentence away.
+        assertEquals(0.005f, MicCalibration(noiseFloor = 0.05f, playbackRms = 0.2f).noiseGateRms, 1e-6f)
     }
 
     @Test
@@ -78,14 +35,34 @@ class VoiceAssistantTest {
         // Quiet room: distant speech is estimated well below target, so it earns headroom.
         assertEquals(10f, MicCalibration(noiseFloor = 0.001f, playbackRms = 0.1f).maxGain, 1e-6f)
         assertEquals(12f, MicCalibration(noiseFloor = 0.0001f, playbackRms = 0.1f).maxGain, 1e-6f)
-        // Noisy room: speech already reaches target level, amplifying would only raise the noise.
-        assertEquals(1f, MicCalibration(noiseFloor = 0.01f, playbackRms = 0.1f).maxGain, 1e-6f)
+        // A noisy room reduces the gain but never switches it off.
+        assertEquals(2f, MicCalibration(noiseFloor = 0.01f, playbackRms = 0.1f).maxGain, 1e-6f)
         // The loudspeaker level must not influence the cap: that was the bug that disabled gain.
         assertEquals(
             MicCalibration(noiseFloor = 0.002f, playbackRms = 0.01f).maxGain,
             MicCalibration(noiseFloor = 0.002f, playbackRms = 0.30f).maxGain,
             1e-6f,
         )
+    }
+
+    /**
+     * The measurement that silenced a panel in the field: 0.0286 is speech level, so the silent
+     * step had heard someone talk. Derived as-is it produced a gate of 0.02 — above the 0.008 to
+     * 0.017 this panel reads for real speech — and a gain cap of 1, i.e. no gain at all. The wake
+     * word then scored 0.001 on a clearly spoken phrase and never fired again.
+     */
+    @Test
+    fun `a calibration measured on a noisy room is refused rather than applied`() {
+        val bogus = MicCalibration(noiseFloor = 0.028592935f, playbackRms = 0.083941f)
+
+        assertFalse(bogus.isPlausible)
+        // Even if it were applied, it can no longer gate speech away nor disable the gain.
+        assertTrue(bogus.noiseGateRms < 0.008f)
+        assertTrue(bogus.maxGain >= 2f)
+
+        assertTrue(MicCalibration(noiseFloor = 0.0008f, playbackRms = 0.08f).isPlausible)
+        assertFalse(MicCalibration(noiseFloor = 0f, playbackRms = 0.08f).isPlausible)
+        assertFalse(MicCalibration(noiseFloor = 0.0008f, playbackRms = 0f).isPlausible)
     }
 
     @Test
@@ -107,5 +84,15 @@ class VoiceAssistantTest {
         assertEquals("hey jarvis", wakeWordLabel("wakeword/hey_jarvis_v0.1.onnx"))
         assertEquals("alexa", wakeWordLabel("wakeword/alexa_v0.1.onnx"))
         assertEquals("custom word", wakeWordLabel("custom_word.onnx"))
+    }
+
+    @Test
+    fun `entity search ignores accents and plurals`() {
+        assertTrue(matchesQuery("binary_sensor.salon Fenetre salon window", "fenêtres"))
+        assertTrue(matchesQuery("binary_sensor.x Salon window", "fenetre salon"))
+        assertTrue(matchesQuery("light.cuisine Plafond cuisine", "cuisine plafond"))
+        // Every word still has to hit: one shared word must not return the whole house.
+        assertFalse(matchesQuery("light.cuisine Plafond cuisine", "cuisine jardin"))
+        assertFalse(matchesQuery("light.cuisine Plafond cuisine", "   "))
     }
 }

@@ -26,7 +26,14 @@ private val backgroundModeKeys = setOf("system", "neutral", "custom", "immich")
 /** Bundled openWakeWord model used until the user picks another one. */
 const val DEFAULT_WAKE_WORD = "wakeword/hey_jarvis_v0.1.onnx"
 
-class Prefs(private val context: Context) {
+/** Native-audio Live model: speech in, speech out, no transcription hop in the critical path. */
+const val DEFAULT_GEMINI_LIVE_MODEL = "gemini-2.5-flash-native-audio-preview-09-2025"
+const val DEFAULT_GEMINI_VOICE = "Puck"
+
+/** Facts the assistant may keep. Every one is re-sent in every session's prompt. */
+const val MAX_VOICE_FACTS = 30
+
+class Prefs(internal val context: Context) {
     private val sp = plainPrefs(context)
 
     /** Encrypted store for secrets (HA token, MQTT password). Falls back to [sp] if the keystore is unavailable. */
@@ -59,6 +66,11 @@ class Prefs(private val context: Context) {
     var homeAssistantPackage: String
         get() = sp.getString("ha_package", "") ?: ""
         set(value) = sp.edit().putString("ha_package", value.trim()).apply()
+
+    /** Optional Home Assistant Companion package used for provider-specific deep links. */
+    var haCompanionPackage: String
+        get() = sp.getString("ha_companion_package", DEFAULT_HA_PACKAGE) ?: DEFAULT_HA_PACKAGE
+        set(value) = sp.edit().putString("ha_companion_package", value.trim()).apply()
 
     var brokerHost: String
         get() = sp.getString("broker_host", "homeassistant.local") ?: "homeassistant.local"
@@ -109,6 +121,31 @@ class Prefs(private val context: Context) {
     var screenTimeoutEnabled: Boolean
         get() = sp.getBoolean("screen_timeout_enabled", true)
         set(value) = sp.edit().putBoolean("screen_timeout_enabled", value).apply()
+
+    /**
+     * Guest mode: the panel still shows everything, but no tap reaches Home Assistant. Persisted so
+     * an away home stays locked across a reboot rather than reopening itself.
+     */
+    var actionLocked: Boolean
+        get() = sp.getBoolean("action_locked", false)
+        set(value) = sp.edit().putBoolean("action_locked", value).apply()
+
+    /**
+     * Assistant muted: no wake engine, no remote trigger. Persisted because a microphone the user
+     * switched off must not come back on its own after a reboot.
+     */
+    var voiceMuted: Boolean
+        get() = sp.getBoolean("voice_muted", false)
+        set(value) = sp.edit().putBoolean("voice_muted", value).apply()
+
+    /**
+     * End of a voice-requested temporary mute, as wall-clock milliseconds. Zero means there is
+     * no timer; [Long.MAX_VALUE] means "until somebody reactivates it". Kept separately from the
+     * existing boolean so Home Assistant's mute switch retains its simple permanent semantics.
+     */
+    var voiceMutedUntilMs: Long
+        get() = sp.getLong("voice_muted_until_ms", 0L)
+        set(value) = sp.edit().putLong("voice_muted_until_ms", value.coerceAtLeast(0L)).apply()
 
     var devKeepScreenOn: Boolean
         get() = sp.getBoolean("dev_keep_screen_on", false)
@@ -252,6 +289,59 @@ class Prefs(private val context: Context) {
         get() = sp.getBoolean("onboarding_completed", false)
         set(value) = sp.edit().putBoolean("onboarding_completed", value).apply()
 
+    var onboardingChannel: String
+        get() = sp.getString("onboarding_channel", "") ?: ""
+        set(value) = sp.edit().putString("onboarding_channel", value).apply()
+
+    /** Monotonic compare-and-set token shared by the device and Web onboarding clients. */
+    var onboardingRevision: Long
+        get() = sp.getLong("onboarding_revision", 0L)
+        set(value) { sp.edit().putLong("onboarding_revision", value.coerceAtLeast(0L)).commit() }
+
+    /** Current Web editor lease. The opaque id is never included in an onboarding snapshot. */
+    var onboardingEditorSession: String
+        get() = sp.getString("onboarding_editor_session", "") ?: ""
+        set(value) { sp.edit().putString("onboarding_editor_session", value.take(128)).commit() }
+
+    var onboardingEditorLeaseUntil: Long
+        get() = sp.getLong("onboarding_editor_lease_until", 0L)
+        set(value) { sp.edit().putLong("onboarding_editor_lease_until", value.coerceAtLeast(0L)).commit() }
+
+    /** Privacy-safe local funnel diagnostics: enum names, counters and durations only. */
+    var onboardingMetricsChannel: String
+        get() = sp.getString("onboarding_metrics_channel", "") ?: ""
+        set(value) = sp.edit().putString("onboarding_metrics_channel", value.take(16)).apply()
+    var onboardingMetricsHighestStep: String
+        get() = sp.getString("onboarding_metrics_highest_step", "") ?: ""
+        set(value) = sp.edit().putString("onboarding_metrics_highest_step", value.take(48)).apply()
+    var onboardingMetricsStartedAt: Long
+        get() = sp.getLong("onboarding_metrics_started_at", 0L)
+        set(value) = sp.edit().putLong("onboarding_metrics_started_at", value.coerceAtLeast(0L)).apply()
+    var onboardingMetricsLastDurationMs: Long
+        get() = sp.getLong("onboarding_metrics_last_duration_ms", 0L)
+        set(value) = sp.edit().putLong("onboarding_metrics_last_duration_ms", value.coerceAtLeast(0L)).apply()
+    var onboardingMetricsAbandonCount: Int
+        get() = sp.getInt("onboarding_metrics_abandon_count", 0)
+        set(value) = sp.edit().putInt("onboarding_metrics_abandon_count", value.coerceAtLeast(0)).apply()
+
+    /** Unlike the broker host, this bit is never inferred from a pre-filled default value. */
+    var mqttOnboardingConfigured: Boolean
+        get() = sp.getBoolean("onboarding_mqtt_configured", false)
+        set(value) = sp.edit().putBoolean("onboarding_mqtt_configured", value).apply()
+
+    /** Provider choices are onboarding intent, independent from credentials already being stored. */
+    var onboardingHomeAssistantSelected: Boolean
+        get() = sp.getBoolean("onboarding_provider_ha", false)
+        set(value) = sp.edit().putBoolean("onboarding_provider_ha", value).apply()
+
+    var onboardingMqttSelected: Boolean
+        get() = sp.getBoolean("onboarding_provider_mqtt", false)
+        set(value) = sp.edit().putBoolean("onboarding_provider_mqtt", value).apply()
+
+    var onboardingGeminiSelected: Boolean
+        get() = sp.getBoolean("onboarding_provider_gemini", false)
+        set(value) = sp.edit().putBoolean("onboarding_provider_gemini", value).apply()
+
     /** Set when the user declined the Home Assistant branch; scopes only that branch. */
     var homeAssistantOnboardingSkipped: Boolean
         get() = sp.getBoolean("onboarding_skipped_ha", false)
@@ -271,16 +361,39 @@ class Prefs(private val context: Context) {
         set(value) = sp.edit().putBoolean("onboarding_gestures_seen", value).apply()
 
     /** Wipes the flow's progress so the assistant can be offered again, keeping every setting. */
-    fun resetOnboarding() {
-        sp.edit()
+    fun resetOnboarding(channel: String = "") {
+        synchronized(onboardingMutationLock) {
+            val nextRevision = onboardingRevision + 1
+            sp.edit()
             .remove("onboarding_version")
             .remove("onboarding_step")
             .remove("onboarding_completed")
+            .putString("onboarding_channel", channel)
             .remove("onboarding_skipped_ha")
             .remove("onboarding_skipped_mqtt")
             .remove("onboarding_skipped_app_cleanup")
             .remove("onboarding_gestures_seen")
-            .apply()
+            .remove("onboarding_editor_session")
+            .remove("onboarding_editor_lease_until")
+            .putLong("onboarding_revision", nextRevision)
+            .commit()
+        }
+    }
+
+    /** Commits the terminal onboarding markers together, before either UI leaves its host. */
+    fun completeOnboarding(channel: String, version: Int) {
+        synchronized(onboardingMutationLock) {
+            sp.edit()
+                .putBoolean("onboarding_gestures_seen", true)
+                .putBoolean("onboarding_completed", true)
+                .putInt("onboarding_version", version)
+                .remove("onboarding_step")
+                .putString("onboarding_channel", channel)
+                .remove("onboarding_editor_session")
+                .remove("onboarding_editor_lease_until")
+                .putLong("onboarding_revision", onboardingRevision + 1)
+                .commit()
+        }
     }
 
     /**
@@ -313,31 +426,37 @@ class Prefs(private val context: Context) {
      * launching with a partially configured profile.
      */
     fun importTransferPayload(payload: ByteArray): Boolean = synchronized(transferLock) {
-        if (payload.isEmpty() || payload.size > TRANSFER_MAX_BYTES) return false
-        val root = runCatching { JSONObject(String(payload, Charsets.UTF_8)) }.getOrNull()
-            ?: return false
-        if (root.optInt("version", -1) != TRANSFER_PAYLOAD_VERSION) return false
-        val plain = root.optJSONObject("plain") ?: return false
-        val secrets = root.optJSONObject("secure") ?: return false
-        val plainValues = decodeTransferObject(plain, allowSecrets = false) ?: return false
-        val secretValues = decodeTransferObject(secrets, allowSecrets = true) ?: return false
+        synchronized(onboardingMutationLock) {
+            if (payload.isEmpty() || payload.size > TRANSFER_MAX_BYTES) return false
+            val root = runCatching { JSONObject(String(payload, Charsets.UTF_8)) }.getOrNull()
+                ?: return false
+            if (root.optInt("version", -1) != TRANSFER_PAYLOAD_VERSION) return false
+            val plain = root.optJSONObject("plain") ?: return false
+            val secrets = root.optJSONObject("secure") ?: return false
+            val plainValues = decodeTransferObject(plain, allowSecrets = false) ?: return false
+            val secretValues = decodeTransferObject(secrets, allowSecrets = true) ?: return false
 
-        val secureEditor = secure.edit()
-        TRANSFER_SECRET_KEYS.forEach(secureEditor::remove)
-        secretValues.forEach { (key, value) -> putEditorValue(secureEditor, key, value) }
-        if (!secureEditor.commit()) return false
+            val secureEditor = secure.edit()
+            TRANSFER_SECRET_KEYS.forEach(secureEditor::remove)
+            secretValues.forEach { (key, value) -> putEditorValue(secureEditor, key, value) }
+            if (!secureEditor.commit()) return false
 
-        val plainEditor = sp.edit()
-        sp.all.keys.filter {
-            it !in TRANSFER_LOCAL_KEYS && it !in TRANSFER_SECRET_KEYS && !it.startsWith("onboarding_")
+            val plainEditor = sp.edit()
+            sp.all.keys.filter {
+                it !in TRANSFER_LOCAL_KEYS && it !in TRANSFER_SECRET_KEYS && !it.startsWith("onboarding_")
+            }
+                .forEach(plainEditor::remove)
+            plainValues.forEach { (key, value) -> putEditorValue(plainEditor, key, value) }
+            plainEditor
+                .putBoolean("onboarding_completed", true)
+                .putInt("onboarding_version", com.iblu01.portallauncher.ui.onboarding.ONBOARDING_VERSION)
+                .putBoolean("onboarding_mqtt_configured", plainValues.containsKey("broker_host"))
+                .remove("onboarding_step")
+                .remove("onboarding_editor_session")
+                .remove("onboarding_editor_lease_until")
+                .putLong("onboarding_revision", onboardingRevision + 1)
+            plainEditor.commit()
         }
-            .forEach(plainEditor::remove)
-        plainValues.forEach { (key, value) -> putEditorValue(plainEditor, key, value) }
-        plainEditor
-            .putBoolean("onboarding_completed", true)
-            .putInt("onboarding_version", com.iblu01.portallauncher.ui.onboarding.ONBOARDING_VERSION)
-            .remove("onboarding_step")
-        plainEditor.commit()
     }
 
     private fun sanitizeTransferValue(key: String, value: Any?): Any? {
@@ -424,27 +543,49 @@ class Prefs(private val context: Context) {
         get() = secure.getString("ha_token", "") ?: ""
         set(value) = secure.edit().putString("ha_token", value.trim()).apply()
 
-    // --- Voice assistant (Pipecat Assist add-on satellite, see voice.VoiceAssistantController) --
+    // --- Voice assistant (Gemini Live speech-to-speech, see voice.VoiceAssistantController) ----
     var voiceAssistantEnabled: Boolean
         get() = sp.getBoolean("voice_enabled", false)
         set(value) = sp.edit().putBoolean("voice_enabled", value).apply()
 
+    /** Google AI Studio API key for the Live API. Lives in the encrypted store, never in the URL. */
+    var voiceGeminiApiKey: String
+        get() = secure.getString("voice_gemini_key", "") ?: ""
+        set(value) = secure.edit().putString("voice_gemini_key", value.trim().take(256)).apply()
+
+    val hasVoiceGeminiApiKey: Boolean
+        get() = secure.getString("voice_gemini_key", "").orEmpty().isNotBlank()
+
     /**
-     * Whatever the user pasted from the add-on page: the `/api/offer` URL, the ESPHome satellite
-     * `ws://` URL, or a bare `host:port`. Normalised at read time by `parseVoiceEndpoint`, so the
-     * raw string is stored as typed and stays recognisable in settings.
+     * Live API model. Editable because Google renames and retires these preview models faster
+     * than a wall panel gets an APK update; a stale default must not be a rebuild.
      */
-    var voiceAssistantUrl: String
-        get() = sp.getString("voice_url", "") ?: ""
-        set(value) = sp.edit().putString("voice_url", value.trim().take(2048)).apply()
+    var voiceGeminiModel: String
+        get() = sp.getString("voice_gemini_model", DEFAULT_GEMINI_LIVE_MODEL) ?: DEFAULT_GEMINI_LIVE_MODEL
+        set(value) = sp.edit().putString("voice_gemini_model", value.trim().take(200)).apply()
 
-    /** Add-on "satellite shared secret". Sent as a bearer token, never in the URL. */
-    var voiceAssistantToken: String
-        get() = secure.getString("voice_token", "") ?: ""
-        set(value) = secure.edit().putString("voice_token", value.trim().take(512)).apply()
+    /** Prebuilt Live voice name (Puck, Charon, Kore, Fenrir, Aoede, …). */
+    var voiceGeminiVoice: String
+        get() = sp.getString("voice_gemini_voice", DEFAULT_GEMINI_VOICE) ?: DEFAULT_GEMINI_VOICE
+        set(value) = sp.edit().putString("voice_gemini_voice", value.trim().take(64)).apply()
 
-    val hasVoiceAssistantToken: Boolean
-        get() = secure.getString("voice_token", "").orEmpty().isNotBlank()
+    /** Extra system instruction appended to the panel's own, for house rules and room context. */
+    var voiceGeminiPrompt: String
+        get() = sp.getString("voice_gemini_prompt", "") ?: ""
+        set(value) = sp.edit().putString("voice_gemini_prompt", value.trim().take(4096)).apply()
+
+    /**
+     * Keep the microphone open while the assistant speaks, so a word cuts it off mid-sentence.
+     *
+     * Off by default and deliberately a user choice: without working echo cancellation the panel
+     * hears its own loudspeaker, the server's voice detection reads that as an interruption, and
+     * the assistant cuts itself off in a loop. Some HALs (this panel's included) claim a hardware
+     * canceller they never run, so the platform's own answer cannot be trusted on its own — the
+     * settings page shows what was detected and lets the user overrule it.
+     */
+    var voiceBargeIn: Boolean
+        get() = sp.getBoolean("voice_barge_in", false)
+        set(value) = sp.edit().putBoolean("voice_barge_in", value).apply()
 
     /** openWakeWord model, as an assets-relative path. See app/src/main/assets/wakeword. */
     var voiceAssistantWakeWord: String
@@ -470,12 +611,61 @@ class Prefs(private val context: Context) {
             val floor = sp.getFloat("voice_mic_noise_floor", -1f)
             val playback = sp.getFloat("voice_mic_playback_rms", -1f)
             if (floor < 0f || playback <= 0f) return null
+            // A stored measurement can be nonsense (a floor read at speech level was seen in the
+            // field, and it silenced the wake word). Ignoring it here means the defaults apply on
+            // the next launch, without needing the user to know they must recalibrate.
             return com.iblu01.portallauncher.voice.MicCalibration(floor, playback)
+                .takeIf { it.isPlausible }
         }
         set(value) = sp.edit()
             .putFloat("voice_mic_noise_floor", value?.noiseFloor ?: -1f)
             .putFloat("voice_mic_playback_rms", value?.playbackRms ?: -1f)
             .apply()
+
+    /**
+     * Durable facts the assistant was told to remember, one per entry, injected into every
+     * session's system prompt. Capped: this is a handful of house facts, not a knowledge base,
+     * and every entry is paid for in tokens on every single session.
+     */
+    var voiceFacts: List<String>
+        get() = runCatching {
+            val array = JSONArray(sp.getString("voice_facts", "[]") ?: "[]")
+            (0 until array.length()).map { array.optString(it) }.filter { it.isNotBlank() }
+        }.getOrDefault(emptyList())
+        set(value) {
+            val clean = value.map { it.trim() }.filter { it.isNotEmpty() }.distinct().takeLast(MAX_VOICE_FACTS)
+            sp.edit().putString("voice_facts", JSONArray(clean).toString()).apply()
+        }
+
+    /** Actions the assistant promised for later. See voice.VoiceScheduler. */
+    var voiceScheduledActions: String
+        get() = sp.getString("voice_scheduled", "[]") ?: "[]"
+        set(value) = sp.edit().putString("voice_scheduled", value).apply()
+
+    /**
+     * Sessions allowed per day, 0 for no limit. A wall panel listens around the clock, and a
+     * false wake in a noisy room opens a billed session: without a ceiling the failure mode is a
+     * surprise at the end of the month rather than anything visible on screen.
+     */
+    var voiceDailySessionLimit: Int
+        get() = sp.getInt("voice_daily_limit", 200)
+        set(value) = sp.edit().putInt("voice_daily_limit", value.coerceIn(0, 5000)).apply()
+
+    /**
+     * Sessions opened today, as (yyyy-mm-dd, count). Stored rather than derived so the ceiling
+     * survives the launcher being restarted, which on a kiosk happens more than one would think.
+     */
+    fun voiceSessionsToday(today: String): Int =
+        if (sp.getString("voice_sessions_date", "") == today) sp.getInt("voice_sessions_count", 0) else 0
+
+    fun recordVoiceSession(today: String): Int {
+        val next = voiceSessionsToday(today) + 1
+        sp.edit()
+            .putString("voice_sessions_date", today)
+            .putInt("voice_sessions_count", next)
+            .apply()
+        return next
+    }
 
     /**
      * In-turn silence ceiling while an exchange is under way. The windows right after connect and
@@ -542,7 +732,7 @@ class Prefs(private val context: Context) {
     /** Integration domains hidden only inside Portal. Home Assistant is never modified. */
     var disabledHaIntegrations: Set<String>
         get() = sp.getStringSet(DISABLED_HA_INTEGRATIONS_KEY, emptySet())
-            ?.mapTo(sortedSetOf()) { it.trim().lowercase() }
+            ?.mapTo(mutableSetOf()) { it.trim().lowercase() }
             .orEmpty()
         set(value) {
             sp.edit().putStringSet(
@@ -860,6 +1050,8 @@ class Prefs(private val context: Context) {
     val brokerUri: String get() = "tcp://$brokerHost:$brokerPort"
 
     companion object {
+        /** One process-wide lock because several Prefs instances can address the same store. */
+        internal val onboardingMutationLock = Any()
         const val DEFAULT_HA_PACKAGE = "io.homeassistant.companion.android"
         const val HOME_PILL_PREFERENCES_CHANGE_KEY = "homePillPreferences"
         const val DISABLED_HA_INTEGRATIONS_KEY = "disabled_ha_integrations"
@@ -874,7 +1066,12 @@ class Prefs(private val context: Context) {
         private const val TRANSFER_MAX_KEYS = 512
         private const val TRANSFER_MAX_STRING = 256 * 1024
         private const val TRANSFER_MAX_SET = 4096
-        private val TRANSFER_SECRET_KEYS = setOf("ha_token", "password", "immich_api_key")
+        private val TRANSFER_SECRET_KEYS = setOf(
+            "ha_token",
+            "password",
+            "immich_api_key",
+            "voice_gemini_key",
+        )
         private val TRANSFER_LOCAL_KEYS = setOf(
             "device_id", "device_name", "widget_ids", "root_provisioned",
             "update_last_check_at", "update_remind_after", "ignored_update_version",

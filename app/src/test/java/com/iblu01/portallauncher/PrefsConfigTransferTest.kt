@@ -20,6 +20,7 @@ class PrefsConfigTransferTest {
         prefs.haToken = "secret-ha-token"
         prefs.brokerHost = "mqtt.example"
         prefs.password = "secret-mqtt-password"
+        prefs.voiceGeminiApiKey = "secret-gemini-key"
         prefs.gridScale = 1.2f
         prefs.deviceName = "Sender"
         prefs.widgetIds = listOf(41)
@@ -33,20 +34,25 @@ class PrefsConfigTransferTest {
         prefs.haToken = "changed"
         prefs.brokerHost = "changed"
         prefs.password = "changed"
+        prefs.voiceGeminiApiKey = "changed"
         prefs.gridScale = 0.8f
         prefs.deviceName = "Receiver"
         prefs.widgetIds = listOf(99)
+        val revisionBeforeImport = prefs.onboardingRevision
 
         assertTrue(prefs.importTransferPayload(payload))
+        assertTrue(prefs.onboardingRevision > revisionBeforeImport)
         assertEquals("https://home.example", prefs.haUrl)
         assertEquals("secret-ha-token", prefs.haToken)
         assertEquals("mqtt.example", prefs.brokerHost)
         assertEquals("secret-mqtt-password", prefs.password)
+        assertEquals("secret-gemini-key", prefs.voiceGeminiApiKey)
         assertEquals(1.2f, prefs.gridScale)
         assertEquals("Receiver", prefs.deviceName)
         assertEquals(listOf(99), prefs.widgetIds)
         assertEquals(listOf("app:one"), prefs.appPlacements.map { it.key })
         assertTrue(prefs.onboardingCompleted)
+        assertTrue(prefs.mqttOnboardingConfigured)
     }
 
     @Test

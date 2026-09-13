@@ -20,6 +20,7 @@ enum class OnboardingStep {
     REMOTE_CONTROL,
     MQTT_CONFIGURATION,
     MQTT_TEST,
+    GEMINI,
     HIDDEN_APPS,
     TAP_APP,
     GESTURES,
@@ -29,7 +30,7 @@ enum class OnboardingStep {
         get() = when (this) {
             WELCOME, RECEIVE_CONFIG, SYSTEM_SETUP, GRID, BACKGROUND -> OnboardingChapter.LAUNCHER
             HOME_ASSISTANT_INTRO, HOME_ASSISTANT_CREDENTIALS, HOME_ASSISTANT_TEST,
-            PILLS_INTRO, REMOTE_CONTROL, MQTT_CONFIGURATION, MQTT_TEST -> OnboardingChapter.HOME
+            PILLS_INTRO, REMOTE_CONTROL, MQTT_CONFIGURATION, MQTT_TEST, GEMINI -> OnboardingChapter.HOME
             HIDDEN_APPS, TAP_APP, GESTURES, COMPLETE -> OnboardingChapter.FINISH
         }
 
@@ -48,7 +49,7 @@ enum class OnboardingChapter { LAUNCHER, HOME, FINISH }
  * already finished should be offered it again; a bump never silently overwrites existing settings
  * (see [com.iblu01.portallauncher.Prefs.onboardingVersion]).
  */
-const val ONBOARDING_VERSION = 1
+const val ONBOARDING_VERSION = 2
 
 /**
  * Which optional branches the user opted out of. Drives every transition, so navigation stays a
@@ -57,6 +58,8 @@ const val ONBOARDING_VERSION = 1
 data class OnboardingFlags(
     val homeAssistantSkipped: Boolean = false,
     val mqttSkipped: Boolean = false,
+    /** Compose does not configure Gemini; Web inserts the dedicated step when selected. */
+    val geminiSkipped: Boolean = true,
     val appCleanupSkipped: Boolean = false,
 )
 
@@ -70,9 +73,11 @@ private fun OnboardingFlags.isSkipped(step: OnboardingStep): Boolean = when (ste
     OnboardingStep.PILLS_INTRO,
     OnboardingStep.REMOTE_CONTROL -> homeAssistantSkipped
 
-    // MQTT also disappears with Home Assistant: without a home there is nothing to control from.
+    // MQTT is an independent provider. Skipping Home Assistant must never remove this branch.
     OnboardingStep.MQTT_CONFIGURATION,
-    OnboardingStep.MQTT_TEST -> homeAssistantSkipped || mqttSkipped
+    OnboardingStep.MQTT_TEST -> mqttSkipped
+
+    OnboardingStep.GEMINI -> geminiSkipped
 
     OnboardingStep.HIDDEN_APPS -> appCleanupSkipped
 

@@ -122,6 +122,7 @@ class SettingsActivity : ComponentActivity() {
                 val autoReturnState by autoReturnTimer.state.collectAsStateWithLifecycle()
                 val voiceState by voice.state.collectAsStateWithLifecycle()
                 val voiceCalibrationState by voice.micCalibration.collectAsStateWithLifecycle()
+                val voiceToolCalls by voice.toolCalls.collectAsStateWithLifecycle()
                 SettingsScreen(
                     prefs = prefs,
                     uiState = uiState,
@@ -135,6 +136,7 @@ class SettingsActivity : ComponentActivity() {
                     initialPage = intent?.getStringExtra(EXTRA_PAGE),
                     voiceState = voiceState,
                     voiceCalibrationState = voiceCalibrationState,
+                    voiceToolCalls = voiceToolCalls,
                     onVoiceStartTest = voice::startSessionNow,
                     onVoiceStopTest = voice::stopSession,
                     onVoiceCalibrate = voice::startMicCalibration,

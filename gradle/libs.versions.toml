@@ -26,7 +26,6 @@ media3 = "1.4.1"
 # openWakeWord for the on-device wake word that gates the connection.
 # Pinned to the last release built with Kotlin 2.0.x: 1.2.x ships 2.3.10 metadata, which this
 # project's Kotlin 2.0.20 compiler refuses to read. The APIs used here are identical in both.
-pipecat = "1.1.0"
 openwakeword = "0.1.5"
 onnxruntime = "1.18.0"
 
@@ -60,9 +59,6 @@ media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", versi
 media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3" }
 media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
 
-# Voice assistant. The transport declares `api(ai.pipecat:client)`, so the RTVI client comes
-# along transitively; no second coordinate to keep in sync.
-pipecat-small-webrtc = { group = "ai.pipecat", name = "small-webrtc-transport", version.ref = "pipecat" }
 openwakeword = { group = "xyz.rementia", name = "openwakeword", version.ref = "openwakeword" }
 onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntime" }
 
